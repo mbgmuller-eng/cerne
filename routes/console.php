@@ -1,0 +1,50 @@
+<?php
+
+use App\Services\FixedBillService;
+use App\Services\InvestmentSnapshotService;
+use App\Services\InvoiceService;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Schedule;
+
+/*
+| Rotinas agendadas
+|
+| Na Hostinger tudo isto é disparado por um único cron a cada minuto
+| (`php artisan schedule:run`) — ver DEPLOY.md. Por isso cada rotina
+| precisa ser idempotente: rodar duas vezes não pode duplicar nada.
+*/
+
+/*
+| Batimento do agendador.
+|
+| As rotinas de verdade rodam de madrugada, então não servem para
+| responder "o cron está vivo?" no meio da tarde. Este carimbo por minuto
+| serve: se ele estiver velho, o cron parou — e as contas fixas vão parar
+| de nascer sem ninguém perceber até o cliente reclamar.
+|
+| Custo: uma escrita em cache por minuto.
+*/
+Schedule::call(function (): void {
+    Cache::put('cerne:scheduler:heartbeat', now()->toIso8601String(), now()->addDays(2));
+})->everyMinute()->name('batimento');
+
+// Contas fixas: gera os vencimentos do mês e marca os atrasos.
+Schedule::call(function (): void {
+    $resultado = app(FixedBillService::class)->runDailyMaintenance();
+
+    logger()->info('Contas fixas', $resultado);
+})->dailyAt('03:10')->name('contas-fixas')->withoutOverlapping();
+
+// Faturas de cartão: fecha o que passou do fechamento, marca as vencidas.
+Schedule::call(function (): void {
+    $resultado = app(InvoiceService::class)->runDailyMaintenance();
+
+    logger()->info('Faturas', $resultado);
+})->dailyAt('03:20')->name('faturas')->withoutOverlapping();
+
+// Investimentos: foto mensal da carteira, no dia 1.
+Schedule::call(function (): void {
+    $criadas = app(InvestmentSnapshotService::class)->captureMonth();
+
+    logger()->info('Snapshots de investimento', ['criadas' => $criadas]);
+})->monthlyOn(1, '03:30')->name('snapshots')->withoutOverlapping();

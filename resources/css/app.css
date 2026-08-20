@@ -1,0 +1,136 @@
+@import 'tailwindcss';
+
+@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
+@source '../../storage/framework/views/*.php';
+@source '../views/**/*.blade.php';
+@source '../../app/Livewire/**/*.php';
+
+/*
+ * Identidade visual do Cerne.
+ *
+ * Verde profundo como cor de marca (confiança, sem o azul genérico de
+ * banco), neutros quentes de fundo (papel, não hospital) e uma fonte de
+ * display com serifa para os números grandes — o patrimônio do cliente
+ * merece ser lido como manchete, não como célula de planilha.
+ *
+ * As fontes vêm do sistema: a hospedagem compartilhada não é lugar de
+ * servir webfont, e o Georgia/Charter que todo aparelho tem já entrega o
+ * contraste tipográfico que se quer aqui.
+ */
+@theme {
+    --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+    --font-display: 'Charter', 'Georgia', 'Iowan Old Style', 'Source Serif Pro', serif;
+
+    /* Marca */
+    --color-brand-50: #f0f7f5;
+    --color-brand-100: #d9ece7;
+    --color-brand-200: #b3d9cf;
+    --color-brand-300: #7fbfae;
+    --color-brand-400: #4c9f8a;
+    --color-brand-500: #2e826f;
+    --color-brand-600: #22685a;
+    --color-brand-700: #1c5449;
+    --color-brand-800: #17443c;
+    --color-brand-900: #123832;
+    --color-brand-950: #0a211d;
+
+    /* Papel */
+    --color-paper: #f7f5f0;
+    --color-paper-dark: #efece4;
+
+    /* Sombras suaves, sem borda dura */
+    --shadow-card: 0 1px 2px rgb(23 68 60 / 0.04), 0 4px 16px -4px rgb(23 68 60 / 0.06);
+    --shadow-card-hover: 0 1px 2px rgb(23 68 60 / 0.06), 0 12px 32px -8px rgb(23 68 60 / 0.12);
+}
+
+@layer base {
+    html {
+        scrollbar-gutter: stable;
+    }
+
+    /* Esconde elementos Alpine até o JS ligar — evita a gaveta "Mais"
+       piscar aberta no primeiro carregamento. */
+    [x-cloak] {
+        display: none !important;
+    }
+
+    /* Números alinhados em coluna nas listas de valores */
+    .tabular-nums {
+        font-variant-numeric: tabular-nums;
+    }
+}
+
+@layer components {
+    /* Cartão padrão da UI. Sombra em vez de borda escura, canto generoso. */
+    .card {
+        @apply rounded-2xl bg-white shadow-card ring-1 ring-brand-950/5;
+    }
+
+    .card-hover {
+        @apply transition-shadow hover:shadow-card-hover;
+    }
+
+    /* Rótulo pequeno em caixa alta acima de números */
+    .eyebrow {
+        @apply text-[11px] font-semibold tracking-[0.08em] text-stone-500 uppercase;
+    }
+
+    /* Número de destaque */
+    .figure {
+        @apply font-display tracking-tight tabular-nums;
+    }
+
+    /* Botões */
+    .btn-primary {
+        @apply inline-flex items-center justify-center rounded-xl bg-brand-700 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-brand-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 disabled:opacity-50;
+    }
+
+    .btn-secondary {
+        @apply inline-flex items-center justify-center rounded-xl bg-white px-4 py-2 text-sm font-medium text-stone-700 shadow-sm ring-1 ring-stone-200 transition hover:bg-stone-50 hover:ring-stone-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500;
+    }
+
+    .btn-ghost {
+        @apply inline-flex items-center justify-center rounded-xl px-3 py-1.5 text-sm text-stone-500 transition hover:bg-stone-100 hover:text-stone-800;
+    }
+
+    /* Campos de formulário */
+    .input {
+        @apply block w-full rounded-xl border-0 bg-white px-3.5 py-2.5 text-sm text-stone-900 shadow-sm ring-1 ring-stone-200 placeholder:text-stone-400 focus:ring-2 focus:ring-brand-500 focus:outline-none;
+    }
+
+    .select {
+        @apply rounded-xl border-0 bg-white py-2 pr-9 pl-3.5 text-sm text-stone-900 shadow-sm ring-1 ring-stone-200 focus:ring-2 focus:ring-brand-500 focus:outline-none;
+    }
+
+    /* Selo de status */
+    .badge {
+        @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium;
+    }
+
+    /* Item da barra lateral */
+    .nav-item {
+        @apply flex items-center gap-3 rounded-xl px-3 py-2 text-sm text-stone-600 transition hover:bg-brand-50 hover:text-brand-800;
+    }
+
+    .nav-item-active {
+        @apply bg-brand-50 font-medium text-brand-800;
+    }
+
+    /* Item da barra inferior (celular) */
+    .tab-item {
+        @apply flex flex-1 flex-col items-center gap-0.5 py-2 text-[10px] font-medium text-stone-500 transition;
+    }
+
+    .tab-item-active {
+        @apply text-brand-700;
+    }
+
+    /* Esconde a barra de rolagem sem tirar a rolagem */
+    .scrollbar-none {
+        scrollbar-width: none;
+    }
+
+    .scrollbar-none::-webkit-scrollbar {
+        display: none;
+    }
+}
