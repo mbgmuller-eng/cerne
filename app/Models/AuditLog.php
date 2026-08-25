@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\AuditAction;
+use App\Models\Concerns\BelongsToProfile;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
@@ -12,6 +13,12 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * Append-only por contrato: a especificação exige que o log não possa ser
  * alterado nem apagado pela aplicação. As sobrescritas abaixo transformam
  * uma tentativa em erro em vez de deixá-la passar silenciosamente.
+ *
+ * Guarda a trilha de auditoria de cada perfil — dado tão sensível quanto o
+ * lançamento que ele descreve — por isso usa BelongsToProfile como qualquer
+ * outro model de domínio (regra 1 do CLAUDE.md). Hoje só é lido via
+ * `$profile->auditLogs()`, mas sem o escopo global uma consulta direta
+ * futura (uma tela de admin, por exemplo) vazaria log de todos os perfis.
  */
 #[Fillable([
     'profile_id', 'user_id', 'action', 'entity_type', 'entity_id',
@@ -19,7 +26,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 ])]
 class AuditLog extends Model
 {
-    use HasUuids;
+    use BelongsToProfile, HasUuids;
 
     public const UPDATED_AT = null;
 

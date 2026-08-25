@@ -60,17 +60,30 @@ class InsuranceIndex extends Component
     /** @return Collection<int, InsurancePolicy> */
     public function getExpiringProperty(): Collection
     {
-        return $this->policies->filter(fn (InsurancePolicy $p) => $p->isExpiring(60));
+        return $this->policies
+            ->filter(fn (InsurancePolicy $p) => $p->isExpiring(30))
+            ->sortBy('expiry_date')
+            ->values();
+    }
+
+    public function getInsurersCountProperty(): int
+    {
+        return $this->policies->pluck('insurer_name')->unique()->count();
     }
 
     public function render()
     {
+        $context = app(ProfileContext::class);
+
         return view('livewire.insurance.insurance-index', [
+            'profile' => $context->profile(),
+            'member' => $context->member(),
             'policies' => $this->policies,
             'byType' => $this->byType,
             'totalCoverage' => $this->totalCoverage,
             'totalMonthly' => $this->totalMonthly,
             'expiring' => $this->expiring,
+            'insurersCount' => $this->insurersCount,
         ]);
     }
 }

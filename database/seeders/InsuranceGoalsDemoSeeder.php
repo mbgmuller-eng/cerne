@@ -59,10 +59,19 @@ class InsuranceGoalsDemoSeeder extends Seeder
             'insurer_name' => 'Icatu Seguros',
             'policy_number' => 'IC-2024-88431',
             'coverage_amount' => '850000.00',
+            'coverages' => [
+                ['name' => 'Morte qualquer causa', 'value' => '850000.00'],
+                ['name' => 'Invalidez permanente por acidente', 'value' => '850000.00'],
+                ['name' => 'Invalidez por doença', 'value' => '425000.00'],
+                ['name' => 'Doenças graves', 'value' => '212500.00'],
+            ],
             'monthly_premium' => '312.40',
             'payment_frequency' => PaymentFrequency::Monthly,
             'bank_account_id' => $contaId,
             'start_date' => $hoje->subYears(2),
+            // Vence em breve: aciona o aviso da tela, igual à apólice
+            // da Porto Seguro mais abaixo.
+            'expiry_date' => $hoje->addDays(18),
             'beneficiaries' => [
                 ['name' => 'Bruno Ribeiro', 'percentage' => 60],
                 ['name' => 'Filhos', 'percentage' => 40],
@@ -76,6 +85,11 @@ class InsuranceGoalsDemoSeeder extends Seeder
             'insurer_name' => 'AZOS',
             'policy_number' => 'AZ-77120',
             'coverage_amount' => '600000.00',
+            'coverages' => [
+                ['name' => 'Invalidez permanente total', 'value' => '600000.00'],
+                ['name' => 'Doenças graves', 'value' => '300000.00'],
+                ['name' => 'Assistência funeral', 'value' => '30000.00'],
+            ],
             'monthly_premium' => '248.90',
             'payment_frequency' => PaymentFrequency::Monthly,
             'bank_account_id' => $contaId,

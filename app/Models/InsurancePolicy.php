@@ -18,7 +18,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 #[Fillable([
     'profile_id', 'member_id', 'insurance_type', 'insurer_name', 'policy_number',
-    'coverage_amount', 'monthly_premium', 'annual_premium', 'payment_frequency',
+    'coverage_amount', 'coverages', 'monthly_premium', 'annual_premium', 'payment_frequency',
     'bank_account_id', 'start_date', 'expiry_date', 'is_active', 'beneficiaries',
     'notes', 'source_document_id', 'created_by_user_id',
 ])]
@@ -42,6 +42,7 @@ class InsurancePolicy extends Model
             // Funciona igual em MySQL e MariaDB; a diferença entre os dois
             // só apareceria se consultássemos JSON pelo banco.
             'beneficiaries' => 'array',
+            'coverages' => 'array',
         ];
     }
 
@@ -102,5 +103,76 @@ class InsurancePolicy extends Model
     {
         return $this->expiry_date !== null
             && $this->expiry_date->isBetween(now(), now()->addDays($dias));
+    }
+
+    /**
+     * Dias até o vencimento — só faz sentido chamar quando isExpiring()
+     * for true.
+     *
+     * now()->diffInDays($data), nesta ordem, já vem positivo (o Carbon 3
+     * do Laravel 13 passou a devolver diferença com sinal dependendo de
+     * qual data é "base" — na ordem invertida viria negativo). ceil() em
+     * vez de int puro porque o resultado é um float fracionário (a
+     * diferença de horas do dia): truncar arredondaria 19,999 para 19
+     * em vez dos 20 dias corridos que realmente restam.
+     */
+    public function daysUntilExpiry(): ?int
+    {
+        if ($this->expiry_date === null) {
+            return null;
+        }
+
+        return (int) ceil(now()->diffInDays($this->expiry_date));
+    }
+
+    /** @return array<int, array{name: string, value: string}> */
+    public function coverageList(): array
+    {
+        return $this->coverages ?? [];
+    }
+
+    /**
+     * Iniciais da seguradora para o selo — "Icatu Seguros" vira "IC".
+     */
+    public function insurerInitials(): string
+    {
+        return self::initialsFor($this->insurer_name);
+    }
+
+    /**
+     * Cor do selo, estável por seguradora (mesma seguradora sempre cai na
+     * mesma cor, sem precisar cadastrar uma paleta por nome).
+     */
+    public function insurerColorIndex(int $paletteSize): int
+    {
+        return self::colorIndexFor($this->insurer_name, $paletteSize);
+    }
+
+    /**
+     * Versões estáticas dos dois métodos acima — para telas que listam
+     * seguradoras por NOME (ex.: o painel do consultor, que agrega vários
+     * clientes e não tem a instância de InsurancePolicy à mão), mas
+     * precisam do mesmo selo/cor da tela de uma apólice só.
+     */
+    public static function initialsFor(string $insurerName): string
+    {
+        $palavras = preg_split('/\s+/', trim($insurerName)) ?: [];
+
+        // "Icatu Seguros" -> "IS" (1ª letra de cada palavra). Nome de uma
+        // palavra só ("AZOS", "Allianz") usaria só 1 letra por esta regra
+        // — e "Allianz"/"AZOS" colidiriam as duas em "A". Pega as 2
+        // primeiras letras da palavra única para desambiguar.
+        if (count($palavras) === 1) {
+            return mb_strtoupper(mb_substr($palavras[0], 0, 2));
+        }
+
+        $primeiras = array_map(fn (string $p) => mb_strtoupper(mb_substr($p, 0, 1)), array_slice($palavras, 0, 2));
+
+        return implode('', $primeiras) ?: '?';
+    }
+
+    public static function colorIndexFor(string $insurerName, int $paletteSize): int
+    {
+        return crc32($insurerName) % $paletteSize;
     }
 }

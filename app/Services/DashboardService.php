@@ -44,14 +44,22 @@ class DashboardService
         $year ??= $hoje->year;
         $month ??= $hoje->month;
 
-        return $this->remember("overview:{$year}-{$month}", fn (): array => [
-            'patrimonio' => $this->netWorth(),
-            'mes' => $this->monthSummary($year, $month),
-            'evolucao' => $this->evolution(),
-            'alertas' => $this->upcomingBills(),
-            'objetivos' => $this->goalsSummary(),
-            'protecao' => $this->insuranceSummary(),
-        ]);
+        return $this->remember("overview:{$year}-{$month}", function () use ($year, $month): array {
+            $alertas = $this->upcomingBills();
+            $alertas['itens'] = $alertas['itens']->all();
+
+            return [
+                'patrimonio' => $this->netWorth(),
+                'mes' => $this->monthSummary($year, $month),
+                // ->all(): o cache não guarda Collection/Model — ver remember().
+                // A view volta a empacotar em Collection ao ler (barato, e
+                // não atravessa o (un)serialize do driver de cache).
+                'evolucao' => $this->evolution()->all(),
+                'alertas' => $alertas,
+                'objetivos' => $this->goalsSummary(),
+                'protecao' => $this->insuranceSummary(),
+            ];
+        });
     }
 
     // -----------------------------------------------------------------
@@ -205,7 +213,15 @@ class DashboardService
                 'tipo' => 'fatura',
             ]);
 
-        $todos = $contas->concat($faturas)->sortBy('vencimento')->values();
+        // Ordena pelo Carbon (compara por data real) e só então formata para
+        // exibição — 'vencimento' vira string aqui porque o cache do
+        // dashboard não pode guardar objetos (config('cache.serializable_
+        // classes') é false por padrão: qualquer objeto no valor cacheado
+        // volta como __PHP_Incomplete_Class na leitura).
+        $todos = $contas->concat($faturas)
+            ->sortBy('vencimento')
+            ->values()
+            ->map(fn (array $item) => [...$item, 'vencimento' => $item['vencimento']->format('d/m')]);
 
         return [
             'itens' => $todos,
@@ -221,12 +237,18 @@ class DashboardService
     public function goalsSummary(): array
     {
         $objetivos = Goal::query()->active()->byPriority()->with('linkedInvestment')->get();
+        $proximo = $objetivos->first();
 
         return [
             'quantidade' => $objetivos->count(),
             'meta' => Money::sum($objetivos->pluck('estimated_value')),
             'acumulado' => Money::sum($objetivos->map(fn (Goal $g) => $g->accumulated())),
-            'proximo' => $objetivos->first(),
+            // Array, não o model: o cache guarda só o que a tela usa (ver
+            // remember() — nunca objetos Eloquent/Collection, ver evolution()).
+            'proximo' => $proximo === null ? null : [
+                'name' => $proximo->name,
+                'progresso' => $proximo->progressPercentage(),
+            ],
         ];
     }
 

@@ -10,6 +10,7 @@ use App\Models\Concerns\Auditable;
 use App\Models\Concerns\BelongsToProfile;
 use App\Models\Concerns\InvalidatesDashboard;
 use App\Models\Concerns\RespectsMemberPrivacy;
+use App\Support\Money;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
@@ -92,5 +93,49 @@ class InvestmentRecord extends Model
     public function displayName(): string
     {
         return $this->ticker ? $this->ticker.' · '.$this->name : $this->name;
+    }
+
+    /** Percentual de ganho sobre o investido — não confundir com return_rate (a taxa contratada). */
+    public function gainPercentage(): ?float
+    {
+        if ($this->invested_amount === null || bccomp($this->invested_amount, '0', 2) <= 0) {
+            return null;
+        }
+
+        return (float) Money::percentageOf($this->unrealizedGain(), $this->invested_amount);
+    }
+
+    /** Dias desde a compra — null se a data não foi informada. */
+    public function daysHeld(): ?int
+    {
+        if ($this->purchase_date === null) {
+            return null;
+        }
+
+        return (int) ceil($this->purchase_date->diffInDays(now()));
+    }
+
+    /**
+     * Retorno anualizado real (CAGR), a partir do valor investido e do
+     * atual ao longo do tempo decorrido — diferente de return_rate, que é
+     * só o texto da taxa contratada ("CDI 102%"), não o resultado de
+     * fato. Sem dias corridos ou sem capital investido não há como
+     * anualizar.
+     */
+    public function annualizedReturnPercentage(): ?float
+    {
+        $dias = $this->daysHeld();
+
+        if ($dias === null || $dias < 1 || $this->invested_amount === null || bccomp($this->invested_amount, '0', 2) <= 0) {
+            return null;
+        }
+
+        $razao = (float) $this->current_amount / (float) $this->invested_amount;
+
+        if ($razao <= 0) {
+            return null;
+        }
+
+        return (pow($razao, 365 / $dias) - 1) * 100;
     }
 }

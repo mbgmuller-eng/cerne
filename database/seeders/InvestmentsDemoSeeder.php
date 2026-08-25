@@ -15,6 +15,7 @@ use App\Models\FinancialProfile;
 use App\Models\FinancialReserve;
 use App\Models\InvestmentPerformance;
 use App\Models\InvestmentRecord;
+use App\Models\InvestmentSnapshot;
 use App\Models\InvestorProfile;
 use App\Models\ProfileMember;
 use App\Models\RecommendedAllocation;
@@ -107,7 +108,6 @@ class InvestmentsDemoSeeder extends Seeder
             [$bruno, AssetClass::Cdb, InvestmentSector::FixedIncome, 'CDB Inter 2028', 'Inter', '42500.00', 'CDI 112%', ReturnRateType::PostfixedCdi],
             [$ana, AssetClass::Tesouro, InvestmentSector::FixedIncome, 'Tesouro IPCA+ 2035', 'Tesouro Direto', '31800.00', 'IPCA + 6,2%', ReturnRateType::PostfixedIpca],
             [$bruno, AssetClass::Lci, InvestmentSector::FixedIncome, 'LCI Bradesco', 'Bradesco', '25000.00', '96% do CDI', ReturnRateType::PostfixedCdi],
-            [$ana, AssetClass::Previdencia, InvestmentSector::Retirement, 'PGBL Icatu', 'Icatu', '87400.00', null, null],
         ];
 
         foreach ($ativos as [$membro, $classe, $setor, $nome, $instituicao, $valor, $taxa, $tipoTaxa]) {
@@ -122,6 +122,54 @@ class InvestmentsDemoSeeder extends Seeder
                 'return_rate' => $taxa,
                 'return_rate_type' => $tipoTaxa,
                 'created_by_user_id' => $userId,
+            ]);
+        }
+
+        $this->previdencia($ana, $userId);
+    }
+
+    /**
+     * Previdência à parte da renda fixa comum: tem aporte inicial, data
+     * de compra e histórico de fotos mensais — é o "card de contrato"
+     * com gráfico de evolução na tela (ver InvestmentSnapshot).
+     */
+    private function previdencia(ProfileMember $ana, string $userId): void
+    {
+        $inicio = CarbonImmutable::now()->subYears(2)->startOfMonth();
+
+        $pgbl = InvestmentRecord::create([
+            'member_id' => $ana->id,
+            'sector' => InvestmentSector::Retirement,
+            'asset_class' => AssetClass::Previdencia,
+            'name' => 'PGBL Icatu',
+            'institution' => 'Icatu',
+            'current_amount' => '87400.00',
+            'invested_amount' => '72000.00',
+            'purchase_date' => $inicio,
+            'return_rate' => 'CDI 98%',
+            'return_rate_type' => ReturnRateType::PostfixedCdi,
+            'created_by_user_id' => $userId,
+        ]);
+
+        // Fotos mensais de aporte + valorização crescendo até o valor
+        // atual — é o que desenha o gráfico de evolução na tela. Uma
+        // curva com leve ruído fica mais real que uma reta.
+        $meses = 24;
+        $inicial = 72000.0;
+        $final = 87400.0;
+        $ritmo = ($final / $inicial) ** (1 / $meses);
+        $variacao = [0.997, 1.006, 1.002, 0.998, 1.009, 1.001, 0.995, 1.011, 1.003, 0.999, 1.007, 1.0];
+
+        $valor = $inicial;
+        for ($i = 1; $i <= $meses; $i++) {
+            $competencia = $inicio->addMonths($i);
+            $valor *= $ritmo * $variacao[($i - 1) % count($variacao)];
+
+            InvestmentSnapshot::create([
+                'investment_id' => $pgbl->id,
+                'year' => $competencia->year,
+                'month' => $competencia->month,
+                'amount' => number_format($i === $meses ? $final : $valor, 2, '.', ''),
             ]);
         }
     }

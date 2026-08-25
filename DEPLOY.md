@@ -8,7 +8,7 @@ O ambiente roda **nativo no Windows**, sem Docker.
 |---|---|---|
 | PHP | 8.3.33 NTS | `C:\php83` (já no PATH do usuário) |
 | Composer | 2.10.2 | `C:\php83\composer.bat` |
-| MySQL | 8.4.9 | binários em `C:\Program Files\MySQL\MySQL Server 8.4`, dados em `C:\Users\gholi\mysql84` |
+| MySQL | 8.4.9 | binários em `C:\Program Files\MySQL\MySQL Server 8.4`, dados em `C:\Users\mbgmu\mysql84` |
 | App | Laravel 13 | http://localhost:8000 |
 
 Bancos: `cerne` (dev) e `cerne_test` (testes). Usuário `cerne`, senha `secret`.
@@ -18,7 +18,7 @@ Bancos: `cerne` (dev) e `cerne_test` (testes). Usuário `cerne`, senha `secret`.
 O MySQL foi instalado **sem serviço do Windows** (exigiria elevação). Inicie-o antes de trabalhar:
 
 ```bash
-"C:\Program Files\MySQL\MySQL Server 8.4\bin\mysqld.exe" --defaults-file="C:\Users\gholi\mysql84\my.ini"
+"C:\Program Files\MySQL\MySQL Server 8.4\bin\mysqld.exe" --defaults-file="C:\Users\mbgmu\mysql84.ini"
 ```
 
 Depois, o servidor da aplicação:
@@ -32,7 +32,7 @@ php artisan serve
 Para o MySQL subir junto com o Windows, rode uma vez num PowerShell **como administrador**:
 
 ```bash
-"C:\Program Files\MySQL\MySQL Server 8.4\bin\mysqld.exe" --install MySQL84 --defaults-file="C:\Users\gholi\mysql84\my.ini"
+"C:\Program Files\MySQL\MySQL Server 8.4\bin\mysqld.exe" --install MySQL84 --defaults-file="C:\Users\mbgmu\mysql84.ini"
 ```
 
 ```bash

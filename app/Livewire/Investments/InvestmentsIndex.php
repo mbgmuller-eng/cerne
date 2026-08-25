@@ -2,9 +2,11 @@
 
 namespace App\Livewire\Investments;
 
+use App\Enums\InvestmentSector;
 use App\Models\FinancialReserve;
 use App\Models\InvestmentPerformance;
 use App\Models\InvestmentRecord;
+use App\Models\InvestmentSnapshot;
 use App\Models\InvestmentTransaction;
 use App\Support\Money;
 use App\Support\ProfileContext;
@@ -73,6 +75,32 @@ class InvestmentsIndex extends Component
         return FinancialReserve::query()->with('member', 'linkedInvestment')->get();
     }
 
+    /**
+     * Histórico mensal (mais antigo primeiro) dos ativos de previdência —
+     * é o que desenha o gráfico do "card de contrato". Só busca pra
+     * quem tem `sector = retirement`; os demais setores não usam gráfico.
+     *
+     * @return array<string, list<float>> investment_id => valores cronológicos
+     */
+    public function getSnapshotHistoryProperty(): array
+    {
+        $idsAposentadoria = $this->investments
+            ->where('sector', InvestmentSector::Retirement)
+            ->pluck('id');
+
+        if ($idsAposentadoria->isEmpty()) {
+            return [];
+        }
+
+        return InvestmentSnapshot::query()
+            ->whereIn('investment_id', $idsAposentadoria)
+            ->orderBy('year')->orderBy('month')
+            ->get(['investment_id', 'amount'])
+            ->groupBy('investment_id')
+            ->map(fn (Collection $grupo) => $grupo->pluck('amount')->map(fn ($v) => (float) $v)->all())
+            ->all();
+    }
+
     /** @return Collection<int, InvestmentPerformance> */
     public function getPerformanceProperty(): Collection
     {
@@ -104,6 +132,7 @@ class InvestmentsIndex extends Component
             'reserves' => $this->reserves,
             'performance' => $this->performance,
             'transactions' => $this->transactions,
+            'snapshotHistory' => $this->snapshotHistory,
         ]);
     }
 }

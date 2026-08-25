@@ -4,10 +4,14 @@ use App\Http\Controllers\Auth\AcceptInviteController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\ProfileSwitchController;
 use App\Http\Controllers\PwaController;
+use App\Http\Controllers\ThemePreferenceController;
 use App\Livewire\Accounts\AccountsIndex;
 use App\Livewire\Accounts\InvoiceShow;
 use App\Livewire\CashFlow\CashFlowIndex;
 use App\Livewire\Consultant\ClientDashboard;
+use App\Livewire\Consultant\PortfolioInsurance;
+use App\Livewire\Consultant\PortfolioInvestments;
+use App\Livewire\Consultant\PortfolioOverview;
 use App\Livewire\Dashboard;
 use App\Livewire\Documents\DocumentsIndex;
 use App\Livewire\FixedBills\FixedBillsIndex;
@@ -43,6 +47,7 @@ Route::middleware('guest')->group(function (): void {
 Route::middleware('auth')->group(function (): void {
     Route::get('/painel', Dashboard::class)->name('dashboard');
     Route::get('/privacidade', PrivacySettings::class)->name('profile.privacy');
+    Route::post('/preferencias/tema', [ThemePreferenceController::class, 'store'])->name('theme.update');
 
     Route::get('/fluxo-de-caixa', CashFlowIndex::class)->name('cashflow.index');
     Route::get('/contas-fixas', FixedBillsIndex::class)->name('fixedbills.index');
@@ -53,6 +58,9 @@ Route::middleware('auth')->group(function (): void {
     Route::get('/contas', AccountsIndex::class)->name('accounts.index');
     Route::get('/faturas/{invoice}', InvoiceShow::class)->name('invoices.show');
 
+    Route::get('/carteira', PortfolioOverview::class)->name('consultant.portfolio');
+    Route::get('/carteira/seguros', PortfolioInsurance::class)->name('consultant.portfolio.insurance');
+    Route::get('/carteira/investimentos', PortfolioInvestments::class)->name('consultant.portfolio.investments');
     Route::get('/clientes', ClientDashboard::class)->name('consultant.clients');
     Route::post('/clientes/{profile}/abrir', [ProfileSwitchController::class, 'store'])->name('profile.switch');
 

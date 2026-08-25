@@ -8,9 +8,17 @@ export default defineConfig({
         laravel({
             input: ['resources/css/app.css', 'resources/js/app.js'],
             refresh: true,
+            // Bunny em vez de Google Fonts: espelho de mesmo catálogo, sem
+            // rastreamento — e os arquivos são baixados no BUILD e servidos
+            // pelo próprio app (ver public/build/), nunca buscados do
+            // navegador do cliente em tempo real. É o que permite usar
+            // webfont de verdade na hospedagem compartilhada.
             fonts: [
-                bunny('Instrument Sans', {
+                bunny('Fraunces', {
                     weights: [400, 500, 600],
+                }),
+                bunny('Inter', {
+                    weights: [400, 500, 600, 700],
                 }),
             ],
         }),

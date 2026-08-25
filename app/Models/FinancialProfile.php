@@ -60,12 +60,20 @@ class FinancialProfile extends Model
      * primeira leitura. Um perfil sem configuração não pode cair no
      * caminho de "nega tudo" nem no de "libera tudo por acidente" —
      * é melhor materializar o padrão explicitamente.
+     *
+     * setRelation() depois do create() é obrigatório: sem isso, a próxima
+     * chamada de settings() no MESMO objeto $profile lê de novo a relação
+     * já carregada (cacheada como nula desde a checagem acima) e tenta
+     * criar outra linha — que colide com a constraint única de profile_id.
+     * MemberPrivacyScope chama settings() a cada query com privacidade
+     * restrita, então isso quebraria no segundo acesso do mesmo request.
      */
     public function settings(): ProfileAccessSettings
     {
-        return $this->accessSettings ?? $this->accessSettings()->create([
-            'updated_by_user_id' => $this->owner_user_id,
-        ]);
+        return $this->accessSettings ?? tap(
+            $this->accessSettings()->create(['updated_by_user_id' => $this->owner_user_id]),
+            fn (ProfileAccessSettings $settings) => $this->setRelation('accessSettings', $settings),
+        );
     }
 
     public function memberFor(User $user): ?ProfileMember

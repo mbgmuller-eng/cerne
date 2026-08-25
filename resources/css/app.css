@@ -1,5 +1,11 @@
 @import 'tailwindcss';
 
+/* Modo escuro por CLASSE (.dark em <html>), não só prefers-color-scheme:
+   a pessoa escolhe explicitamente (ver App\Enums\ThemePreference e
+   resources/js/app.js) — "sistema" ainda funciona, só que decidido em JS
+   checando matchMedia, não pelo Tailwind sozinho. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
 @source '../../storage/framework/views/*.php';
 @source '../views/**/*.blade.php';
@@ -8,44 +14,88 @@
 /*
  * Identidade visual do Cerne.
  *
- * Verde profundo como cor de marca (confiança, sem o azul genérico de
- * banco), neutros quentes de fundo (papel, não hospital) e uma fonte de
- * display com serifa para os números grandes — o patrimônio do cliente
- * merece ser lido como manchete, não como célula de planilha.
+ * Navy como cor de marca (institucional, sóbria) e emerald como cor de
+ * destaque — núcleo do ícone, CTAs primários, indicadores de ganho (ver
+ * resources/branding/ e DEPLOY.md). Neutros em slate, não stone: um cinza
+ * morno ao lado de navy destoa, então o app inteiro migrou para a escala
+ * fria. Fonte de display com serifa para os números grandes — o
+ * patrimônio do cliente merece ser lido como manchete, não como célula
+ * de planilha.
  *
- * As fontes vêm do sistema: a hospedagem compartilhada não é lugar de
- * servir webfont, e o Georgia/Charter que todo aparelho tem já entrega o
- * contraste tipográfico que se quer aqui.
+ * Fraunces (serifada, voz de marca — "Cerne" no header, nome do cliente,
+ * números de destaque, títulos de seção) e Inter (texto funcional — corpo,
+ * labels, tabelas, botões). As duas vêm do Bunny Fonts, baixadas no BUILD
+ * e servidas pelo próprio app (ver vite.config.js) — nunca buscadas de um
+ * CDN em tempo real, o que a hospedagem compartilhada não bancaria bem.
  */
 @theme {
-    --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
-    --font-display: 'Charter', 'Georgia', 'Iowan Old Style', 'Source Serif Pro', serif;
+    --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+    --font-display: 'Fraunces', 'Charter', 'Georgia', 'Iowan Old Style', 'Source Serif Pro', serif;
 
-    /* Marca */
-    --color-brand-50: #f0f7f5;
-    --color-brand-100: #d9ece7;
-    --color-brand-200: #b3d9cf;
-    --color-brand-300: #7fbfae;
-    --color-brand-400: #4c9f8a;
-    --color-brand-500: #2e826f;
-    --color-brand-600: #22685a;
-    --color-brand-700: #1c5449;
-    --color-brand-800: #17443c;
-    --color-brand-900: #123832;
-    --color-brand-950: #0a211d;
+    /* Marca — escala derivada do navy institucional (#0B1D3A), âncora em
+       800 (o tom mais usado hoje em cabeçalhos e barra lateral). */
+    --color-brand-50: #f5f6f7;
+    --color-brand-100: #e7e8eb;
+    --color-brand-200: #ced2d8;
+    --color-brand-300: #b1b6c0;
+    --color-brand-400: #9199a6;
+    --color-brand-500: #727c8d;
+    --color-brand-600: #546175;
+    --color-brand-700: #37465d;
+    --color-brand-800: #0b1d3a;
+    --color-brand-900: #091830;
+    --color-brand-950: #071123;
 
-    /* Papel */
-    --color-paper: #f7f5f0;
-    --color-paper-dark: #efece4;
+    /* Destaque — emerald, para CTAs primários e indicadores de ganho.
+       #10b981/#059669 já são os emerald-500/600 padrão do Tailwind; a
+       escala completa abaixo só nomeia esse mesmo padrão como token
+       semântico do Cerne. */
+    --color-accent-50: #ecfdf5;
+    --color-accent-100: #d1fae5;
+    --color-accent-200: #a7f3d0;
+    --color-accent-300: #6ee7b7;
+    --color-accent-400: #34d399;
+    --color-accent-500: #10b981;
+    --color-accent-600: #059669;
+    --color-accent-700: #047857;
+    --color-accent-800: #065f46;
+    --color-accent-900: #064e3b;
+    --color-accent-950: #022c22;
+
+    /* Papel — fundo de superfície, frio (slate-50/200) em vez do antigo
+       tom quente. */
+    --color-paper: #f8fafc;
+    --color-paper-dark: #e2e8f0;
 
     /* Sombras suaves, sem borda dura */
-    --shadow-card: 0 1px 2px rgb(23 68 60 / 0.04), 0 4px 16px -4px rgb(23 68 60 / 0.06);
-    --shadow-card-hover: 0 1px 2px rgb(23 68 60 / 0.06), 0 12px 32px -8px rgb(23 68 60 / 0.12);
+    --shadow-card: 0 1px 2px rgb(11 29 58 / 0.05), 0 4px 16px -4px rgb(11 29 58 / 0.08);
+    --shadow-card-hover: 0 1px 2px rgb(11 29 58 / 0.07), 0 12px 32px -8px rgb(11 29 58 / 0.14);
+}
+
+/*
+ * Fundo e sombra são variáveis (--color-paper*, --shadow-card*), então
+ * redefini-las aqui já muda todo `bg-paper`/`shadow-card` do app sem
+ * tocar em nenhum Blade — é por isso que ficam fora do @theme de cima.
+ * Cor sólida (branco, slate, brand) que aparece em `.card`, botões etc.
+ * continua precisando de `dark:` explícito onde é usada; essa parte não
+ * tem mágica de variável.
+ */
+.dark {
+    --color-paper: #0f172a; /* slate-900 */
+    --color-paper-dark: #1e293b; /* slate-800 */
+    --shadow-card: 0 1px 2px rgb(0 0 0 / 0.3), 0 4px 16px -4px rgb(0 0 0 / 0.4);
+    --shadow-card-hover: 0 1px 2px rgb(0 0 0 / 0.35), 0 12px 32px -8px rgb(0 0 0 / 0.5);
 }
 
 @layer base {
     html {
         scrollbar-gutter: stable;
+    }
+
+    /* Inputs, scrollbars e outros controles nativos do navegador também
+       precisam saber que estão num fundo escuro. */
+    .dark {
+        color-scheme: dark;
     }
 
     /* Esconde elementos Alpine até o JS ligar — evita a gaveta "Mais"
@@ -63,7 +113,7 @@
 @layer components {
     /* Cartão padrão da UI. Sombra em vez de borda escura, canto generoso. */
     .card {
-        @apply rounded-2xl bg-white shadow-card ring-1 ring-brand-950/5;
+        @apply rounded-2xl bg-white shadow-card ring-1 ring-brand-950/5 dark:bg-slate-800 dark:ring-white/10;
     }
 
     .card-hover {
@@ -72,7 +122,7 @@
 
     /* Rótulo pequeno em caixa alta acima de números */
     .eyebrow {
-        @apply text-[11px] font-semibold tracking-[0.08em] text-stone-500 uppercase;
+        @apply text-[11px] font-semibold tracking-[0.08em] text-slate-500 uppercase dark:text-slate-400;
     }
 
     /* Número de destaque */
@@ -80,26 +130,28 @@
         @apply font-display tracking-tight tabular-nums;
     }
 
-    /* Botões */
+    /* Botões: CTA primário em emerald (destaque), não navy (institucional) —
+       ver usage.emerald em resources/branding/. Emerald já contrasta bem
+       em fundo claro e escuro, então não precisa de variante própria. */
     .btn-primary {
-        @apply inline-flex items-center justify-center rounded-xl bg-brand-700 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-brand-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 disabled:opacity-50;
+        @apply inline-flex items-center justify-center rounded-xl bg-accent-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-accent-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-500 focus-visible:ring-offset-2 disabled:opacity-50;
     }
 
     .btn-secondary {
-        @apply inline-flex items-center justify-center rounded-xl bg-white px-4 py-2 text-sm font-medium text-stone-700 shadow-sm ring-1 ring-stone-200 transition hover:bg-stone-50 hover:ring-stone-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500;
+        @apply inline-flex items-center justify-center rounded-xl bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm ring-1 ring-slate-200 transition hover:bg-slate-50 hover:ring-slate-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:bg-slate-800 dark:text-slate-200 dark:ring-slate-700 dark:hover:bg-slate-700 dark:hover:ring-slate-600;
     }
 
     .btn-ghost {
-        @apply inline-flex items-center justify-center rounded-xl px-3 py-1.5 text-sm text-stone-500 transition hover:bg-stone-100 hover:text-stone-800;
+        @apply inline-flex items-center justify-center rounded-xl px-3 py-1.5 text-sm text-slate-500 transition hover:bg-slate-100 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100;
     }
 
     /* Campos de formulário */
     .input {
-        @apply block w-full rounded-xl border-0 bg-white px-3.5 py-2.5 text-sm text-stone-900 shadow-sm ring-1 ring-stone-200 placeholder:text-stone-400 focus:ring-2 focus:ring-brand-500 focus:outline-none;
+        @apply block w-full rounded-xl border-0 bg-white px-3.5 py-2.5 text-sm text-slate-900 shadow-sm ring-1 ring-slate-200 placeholder:text-slate-400 focus:ring-2 focus:ring-brand-500 focus:outline-none dark:bg-slate-800 dark:text-slate-100 dark:ring-slate-700 dark:placeholder:text-slate-500;
     }
 
     .select {
-        @apply rounded-xl border-0 bg-white py-2 pr-9 pl-3.5 text-sm text-stone-900 shadow-sm ring-1 ring-stone-200 focus:ring-2 focus:ring-brand-500 focus:outline-none;
+        @apply rounded-xl border-0 bg-white py-2 pr-9 pl-3.5 text-sm text-slate-900 shadow-sm ring-1 ring-slate-200 focus:ring-2 focus:ring-brand-500 focus:outline-none dark:bg-slate-800 dark:text-slate-100 dark:ring-slate-700;
     }
 
     /* Selo de status */
@@ -109,20 +161,30 @@
 
     /* Item da barra lateral */
     .nav-item {
-        @apply flex items-center gap-3 rounded-xl px-3 py-2 text-sm text-stone-600 transition hover:bg-brand-50 hover:text-brand-800;
+        @apply flex items-center gap-3 rounded-xl px-3 py-2 text-sm text-slate-600 transition hover:bg-brand-50 hover:text-brand-800 dark:text-slate-300 dark:hover:bg-white/5 dark:hover:text-white;
     }
 
     .nav-item-active {
-        @apply bg-brand-50 font-medium text-brand-800;
+        @apply bg-brand-50 font-medium text-brand-800 dark:bg-accent-500/15 dark:text-accent-400;
     }
 
     /* Item da barra inferior (celular) */
     .tab-item {
-        @apply flex flex-1 flex-col items-center gap-0.5 py-2 text-[10px] font-medium text-stone-500 transition;
+        @apply flex flex-1 flex-col items-center gap-0.5 py-2 text-[10px] font-medium text-slate-500 transition dark:text-slate-400;
     }
 
     .tab-item-active {
-        @apply text-brand-700;
+        @apply text-brand-700 dark:text-accent-400;
+    }
+
+    /* Seletor de tema (claro/sistema/escuro) — ver x-theme-switcher e
+       resources/js/app.js, que alterna esta mesma classe no clique. */
+    .theme-switch-btn {
+        @apply flex h-7 w-7 items-center justify-center rounded-md text-slate-500 transition hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200;
+    }
+
+    .theme-switch-active {
+        @apply bg-white text-brand-800 shadow-sm dark:bg-slate-700 dark:text-white;
     }
 
     /* Esconde a barra de rolagem sem tirar a rolagem */
