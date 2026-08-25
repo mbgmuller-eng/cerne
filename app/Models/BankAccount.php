@@ -49,6 +49,25 @@ class BankAccount extends Model
     }
 
     /**
+     * Tem algum lançamento de verdade vinculado? Se sim, a conta não pode
+     * ser excluída — só desativada. Cobre toda tabela que referencia
+     * bank_account_id/broker_account_id/paid_from_account_id (ver
+     * migrations); PaymentMethod fica de fora de propósito, porque é só
+     * uma preferência de pagamento salva, não um lançamento financeiro, e
+     * já é cascadeOnDelete.
+     */
+    public function hasActivity(): bool
+    {
+        return ExpenseRecord::query()->where('bank_account_id', $this->id)->exists()
+            || IncomeRecord::query()->where('bank_account_id', $this->id)->exists()
+            || CreditCardInvoice::query()->where('paid_from_account_id', $this->id)->exists()
+            || FixedBill::query()->where('bank_account_id', $this->id)->exists()
+            || RecurringIncome::query()->where('bank_account_id', $this->id)->exists()
+            || InvestmentRecord::query()->where('broker_account_id', $this->id)->exists()
+            || InsurancePolicy::query()->where('bank_account_id', $this->id)->exists();
+    }
+
+    /**
      * Movimenta o saldo de forma atômica.
      *
      * O incremento acontece no banco (`saldo = saldo + valor`) e não em

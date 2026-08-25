@@ -103,6 +103,21 @@ class MemberPrivacyTest extends TestCase
     }
 
     /**
+     * Perfil novo, ninguém nunca configurou nada: settings() precisa
+     * materializar transparent na hora — não pode ler como "private" só
+     * porque o objeto recém-criado não é recarregado do banco (a
+     * constraint única de profile_id em profile_access_settings faz
+     * `create()` não devolver os DEFAULTs da coluna automaticamente).
+     */
+    public function test_perfil_novo_materializa_configuracao_transparente_na_primeira_leitura(): void
+    {
+        $profile = FinancialProfile::factory()->create();
+
+        self::assertSame('transparent', $profile->settings()->preset());
+        self::assertTrue($profile->settings()->sharesDomain('expense_visibility'));
+    }
+
+    /**
      * @return array{0: FinancialProfile, 1: User, 2: ProfileMember, 3: User, 4: ProfileMember}
      */
     private function createRestrictedCouple(): array

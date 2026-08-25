@@ -2,9 +2,9 @@
 
 namespace App\Livewire\Goals;
 
+use App\Livewire\Concerns\RequiresActiveProfile;
 use App\Models\Goal;
 use App\Support\Money;
-use App\Support\ProfileContext;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
@@ -15,9 +15,11 @@ use Livewire\Component;
 #[Layout('components.layouts.app')]
 class GoalsIndex extends Component
 {
+    use RequiresActiveProfile;
+
     public function mount(): void
     {
-        abort_if(app(ProfileContext::class)->profile() === null, 404);
+        $this->redirectOrAbortWithoutProfile();
     }
 
     /** @return Collection<int, Goal> */

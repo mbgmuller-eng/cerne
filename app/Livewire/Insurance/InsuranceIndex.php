@@ -2,6 +2,8 @@
 
 namespace App\Livewire\Insurance;
 
+use App\Livewire\Concerns\HasPrivacyTabs;
+use App\Livewire\Concerns\RequiresActiveProfile;
 use App\Models\InsurancePolicy;
 use App\Support\Money;
 use App\Support\ProfileContext;
@@ -15,19 +17,29 @@ use Livewire\Component;
 #[Layout('components.layouts.app')]
 class InsuranceIndex extends Component
 {
+    use RequiresActiveProfile;
+    use HasPrivacyTabs;
+
+    protected function privacyDomains(): array
+    {
+        return ['insurance_visibility'];
+    }
+
     public function mount(): void
     {
-        abort_if(app(ProfileContext::class)->profile() === null, 404);
+        $this->redirectOrAbortWithoutProfile();
     }
 
     /** @return Collection<int, InsurancePolicy> */
     public function getPoliciesProperty(): Collection
     {
-        return InsurancePolicy::query()
-            ->active()
-            ->with('member')
-            ->orderBy('insurance_type')
-            ->get();
+        $query = InsurancePolicy::query()->active()->with('member')->orderBy('insurance_type');
+
+        if ($this->showPrivacyTabs) {
+            $query->where('member_id', $this->viewAs === '' ? null : $this->viewAs);
+        }
+
+        return $query->get();
     }
 
     /**
@@ -76,6 +88,8 @@ class InsuranceIndex extends Component
         $context = app(ProfileContext::class);
 
         return view('livewire.insurance.insurance-index', [
+            'showPrivacyTabs' => $this->showPrivacyTabs,
+            'privacyMembers' => $this->privacyMembers,
             'profile' => $context->profile(),
             'member' => $context->member(),
             'policies' => $this->policies,

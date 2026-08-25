@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 #[Fillable(['profile_id', 'user_id', 'name', 'role', 'color_hex', 'is_active'])]
 class ProfileMember extends Model
@@ -30,6 +31,11 @@ class ProfileMember extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function investorProfile(): HasOne
+    {
+        return $this->hasOne(InvestorProfile::class, 'member_id');
     }
 
     public function isPrimary(): bool

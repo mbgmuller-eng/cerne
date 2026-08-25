@@ -5,6 +5,7 @@ namespace App\Livewire\Documents;
 use App\Enums\DocumentType;
 use App\Enums\ProcessingStatus;
 use App\Jobs\ProcessDocumentJob;
+use App\Livewire\Concerns\RequiresActiveProfile;
 use App\Models\DocumentUpload;
 use App\Services\Extraction\DocumentCommitService;
 use App\Support\ProfileContext;
@@ -23,6 +24,8 @@ use Livewire\WithFileUploads;
 #[Layout('components.layouts.app')]
 class DocumentsIndex extends Component
 {
+    use RequiresActiveProfile;
+
     use WithFileUploads;
 
     public $arquivo;
@@ -37,7 +40,7 @@ class DocumentsIndex extends Component
 
     public function mount(): void
     {
-        abort_if(app(ProfileContext::class)->profile() === null, 404);
+        $this->redirectOrAbortWithoutProfile();
     }
 
     public function rules(): array

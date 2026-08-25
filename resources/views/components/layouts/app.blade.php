@@ -21,7 +21,7 @@
     $tabsMais = array_slice($nav, 4);
     $emMais = collect($tabsMais)->contains(fn ($t) => request()->routeIs($t[0]));
 
-    // "Meus clientes" e "Painel da carteira" não são telas DE um perfil —
+    // "Painel da carteira" e as telas irmãs não são telas DE um perfil —
     // são a área de gestão do consultor. Sem esta distinção, o perfil do
     // último cliente aberto (guardado na sessão) continuava ditando o menu
     // de navegação mesmo aqui, como se ainda estivéssemos dentro dele.
@@ -143,10 +143,6 @@
                         <x-nav-icon name="flow" />
                         <span>Investimentos da carteira</span>
                     </a>
-                    <a href="{{ route('consultant.clients') }}" class="nav-item">
-                        <x-nav-icon name="users" />
-                        <span>Meus clientes</span>
-                    </a>
                 @endif
 
                 <div class="mt-2 flex justify-center">
@@ -177,10 +173,6 @@
                 <a href="{{ route('consultant.portfolio.investments') }}" @class(['nav-item', 'nav-item-active' => request()->routeIs('consultant.portfolio.investments')])>
                     <x-nav-icon name="flow" />
                     <span>Investimentos da carteira</span>
-                </a>
-                <a href="{{ route('consultant.clients') }}" @class(['nav-item', 'nav-item-active' => request()->routeIs('consultant.clients')])>
-                    <x-nav-icon name="users" />
-                    <span>Meus clientes</span>
                 </a>
             </nav>
 
@@ -242,10 +234,6 @@
                         <a href="{{ route('consultant.portfolio.investments') }}" class="btn-ghost" title="Investimentos da carteira">
                             <x-nav-icon name="flow" class="h-4 w-4" />
                             <span class="ml-1.5 hidden sm:inline">Invest.</span>
-                        </a>
-                        <a href="{{ route('consultant.clients') }}" class="btn-ghost" title="Meus clientes">
-                            <x-nav-icon name="users" class="h-4 w-4" />
-                            <span class="ml-1.5 hidden sm:inline">Clientes</span>
                         </a>
                     @endif
 

@@ -8,7 +8,6 @@ use App\Http\Controllers\ThemePreferenceController;
 use App\Livewire\Accounts\AccountsIndex;
 use App\Livewire\Accounts\InvoiceShow;
 use App\Livewire\CashFlow\CashFlowIndex;
-use App\Livewire\Consultant\ClientDashboard;
 use App\Livewire\Consultant\PortfolioInsurance;
 use App\Livewire\Consultant\PortfolioInvestments;
 use App\Livewire\Consultant\PortfolioOverview;
@@ -61,7 +60,6 @@ Route::middleware('auth')->group(function (): void {
     Route::get('/carteira', PortfolioOverview::class)->name('consultant.portfolio');
     Route::get('/carteira/seguros', PortfolioInsurance::class)->name('consultant.portfolio.insurance');
     Route::get('/carteira/investimentos', PortfolioInvestments::class)->name('consultant.portfolio.investments');
-    Route::get('/clientes', ClientDashboard::class)->name('consultant.clients');
     Route::post('/clientes/{profile}/abrir', [ProfileSwitchController::class, 'store'])->name('profile.switch');
 
     Route::post('/sair', [LoginController::class, 'destroy'])->name('logout');

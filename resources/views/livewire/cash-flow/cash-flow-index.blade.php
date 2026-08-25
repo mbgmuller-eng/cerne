@@ -10,11 +10,217 @@
             <p class="mt-1 text-sm text-slate-500 dark:text-slate-400 first-letter:uppercase">{{ $periodLabel }}</p>
         </div>
 
-        <div class="flex items-center gap-1">
+        <div class="flex flex-wrap items-center gap-2">
+            <button wire:click="toggleIncomeForm" class="btn-secondary px-3 py-1.5">+ Receita</button>
+            <button wire:click="toggleExpenseForm" class="btn-primary px-3 py-1.5">+ Despesa</button>
+            <span class="mx-1 h-5 w-px bg-slate-200 dark:bg-white/10"></span>
             <button wire:click="previousMonth" class="btn-secondary px-3 py-1.5">←</button>
             <button wire:click="nextMonth" class="btn-secondary px-3 py-1.5">→</button>
         </div>
     </div>
+
+    {{-- Casal / cada membro — só quando há algo marcado como oculto ---- --}}
+    @if ($showPrivacyTabs)
+        <x-privacy-tabs :members="$privacyMembers" :view-as="$viewAs" />
+    @endif
+
+    {{-- Nova despesa ----------------------------------------------------- --}}
+    @if ($showExpenseForm)
+        <form wire:submit="saveExpense" class="card space-y-4 p-5">
+            <div class="flex items-baseline justify-between">
+                <h2 class="text-sm font-semibold text-slate-900 dark:text-white">Nova despesa</h2>
+                <button type="button" wire:click="toggleExpenseForm" class="btn-ghost px-2 py-1 text-xs">Cancelar</button>
+            </div>
+
+            <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                <div class="lg:col-span-2">
+                    <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Descrição</label>
+                    <input type="text" wire:model="expenseDescription" class="input mt-1.5" placeholder="Ex.: Supermercado">
+                    @error('expenseDescription') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                </div>
+
+                <div>
+                    <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Valor</label>
+                    <input type="number" step="0.01" min="0.01" wire:model="expenseAmount" class="input mt-1.5" placeholder="0,00">
+                    @error('expenseAmount') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                </div>
+
+                <div>
+                    <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Data</label>
+                    <input type="date" wire:model="expenseDate" class="input mt-1.5">
+                    @error('expenseDate') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                </div>
+
+                <div>
+                    <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Necessidade</label>
+                    <select wire:model="expenseNecessity" class="select mt-1.5 w-full">
+                        <option value="">Selecione</option>
+                        @foreach (Necessity::options() as $valor => $rotulo)
+                            <option value="{{ $valor }}">{{ $rotulo }}</option>
+                        @endforeach
+                    </select>
+                    @error('expenseNecessity') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                </div>
+
+                <div>
+                    <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Categoria</label>
+                    <select wire:model.live="expenseCategoryId" class="select mt-1.5 w-full">
+                        <option value="">Selecione</option>
+                        @foreach ($categories as $categoria)
+                            <option value="{{ $categoria->id }}">{{ $categoria->name }}</option>
+                        @endforeach
+                    </select>
+                    @error('expenseCategoryId') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                </div>
+
+                <div>
+                    <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Subcategoria</label>
+                    <select wire:model="expenseSubcategoryId" class="select mt-1.5 w-full" @if ($expenseCategoryId === '') disabled @endif>
+                        <option value="">Nenhuma</option>
+                        @foreach ($expenseSubcategories as $sub)
+                            <option value="{{ $sub->id }}">{{ $sub->name }}</option>
+                        @endforeach
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Ou crie uma subcategoria</label>
+                    <input type="text" wire:model="expenseNewSubcategory" class="input mt-1.5" placeholder="Ex.: Terapia">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Membro</label>
+                    <select wire:model="expenseMemberId" class="select mt-1.5 w-full">
+                        <option value="">Conjunta / não informado</option>
+                        @foreach ($members as $membro)
+                            <option value="{{ $membro->id }}">{{ $membro->name }}</option>
+                        @endforeach
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Pagamento</label>
+                    <select wire:model.live="expensePaymentMethod" class="select mt-1.5 w-full">
+                        <option value="outro">Conta / dinheiro</option>
+                        <option value="cartao">Cartão de crédito</option>
+                    </select>
+                </div>
+
+                @if ($expensePaymentMethod === 'cartao')
+                    <div>
+                        <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Cartão</label>
+                        <select wire:model="expenseCreditCardId" class="select mt-1.5 w-full">
+                            <option value="">Selecione</option>
+                            @foreach ($creditCards as $cartao)
+                                <option value="{{ $cartao->id }}">{{ $cartao->displayName() }}</option>
+                            @endforeach
+                        </select>
+                        @error('expenseCreditCardId') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Parcelas</label>
+                        <input type="number" min="1" max="{{ $maxInstallments }}" wire:model="expenseInstallments" class="input mt-1.5">
+                        @error('expenseInstallments') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                        <p class="mt-1 text-xs text-slate-400">1x = à vista no cartão.</p>
+                    </div>
+                @else
+                    <div>
+                        <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Conta (opcional)</label>
+                        <select wire:model="expenseBankAccountId" class="select mt-1.5 w-full">
+                            <option value="">Sem débito em conta</option>
+                            @foreach ($bankAccounts as $conta)
+                                <option value="{{ $conta->id }}">{{ $conta->displayName() }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                @endif
+
+                <div class="sm:col-span-2 lg:col-span-3">
+                    <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Notas (opcional)</label>
+                    <textarea wire:model="expenseNotes" rows="2" class="input mt-1.5"></textarea>
+                </div>
+            </div>
+
+            <div class="flex justify-end gap-2">
+                <button type="submit" class="btn-primary px-4 py-2" wire:loading.attr="disabled">Salvar despesa</button>
+            </div>
+        </form>
+    @endif
+
+    {{-- Nova receita ------------------------------------------------------ --}}
+    @if ($showIncomeForm)
+        <form wire:submit="saveIncome" class="card space-y-4 p-5">
+            <div class="flex items-baseline justify-between">
+                <h2 class="text-sm font-semibold text-slate-900 dark:text-white">Nova receita</h2>
+                <button type="button" wire:click="toggleIncomeForm" class="btn-ghost px-2 py-1 text-xs">Cancelar</button>
+            </div>
+
+            <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                <div class="lg:col-span-2">
+                    <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Descrição (opcional)</label>
+                    <input type="text" wire:model="incomeDescription" class="input mt-1.5" placeholder="Ex.: Salário de agosto">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Valor</label>
+                    <input type="number" step="0.01" min="0.01" wire:model="incomeAmount" class="input mt-1.5" placeholder="0,00">
+                    @error('incomeAmount') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                </div>
+
+                <div>
+                    <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Data de recebimento</label>
+                    <input type="date" wire:model="incomeDate" class="input mt-1.5">
+                    @error('incomeDate') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                </div>
+
+                <div>
+                    <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Categoria</label>
+                    <select wire:model="incomeCategoryId" class="select mt-1.5 w-full">
+                        <option value="">Selecione</option>
+                        @foreach ($incomeCategories as $categoria)
+                            <option value="{{ $categoria->id }}">{{ $categoria->name }}</option>
+                        @endforeach
+                    </select>
+                    @error('incomeCategoryId') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                </div>
+
+                <div>
+                    <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Membro</label>
+                    <select wire:model="incomeMemberId" class="select mt-1.5 w-full">
+                        <option value="">Conjunta / não informado</option>
+                        @foreach ($members as $membro)
+                            <option value="{{ $membro->id }}">{{ $membro->name }}</option>
+                        @endforeach
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Conta (opcional)</label>
+                    <select wire:model="incomeBankAccountId" class="select mt-1.5 w-full">
+                        <option value="">Sem crédito em conta</option>
+                        @foreach ($bankAccounts as $conta)
+                            <option value="{{ $conta->id }}">{{ $conta->displayName() }}</option>
+                        @endforeach
+                    </select>
+                </div>
+
+                <div class="flex items-center gap-2 pt-5">
+                    <input type="checkbox" wire:model="incomeRecurring" id="incomeRecurring" class="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500">
+                    <label for="incomeRecurring" class="text-sm text-slate-600 dark:text-slate-400">Recorrente</label>
+                </div>
+
+                <div class="sm:col-span-2 lg:col-span-3">
+                    <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Notas (opcional)</label>
+                    <textarea wire:model="incomeNotes" rows="2" class="input mt-1.5"></textarea>
+                </div>
+            </div>
+
+            <div class="flex justify-end gap-2">
+                <button type="submit" class="btn-primary px-4 py-2" wire:loading.attr="disabled">Salvar receita</button>
+            </div>
+        </form>
+    @endif
 
     {{-- Totais -------------------------------------------------------- --}}
     <div class="grid gap-4 sm:grid-cols-3">

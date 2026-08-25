@@ -3,11 +3,17 @@
 namespace Tests\Feature;
 
 use App\Enums\ConsultantClientStatus;
+use App\Enums\InvoiceStatus;
+use App\Enums\MemberRole;
 use App\Models\BankAccount;
 use App\Models\ConsultantClient;
+use App\Models\CreditCard;
+use App\Models\CreditCardInvoice;
 use App\Models\FinancialProfile;
 use App\Models\InsurancePolicy;
 use App\Models\InvestmentRecord;
+use App\Models\InvestmentSnapshot;
+use App\Models\ProfileAccessSettings;
 use App\Models\ProfileMember;
 use App\Models\User;
 use App\Services\ConsultantPortfolioService;
@@ -183,6 +189,199 @@ class ConsultantPortfolioServiceTest extends TestCase
         self::assertCount(1, $linhas);
         self::assertSame('XP Investimentos', $linhas->first()['investment']->institution);
         self::assertSame($clienteA->name, $linhas->first()['client_name']);
+    }
+
+    public function test_lista_de_clientes_sem_seguro_de_vida_e_acionavel(): void
+    {
+        $consultor = User::factory()->consultant()->create();
+
+        [$comSeguro] = $this->criarClienteVinculado($consultor);
+        InsurancePolicy::factory()->life()->create(['profile_id' => $comSeguro->id]);
+
+        [$semSeguro, $clienteSemSeguro] = $this->criarClienteVinculado($consultor);
+
+        // Vínculo pendente não entra na lista — a política não autoriza ler
+        // apólice de um perfil que o consultor ainda não pode acessar.
+        $pendente = User::factory()->create();
+        ConsultantClient::factory()->pending()->create([
+            'consultant_id' => $consultor->id,
+            'client_id' => $pendente->id,
+        ]);
+
+        $dados = app(ConsultantPortfolioService::class)->overview($consultor);
+
+        self::assertCount(1, $dados['sem_seguro_vida']);
+        self::assertSame($semSeguro->id, $dados['sem_seguro_vida'][0]['profile_id']);
+        self::assertSame($clienteSemSeguro->email, $dados['sem_seguro_vida'][0]['email']);
+    }
+
+    public function test_evolucao_investido_soma_snapshots_dos_clientes_ativos_por_mes(): void
+    {
+        $consultor = User::factory()->consultant()->create();
+
+        [$perfilA] = $this->criarClienteVinculado($consultor);
+        $investimentoA = InvestmentRecord::factory()->create(['profile_id' => $perfilA->id]);
+        InvestmentSnapshot::create([
+            'profile_id' => $perfilA->id,
+            'investment_id' => $investimentoA->id,
+            'year' => now()->year,
+            'month' => now()->month,
+            'amount' => '10000.00',
+        ]);
+
+        [$perfilB] = $this->criarClienteVinculado($consultor);
+        $investimentoB = InvestmentRecord::factory()->create(['profile_id' => $perfilB->id]);
+        InvestmentSnapshot::create([
+            'profile_id' => $perfilB->id,
+            'investment_id' => $investimentoB->id,
+            'year' => now()->year,
+            'month' => now()->month,
+            'amount' => '5000.00',
+        ]);
+
+        // Snapshot de um cliente de OUTRO consultor nunca pode entrar na soma.
+        $outroConsultor = User::factory()->consultant()->create();
+        [$perfilOutro] = $this->criarClienteVinculado($outroConsultor);
+        $investimentoOutro = InvestmentRecord::factory()->create(['profile_id' => $perfilOutro->id]);
+        InvestmentSnapshot::create([
+            'profile_id' => $perfilOutro->id,
+            'investment_id' => $investimentoOutro->id,
+            'year' => now()->year,
+            'month' => now()->month,
+            'amount' => '99999.00',
+        ]);
+
+        $dados = app(ConsultantPortfolioService::class)->overview($consultor);
+
+        self::assertCount(12, $dados['evolucao_investido']);
+        $mesAtual = collect($dados['evolucao_investido'])->last();
+        self::assertSame('15000.00', $mesAtual['valor']);
+    }
+
+    public function test_acoes_pendentes_lista_vinculos_ordenados_e_faturas_vencendo(): void
+    {
+        // Congela o relógio no segundo exato: "dias pendente" soma
+        // diffInDays(invited_at, now()), e o MySQL trunca invited_at pro
+        // segundo ao gravar — sem alinhar os dois em startOfSecond(), a
+        // fração de segundo perdida na gravação sobra pro ceil() (ver
+        // InvestmentRecord::daysHeld()) arredondar 10 dias pra 11.
+        $this->travelTo(now()->startOfSecond());
+
+        $consultor = User::factory()->consultant()->create();
+
+        $antigo = User::factory()->create(['name' => 'Convite Antigo']);
+        ConsultantClient::factory()->pending()->create([
+            'consultant_id' => $consultor->id,
+            'client_id' => $antigo->id,
+            'invited_at' => now()->subDays(10),
+        ]);
+
+        $recente = User::factory()->create(['name' => 'Convite Recente']);
+        ConsultantClient::factory()->pending()->create([
+            'consultant_id' => $consultor->id,
+            'client_id' => $recente->id,
+            'invited_at' => now()->subDays(2),
+        ]);
+
+        [$perfil, $cliente] = $this->criarClienteVinculado($consultor);
+        $cartaoProximo = CreditCard::factory()->create(['profile_id' => $perfil->id]);
+        CreditCardInvoice::create([
+            'profile_id' => $perfil->id,
+            'credit_card_id' => $cartaoProximo->id,
+            'year' => now()->year,
+            'month' => now()->month,
+            'closing_date' => now(),
+            'due_date' => now()->addDays(3),
+            'total_amount' => '500.00',
+            'status' => InvoiceStatus::Open,
+        ]);
+
+        // Fatura fora da janela de dias configurada não deve aparecer.
+        $cartaoDistante = CreditCard::factory()->create(['profile_id' => $perfil->id]);
+        CreditCardInvoice::create([
+            'profile_id' => $perfil->id,
+            'credit_card_id' => $cartaoDistante->id,
+            'year' => now()->year,
+            'month' => now()->month,
+            'closing_date' => now(),
+            'due_date' => now()->addDays(30),
+            'total_amount' => '999.00',
+            'status' => InvoiceStatus::Open,
+        ]);
+
+        // Vínculo pendente de OUTRO consultor nunca pode vazar aqui.
+        $outroConsultor = User::factory()->consultant()->create();
+        ConsultantClient::factory()->pending()->create([
+            'consultant_id' => $outroConsultor->id,
+            'client_id' => User::factory()->create()->id,
+        ]);
+
+        $dados = app(ConsultantPortfolioService::class)->overview($consultor)['acoes_pendentes'];
+
+        self::assertCount(2, $dados['vinculos']);
+        self::assertSame('Convite Antigo', $dados['vinculos'][0]['name']);
+        self::assertSame(10, $dados['vinculos'][0]['dias']);
+        self::assertSame('Convite Recente', $dados['vinculos'][1]['name']);
+        self::assertSame(2, $dados['vinculos'][1]['dias']);
+
+        self::assertCount(1, $dados['faturas']);
+        self::assertSame($cliente->name, $dados['faturas'][0]['cliente']);
+        self::assertSame('500.00', $dados['faturas'][0]['valor']);
+        self::assertSame('500.00', $dados['total_faturas']);
+    }
+
+    public function test_distribuicao_conta_individual_casal_e_vida_financeira(): void
+    {
+        $consultor = User::factory()->consultant()->create();
+
+        // Individual.
+        $this->criarClienteVinculado($consultor);
+
+        // Casal com vida financeira única (preset transparente).
+        [$perfilTransparente] = $this->criarCasalVinculado($consultor);
+        $perfilTransparente->settings()->update(ProfileAccessSettings::transparentPreset());
+
+        // Casal com vida financeira separada (preset privado).
+        [$perfilPrivado] = $this->criarCasalVinculado($consultor);
+        $perfilPrivado->settings()->update(ProfileAccessSettings::privatePreset());
+
+        // Vínculo pendente não entra na distribuição — só a carteira ativa.
+        $pendente = User::factory()->create();
+        ConsultantClient::factory()->pending()->create([
+            'consultant_id' => $consultor->id,
+            'client_id' => $pendente->id,
+        ]);
+
+        $dados = app(ConsultantPortfolioService::class)->overview($consultor)['distribuicao'];
+
+        self::assertSame(1, $dados['individual']);
+        self::assertSame(2, $dados['casal']);
+        self::assertSame(1, $dados['vida_financeira']['unica']);
+        self::assertSame(1, $dados['vida_financeira']['separada']);
+    }
+
+    /** @return array{0: FinancialProfile, 1: User} perfil de casal com dois logins (titular + cônjuge) */
+    private function criarCasalVinculado(User $consultor): array
+    {
+        $titular = User::factory()->create();
+        ConsultantClient::factory()->create([
+            'consultant_id' => $consultor->id,
+            'client_id' => $titular->id,
+            'status' => ConsultantClientStatus::Active,
+        ]);
+
+        $perfil = FinancialProfile::factory()->couple()->create(['owner_user_id' => $titular->id]);
+        ProfileMember::factory()->create([
+            'profile_id' => $perfil->id,
+            'user_id' => $titular->id,
+            'role' => MemberRole::Primary,
+        ]);
+        ProfileMember::factory()->secondary()->create([
+            'profile_id' => $perfil->id,
+            'user_id' => User::factory()->create()->id,
+        ]);
+
+        return [$perfil, $titular];
     }
 
     /** @return array{0: FinancialProfile, 1: User} */

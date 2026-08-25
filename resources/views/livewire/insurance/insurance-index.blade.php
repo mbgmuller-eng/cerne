@@ -37,6 +37,11 @@
         </div>
     </div>
 
+    {{-- Casal / cada membro — só quando há algo marcado como oculto ---- --}}
+    @if ($showPrivacyTabs)
+        <x-privacy-tabs :members="$privacyMembers" :view-as="$viewAs" />
+    @endif
+
     {{-- Avisos de vencimento -------------------------------------------- --}}
     @foreach ($expiring as $apolice)
         <div class="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 dark:border-amber-500/30 dark:bg-amber-500/10">

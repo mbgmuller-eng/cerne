@@ -24,6 +24,7 @@ use App\Models\FinancialProfile;
 use App\Models\Goal;
 use App\Models\InsurancePolicy;
 use App\Models\InvestmentRecord;
+use App\Models\InvestmentSnapshot;
 use App\Models\ProfileAccessSettings;
 use App\Models\ProfileMember;
 use App\Models\User;
@@ -364,7 +365,7 @@ class ConsultantBulkClientsSeeder extends Seeder
             $variacaoPct = random_int(-8, 25) / 100;
             $investido = bcdiv($atual, (string) (1 + $variacaoPct), 2);
 
-            InvestmentRecord::create([
+            $investimento = InvestmentRecord::create([
                 'member_id' => $membro->id,
                 'sector' => $setor,
                 'asset_class' => $classe,
@@ -377,6 +378,51 @@ class ConsultantBulkClientsSeeder extends Seeder
                 'return_rate_type' => $taxa !== null ? ReturnRateType::PostfixedCdi : null,
                 'created_by_user_id' => $userId,
             ]);
+
+            $this->criarSnapshotsHistorico($investimento);
+        }
+    }
+
+    /**
+     * Fotos mensais dos últimos N meses (config('cerne.dashboard.
+     * evolution_months')), pra "Evolução do patrimônio investido" da
+     * Carteira do consultor não nascer vazia — sem isso só o cron mensal
+     * (InvestmentSnapshotService, dia 1) preencheria essa tabela, e um
+     * ambiente novo ficaria meses sem gráfico nenhum.
+     *
+     * Crescimento fictício deliberado, ancorado no patrimônio ATUAL (mês
+     * corrente = current_amount, exato): 12 meses atrás valia entre 55% e
+     * 80% de hoje — não é o `invested_amount` (isso é só o ganho/perda da
+     * posição, quase sempre perto de 1:1 do atual, o que fazia o gráfico
+     * sair quase reto). Ruído mês a mês por cima da curva, mesma ideia de
+     * InvestmentsDemoSeeder::previdencia(), generalizada pra qualquer
+     * ativo (não é o histórico real do ativo, só faz a carteira ter
+     * volume de verdade pra navegar).
+     */
+    private function criarSnapshotsHistorico(InvestmentRecord $investimento): void
+    {
+        $meses = config('cerne.dashboard.evolution_months');
+        $hoje = CarbonImmutable::now();
+        $atual = (float) $investimento->current_amount;
+
+        $pctInicio = random_int(55, 80) / 100;
+        $ritmo = ($atual > 0 ? 1 / $pctInicio : 1) ** (1 / $meses);
+
+        $valor = $atual;
+        for ($i = 0; $i < $meses; $i++) {
+            $competencia = $hoje->subMonths($i);
+
+            InvestmentSnapshot::create([
+                'investment_id' => $investimento->id,
+                'year' => $competencia->year,
+                'month' => $competencia->month,
+                'amount' => number_format(max($valor, 0), 2, '.', ''),
+            ]);
+
+            if ($i < $meses - 1) {
+                $ruido = random_int(-400, 400) / 10000; // ±4%
+                $valor = $valor / $ritmo * (1 + $ruido);
+            }
         }
     }
 

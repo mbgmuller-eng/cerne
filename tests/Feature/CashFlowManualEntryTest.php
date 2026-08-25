@@ -1,0 +1,185 @@
+<?php
+
+namespace Tests\Feature;
+
+use App\Livewire\CashFlow\CashFlowIndex;
+use App\Models\BankAccount;
+use App\Models\CreditCard;
+use App\Models\ExpenseCategory;
+use App\Models\ExpenseRecord;
+use App\Models\FinancialProfile;
+use App\Models\IncomeCategory;
+use App\Models\IncomeRecord;
+use App\Models\ProfileMember;
+use App\Models\User;
+use App\Support\ProfileContext;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Livewire\Livewire;
+use Tests\TestCase;
+
+/**
+ * Cadastro manual de despesa/receita no fluxo de caixa. Cobre dinheiro
+ * (saldo de conta precisa bater exato) e tenancy (um member_id ou
+ * category_id de outro perfil nunca pode vazar pro lançamento — CLAUDE.md
+ * regra 1).
+ */
+class CashFlowManualEntryTest extends TestCase
+{
+    use RefreshDatabase;
+
+    public function test_despesa_debitada_em_conta_atualiza_o_saldo_exato(): void
+    {
+        [$perfil, $membro] = $this->criarPerfil();
+        $conta = BankAccount::factory()->for($perfil, 'profile')->for($membro, 'member')
+            ->create(['current_balance' => '1000.00']);
+        $categoria = ExpenseCategory::factory()->create();
+
+        Livewire::test(CashFlowIndex::class)
+            ->set('expenseDescription', 'Supermercado')
+            ->set('expenseAmount', '123.45')
+            ->set('expenseDate', '2026-08-10')
+            ->set('expenseNecessity', 'essential')
+            ->set('expenseCategoryId', $categoria->id)
+            ->set('expenseBankAccountId', $conta->id)
+            ->call('saveExpense')
+            ->assertHasNoErrors();
+
+        $conta->refresh();
+        self::assertSame('876.55', $conta->current_balance);
+
+        $lancamento = ExpenseRecord::withoutProfileScope()->where('description', 'Supermercado')->firstOrFail();
+        self::assertSame('123.45', $lancamento->amount);
+        self::assertSame(2026, $lancamento->year);
+        self::assertSame(8, $lancamento->month);
+        self::assertSame($conta->id, $lancamento->bank_account_id);
+    }
+
+    public function test_despesa_sem_conta_selecionada_nao_mexe_em_saldo_nenhum(): void
+    {
+        [$perfil, $membro] = $this->criarPerfil();
+        $conta = BankAccount::factory()->for($perfil, 'profile')->for($membro, 'member')
+            ->create(['current_balance' => '1000.00']);
+        $categoria = ExpenseCategory::factory()->create();
+
+        Livewire::test(CashFlowIndex::class)
+            ->set('expenseDescription', 'Dinheiro no bolso')
+            ->set('expenseAmount', '50.00')
+            ->set('expenseDate', '2026-08-10')
+            ->set('expenseNecessity', 'discretionary')
+            ->set('expenseCategoryId', $categoria->id)
+            ->call('saveExpense')
+            ->assertHasNoErrors();
+
+        $conta->refresh();
+        self::assertSame('1000.00', $conta->current_balance);
+    }
+
+    public function test_despesa_no_cartao_cria_uma_parcela_por_mes_via_installment_service(): void
+    {
+        [$perfil, $membro] = $this->criarPerfil();
+        $cartao = CreditCard::factory()->for($perfil, 'profile')->for($membro, 'member')->create();
+        $categoria = ExpenseCategory::factory()->create();
+
+        Livewire::test(CashFlowIndex::class)
+            ->set('expenseDescription', 'Geladeira nova')
+            ->set('expenseAmount', '1000.00')
+            ->set('expenseDate', '2026-08-15')
+            ->set('expenseNecessity', 'essential')
+            ->set('expenseCategoryId', $categoria->id)
+            ->set('expensePaymentMethod', 'cartao')
+            ->set('expenseCreditCardId', $cartao->id)
+            ->set('expenseInstallments', 4)
+            ->call('saveExpense')
+            ->assertHasNoErrors();
+
+        $parcelas = ExpenseRecord::withoutProfileScope()
+            ->where('description', 'like', 'Geladeira nova%')
+            ->orderBy('installment_number')
+            ->get();
+
+        self::assertCount(4, $parcelas);
+        self::assertSame(['250.00', '250.00', '250.00', '250.00'], $parcelas->pluck('amount')->all());
+        self::assertSame([8, 9, 10, 11], $parcelas->pluck('month')->all());
+        // Cada parcela numa fatura diferente — o motor de ciclo funcionando.
+        self::assertCount(4, $parcelas->pluck('credit_card_invoice_id')->unique());
+    }
+
+    public function test_receita_creditada_em_conta_atualiza_o_saldo_exato(): void
+    {
+        [$perfil, $membro] = $this->criarPerfil();
+        $conta = BankAccount::factory()->for($perfil, 'profile')->for($membro, 'member')
+            ->create(['current_balance' => '500.00']);
+        $categoria = IncomeCategory::create(['name' => 'Salário', 'is_default' => true, 'is_active' => true]);
+
+        Livewire::test(CashFlowIndex::class)
+            ->set('incomeAmount', '2000.00')
+            ->set('incomeDate', '2026-08-05')
+            ->set('incomeCategoryId', $categoria->id)
+            ->set('incomeBankAccountId', $conta->id)
+            ->call('saveIncome')
+            ->assertHasNoErrors();
+
+        $conta->refresh();
+        self::assertSame('2500.00', $conta->current_balance);
+
+        $lancamento = IncomeRecord::withoutProfileScope()->where('category_id', $categoria->id)->firstOrFail();
+        self::assertSame('2000.00', $lancamento->amount);
+    }
+
+    public function test_membro_de_outro_perfil_nao_vaza_para_o_lancamento(): void
+    {
+        [$perfil, $membro] = $this->criarPerfil();
+        $categoria = ExpenseCategory::factory()->create();
+
+        // NÃO chama criarPerfil() de novo aqui — isso trocaria o
+        // ProfileContext ativo pro perfil errado. Só cria o outro perfil e
+        // o membro dele, sem mexer no contexto.
+        $outroPerfil = FinancialProfile::factory()->create();
+        $membroDeOutroPerfil = ProfileMember::factory()->create(['profile_id' => $outroPerfil->id]);
+
+        Livewire::test(CashFlowIndex::class)
+            ->set('expenseDescription', 'Tentativa de vazamento')
+            ->set('expenseAmount', '10.00')
+            ->set('expenseDate', '2026-08-10')
+            ->set('expenseNecessity', 'essential')
+            ->set('expenseCategoryId', $categoria->id)
+            ->set('expenseMemberId', $membroDeOutroPerfil->id)
+            ->call('saveExpense')
+            ->assertHasNoErrors();
+
+        $lancamento = ExpenseRecord::withoutProfileScope()->where('description', 'Tentativa de vazamento')->firstOrFail();
+        self::assertNull($lancamento->member_id);
+        self::assertSame($perfil->id, $lancamento->profile_id);
+    }
+
+    public function test_categoria_de_outro_perfil_nao_permite_salvar(): void
+    {
+        $outroPerfil = FinancialProfile::factory()->create();
+        $categoriaDeOutroPerfil = ExpenseCategory::factory()->custom($outroPerfil)->create();
+
+        // Contexto ativo é OUTRO perfil — a categoria acima não é dele.
+        $this->criarPerfil();
+
+        $this->expectException(\Illuminate\Database\Eloquent\ModelNotFoundException::class);
+
+        Livewire::test(CashFlowIndex::class)
+            ->set('expenseDescription', 'Categoria alheia')
+            ->set('expenseAmount', '10.00')
+            ->set('expenseDate', '2026-08-10')
+            ->set('expenseNecessity', 'essential')
+            ->set('expenseCategoryId', $categoriaDeOutroPerfil->id)
+            ->call('saveExpense');
+    }
+
+    /** @return array{0: FinancialProfile, 1: ProfileMember} perfil ativo no ProfileContext + o membro titular */
+    private function criarPerfil(): array
+    {
+        $usuario = User::factory()->create();
+        $perfil = FinancialProfile::factory()->create(['owner_user_id' => $usuario->id]);
+        $membro = ProfileMember::factory()->create(['profile_id' => $perfil->id, 'user_id' => $usuario->id]);
+        $this->actingAs($usuario);
+        app(ProfileContext::class)->set($perfil, $membro);
+
+        return [$perfil, $membro];
+    }
+}

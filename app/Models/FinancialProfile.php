@@ -61,6 +61,16 @@ class FinancialProfile extends Model
      * caminho de "nega tudo" nem no de "libera tudo por acidente" —
      * é melhor materializar o padrão explicitamente.
      *
+     * O preset precisa ir explícito no create() — contar só com o
+     * DEFAULT da coluna no banco não basta: o objeto Eloquent recém-criado
+     * não é recarregado do banco após o INSERT (chave não incremental,
+     * sem motivo pra isso normalmente), então os atributos que o create()
+     * não recebeu ficam ausentes NO OBJETO EM MEMÓRIA, mesmo a linha no
+     * banco já tendo o default certo. `preset()` lendo esses atributos
+     * ausentes como null batia (incorretamente) em "private", não
+     * "transparent" — é exatamente o "libera/nega por acidente" que este
+     * método existe pra evitar.
+     *
      * setRelation() depois do create() é obrigatório: sem isso, a próxima
      * chamada de settings() no MESMO objeto $profile lê de novo a relação
      * já carregada (cacheada como nula desde a checagem acima) e tenta
@@ -71,7 +81,10 @@ class FinancialProfile extends Model
     public function settings(): ProfileAccessSettings
     {
         return $this->accessSettings ?? tap(
-            $this->accessSettings()->create(['updated_by_user_id' => $this->owner_user_id]),
+            $this->accessSettings()->create(array_merge(
+                ProfileAccessSettings::transparentPreset(),
+                ['updated_by_user_id' => $this->owner_user_id],
+            )),
             fn (ProfileAccessSettings $settings) => $this->setRelation('accessSettings', $settings),
         );
     }

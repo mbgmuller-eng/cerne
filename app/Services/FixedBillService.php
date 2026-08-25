@@ -15,26 +15,25 @@ use Illuminate\Support\Facades\DB;
 class FixedBillService
 {
     /**
-     * Garante que existe o vencimento de uma conta numa competência.
+     * Cadastra uma conta fixa nova. A geração dos vencimentos fica pro
+     * generateForMonth de sempre — chamado logo em seguida pra quem
+     * cadastrou já ver o vencimento do mês corrente na hora.
      *
-     * Idempotente pelo índice único (conta, ano, mês): o cron da hospedagem
-     * compartilhada pode disparar duas vezes, e uma conta duplicada no mês
-     * faria o cliente achar que deve o dobro.
+     * @param  array{
+     *     name: string, amount: string, recurrence: \App\Enums\RecurrenceType,
+     *     due_day?: ?int, due_weekday?: ?int, due_month?: ?int,
+     *     member_id?: ?string, bank_account_id?: ?string, credit_card_id?: ?string,
+     *     category_id?: ?string, subcategory_id?: ?string, is_variable?: bool, notes?: ?string,
+     * }  $dados
      */
-    public function ensurePayment(FixedBill $bill, int $year, int $month): FixedBillPayment
+    public function create(array $dados): FixedBill
     {
-        return FixedBillPayment::firstOrCreate(
-            [
-                'fixed_bill_id' => $bill->id,
-                'year' => $year,
-                'month' => $month,
-            ],
-            [
-                'profile_id' => $bill->profile_id,
-                'due_date' => $bill->dueDateFor($year, $month),
-                'status' => FixedBillPaymentStatus::Pending,
-            ],
-        );
+        $bill = FixedBill::create($dados);
+
+        $hoje = CarbonImmutable::now();
+        $this->generateOccurrencesFor($bill, $hoje->year, $hoje->month);
+
+        return $bill;
     }
 
     /**
@@ -53,25 +52,47 @@ class FixedBillService
             ->where('is_active', true)
             ->chunkById(200, function ($contas) use ($year, $month, &$criados): void {
                 foreach ($contas as $conta) {
-                    $antes = FixedBillPayment::withoutProfileScope()
-                        ->where('fixed_bill_id', $conta->id)
-                        ->where('year', $year)
-                        ->where('month', $month)
-                        ->exists();
-
-                    if (! $antes) {
-                        FixedBillPayment::withoutProfileScope()->create([
-                            'profile_id' => $conta->profile_id,
-                            'fixed_bill_id' => $conta->id,
-                            'year' => $year,
-                            'month' => $month,
-                            'due_date' => $conta->dueDateFor($year, $month),
-                            'status' => FixedBillPaymentStatus::Pending,
-                        ]);
-                        $criados++;
-                    }
+                    $criados += $this->generateOccurrencesFor($conta, $year, $month);
                 }
             });
+
+        return $criados;
+    }
+
+    /**
+     * Gera os vencimentos de UMA conta numa competência.
+     *
+     * Idempotente por (conta, due_date) — não por (conta, ano, mês): conta
+     * semanal tem 4-5 vencimentos no mesmo mês, cada um com sua própria
+     * data. O cron da hospedagem compartilhada pode disparar duas vezes; é
+     * o índice único de fixed_bill_payments que garante que isso não
+     * duplica nada, esta checagem aqui é só pra não gerar a query de INSERT
+     * à toa.
+     */
+    private function generateOccurrencesFor(FixedBill $conta, int $year, int $month): int
+    {
+        $criados = 0;
+
+        foreach ($conta->occurrencesInMonth($year, $month) as $vencimento) {
+            $existe = FixedBillPayment::withoutProfileScope()
+                ->where('fixed_bill_id', $conta->id)
+                ->where('due_date', $vencimento->toDateString())
+                ->exists();
+
+            if ($existe) {
+                continue;
+            }
+
+            FixedBillPayment::withoutProfileScope()->create([
+                'profile_id' => $conta->profile_id,
+                'fixed_bill_id' => $conta->id,
+                'year' => $vencimento->year,
+                'month' => $vencimento->month,
+                'due_date' => $vencimento,
+                'status' => FixedBillPaymentStatus::Pending,
+            ]);
+            $criados++;
+        }
 
         return $criados;
     }

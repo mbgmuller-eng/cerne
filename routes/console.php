@@ -3,6 +3,7 @@
 use App\Services\FixedBillService;
 use App\Services\InvestmentSnapshotService;
 use App\Services\InvoiceService;
+use App\Services\RecurringIncomeService;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Schedule;
 
@@ -34,6 +35,13 @@ Schedule::call(function (): void {
 
     logger()->info('Contas fixas', $resultado);
 })->dailyAt('03:10')->name('contas-fixas')->withoutOverlapping();
+
+// Receitas recorrentes: gera os recebimentos do mês e marca os atrasos.
+Schedule::call(function (): void {
+    $resultado = app(RecurringIncomeService::class)->runDailyMaintenance();
+
+    logger()->info('Receitas recorrentes', $resultado);
+})->dailyAt('03:15')->name('receitas-recorrentes')->withoutOverlapping();
 
 // Faturas de cartão: fecha o que passou do fechamento, marca as vencidas.
 Schedule::call(function (): void {

@@ -8,12 +8,16 @@ use App\Enums\MemberRole;
 use App\Enums\ProfileType;
 use App\Models\BankAccount;
 use App\Models\ConsultantClient;
+use App\Models\CreditCard;
 use App\Models\CreditCardInvoice;
 use App\Models\FinancialProfile;
 use App\Models\InsurancePolicy;
 use App\Models\InvestmentRecord;
+use App\Models\InvestmentSnapshot;
+use App\Models\Scopes\MemberPrivacyScope;
 use App\Models\User;
 use App\Support\Money;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
 
 /**
@@ -46,13 +50,19 @@ class ConsultantPortfolioService
      *     premios_mes: string,
      *     multiproduto: int,
      *     por_cliente: list<array>,
+     *     sem_seguro_vida: list<array{profile_id: string, name: string, email: string, patrimonio: string, since: ?\Illuminate\Support\Carbon}>,
+     *     evolucao_investido: list<array{rotulo: string, valor: string}>,
+     *     acoes_pendentes: array,
+     *     distribuicao: array{individual: int, casal: int, vida_financeira: array{unica: int, separada: int}},
      * }
      */
     public function overview(User $consultant): array
     {
-        $profileIds = $this->activeClientProfileIds($consultant);
+        $profiles = $this->activeClientProfiles($consultant);
+        $profileIds = $profiles->pluck('id');
         $apolices = $this->activeInsurancePolicies($profileIds);
         $apolicesPorPerfil = $apolices->groupBy('profile_id');
+        $porCliente = $this->perClientBreakdown($consultant, $profileIds, $apolicesPorPerfil);
 
         return [
             'clientes' => [
@@ -63,7 +73,11 @@ class ConsultantPortfolioService
             'seguro_vida' => $this->lifeInsuranceCoverage($apolicesPorPerfil, $profileIds),
             'premios_mes' => Money::sum($apolices->map(fn (InsurancePolicy $p) => $p->normalizedMonthlyCost())),
             'multiproduto' => $apolicesPorPerfil->filter(fn (Collection $grupo) => $grupo->count() >= 2)->count(),
-            'por_cliente' => $this->perClientBreakdown($consultant, $profileIds, $apolicesPorPerfil),
+            'por_cliente' => $porCliente,
+            'sem_seguro_vida' => $this->clientsWithoutLifeInsurance($porCliente),
+            'evolucao_investido' => $this->investedEvolution($profileIds),
+            'acoes_pendentes' => $this->pendingActions($consultant, $profiles),
+            'distribuicao' => $this->distribution($porCliente),
         ];
     }
 
@@ -122,12 +136,6 @@ class ConsultantPortfolioService
                 'investment' => $i,
                 'client_name' => $nomes[$i->profile_id] ?? '—',
             ]);
-    }
-
-    /** @return Collection<int, string> ids dos perfis dos clientes com vínculo ativo */
-    private function activeClientProfileIds(User $consultant): Collection
-    {
-        return $this->activeClientProfiles($consultant)->pluck('id');
     }
 
     /** @return Collection<int, FinancialProfile> perfis dos clientes com vínculo ativo, com o dono carregado */
@@ -363,5 +371,158 @@ class ConsultantPortfolioService
         }
 
         return $resultado;
+    }
+
+    /**
+     * Clientes ativos sem nenhuma apólice de vida vigente — lista acionável
+     * (quem contatar), não só a contagem que já vai em seguro_vida.sem.
+     * Deriva de $porCliente (já calculado) em vez de reconsultar: é o
+     * mesmo dado, só filtrado — e chega com patrimônio/data de vínculo de
+     * graça, pra a tela poder ordenar por eles.
+     *
+     * @param  list<array>  $porCliente
+     * @return list<array{profile_id: string, name: string, email: string, patrimonio: string, since: ?\Illuminate\Support\Carbon}>
+     */
+    private function clientsWithoutLifeInsurance(array $porCliente): array
+    {
+        return collect($porCliente)
+            ->filter(fn (array $l) => $l['status'] === ConsultantClientStatus::Active && ! $l['seguro_vida'])
+            ->map(fn (array $l) => [
+                'profile_id' => $l['profile_id'],
+                'name' => $l['name'],
+                'email' => $l['email'],
+                'patrimonio' => $l['patrimonio'],
+                'since' => $l['since'],
+            ])
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Patrimônio investido dos últimos N meses, somado através de todos os
+     * clientes ativos. Não é o patrimônio líquido inteiro — contas e
+     * faturas não têm snapshot histórico (só InvestmentSnapshot existe),
+     * então "evolução do patrimônio" aqui é honestamente só a parte que dá
+     * pra reconstruir mês a mês.
+     *
+     * @param  Collection<int, string>  $profileIds
+     * @return list<array{rotulo: string, valor: string}>
+     */
+    private function investedEvolution(Collection $profileIds): array
+    {
+        $meses = config('cerne.dashboard.evolution_months');
+        $inicio = CarbonImmutable::now()->startOfMonth()->subMonths($meses - 1);
+
+        $totais = $profileIds->isEmpty() ? collect() : InvestmentSnapshot::withoutProfileScope()
+            ->whereIn('profile_id', $profileIds)
+            ->where(function ($q) use ($inicio): void {
+                $q->where('year', '>', $inicio->year)
+                    ->orWhere(function ($q2) use ($inicio): void {
+                        $q2->where('year', $inicio->year)->where('month', '>=', $inicio->month);
+                    });
+            })
+            ->selectRaw('year, month, SUM(amount) as total')
+            ->groupBy('year', 'month')
+            ->get()
+            ->mapWithKeys(fn ($linha) => [$linha->year.'-'.$linha->month => $linha->total]);
+
+        return collect(range(0, $meses - 1))->map(function (int $i) use ($inicio, $totais): array {
+            $mes = $inicio->addMonths($i);
+
+            return [
+                'rotulo' => $mes->translatedFormat('M/y'),
+                'valor' => Money::parse($totais[$mes->year.'-'.$mes->month] ?? 0),
+            ];
+        })->all();
+    }
+
+    /**
+     * Vínculos pendentes (pipeline de convite, ordenados do mais antigo pro
+     * mais novo) e faturas vencendo nos próximos dias, através da carteira
+     * inteira — pra saber onde agir sem abrir cliente por cliente.
+     *
+     * @param  Collection<int, FinancialProfile>  $profiles
+     * @return array{vinculos: list<array{name: string, email: string, dias: int}>, faturas: list<array>, total_faturas: string, dias: int}
+     */
+    private function pendingActions(User $consultant, Collection $profiles): array
+    {
+        $vinculos = ConsultantClient::query()
+            ->with('client')
+            ->where('consultant_id', $consultant->id)
+            ->where('status', ConsultantClientStatus::Pending)
+            ->orderBy('invited_at')
+            ->get()
+            ->map(fn (ConsultantClient $c) => [
+                'name' => $c->client->name,
+                'email' => $c->client->email,
+                'dias' => (int) ceil($c->invited_at->diffInDays(now())),
+            ])
+            ->all();
+
+        $dias = config('cerne.dashboard.upcoming_bills_days');
+        $profileIds = $profiles->pluck('id');
+        $faturas = collect();
+
+        if ($profileIds->isNotEmpty()) {
+            $nomes = $this->clientNamesByProfile($profiles);
+            $limite = CarbonImmutable::now()->addDays($dias);
+
+            $faturas = CreditCardInvoice::withoutProfileScope()
+                ->whereIn('profile_id', $profileIds)
+                ->outstanding()
+                ->whereDate('due_date', '>=', now()->toDateString())
+                ->whereDate('due_date', '<=', $limite->toDateString())
+                ->orderBy('due_date')
+                ->get();
+
+            // O cartão também é BelongsToProfile (e RespectsMemberPrivacy):
+            // um ->with('creditCard') comum herdaria o escopo do cartão, que
+            // falha fechado sem perfil ativo — o consultor não tem nenhum
+            // aberto nesta tela. Busca à parte, com os dois escopos
+            // removidos deliberadamente (mesmo motivo do withoutProfileScope
+            // no topo da classe).
+            $nomesCartao = CreditCard::withoutProfileScope()
+                ->withoutGlobalScope(MemberPrivacyScope::class)
+                ->whereIn('id', $faturas->pluck('credit_card_id'))
+                ->pluck('card_name', 'id');
+
+            $faturas = $faturas
+                ->map(fn (CreditCardInvoice $f) => [
+                    'cliente' => $nomes[$f->profile_id] ?? '—',
+                    'nome' => 'Fatura '.($nomesCartao[$f->credit_card_id] ?? '—'),
+                    'valor' => $f->total_amount,
+                    'vencimento' => $f->due_date->format('d/m'),
+                ]);
+        }
+
+        return [
+            'vinculos' => $vinculos,
+            'faturas' => $faturas->values()->all(),
+            'total_faturas' => Money::sum($faturas->pluck('valor')),
+            'dias' => $dias,
+        ];
+    }
+
+    /**
+     * Perfil individual vs. casal, e entre casais, vida financeira única
+     * vs. separada — só entre clientes ATIVOS (a carteira de fato, não o
+     * pipeline de convites).
+     *
+     * @param  list<array>  $porCliente
+     * @return array{individual: int, casal: int, vida_financeira: array{unica: int, separada: int}}
+     */
+    private function distribution(array $porCliente): array
+    {
+        $ativos = collect($porCliente)->filter(fn (array $l) => $l['status'] === ConsultantClientStatus::Active);
+        $individual = $ativos->filter(fn (array $l) => $l['tipo_perfil'] === ProfileType::Single)->count();
+
+        return [
+            'individual' => $individual,
+            'casal' => $ativos->count() - $individual,
+            'vida_financeira' => [
+                'unica' => $ativos->filter(fn (array $l) => $l['vida_financeira'] === 'unica')->count(),
+                'separada' => $ativos->filter(fn (array $l) => $l['vida_financeira'] === 'separada')->count(),
+            ],
+        ];
     }
 }

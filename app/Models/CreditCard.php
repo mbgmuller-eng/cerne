@@ -57,6 +57,20 @@ class CreditCard extends Model
         return $this->card_name.$suffix;
     }
 
+    /**
+     * Tem alguma fatura, compra ou conta fixa vinculada? Se sim, o cartão
+     * não pode ser excluído — só desativado. Mesmo raciocínio de
+     * BankAccount::hasActivity(); PaymentMethod fica de fora (cascade,
+     * não é lançamento).
+     */
+    public function hasActivity(): bool
+    {
+        return ExpenseRecord::query()->where('credit_card_id', $this->id)->exists()
+            || CreditCardInvoice::query()->where('credit_card_id', $this->id)->exists()
+            || FixedBill::query()->where('credit_card_id', $this->id)->exists()
+            || InstallmentGroup::query()->where('credit_card_id', $this->id)->exists();
+    }
+
     // ---------------------------------------------------------------------
     // Ciclo de fatura
     // ---------------------------------------------------------------------

@@ -5,6 +5,7 @@ namespace Database\Seeders;
 use App\Enums\AllocationAssetClass;
 use App\Enums\AssetClass;
 use App\Enums\Benchmark;
+use App\Enums\EmploymentType;
 use App\Enums\InvestmentSector;
 use App\Enums\InvestorType;
 use App\Enums\PeriodType;
@@ -77,8 +78,7 @@ class InvestmentsDemoSeeder extends Seeder
         $perfilAna = InvestorProfile::create([
             'member_id' => $ana->id,
             'investor_type' => InvestorType::Moderate,
-            'monthly_cost_average' => '11500.00',
-            'months_reserve_target' => 6,
+            'employment_type' => EmploymentType::PublicServant,
         ]);
 
         // A alocação recomendada precisa somar 100%.
@@ -101,8 +101,7 @@ class InvestmentsDemoSeeder extends Seeder
         InvestorProfile::create([
             'member_id' => $bruno->id,
             'investor_type' => InvestorType::Conservative,
-            'monthly_cost_average' => '11500.00',
-            'months_reserve_target' => 12,
+            'employment_type' => EmploymentType::SelfEmployed,
         ]);
     }
 
@@ -241,6 +240,13 @@ class InvestmentsDemoSeeder extends Seeder
         }
     }
 
+    /**
+     * Casal ou solteiro, todo membro com perfil de investidor tem as DUAS
+     * reservas — a meta de cada uma agora é calculada (ver
+     * InvestorProfile::peaceReserveTarget()/opportunityReserveTarget()),
+     * então `target_amount` aqui é só o valor de partida antes do
+     * perfil existir; fica sem uso assim que ele é cadastrado.
+     */
     private function reservas(ProfileMember $ana, ProfileMember $bruno): void
     {
         $reservaPaz = InvestmentRecord::where('name', 'Reserva de emergência')->first();
@@ -248,16 +254,29 @@ class InvestmentsDemoSeeder extends Seeder
         FinancialReserve::create([
             'member_id' => $ana->id,
             'reserve_type' => ReserveType::Paz,
-            // 11.500 x 6 meses
-            'target_amount' => '69000.00',
+            'target_amount' => '0.00',
             'current_amount' => '69000.00',
             'linked_investment_id' => $reservaPaz?->id,
         ]);
 
         FinancialReserve::create([
+            'member_id' => $ana->id,
+            'reserve_type' => ReserveType::Oportunidade,
+            'target_amount' => '0.00',
+            'current_amount' => '18000.00',
+        ]);
+
+        FinancialReserve::create([
+            'member_id' => $bruno->id,
+            'reserve_type' => ReserveType::Paz,
+            'target_amount' => '0.00',
+            'current_amount' => '0.00',
+        ]);
+
+        FinancialReserve::create([
             'member_id' => $bruno->id,
             'reserve_type' => ReserveType::Oportunidade,
-            'target_amount' => '50000.00',
+            'target_amount' => '0.00',
             'current_amount' => '31200.00',
         ]);
     }

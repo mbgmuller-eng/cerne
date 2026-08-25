@@ -85,4 +85,24 @@ enum AssetClass: string
             self::EtfInternacional, self::AcaoExterior => InvestmentSector::International,
         };
     }
+
+    /**
+     * Classe usada na comparação com a alocação RECOMENDADA
+     * (recommended_allocations, ver AllocationAssetClass). Reserva,
+     * previdência, poupança e "outro" ficam de fora — não fazem parte
+     * da alocação de investimento recomendada pelo consultor, são
+     * tratadas à parte (reserva de emergência tem sua própria meta).
+     */
+    public function allocationClass(): ?AllocationAssetClass
+    {
+        return match ($this) {
+            self::Cdb, self::Tesouro, self::Lca, self::Lci, self::Consorcio => AllocationAssetClass::FixedIncome,
+            self::Fundo, self::FundoInfra => AllocationAssetClass::Funds,
+            self::Acao, self::Fii => AllocationAssetClass::EquitiesFiis,
+            self::Cripto => AllocationAssetClass::DigitalAssets,
+            self::Etf => AllocationAssetClass::Etfs,
+            self::EtfInternacional, self::AcaoExterior => AllocationAssetClass::International,
+            self::ReservaPaz, self::ReservaOportunidade, self::Previdencia, self::Poupanca, self::Outro => null,
+        };
+    }
 }
