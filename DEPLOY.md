@@ -145,10 +145,14 @@ CACHE_STORE=database
 
 ### 6. Cache de produção
 
-Depois de cada deploy:
+Depois de cada deploy (sequência completa, com o motivo do `--no-scripts` explicado
+na seção **Checklist antes de publicar**, mais abaixo):
 
 ```bash
-php artisan config:cache && php artisan route:cache && php artisan view:cache && php artisan migrate --force
+composer install --no-dev --optimize-autoloader --no-scripts
+php artisan package:discover --ansi
+php artisan migrate --force
+php artisan config:cache && php artisan route:cache && php artisan view:cache
 ```
 
 ### 7. Backup
@@ -179,12 +183,22 @@ Ele **não** tem acesso SSH ao servidor — depois do push, no servidor:
 
 ```bash
 git pull origin master
-composer install --no-dev --optimize-autoloader
+composer install --no-dev --optimize-autoloader --no-scripts
+php artisan package:discover --ansi
 php artisan migrate --force
 php artisan config:cache && php artisan route:cache && php artisan view:cache
 chmod -R 775 storage bootstrap/cache
 php artisan cerne:check --strict
 ```
+
+**Por que `--no-scripts` + `package:discover` manual:** a hospedagem compartilhada da
+Hostinger desabilita `proc_open` no PHP de linha de comando. O hook automático do
+Composer (`postAutoloadDump`, que chama `@php artisan package:discover`) roda esse
+comando via `Process`/`proc_open` e falha com *"The Process class relies on
+proc_open, which is not available on your PHP installation"* — mesmo com
+`composer install` tendo funcionado normalmente até ali. Rodar `php artisan
+package:discover` direto no shell não tem esse problema, porque aí é o bash chamando
+o PHP diretamente, sem o Composer tentar abrir um subprocesso por dentro do PHP.
 
 `cerne:check --strict` confere ambiente, cookies, banco, fila, agendador, importação por IA e caches, e explica o porquê de cada item que falhar — sai com erro, útil para travar uma publicação automática.
 
