@@ -29,6 +29,7 @@ use App\Models\ProfileMember;
 use App\Models\User;
 use App\Support\ProfileContext;
 use Carbon\CarbonImmutable;
+use Database\Seeders\Concerns\DevOnlySeeder;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
 
@@ -46,6 +47,8 @@ use Illuminate\Support\Facades\Hash;
  */
 class ConsultantBulkClientsSeeder extends Seeder
 {
+    use DevOnlySeeder;
+
     private const TOTAL_CLIENTES = 40;
 
     /** @var array<int, string> */
@@ -74,6 +77,8 @@ class ConsultantBulkClientsSeeder extends Seeder
 
     public function run(): void
     {
+        $this->abortInProduction();
+
         $consultor = User::where('email', 'consultor@cerne.test')->where('role', UserRole::Consultant)->first();
 
         if ($consultor === null) {

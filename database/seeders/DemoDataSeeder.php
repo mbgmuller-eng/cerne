@@ -11,6 +11,7 @@ use App\Models\ProfileMember;
 use App\Services\InvoiceService;
 use App\Support\ProfileContext;
 use Carbon\CarbonImmutable;
+use Database\Seeders\Concerns\DevOnlySeeder;
 use Illuminate\Database\Seeder;
 
 /**
@@ -24,8 +25,12 @@ use Illuminate\Database\Seeder;
  */
 class DemoDataSeeder extends Seeder
 {
+    use DevOnlySeeder;
+
     public function run(): void
     {
+        $this->abortInProduction();
+
         $profile = FinancialProfile::where('profile_name', 'Família Ribeiro')->first();
 
         if ($profile === null) {

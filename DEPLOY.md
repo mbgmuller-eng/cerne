@@ -167,20 +167,35 @@ Com rotação de 7 dias:
 
 ## Checklist antes de publicar
 
-A maior parte da lista se verifica sozinha. No servidor:
+Na máquina de dev, `deploy.ps1` cobre a parte local — testa, builda os assets, confere que nenhum segredo vazou pro build e que `.env`/`docs/ACESSOS.md` não entram no commit, e dá push pra `origin/master`:
+
+```powershell
+.\deploy.ps1 -Message "descrição do que mudou"
+```
+
+Use `-NoCommit` pra só testar e buildar (revisar o `git status` antes de decidir a mensagem), ou `-SkipPush` pra commitar local sem empurrar ainda.
+
+Ele **não** tem acesso SSH ao servidor — depois do push, no servidor:
 
 ```bash
+git pull origin master
+composer install --no-dev --optimize-autoloader
+php artisan migrate --force
+php artisan config:cache && php artisan route:cache && php artisan view:cache
+chmod -R 775 storage bootstrap/cache
 php artisan cerne:check --strict
 ```
 
-O comando confere ambiente, cookies, banco, fila, agendador, importação por IA e caches, e explica o porquê de cada item que falhar. Com `--strict` ele sai com erro — útil para travar uma publicação automática.
+`cerne:check --strict` confere ambiente, cookies, banco, fila, agendador, importação por IA e caches, e explica o porquê de cada item que falhar — sai com erro, útil para travar uma publicação automática.
 
-O que ele **não** consegue verificar e continua manual:
+O que **não** se verifica sozinho:
 
-- [ ] `php artisan test` verde na máquina de desenvolvimento — em especial `TenancyIsolationTest`
-- [ ] `public/build/` atualizado (o `deploy.ps1` faz isso)
 - [ ] Backup diário rodando
-- [ ] `.env` fora do Git
+- [ ] `.env` fora do Git (o `deploy.ps1` só confere o que está prestes a ser commitado, não a configuração do servidor)
+
+### Dado de teste nunca sobe
+
+`DevSeeder`, `DemoDataSeeder`, `CashFlowDemoSeeder`, `FixedBillsDemoSeeder`, `InvestmentsDemoSeeder`, `InsuranceGoalsDemoSeeder` e `ConsultantBulkClientsSeeder` só existem como **código** no repositório — os *dados* que eles geram nunca saem do banco local, porque nenhum deploy roda seeder nenhum. Cada um deles também se recusa a rodar sozinho se `APP_ENV=production` (`database/seeders/Concerns/DevOnlySeeder.php`), então mesmo um `--class` errado digitado por engano no servidor não cria conta fake em produção.
 
 ## PWA
 

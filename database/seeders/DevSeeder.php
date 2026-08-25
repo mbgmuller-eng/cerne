@@ -11,6 +11,7 @@ use App\Models\FinancialProfile;
 use App\Models\ProfileAccessSettings;
 use App\Models\ProfileMember;
 use App\Models\User;
+use Database\Seeders\Concerns\DevOnlySeeder;
 use Illuminate\Database\Seeder;
 
 /**
@@ -21,8 +22,12 @@ use Illuminate\Database\Seeder;
  */
 class DevSeeder extends Seeder
 {
+    use DevOnlySeeder;
+
     public function run(): void
     {
+        $this->abortInProduction();
+
         $consultor = User::create([
             'name' => 'Marina Alencar',
             'email' => 'consultor@cerne.test',

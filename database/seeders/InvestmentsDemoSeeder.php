@@ -23,6 +23,7 @@ use App\Services\InvestmentSnapshotService;
 use App\Services\InvestmentTransactionService;
 use App\Support\ProfileContext;
 use Carbon\CarbonImmutable;
+use Database\Seeders\Concerns\DevOnlySeeder;
 use Illuminate\Database\Seeder;
 
 /**
@@ -34,8 +35,12 @@ use Illuminate\Database\Seeder;
  */
 class InvestmentsDemoSeeder extends Seeder
 {
+    use DevOnlySeeder;
+
     public function run(): void
     {
+        $this->abortInProduction();
+
         $profile = FinancialProfile::where('profile_name', 'Família Ribeiro')->first();
 
         if ($profile === null) {
