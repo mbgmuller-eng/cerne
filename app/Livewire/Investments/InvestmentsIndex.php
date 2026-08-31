@@ -76,6 +76,8 @@ class InvestmentsIndex extends Component
 
     public string $investmentMemberId = '';
 
+    public bool $investmentIsPrivate = false;
+
     public string $investmentCurrentAmount = '';
 
     public string $investmentInvestedAmount = '';
@@ -437,6 +439,7 @@ class InvestmentsIndex extends Component
             'purchase_date' => $dataCompra,
             'return_rate' => $data['investmentReturnRate'] !== '' ? $data['investmentReturnRate'] : null,
             'created_by_user_id' => auth()->id(),
+            'is_private' => $this->investmentIsPrivate,
         ];
 
         if ($comCotas) {
@@ -472,7 +475,7 @@ class InvestmentsIndex extends Component
     {
         $this->reset(
             'investmentName', 'investmentTicker', 'investmentAssetClass', 'investmentInstitution',
-            'investmentMemberId', 'investmentCurrentAmount', 'investmentInvestedAmount',
+            'investmentMemberId', 'investmentIsPrivate', 'investmentCurrentAmount', 'investmentInvestedAmount',
             'investmentQuantity', 'investmentUnitPrice', 'investmentPurchaseDate', 'investmentReturnRate',
         );
         $this->resetErrorBag();

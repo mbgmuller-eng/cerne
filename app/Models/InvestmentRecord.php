@@ -24,7 +24,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'current_amount', 'invested_amount', 'average_price', 'quantity', 'purchase_date',
     'maturity_date', 'return_rate', 'return_rate_type', 'broker_account_id', 'source',
     'external_asset_id', 'is_locked_by_sync', 'is_active', 'notes', 'source_document_id',
-    'created_by_user_id',
+    'created_by_user_id', 'is_private',
 ])]
 class InvestmentRecord extends Model
 {
@@ -45,6 +45,7 @@ class InvestmentRecord extends Model
             'maturity_date' => 'date',
             'is_locked_by_sync' => 'boolean',
             'is_active' => 'boolean',
+            'is_private' => 'boolean',
         ];
     }
 

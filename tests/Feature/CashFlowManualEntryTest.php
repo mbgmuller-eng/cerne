@@ -177,6 +177,24 @@ class CashFlowManualEntryTest extends TestCase
         self::assertSame('2000.00', $lancamento->amount);
     }
 
+    public function test_receita_marcada_oculta_grava_is_private(): void
+    {
+        [$perfil, $membro] = $this->criarPerfil();
+        $categoria = IncomeCategory::create(['name' => 'Freela', 'is_default' => true, 'is_active' => true]);
+
+        Livewire::test(CashFlowIndex::class)
+            ->set('incomeAmount', '800.00')
+            ->set('incomeDate', '2026-08-05')
+            ->set('incomeCategoryId', $categoria->id)
+            ->set('incomeMemberId', $membro->id)
+            ->set('incomeIsPrivate', true)
+            ->call('saveIncome')
+            ->assertHasNoErrors();
+
+        $lancamento = IncomeRecord::withoutProfileScope()->where('category_id', $categoria->id)->firstOrFail();
+        self::assertTrue($lancamento->is_private);
+    }
+
     public function test_membro_de_outro_perfil_nao_vaza_para_o_lancamento(): void
     {
         [$perfil, $membro] = $this->criarPerfil();

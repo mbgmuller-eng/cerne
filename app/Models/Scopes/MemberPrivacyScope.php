@@ -34,13 +34,20 @@ class MemberPrivacyScope implements Scope
 
         $memberId = $context->memberId();
         $hasJointFlag = $model::hasJointFlag();
+        $hasVisibleToPartnerFlag = $model::hasVisibleToPartnerFlag();
 
-        $builder->where(function (Builder $query) use ($model, $memberId, $hasJointFlag): void {
+        $builder->where(function (Builder $query) use ($model, $memberId, $hasJointFlag, $hasVisibleToPartnerFlag): void {
             $query->where($model->qualifyColumn('member_id'), $memberId)
                 // member_id nulo = registro da família, visível a todos.
-                ->orWhereNull($model->qualifyColumn('member_id'))
-                // Não é meu nem da família, mas não foi marcado como oculto.
-                ->orWhere($model->qualifyColumn('is_private'), false);
+                ->orWhereNull($model->qualifyColumn('member_id'));
+
+            // Conta/cartão usa o próprio campo (visible_to_partner é o
+            // sentido invertido de is_private); os demais usam is_private.
+            if ($hasVisibleToPartnerFlag) {
+                $query->orWhere($model->qualifyColumn('visible_to_partner'), true);
+            } else {
+                $query->orWhere($model->qualifyColumn('is_private'), false);
+            }
 
             // Conta ou cartão conjunto pertence ao casal, não a um membro:
             // fica visível independentemente de quem marcou o quê.

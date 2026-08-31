@@ -194,13 +194,20 @@
 
                 <div>
                     <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Membro</label>
-                    <select wire:model="incomeMemberId" class="select mt-1.5 w-full">
+                    <select wire:model.live="incomeMemberId" class="select mt-1.5 w-full">
                         <option value="">Conjunta / não informado</option>
                         @foreach ($members as $membro)
                             <option value="{{ $membro->id }}">{{ $membro->name }}</option>
                         @endforeach
                     </select>
                 </div>
+
+                @if ($privacyMembers->count() >= 2 && $incomeMemberId !== '')
+                    <div class="flex items-center gap-2 pt-5">
+                        <input type="checkbox" wire:model="incomeIsPrivate" id="incomeIsPrivate" class="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500">
+                        <label for="incomeIsPrivate" class="text-sm text-slate-600 dark:text-slate-400">Ocultar do meu cônjuge</label>
+                    </div>
+                @endif
 
                 <div>
                     <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Conta (opcional)</label>

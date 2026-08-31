@@ -81,7 +81,7 @@
 
                     <div>
                         <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Membro</label>
-                        <select wire:model="investmentMemberId" class="select mt-1.5 w-full">
+                        <select wire:model.live="investmentMemberId" class="select mt-1.5 w-full">
                             <option value="">Selecione</option>
                             @foreach ($members as $membro)
                                 <option value="{{ $membro->id }}">{{ $membro->name }}</option>
@@ -89,6 +89,13 @@
                         </select>
                         @error('investmentMemberId') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
                     </div>
+
+                    @if ($privacyMembers->count() >= 2 && $investmentMemberId !== '')
+                        <div class="flex items-center gap-2 pt-5">
+                            <input type="checkbox" wire:model="investmentIsPrivate" id="investmentIsPrivate" class="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500">
+                            <label for="investmentIsPrivate" class="text-sm text-slate-600 dark:text-slate-400">Ocultar do meu cônjuge</label>
+                        </div>
+                    @endif
 
                     <div>
                         <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Instituição</label>

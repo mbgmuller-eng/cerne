@@ -18,7 +18,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 #[Fillable([
     'profile_id', 'member_id', 'name', 'amount', 'due_day', 'recurrence', 'due_weekday',
     'due_month', 'bank_account_id', 'credit_card_id', 'category_id', 'subcategory_id',
-    'is_variable', 'is_active', 'notes',
+    'is_variable', 'is_active', 'notes', 'is_private',
 ])]
 class FixedBill extends Model
 {
@@ -34,6 +34,7 @@ class FixedBill extends Model
             'due_month' => 'integer',
             'is_variable' => 'boolean',
             'is_active' => 'boolean',
+            'is_private' => 'boolean',
         ];
     }
 

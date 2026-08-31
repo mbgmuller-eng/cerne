@@ -82,6 +82,8 @@ class FixedBillsIndex extends Component
 
     public string $billMemberId = '';
 
+    public bool $billIsPrivate = false;
+
     public string $billBankAccountId = '';
 
     public bool $billIsVariable = false;
@@ -109,6 +111,8 @@ class FixedBillsIndex extends Component
     public string $incomeCategoryId = '';
 
     public string $incomeMemberId = '';
+
+    public bool $incomeIsPrivate = false;
 
     public string $incomeBankAccountId = '';
 
@@ -235,6 +239,7 @@ class FixedBillsIndex extends Component
             'bank_account_id' => $conta?->id,
             'is_variable' => $this->billIsVariable,
             'notes' => $this->billNotes !== '' ? $this->billNotes : null,
+            'is_private' => $memberId !== null && $this->billIsPrivate,
         ]);
 
         session()->flash('status', 'Conta fixa cadastrada.');
@@ -246,7 +251,7 @@ class FixedBillsIndex extends Component
     {
         $this->reset(
             'billName', 'billAmount', 'billDueDay', 'billDueWeekday', 'billDueMonth',
-            'billCategoryId', 'billMemberId', 'billBankAccountId', 'billIsVariable', 'billNotes',
+            'billCategoryId', 'billMemberId', 'billIsPrivate', 'billBankAccountId', 'billIsVariable', 'billNotes',
         );
         $this->billRecurrence = 'monthly';
         $this->resetErrorBag();
@@ -365,6 +370,7 @@ class FixedBillsIndex extends Component
             'bank_account_id' => $conta?->id,
             'is_variable' => $this->incomeIsVariable,
             'notes' => $this->incomeNotes !== '' ? $this->incomeNotes : null,
+            'is_private' => $memberId !== null && $this->incomeIsPrivate,
         ]);
 
         session()->flash('status', 'Receita recorrente cadastrada.');
@@ -376,7 +382,8 @@ class FixedBillsIndex extends Component
     {
         $this->reset(
             'incomeName', 'incomeAmount', 'incomeDueDay', 'incomeDueWeekday', 'incomeDueMonth',
-            'incomeCategoryId', 'incomeMemberId', 'incomeBankAccountId', 'incomeIsVariable', 'incomeNotes',
+            'incomeCategoryId', 'incomeMemberId', 'incomeIsPrivate', 'incomeBankAccountId',
+            'incomeIsVariable', 'incomeNotes',
         );
         $this->incomeRecurrence = 'monthly';
         $this->resetErrorBag();

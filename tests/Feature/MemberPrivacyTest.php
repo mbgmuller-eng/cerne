@@ -102,9 +102,10 @@ class MemberPrivacyTest extends TestCase
 
     /**
      * Conta conjunta escapa da restrição por natureza: pertence ao casal,
-     * não a um membro — mesmo que a conta esteja marcada como oculta.
+     * não a um membro — mesmo tentando marcar como privada (is_joint força
+     * visible_to_partner=true, ver HasSharingFlags).
      */
-    public function test_conta_conjunta_e_sempre_visivel_mesmo_marcada_como_oculta(): void
+    public function test_conta_conjunta_e_sempre_visivel_mesmo_tentando_marcar_como_privada(): void
     {
         [$profile, , $ownerMember, $secondaryUser, $secondaryMember] = $this->createCouple();
 
@@ -112,12 +113,31 @@ class MemberPrivacyTest extends TestCase
             ->for($profile, 'profile')
             ->for($ownerMember, 'member')
             ->joint()
-            ->create(['is_private' => true]);
+            ->create(['visible_to_partner' => false]);
 
         $this->actingAs($secondaryUser);
         app(ProfileContext::class)->set($profile, $secondaryMember);
 
         self::assertTrue(BankAccount::all()->contains($contaConjunta));
+    }
+
+    /**
+     * Conta/cartão usa `visible_to_partner` (campo próprio, anterior ao
+     * `is_private` genérico) — mesma regra, coluna diferente.
+     */
+    public function test_conta_com_visible_to_partner_falso_fica_oculta_do_conjuge(): void
+    {
+        [$profile, , $ownerMember, $secondaryUser, $secondaryMember] = $this->createCouple();
+
+        $contaPrivada = BankAccount::factory()
+            ->for($profile, 'profile')
+            ->for($ownerMember, 'member')
+            ->create(['is_joint' => false, 'visible_to_partner' => false]);
+
+        $this->actingAs($secondaryUser);
+        app(ProfileContext::class)->set($profile, $secondaryMember);
+
+        self::assertFalse(BankAccount::all()->contains($contaPrivada));
     }
 
     /**

@@ -119,6 +119,8 @@ class CashFlowIndex extends Component
 
     public string $incomeMemberId = '';
 
+    public bool $incomeIsPrivate = false;
+
     public string $incomeBankAccountId = '';
 
     public bool $incomeRecurring = false;
@@ -341,6 +343,7 @@ class CashFlowIndex extends Component
             'is_recurring' => $this->incomeRecurring,
             'notes' => $this->incomeNotes !== '' ? $this->incomeNotes : null,
             'created_by_user_id' => auth()->id(),
+            'is_private' => $memberId !== null && $this->incomeIsPrivate,
         ]);
 
         $conta?->applyToBalance($data['incomeAmount']);
@@ -353,7 +356,7 @@ class CashFlowIndex extends Component
     private function resetIncomeForm(): void
     {
         $this->reset(
-            'incomeDescription', 'incomeAmount', 'incomeCategoryId', 'incomeMemberId',
+            'incomeDescription', 'incomeAmount', 'incomeCategoryId', 'incomeMemberId', 'incomeIsPrivate',
             'incomeBankAccountId', 'incomeRecurring', 'incomeNotes',
         );
         $this->incomeDate = CarbonImmutable::now()->toDateString();

@@ -23,6 +23,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 #[Fillable([
     'profile_id', 'member_id', 'name', 'amount', 'recurrence', 'due_day', 'due_weekday',
     'due_month', 'bank_account_id', 'category_id', 'is_variable', 'is_active', 'notes',
+    'is_private',
 ])]
 class RecurringIncome extends Model
 {
@@ -38,6 +39,7 @@ class RecurringIncome extends Model
             'due_month' => 'integer',
             'is_variable' => 'boolean',
             'is_active' => 'boolean',
+            'is_private' => 'boolean',
         ];
     }
 

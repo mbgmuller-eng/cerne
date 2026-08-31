@@ -115,7 +115,7 @@ class PrivacyTabsTest extends TestCase
         $this->actingAs($ana->user);
         app(ProfileContext::class)->set($perfil, $ana->member);
 
-        $contaDeAna = BankAccount::factory()->for($perfil, 'profile')->for($ana->member, 'member')->create(['is_joint' => false, 'is_private' => true, 'account_type' => AccountType::Checking]);
+        $contaDeAna = BankAccount::factory()->for($perfil, 'profile')->for($ana->member, 'member')->create(['is_joint' => false, 'visible_to_partner' => false, 'account_type' => AccountType::Checking]);
         $contaConjunta = BankAccount::factory()->for($perfil, 'profile')->for($bruno->member, 'member')->create(['is_joint' => true, 'account_type' => AccountType::Checking]);
 
         $abaCasal = Livewire::test(AccountsIndex::class)->set('viewAs', '')->get('accounts');

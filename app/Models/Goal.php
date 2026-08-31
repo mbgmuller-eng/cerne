@@ -19,7 +19,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 #[Fillable([
     'profile_id', 'member_id', 'name', 'priority', 'estimated_value', 'target_date',
     'funding_method', 'installment_amount', 'current_amount', 'linked_investment_id',
-    'status', 'notes', 'created_by_user_id',
+    'status', 'notes', 'created_by_user_id', 'is_private',
 ])]
 class Goal extends Model
 {
@@ -35,6 +35,7 @@ class Goal extends Model
             'installment_amount' => 'decimal:2',
             'current_amount' => 'decimal:2',
             'target_date' => 'date',
+            'is_private' => 'boolean',
         ];
     }
 

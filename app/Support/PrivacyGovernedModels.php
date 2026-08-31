@@ -15,10 +15,14 @@ use App\Models\Scopes\MemberPrivacyScope;
 use App\Models\Scopes\ProfileScope;
 
 /**
- * Os lançamentos que carregam a flag `is_private` (oculto do cônjuge) —
- * usado onde é preciso perguntar "existe ALGO oculto neste perfil?" sem se
- * prender a um domínio específico (ver HasPrivacyTabs,
+ * Os lançamentos que carregam privacidade por registro (oculto do
+ * cônjuge) — usado onde é preciso perguntar "existe ALGO oculto neste
+ * perfil?" sem se prender a um domínio específico (ver HasPrivacyTabs,
  * ConsultantPortfolioService::resumoDeExibicao()).
+ *
+ * Conta e cartão usam `visible_to_partner` (campo próprio deles, anterior
+ * a `is_private` — ver HasSharingFlags), sentido invertido dos demais;
+ * os outros usam `is_private`.
  *
  * Não inclui InvestmentTransaction/InvestmentPerformance (herdam a
  * privacidade do InvestmentRecord) nem FinancialReserve (deriva
@@ -44,12 +48,14 @@ class PrivacyGovernedModels
     public static function anyPrivate(string $profileId, array $models = self::ALL): bool
     {
         foreach ($models as $modelClass) {
-            $temOculto = $modelClass::query()
+            $query = $modelClass::query()
                 ->withoutGlobalScope(ProfileScope::class)
                 ->withoutGlobalScope(MemberPrivacyScope::class)
-                ->where('profile_id', $profileId)
-                ->where('is_private', true)
-                ->exists();
+                ->where('profile_id', $profileId);
+
+            $temOculto = $modelClass::hasVisibleToPartnerFlag()
+                ? $query->where('visible_to_partner', false)->exists()
+                : $query->where('is_private', true)->exists();
 
             if ($temOculto) {
                 return true;

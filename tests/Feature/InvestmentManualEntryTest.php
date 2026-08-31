@@ -80,6 +80,23 @@ class InvestmentManualEntryTest extends TestCase
         self::assertNull($investimento->quantity);
     }
 
+    public function test_investimento_marcado_oculto_grava_is_private(): void
+    {
+        [, $membro] = $this->criarPerfil();
+
+        Livewire::test(InvestmentsIndex::class)
+            ->set('investmentName', 'Fundo sigiloso')
+            ->set('investmentAssetClass', AssetClass::Cdb->value)
+            ->set('investmentMemberId', $membro->id)
+            ->set('investmentCurrentAmount', '2000.00')
+            ->set('investmentIsPrivate', true)
+            ->call('saveInvestment')
+            ->assertHasNoErrors();
+
+        $investimento = InvestmentRecord::withoutProfileScope()->where('name', 'Fundo sigiloso')->sole();
+        self::assertTrue($investimento->is_private);
+    }
+
     public function test_ativo_sem_cota_sem_investido_informado_usa_o_valor_atual(): void
     {
         [, $membro] = $this->criarPerfil();

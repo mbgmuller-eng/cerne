@@ -16,6 +16,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 #[Fillable([
     'profile_id', 'member_id', 'category_id', 'description', 'amount', 'received_date',
     'bank_account_id', 'is_recurring', 'notes', 'source_document_id', 'created_by_user_id',
+    'is_private',
 ])]
 class IncomeRecord extends Model
 {
@@ -31,6 +32,7 @@ class IncomeRecord extends Model
             'year' => 'integer',
             'month' => 'integer',
             'is_recurring' => 'boolean',
+            'is_private' => 'boolean',
         ];
     }
 

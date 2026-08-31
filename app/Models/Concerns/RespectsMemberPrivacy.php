@@ -10,11 +10,15 @@ use Illuminate\Database\Eloquent\Builder;
  * Segunda camada de isolamento, aplicada SOBRE o BelongsToProfile.
  *
  * O tenancy responde "de qual casal é este dado?". Esta trait responde
- * "dentro do casal, quem pode ver este lançamento?", conforme o campo
- * `is_private` do próprio registro:
+ * "dentro do casal, quem pode ver este lançamento?", conforme o campo do
+ * próprio registro:
  *
  *   - registro da família (member_id nulo): visível aos dois, sempre;
- *   - registro marcado como privado: só quem é o dono dele (e o consultor);
+ *   - registro marcado como privado (`is_private`): só quem é o dono dele
+ *     (e o consultor). Conta e cartão já tinham seu próprio campo pra isso
+ *     ANTES desta trait existir — `visible_to_partner` (ver
+ *     HasSharingFlags) — então usam ele em vez de `is_private`, pra não
+ *     ter dois campos de privacidade fazendo a mesma pergunta;
  *   - contas e cartões conjuntos (is_joint) escapam da restrição.
  *
  * Não há mais exceção pro dono do perfil — a regra vale igual pros dois do
@@ -31,6 +35,12 @@ trait RespectsMemberPrivacy
     public static function hasJointFlag(): bool
     {
         return in_array('is_joint', (new static)->getFillable(), true);
+    }
+
+    /** O model já tem seu próprio campo de privacidade (ver HasSharingFlags)? */
+    public static function hasVisibleToPartnerFlag(): bool
+    {
+        return in_array('visible_to_partner', (new static)->getFillable(), true);
     }
 
     /**
