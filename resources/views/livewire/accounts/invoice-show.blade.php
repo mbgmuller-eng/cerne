@@ -32,11 +32,52 @@
 
     @if ($invoice->isPaid())
         <div class="rounded-lg border border-brand-200 bg-brand-50 dark:border-brand-500/30 dark:bg-brand-500/10 px-4 py-3 text-sm text-brand-900 dark:text-brand-100">
-            Paga em {{ $invoice->paid_at->format('d/m/Y') }} — {{ Money::format($invoice->paid_amount) }}
-            @if ($invoice->paidFromAccount)
-                · debitado de {{ $invoice->paidFromAccount->bank_name }}
-            @endif
+            <div class="flex flex-wrap items-center justify-between gap-3">
+                <p>
+                    Paga em {{ $invoice->paid_at->format('d/m/Y') }} — {{ Money::format($invoice->paid_amount) }}
+                    @if ($invoice->paidFromAccount)
+                        · debitado de {{ $invoice->paidFromAccount->bank_name }}
+                    @endif
+                </p>
+
+                @if ($confirmingUnpay)
+                    <span class="text-xs">Confirma o estorno?</span>
+                    <button wire:click="unpay" class="text-sm font-medium text-red-700 hover:underline dark:text-red-400">Sim</button>
+                    <button wire:click="$set('confirmingUnpay', false)" class="text-sm text-brand-700 hover:underline dark:text-brand-300">Não</button>
+                @else
+                    <button wire:click="$set('confirmingUnpay', true)" class="text-xs font-medium text-brand-700 hover:underline dark:text-brand-300">
+                        Estornar pagamento
+                    </button>
+                @endif
+            </div>
         </div>
+    @elseif ($podePagar)
+        <form wire:submit="pay" class="card space-y-4 p-5">
+            <h2 class="text-sm font-semibold text-slate-900 dark:text-white">Marcar fatura como paga</h2>
+
+            <div class="grid gap-4 sm:grid-cols-3">
+                <div>
+                    <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Conta</label>
+                    <select wire:model="payBankAccountId" class="select mt-1.5 w-full">
+                        <option value="">Selecione</option>
+                        @foreach ($bankAccounts as $conta)
+                            <option value="{{ $conta->id }}">{{ $conta->displayName() }}</option>
+                        @endforeach
+                    </select>
+                    @error('payBankAccountId') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                </div>
+
+                <div>
+                    <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Valor pago</label>
+                    <input type="number" step="0.01" min="0.01" wire:model="payAmount" class="input mt-1.5">
+                    @error('payAmount') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                </div>
+
+                <div class="flex items-end">
+                    <button type="submit" class="btn-primary px-4 py-2 w-full" wire:loading.attr="disabled">Marcar como paga</button>
+                </div>
+            </div>
+        </form>
     @endif
 
     <section>

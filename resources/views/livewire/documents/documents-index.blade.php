@@ -40,12 +40,27 @@
 
             <div>
                 <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Tipo</label>
-                <select wire:model="documentType" class="select mt-1.5">
+                <select wire:model.live="documentType" class="select mt-1.5">
                     @foreach ($tipos as $valor => $rotulo)
                         <option value="{{ $valor }}">{{ $rotulo }}</option>
                     @endforeach
                 </select>
             </div>
+
+            @if ($documentType === 'bank_statement')
+                <div>
+                    <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Conta do extrato</label>
+                    <select wire:model="uploadBankAccountId" class="select mt-1.5">
+                        <option value="">Selecione a conta</option>
+                        @foreach ($bankAccounts as $conta)
+                            <option value="{{ $conta->id }}">{{ $conta->displayName() }}</option>
+                        @endforeach
+                    </select>
+                    @error('uploadBankAccountId')
+                        <p class="mt-1 text-sm text-red-700 dark:text-red-400">{{ $message }}</p>
+                    @enderror
+                </div>
+            @endif
 
             <button
                 type="submit"

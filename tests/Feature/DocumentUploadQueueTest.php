@@ -35,6 +35,7 @@ class DocumentUploadQueueTest extends TestCase
 
         Livewire::test(DocumentsIndex::class)
             ->set('arquivo', UploadedFile::fake()->create('extrato.pdf', 100, 'application/pdf'))
+            ->set('documentType', 'insurance_policy') // não exige conta bancária — irrelevante pro que este teste cobre
             ->call('enviar')
             ->assertHasNoErrors();
 
@@ -52,6 +53,7 @@ class DocumentUploadQueueTest extends TestCase
 
         Livewire::test(DocumentsIndex::class)
             ->set('arquivo', UploadedFile::fake()->create('extrato.pdf', 100, 'application/pdf'))
+            ->set('documentType', 'insurance_policy') // não exige conta bancária — irrelevante pro que este teste cobre
             ->call('enviar')
             ->assertHasNoErrors();
 

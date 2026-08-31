@@ -15,7 +15,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Facades\Storage;
 
 #[Fillable([
-    'profile_id', 'uploaded_by_user_id', 'member_id', 'document_type',
+    'profile_id', 'uploaded_by_user_id', 'member_id', 'bank_account_id', 'document_type',
     'original_filename', 'storage_path', 'size_bytes', 'institution_name',
     'reference_month', 'reference_year', 'processing_status',
     'records_extracted', 'extraction_summary', 'error_message',
@@ -48,6 +48,11 @@ class DocumentUpload extends Model
     public function member(): BelongsTo
     {
         return $this->belongsTo(ProfileMember::class, 'member_id');
+    }
+
+    public function bankAccount(): BelongsTo
+    {
+        return $this->belongsTo(BankAccount::class);
     }
 
     public function scopeAwaitingReview(Builder $query): Builder

@@ -2,6 +2,7 @@
 
 namespace App\Livewire\CashFlow;
 
+use App\Enums\InvoiceStatus;
 use App\Enums\Necessity;
 use App\Livewire\Concerns\HasPrivacyTabs;
 use App\Livewire\Concerns\RequiresActiveProfile;
@@ -14,11 +15,13 @@ use App\Models\IncomeCategory;
 use App\Models\IncomeRecord;
 use App\Models\ProfileMember;
 use App\Services\InstallmentService;
+use App\Services\InvoiceService;
 use App\Support\Money;
 use App\Support\ProfileContext;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Url;
@@ -74,6 +77,11 @@ class CashFlowIndex extends Component
 
     public bool $showExpenseForm = false;
 
+    /** Nulo = criando; preenchido = editando esta despesa. */
+    public ?string $editingExpenseId = null;
+
+    public ?string $confirmingDeleteExpenseId = null;
+
     public string $expenseDescription = '';
 
     public string $expenseAmount = '';
@@ -108,6 +116,11 @@ class CashFlowIndex extends Component
     // -----------------------------------------------------------------
 
     public bool $showIncomeForm = false;
+
+    /** Nulo = criando; preenchido = editando esta receita. */
+    public ?string $editingIncomeId = null;
+
+    public ?string $confirmingDeleteIncomeId = null;
 
     public string $incomeDescription = '';
 
@@ -191,8 +204,84 @@ class CashFlowIndex extends Component
             ->get();
     }
 
+    public function editExpense(string $id): void
+    {
+        $despesa = ExpenseRecord::query()->findOrFail($id);
+
+        if ($this->isLockedByPaidInvoice($despesa)) {
+            session()->flash('status', 'Essa despesa está numa fatura já paga — estorne o pagamento da fatura antes de editar.');
+
+            return;
+        }
+
+        $this->editingExpenseId = $despesa->id;
+        $this->expenseDescription = $despesa->description;
+        $this->expenseAmount = $despesa->amount;
+        $this->expenseDate = $despesa->expense_date->toDateString();
+        $this->expenseNecessity = $despesa->necessity->value;
+        $this->expenseCategoryId = $despesa->category_id;
+        $this->expenseSubcategoryId = $despesa->subcategory_id ?? '';
+        $this->expenseMemberId = $despesa->member_id ?? '';
+        $this->expenseIsPrivate = $despesa->is_private;
+        $this->expensePaymentMethod = $despesa->credit_card_id !== null ? 'cartao' : 'outro';
+        $this->expenseBankAccountId = $despesa->bank_account_id ?? '';
+        $this->expenseNotes = $despesa->notes ?? '';
+        $this->showExpenseForm = true;
+        $this->showIncomeForm = false;
+    }
+
+    public function confirmDeleteExpense(string $id): void
+    {
+        $this->confirmingDeleteExpenseId = $id;
+    }
+
+    public function cancelDeleteExpense(): void
+    {
+        $this->confirmingDeleteExpenseId = null;
+    }
+
+    public function deleteExpense(string $id): void
+    {
+        $despesa = ExpenseRecord::query()->findOrFail($id);
+
+        if ($this->isLockedByPaidInvoice($despesa)) {
+            $this->confirmingDeleteExpenseId = null;
+            session()->flash('status', 'Essa despesa está numa fatura já paga — estorne o pagamento da fatura antes de excluir.');
+
+            return;
+        }
+
+        DB::transaction(function () use ($despesa): void {
+            if ($despesa->bank_account_id !== null) {
+                BankAccount::withoutProfileScope()->find($despesa->bank_account_id)?->applyToBalance($despesa->amount);
+            }
+
+            $invoice = $despesa->invoice;
+            $despesa->delete();
+
+            if ($invoice !== null) {
+                app(InvoiceService::class)->recalculateTotal($invoice);
+            }
+        });
+
+        $this->confirmingDeleteExpenseId = null;
+        session()->flash('status', 'Despesa excluída.');
+    }
+
+    /** Despesa de cartão numa fatura já paga: mexer no valor descombinaria o que já foi debitado. */
+    private function isLockedByPaidInvoice(ExpenseRecord $despesa): bool
+    {
+        return $despesa->credit_card_id !== null && $despesa->invoice?->status === InvoiceStatus::Paid;
+    }
+
     public function saveExpense(InstallmentService $installments): void
     {
+        if ($this->editingExpenseId !== null) {
+            $this->updateExpense();
+
+            return;
+        }
+
         $data = $this->validate([
             'expenseDescription' => ['required', 'string', 'max:255'],
             'expenseAmount' => ['required', 'numeric', 'gt:0'],
@@ -268,6 +357,90 @@ class CashFlowIndex extends Component
         $this->showExpenseForm = false;
     }
 
+    /**
+     * Não troca a despesa entre cartão e conta bancária — é uma mudança
+     * estrutural (fatura, parcelamento) que este formulário não cobre.
+     * Só os demais campos mudam; conta bancária pode ser reatribuída
+     * quando a despesa não é de cartão.
+     */
+    private function updateExpense(): void
+    {
+        $despesa = ExpenseRecord::query()->findOrFail($this->editingExpenseId);
+
+        if ($this->isLockedByPaidInvoice($despesa)) {
+            $this->addError('expenseAmount', 'Essa despesa está numa fatura já paga — estorne o pagamento da fatura antes de editar.');
+
+            return;
+        }
+
+        $data = $this->validate([
+            'expenseDescription' => ['required', 'string', 'max:255'],
+            'expenseAmount' => ['required', 'numeric', 'gt:0'],
+            'expenseDate' => ['required', 'date'],
+            'expenseNecessity' => ['required', Rule::enum(Necessity::class)],
+            'expenseCategoryId' => ['required'],
+            'expenseSubcategoryId' => ['nullable'],
+            'expenseNewSubcategory' => ['nullable', 'string', 'max:255'],
+            'expenseMemberId' => ['nullable'],
+            'expenseBankAccountId' => ['nullable'],
+            'expenseNotes' => ['nullable', 'string'],
+        ], attributes: [
+            'expenseDescription' => 'descrição',
+            'expenseAmount' => 'valor',
+            'expenseDate' => 'data',
+            'expenseNecessity' => 'necessidade',
+            'expenseCategoryId' => 'categoria',
+        ]);
+
+        $categoria = ExpenseCategory::query()->findOrFail($data['expenseCategoryId']);
+        $subcategoriaId = $this->resolveSubcategoryId($categoria);
+        $memberId = $this->validarMembro($this->expenseMemberId);
+        $data_compra = CarbonImmutable::parse($data['expenseDate']);
+
+        DB::transaction(function () use ($despesa, $data, $categoria, $subcategoriaId, $memberId, $data_compra): void {
+            $camposComuns = [
+                'description' => $data['expenseDescription'],
+                'necessity' => $data['expenseNecessity'],
+                'category_id' => $categoria->id,
+                'subcategory_id' => $subcategoriaId,
+                'amount' => $data['expenseAmount'],
+                'expense_date' => $data_compra,
+                'member_id' => $memberId,
+                'notes' => $this->expenseNotes !== '' ? $this->expenseNotes : null,
+                'is_private' => $memberId !== null && $this->expenseIsPrivate,
+            ];
+
+            if ($despesa->credit_card_id !== null) {
+                $despesa->update($camposComuns);
+
+                if ($despesa->invoice !== null) {
+                    app(InvoiceService::class)->recalculateTotal($despesa->invoice);
+                }
+
+                return;
+            }
+
+            // Desfaz o débito antigo ANTES de gravar o novo valor/conta —
+            // se as duas coisas fossem a mesma conta, a ordem errada
+            // aplicaria o delta sobre um saldo que já mudou.
+            if ($despesa->bank_account_id !== null) {
+                BankAccount::withoutProfileScope()->find($despesa->bank_account_id)?->applyToBalance($despesa->amount);
+            }
+
+            $contaNova = $this->expenseBankAccountId !== ''
+                ? BankAccount::query()->findOrFail($this->expenseBankAccountId)
+                : null;
+
+            $despesa->update($camposComuns + ['bank_account_id' => $contaNova?->id]);
+
+            $contaNova?->applyToBalance('-'.$data['expenseAmount']);
+        });
+
+        session()->flash('status', 'Despesa atualizada.');
+        $this->resetExpenseForm();
+        $this->showExpenseForm = false;
+    }
+
     private function resolveSubcategoryId(ExpenseCategory $categoria): ?string
     {
         if (trim($this->expenseNewSubcategory) !== '') {
@@ -289,7 +462,7 @@ class CashFlowIndex extends Component
             'expenseDescription', 'expenseAmount', 'expenseNecessity', 'expenseCategoryId',
             'expenseSubcategoryId', 'expenseNewSubcategory', 'expenseMemberId', 'expenseIsPrivate',
             'expensePaymentMethod', 'expenseBankAccountId', 'expenseCreditCardId', 'expenseInstallments',
-            'expenseNotes',
+            'expenseNotes', 'editingExpenseId',
         );
         $this->expenseDate = CarbonImmutable::now()->toDateString();
         $this->expensePaymentMethod = 'outro';
@@ -311,8 +484,58 @@ class CashFlowIndex extends Component
         }
     }
 
+    public function editIncome(string $id): void
+    {
+        $receita = IncomeRecord::query()->findOrFail($id);
+
+        $this->editingIncomeId = $receita->id;
+        $this->incomeDescription = $receita->description ?? '';
+        $this->incomeAmount = $receita->amount;
+        $this->incomeDate = $receita->received_date->toDateString();
+        $this->incomeCategoryId = $receita->category_id;
+        $this->incomeMemberId = $receita->member_id ?? '';
+        $this->incomeIsPrivate = $receita->is_private;
+        $this->incomeBankAccountId = $receita->bank_account_id ?? '';
+        $this->incomeRecurring = $receita->is_recurring;
+        $this->incomeNotes = $receita->notes ?? '';
+        $this->showIncomeForm = true;
+        $this->showExpenseForm = false;
+    }
+
+    public function confirmDeleteIncome(string $id): void
+    {
+        $this->confirmingDeleteIncomeId = $id;
+    }
+
+    public function cancelDeleteIncome(): void
+    {
+        $this->confirmingDeleteIncomeId = null;
+    }
+
+    public function deleteIncome(string $id): void
+    {
+        $receita = IncomeRecord::query()->findOrFail($id);
+
+        DB::transaction(function () use ($receita): void {
+            if ($receita->bank_account_id !== null) {
+                BankAccount::withoutProfileScope()->find($receita->bank_account_id)?->applyToBalance('-'.$receita->amount);
+            }
+
+            $receita->delete();
+        });
+
+        $this->confirmingDeleteIncomeId = null;
+        session()->flash('status', 'Receita excluída.');
+    }
+
     public function saveIncome(): void
     {
+        if ($this->editingIncomeId !== null) {
+            $this->updateIncome();
+
+            return;
+        }
+
         $data = $this->validate([
             'incomeDescription' => ['nullable', 'string', 'max:255'],
             'incomeAmount' => ['required', 'numeric', 'gt:0'],
@@ -353,11 +576,62 @@ class CashFlowIndex extends Component
         $this->showIncomeForm = false;
     }
 
+    private function updateIncome(): void
+    {
+        $data = $this->validate([
+            'incomeDescription' => ['nullable', 'string', 'max:255'],
+            'incomeAmount' => ['required', 'numeric', 'gt:0'],
+            'incomeDate' => ['required', 'date'],
+            'incomeCategoryId' => ['required'],
+            'incomeMemberId' => ['nullable'],
+            'incomeBankAccountId' => ['nullable'],
+            'incomeNotes' => ['nullable', 'string'],
+        ], attributes: [
+            'incomeAmount' => 'valor',
+            'incomeDate' => 'data',
+            'incomeCategoryId' => 'categoria',
+        ]);
+
+        $receita = IncomeRecord::query()->findOrFail($this->editingIncomeId);
+        $categoria = IncomeCategory::query()->findOrFail($data['incomeCategoryId']);
+        $memberId = $this->validarMembro($this->incomeMemberId);
+
+        DB::transaction(function () use ($receita, $data, $categoria, $memberId): void {
+            // Mesma ordem do updateExpense: desfaz o crédito antigo antes
+            // de aplicar o novo, senão a mesma conta recebe o delta errado.
+            if ($receita->bank_account_id !== null) {
+                BankAccount::withoutProfileScope()->find($receita->bank_account_id)?->applyToBalance('-'.$receita->amount);
+            }
+
+            $contaNova = $this->incomeBankAccountId !== ''
+                ? BankAccount::query()->findOrFail($this->incomeBankAccountId)
+                : null;
+
+            $receita->update([
+                'member_id' => $memberId,
+                'category_id' => $categoria->id,
+                'description' => $data['incomeDescription'] !== '' ? $data['incomeDescription'] : null,
+                'amount' => $data['incomeAmount'],
+                'received_date' => CarbonImmutable::parse($data['incomeDate']),
+                'bank_account_id' => $contaNova?->id,
+                'is_recurring' => $this->incomeRecurring,
+                'notes' => $this->incomeNotes !== '' ? $this->incomeNotes : null,
+                'is_private' => $memberId !== null && $this->incomeIsPrivate,
+            ]);
+
+            $contaNova?->applyToBalance($data['incomeAmount']);
+        });
+
+        session()->flash('status', 'Receita atualizada.');
+        $this->resetIncomeForm();
+        $this->showIncomeForm = false;
+    }
+
     private function resetIncomeForm(): void
     {
         $this->reset(
             'incomeDescription', 'incomeAmount', 'incomeCategoryId', 'incomeMemberId', 'incomeIsPrivate',
-            'incomeBankAccountId', 'incomeRecurring', 'incomeNotes',
+            'incomeBankAccountId', 'incomeRecurring', 'incomeNotes', 'editingIncomeId',
         );
         $this->incomeDate = CarbonImmutable::now()->toDateString();
         $this->resetErrorBag();
@@ -391,7 +665,7 @@ class CashFlowIndex extends Component
     {
         $query = ExpenseRecord::query()
             ->forPeriod($this->year, $this->month)
-            ->with(['category', 'subcategory', 'member', 'creditCard', 'installmentGroup'])
+            ->with(['category', 'subcategory', 'member', 'creditCard', 'installmentGroup', 'invoice'])
             ->orderByDesc('expense_date');
 
         if ($this->necessity !== '') {

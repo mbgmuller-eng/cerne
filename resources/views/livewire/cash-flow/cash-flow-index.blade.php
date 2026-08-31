@@ -1,5 +1,6 @@
 @use('App\Support\Money')
 @use('App\Enums\Necessity')
+@use('App\Enums\InvoiceStatus')
 
 <div class="space-y-6">
 
@@ -28,7 +29,7 @@
     @if ($showExpenseForm)
         <form wire:submit="saveExpense" class="card space-y-4 p-5">
             <div class="flex items-baseline justify-between">
-                <h2 class="text-sm font-semibold text-slate-900 dark:text-white">Nova despesa</h2>
+                <h2 class="text-sm font-semibold text-slate-900 dark:text-white">{{ $editingExpenseId ? 'Editar despesa' : 'Nova despesa' }}</h2>
                 <button type="button" wire:click="toggleExpenseForm" class="btn-ghost px-2 py-1 text-xs">Cancelar</button>
             </div>
 
@@ -105,42 +106,62 @@
                     </div>
                 @endif
 
-                <div>
-                    <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Pagamento</label>
-                    <select wire:model.live="expensePaymentMethod" class="select mt-1.5 w-full">
-                        <option value="outro">Conta / dinheiro</option>
-                        <option value="cartao">Cartão de crédito</option>
-                    </select>
-                </div>
-
-                @if ($expensePaymentMethod === 'cartao')
-                    <div>
-                        <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Cartão</label>
-                        <select wire:model="expenseCreditCardId" class="select mt-1.5 w-full">
-                            <option value="">Selecione</option>
-                            @foreach ($creditCards as $cartao)
-                                <option value="{{ $cartao->id }}">{{ $cartao->displayName() }}</option>
-                            @endforeach
-                        </select>
-                        @error('expenseCreditCardId') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
-                    </div>
-
-                    <div>
-                        <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Parcelas</label>
-                        <input type="number" min="1" max="{{ $maxInstallments }}" wire:model="expenseInstallments" class="input mt-1.5">
-                        @error('expenseInstallments') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
-                        <p class="mt-1 text-xs text-slate-400">1x = à vista no cartão.</p>
-                    </div>
+                @if ($editingExpenseId)
+                    {{-- Editar não troca cartão/conta de lugar — é mudança
+                         estrutural (fatura, parcelamento), não cabe aqui. --}}
+                    @if ($expensePaymentMethod === 'cartao')
+                        <div class="sm:col-span-2 lg:col-span-3 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-500 dark:bg-slate-700 dark:text-slate-400">
+                            Despesa de cartão — cartão e parcelamento não podem ser alterados por aqui.
+                        </div>
+                    @else
+                        <div>
+                            <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Conta (opcional)</label>
+                            <select wire:model="expenseBankAccountId" class="select mt-1.5 w-full">
+                                <option value="">Sem débito em conta</option>
+                                @foreach ($bankAccounts as $conta)
+                                    <option value="{{ $conta->id }}">{{ $conta->displayName() }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                    @endif
                 @else
                     <div>
-                        <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Conta (opcional)</label>
-                        <select wire:model="expenseBankAccountId" class="select mt-1.5 w-full">
-                            <option value="">Sem débito em conta</option>
-                            @foreach ($bankAccounts as $conta)
-                                <option value="{{ $conta->id }}">{{ $conta->displayName() }}</option>
-                            @endforeach
+                        <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Pagamento</label>
+                        <select wire:model.live="expensePaymentMethod" class="select mt-1.5 w-full">
+                            <option value="outro">Conta / dinheiro</option>
+                            <option value="cartao">Cartão de crédito</option>
                         </select>
                     </div>
+
+                    @if ($expensePaymentMethod === 'cartao')
+                        <div>
+                            <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Cartão</label>
+                            <select wire:model="expenseCreditCardId" class="select mt-1.5 w-full">
+                                <option value="">Selecione</option>
+                                @foreach ($creditCards as $cartao)
+                                    <option value="{{ $cartao->id }}">{{ $cartao->displayName() }}</option>
+                                @endforeach
+                            </select>
+                            @error('expenseCreditCardId') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Parcelas</label>
+                            <input type="number" min="1" max="{{ $maxInstallments }}" wire:model="expenseInstallments" class="input mt-1.5">
+                            @error('expenseInstallments') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                            <p class="mt-1 text-xs text-slate-400">1x = à vista no cartão.</p>
+                        </div>
+                    @else
+                        <div>
+                            <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Conta (opcional)</label>
+                            <select wire:model="expenseBankAccountId" class="select mt-1.5 w-full">
+                                <option value="">Sem débito em conta</option>
+                                @foreach ($bankAccounts as $conta)
+                                    <option value="{{ $conta->id }}">{{ $conta->displayName() }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                    @endif
                 @endif
 
                 <div class="sm:col-span-2 lg:col-span-3">
@@ -150,7 +171,7 @@
             </div>
 
             <div class="flex justify-end gap-2">
-                <button type="submit" class="btn-primary px-4 py-2" wire:loading.attr="disabled">Salvar despesa</button>
+                <button type="submit" class="btn-primary px-4 py-2" wire:loading.attr="disabled">{{ $editingExpenseId ? 'Salvar alterações' : 'Salvar despesa' }}</button>
             </div>
         </form>
     @endif
@@ -159,7 +180,7 @@
     @if ($showIncomeForm)
         <form wire:submit="saveIncome" class="card space-y-4 p-5">
             <div class="flex items-baseline justify-between">
-                <h2 class="text-sm font-semibold text-slate-900 dark:text-white">Nova receita</h2>
+                <h2 class="text-sm font-semibold text-slate-900 dark:text-white">{{ $editingIncomeId ? 'Editar receita' : 'Nova receita' }}</h2>
                 <button type="button" wire:click="toggleIncomeForm" class="btn-ghost px-2 py-1 text-xs">Cancelar</button>
             </div>
 
@@ -231,7 +252,7 @@
             </div>
 
             <div class="flex justify-end gap-2">
-                <button type="submit" class="btn-primary px-4 py-2" wire:loading.attr="disabled">Salvar receita</button>
+                <button type="submit" class="btn-primary px-4 py-2" wire:loading.attr="disabled">{{ $editingIncomeId ? 'Salvar alterações' : 'Salvar receita' }}</button>
             </div>
         </form>
     @endif
@@ -335,6 +356,7 @@
         @else
             <ul class="mt-3 card divide-y divide-slate-100 dark:divide-white/10">
                 @foreach ($expenses as $despesa)
+                    @php $faturaPaga = $despesa->isOnCredit() && $despesa->invoice?->status === InvoiceStatus::Paid; @endphp
                     <li class="flex items-center justify-between gap-4 px-5 py-3">
                         <div class="flex min-w-0 items-center gap-3">
                             <span class="h-8 w-1 shrink-0 rounded-full" style="background: {{ $despesa->necessity->color() }}"></span>
@@ -350,10 +372,32 @@
                             </div>
                         </div>
 
-                        <div class="shrink-0 text-right">
-                            <p class="text-sm tabular-nums text-slate-800 dark:text-slate-200">{{ Money::format($despesa->amount) }}</p>
-                            @if ($despesa->isInstallment())
-                                <p class="text-xs text-slate-400">parcela {{ $despesa->installmentLabel() }}</p>
+                        <div class="flex shrink-0 items-center gap-3">
+                            <div class="text-right">
+                                <p class="text-sm tabular-nums text-slate-800 dark:text-slate-200">{{ Money::format($despesa->amount) }}</p>
+                                @if ($despesa->isInstallment())
+                                    <p class="text-xs text-slate-400">parcela {{ $despesa->installmentLabel() }}</p>
+                                @endif
+                            </div>
+
+                            @if ($faturaPaga)
+                                <span class="text-xs text-slate-400" title="Fatura já paga — estorne o pagamento para editar ou excluir">
+                                    <x-nav-icon name="lock" class="h-4 w-4" />
+                                </span>
+                            @elseif ($confirmingDeleteExpenseId === $despesa->id)
+                                <span class="text-xs text-slate-500 dark:text-slate-400">Confirma?</span>
+                                <button wire:click="deleteExpense('{{ $despesa->id }}')" class="text-sm font-medium text-red-700 hover:underline dark:text-red-400">Sim</button>
+                                <button wire:click="cancelDeleteExpense" class="text-sm text-slate-400 hover:text-slate-700 dark:hover:text-slate-300">Não</button>
+                            @else
+                                <div class="relative" x-data="{ open: false }" @click.outside="open = false">
+                                    <button type="button" @click="open = !open" class="btn-ghost px-2 py-1.5" aria-label="Mais ações">
+                                        <x-nav-icon name="dots" class="h-4 w-4" />
+                                    </button>
+                                    <div x-show="open" x-transition x-cloak @click="open = false" class="absolute right-0 z-10 mt-1 w-32 overflow-hidden rounded-xl bg-white py-1 shadow-card ring-1 ring-brand-950/5 dark:bg-slate-800 dark:ring-white/10">
+                                        <button wire:click="editExpense('{{ $despesa->id }}')" type="button" class="block w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-700">Editar</button>
+                                        <button wire:click="confirmDeleteExpense('{{ $despesa->id }}')" type="button" class="block w-full px-3 py-2 text-left text-sm text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-500/10">Excluir</button>
+                                    </div>
+                                </div>
                             @endif
                         </div>
                     </li>
@@ -383,7 +427,26 @@
                                 @if ($receita->is_recurring) · recorrente @endif
                             </p>
                         </div>
-                        <p class="shrink-0 text-sm tabular-nums text-brand-800 dark:text-brand-300">{{ Money::format($receita->amount) }}</p>
+
+                        <div class="flex shrink-0 items-center gap-3">
+                            <p class="text-sm tabular-nums text-brand-800 dark:text-brand-300">{{ Money::format($receita->amount) }}</p>
+
+                            @if ($confirmingDeleteIncomeId === $receita->id)
+                                <span class="text-xs text-slate-500 dark:text-slate-400">Confirma?</span>
+                                <button wire:click="deleteIncome('{{ $receita->id }}')" class="text-sm font-medium text-red-700 hover:underline dark:text-red-400">Sim</button>
+                                <button wire:click="cancelDeleteIncome" class="text-sm text-slate-400 hover:text-slate-700 dark:hover:text-slate-300">Não</button>
+                            @else
+                                <div class="relative" x-data="{ open: false }" @click.outside="open = false">
+                                    <button type="button" @click="open = !open" class="btn-ghost px-2 py-1.5" aria-label="Mais ações">
+                                        <x-nav-icon name="dots" class="h-4 w-4" />
+                                    </button>
+                                    <div x-show="open" x-transition x-cloak @click="open = false" class="absolute right-0 z-10 mt-1 w-32 overflow-hidden rounded-xl bg-white py-1 shadow-card ring-1 ring-brand-950/5 dark:bg-slate-800 dark:ring-white/10">
+                                        <button wire:click="editIncome('{{ $receita->id }}')" type="button" class="block w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-700">Editar</button>
+                                        <button wire:click="confirmDeleteIncome('{{ $receita->id }}')" type="button" class="block w-full px-3 py-2 text-left text-sm text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-500/10">Excluir</button>
+                                    </div>
+                                </div>
+                            @endif
+                        </div>
                     </li>
                 @endforeach
             </ul>

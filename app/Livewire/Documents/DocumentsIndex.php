@@ -6,6 +6,7 @@ use App\Enums\DocumentType;
 use App\Enums\ProcessingStatus;
 use App\Jobs\ProcessDocumentJob;
 use App\Livewire\Concerns\RequiresActiveProfile;
+use App\Models\BankAccount;
 use App\Models\DocumentUpload;
 use App\Services\Extraction\DocumentCommitService;
 use App\Support\ProfileContext;
@@ -32,6 +33,8 @@ class DocumentsIndex extends Component
 
     public string $documentType = 'bank_statement';
 
+    public string $uploadBankAccountId = '';
+
     /** Documento aberto para revisão. */
     public ?string $revisandoId = null;
 
@@ -53,12 +56,16 @@ class DocumentsIndex extends Component
                 'max:'.(config('cerne.ai.max_upload_mb') * 1024),
             ],
             'documentType' => ['required', 'string'],
+            // Sem isso, confirmar a importação não tem como debitar/creditar
+            // o saldo certo — extrato sem conta é exatamente o bug que
+            // deixava o saldo do BTG parado depois de importar.
+            'uploadBankAccountId' => ['required_if:documentType,bank_statement'],
         ];
     }
 
     public function enviar(): void
     {
-        $this->validate();
+        $data = $this->validate();
 
         $context = app(ProfileContext::class);
 
@@ -68,9 +75,14 @@ class DocumentsIndex extends Component
             config('cerne.documents.disk'),
         );
 
+        $conta = $data['uploadBankAccountId'] !== ''
+            ? BankAccount::query()->findOrFail($data['uploadBankAccountId'])
+            : null;
+
         $documento = DocumentUpload::create([
             'uploaded_by_user_id' => auth()->id(),
             'member_id' => $context->memberId(),
+            'bank_account_id' => $conta?->id,
             'document_type' => $this->documentType,
             'original_filename' => $this->arquivo->getClientOriginalName(),
             'storage_path' => $caminho,
@@ -85,7 +97,7 @@ class DocumentsIndex extends Component
             ProcessDocumentJob::dispatch($documento->id);
         }
 
-        $this->reset('arquivo');
+        $this->reset('arquivo', 'uploadBankAccountId');
         session()->flash('status', 'Documento enviado. A leitura acontece em segundo plano.');
     }
 
@@ -154,6 +166,7 @@ class DocumentsIndex extends Component
             'revisando' => $this->revisando,
             'tipos' => DocumentType::options(),
             'iaConfigurada' => filled(config('cerne.ai.api_key')),
+            'bankAccounts' => BankAccount::query()->active()->orderBy('bank_name')->get(),
         ]);
     }
 }

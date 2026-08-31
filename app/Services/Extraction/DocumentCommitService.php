@@ -62,10 +62,15 @@ class DocumentCommitService
         });
     }
 
-    /** Extrato: cada linha vira receita ou despesa. */
+    /**
+     * Extrato: cada linha vira receita ou despesa, debitando/creditando a
+     * conta escolhida no upload — sem isso o saldo da conta nunca
+     * refletiria o que o extrato importado já mostra.
+     */
     private function bankStatement(DocumentUpload $documento, array $itens, string $userId): int
     {
         $criados = 0;
+        $conta = $documento->bankAccount;
 
         foreach ($itens as $item) {
             $data = $this->parseDate($item['data'] ?? null);
@@ -74,16 +79,21 @@ class DocumentCommitService
                 continue;
             }
 
+            $valor = Money::parse($item['valor'] ?? 0);
+
             if (($item['tipo'] ?? null) === 'receita') {
                 IncomeRecord::create([
                     'member_id' => $documento->member_id,
                     'category_id' => $this->incomeCategory($item['categoria_sugerida'] ?? null),
                     'description' => $item['descricao'] ?? 'Importado',
-                    'amount' => Money::parse($item['valor'] ?? 0),
+                    'amount' => $valor,
                     'received_date' => $data,
+                    'bank_account_id' => $conta?->id,
                     'source_document_id' => $documento->id,
                     'created_by_user_id' => $userId,
                 ]);
+
+                $conta?->applyToBalance($valor);
             } else {
                 ExpenseRecord::create([
                     'member_id' => $documento->member_id,
@@ -92,11 +102,14 @@ class DocumentCommitService
                     // é essencial e o usuário reclassifica no fluxo de caixa.
                     'necessity' => Necessity::Essential,
                     'category_id' => $this->expenseCategory($item['categoria_sugerida'] ?? null),
-                    'amount' => Money::parse($item['valor'] ?? 0),
+                    'amount' => $valor,
                     'expense_date' => $data,
+                    'bank_account_id' => $conta?->id,
                     'source_document_id' => $documento->id,
                     'created_by_user_id' => $userId,
                 ]);
+
+                $conta?->applyToBalance('-'.$valor);
             }
 
             $criados++;

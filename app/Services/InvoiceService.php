@@ -113,6 +113,32 @@ class InvoiceService
     }
 
     /**
+     * Estorna o pagamento: devolve o saldo debitado e volta a fatura pra
+     * "fechada" — o estado anterior ao pagamento na sequência normal
+     * (Open → Closed → Paid). Único jeito de corrigir uma despesa de
+     * cartão depois que a fatura já foi paga: estorna, edita, paga de novo.
+     */
+    public function unpay(CreditCardInvoice $invoice): CreditCardInvoice
+    {
+        if ($invoice->status !== InvoiceStatus::Paid) {
+            throw new \RuntimeException('Esta fatura não está paga.');
+        }
+
+        return DB::transaction(function () use ($invoice): CreditCardInvoice {
+            $invoice->paidFromAccount?->applyToBalance($invoice->paid_amount);
+
+            $invoice->update([
+                'status' => InvoiceStatus::Closed,
+                'paid_at' => null,
+                'paid_amount' => null,
+                'paid_from_account_id' => null,
+            ]);
+
+            return $invoice->refresh();
+        });
+    }
+
+    /**
      * Rotina diária: fecha o que venceu o fechamento e marca como vencida
      * a fatura não paga que passou do vencimento.
      *
