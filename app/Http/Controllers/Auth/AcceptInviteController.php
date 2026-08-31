@@ -30,10 +30,8 @@ class AcceptInviteController extends Controller
     public function store(Request $request, string $token, ClientOnboardingService $onboarding): RedirectResponse
     {
         $data = $request->validate([
-            'profile_name' => ['required', 'string', 'max:100'],
             'password' => ['required', 'confirmed', Password::min(8)->letters()->numbers()],
         ], attributes: [
-            'profile_name' => 'nome do perfil',
             'password' => 'senha',
         ]);
 
@@ -47,7 +45,7 @@ class AcceptInviteController extends Controller
             ]);
         }
 
-        $user = $onboarding->acceptInvite($invite, $data['password'], $data['profile_name']);
+        $user = $onboarding->acceptInvite($invite, $data['password']);
 
         Auth::login($user);
         $request->session()->regenerate();

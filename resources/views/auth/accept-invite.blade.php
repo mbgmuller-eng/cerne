@@ -28,21 +28,6 @@
             </div>
 
             <div>
-                <label for="profile_name" class="block text-sm font-medium text-slate-700 dark:text-slate-300">Nome do perfil</label>
-                <input
-                    id="profile_name"
-                    name="profile_name"
-                    type="text"
-                    value="{{ old('profile_name', 'Finanças de '.explode(' ', trim($invite->client_name))[0]) }}"
-                    required
-                    class="input mt-1.5"
-                >
-                @error('profile_name')
-                    <p class="mt-1 text-sm text-red-700 dark:text-red-400">{{ $message }}</p>
-                @enderror
-            </div>
-
-            <div>
                 <label for="password" class="block text-sm font-medium text-slate-700 dark:text-slate-300">Senha</label>
                 <input
                     id="password"

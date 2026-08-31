@@ -29,9 +29,9 @@ class ClientOnboardingService
     /**
      * @param  string  $password  Senha em claro; o cast `hashed` do model cuida do resto.
      */
-    public function acceptInvite(ConsultantInvite $invite, string $password, ?string $profileName = null): User
+    public function acceptInvite(ConsultantInvite $invite, string $password): User
     {
-        return DB::transaction(function () use ($invite, $password, $profileName): User {
+        return DB::transaction(function () use ($invite, $password): User {
             $user = User::create([
                 'name' => $invite->client_name,
                 'email' => $invite->client_email,
@@ -42,9 +42,13 @@ class ClientOnboardingService
 
             $user->forceFill(['email_verified_at' => now()])->save();
 
+            // O nome do perfil é sempre o que o consultor escreveu ao
+            // convidar — "Marcelo Müller" vira o perfil "Marcelo Müller",
+            // "Marcelo e Helen" vira "Marcelo e Helen". Não é mais algo
+            // que o cliente escolhe na tela de aceite.
             $profile = FinancialProfile::create([
                 'owner_user_id' => $user->id,
-                'profile_name' => $profileName ?: $this->defaultProfileName($invite->client_name),
+                'profile_name' => $invite->client_name,
                 'profile_type' => ProfileType::Single,
                 'base_currency' => 'BRL',
                 'reference_month' => 1,
@@ -112,12 +116,5 @@ class ClientOnboardingService
                 'is_active' => true,
             ]);
         });
-    }
-
-    private function defaultProfileName(string $clientName): string
-    {
-        $firstName = trim(explode(' ', trim($clientName))[0]);
-
-        return $firstName !== '' ? "Finanças de {$firstName}" : 'Minhas finanças';
     }
 }
