@@ -85,12 +85,13 @@ return [
         // mais por token sem ganho perceptível aqui.
         'model' => env('CERNE_AI_MODEL', 'claude-sonnet-5'),
 
-        // Extrato de dois meses de conta bancária movimentada passa de 150
+        // Extrato de dois meses de conta bancária movimentada passa de 200
         // lançamentos reais — o teto precisa acomodar o JSON inteiro, senão
         // a resposta vem truncada (stop_reason "max_tokens") antes de listar
-        // tudo. 16000 dava conta de um mês; dobrado pra cobrir período maior
-        // com folga.
-        'max_tokens' => 32000,
+        // tudo. 16000 dava conta de um mês; 32000 ainda truncou o mesmo
+        // extrato de dois meses numa segunda tentativa (o tamanho da saída
+        // varia de execução pra execução). Dobrado de novo, com folga maior.
+        'max_tokens' => 64000,
 
         // 'high' lê melhor as tabelas mal formatadas de PDF escaneado,
         // que é o caso comum de extrato bancário brasileiro.
