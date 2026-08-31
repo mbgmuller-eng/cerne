@@ -80,7 +80,7 @@ img {
     -premailer-cellpadding: 0;
     -premailer-cellspacing: 0;
     -premailer-width: 100%;
-    background-color: #fafafa;
+    background-color: #e7e8eb;
     margin: 0;
     padding: 0;
     width: 100%;
@@ -99,8 +99,9 @@ img {
 
 .header {
     background-color: #0b1d3a;
-    padding: 28px 0;
+    padding: 24px 0;
     text-align: center;
+    border-radius: 8px 8px 0 0;
 }
 
 .header a {
@@ -132,7 +133,7 @@ img {
     -premailer-cellpadding: 0;
     -premailer-cellspacing: 0;
     -premailer-width: 100%;
-    background-color: #fafafa;
+    background-color: #e7e8eb;
     border-bottom: 1px solid #fafafa;
     border-top: 1px solid #fafafa;
     margin: 0;
@@ -146,8 +147,9 @@ img {
     -premailer-width: 570px;
     background-color: #ffffff;
     border-color: #e4e4e7;
-    border-radius: 4px;
+    border-radius: 8px;
     border-width: 1px;
+    overflow: hidden;
     box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1);
     margin: 0 auto;
     padding: 0;
@@ -279,7 +281,7 @@ img {
 }
 
 .panel-content {
-    background-color: #fafafa;
+    background-color: #e7e8eb;
     color: #52525b;
     padding: 16px;
 }
