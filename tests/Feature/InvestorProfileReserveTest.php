@@ -34,12 +34,15 @@ class InvestorProfileReserveTest extends TestCase
         [$perfil, $membro] = $this->criarPerfil();
 
         // 14 meses de gasto essencial, 100 a 1400 — os 2 mais antigos
-        // (1300 e 1400) precisam ficar de fora da média.
+        // (1300 e 1400) precisam ficar de fora da média. Ancorado no
+        // início do mês pra "hoje" não empurrar dois $i pro mesmo mês por
+        // overflow de dia (ex.: 31/08 - 2 meses "transborda" pra 01/07,
+        // colidindo com 31/08 - 1 mês = 31/07).
         for ($i = 1; $i <= 14; $i++) {
             ExpenseRecord::factory()->for($perfil, 'profile')->create([
                 'necessity' => Necessity::Essential,
                 'amount' => number_format($i * 100, 2, '.', ''),
-                'expense_date' => CarbonImmutable::now()->subMonths($i),
+                'expense_date' => CarbonImmutable::now()->startOfMonth()->subMonths($i),
             ]);
         }
 
