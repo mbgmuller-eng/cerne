@@ -53,18 +53,17 @@ class DocumentProcessed extends Notification implements ShouldQueue
 
     public function toMail(object $notifiable): MailMessage
     {
-        if ($this->status === ProcessingStatus::Completed) {
-            return (new MailMessage)
-                ->subject('Importação concluída')
-                ->line("O arquivo \"{$this->filename}\" foi processado.")
-                ->action('Revisar', route('documents.index'));
-        }
+        $sucesso = $this->status === ProcessingStatus::Completed;
 
         return (new MailMessage)
-            ->subject('Falha na importação')
-            ->line("Não foi possível processar \"{$this->filename}\".")
-            ->line($this->errorMessage ?? '')
-            ->action('Ver documentos', route('documents.index'));
+            ->subject($sucesso ? 'Importação concluída' : 'Falha na importação')
+            ->markdown('mail.document-processed', [
+                'recipientName' => $notifiable->name,
+                'sucesso' => $sucesso,
+                'filename' => $this->filename,
+                'errorMessage' => $this->errorMessage,
+                'url' => route('documents.index'),
+            ]);
     }
 
     /** @return array<string, mixed> */

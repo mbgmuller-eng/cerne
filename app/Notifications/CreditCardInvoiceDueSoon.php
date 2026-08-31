@@ -53,9 +53,13 @@ class CreditCardInvoiceDueSoon extends Notification implements ShouldQueue
     {
         return (new MailMessage)
             ->subject("Fatura vence em breve: {$this->cardDisplayName}")
-            ->line("A fatura do cartão \"{$this->cardDisplayName}\" vence em ".CarbonImmutable::parse($this->dueDate)->format('d/m').'.')
-            ->line('Valor: '.Money::format($this->amount))
-            ->action('Ver fatura', route('invoices.show', $this->invoiceId));
+            ->markdown('mail.credit-card-invoice-due-soon', [
+                'recipientName' => $notifiable->name,
+                'cardDisplayName' => $this->cardDisplayName,
+                'dueDateFormatted' => CarbonImmutable::parse($this->dueDate)->format('d/m'),
+                'amountFormatted' => Money::format($this->amount),
+                'url' => route('invoices.show', $this->invoiceId),
+            ]);
     }
 
     /** @return array<string, mixed> */

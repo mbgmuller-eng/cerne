@@ -55,9 +55,13 @@ class FixedBillDueSoon extends Notification implements ShouldQueue
     {
         return (new MailMessage)
             ->subject("Vence em breve: {$this->billName}")
-            ->line("A conta \"{$this->billName}\" vence em ".CarbonImmutable::parse($this->dueDate)->format('d/m').'.')
-            ->line('Valor previsto: '.Money::format($this->amount))
-            ->action('Ver contas fixas', route('fixedbills.index'));
+            ->markdown('mail.fixed-bill-due-soon', [
+                'recipientName' => $notifiable->name,
+                'billName' => $this->billName,
+                'dueDateFormatted' => CarbonImmutable::parse($this->dueDate)->format('d/m'),
+                'amountFormatted' => Money::format($this->amount),
+                'url' => route('fixedbills.index'),
+            ]);
     }
 
     /** @return array<string, mixed> */
