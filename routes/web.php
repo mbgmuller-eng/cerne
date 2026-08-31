@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Auth\AcceptInviteController;
 use App\Http\Controllers\Auth\LoginController;
+use App\Http\Controllers\ConsultantLinkController;
 use App\Http\Controllers\ProfileSwitchController;
 use App\Http\Controllers\PwaController;
 use App\Http\Controllers\ThemePreferenceController;
@@ -61,6 +62,14 @@ Route::middleware('auth')->group(function (): void {
     Route::get('/carteira/seguros', PortfolioInsurance::class)->name('consultant.portfolio.insurance');
     Route::get('/carteira/investimentos', PortfolioInvestments::class)->name('consultant.portfolio.investments');
     Route::post('/clientes/{profile}/abrir', [ProfileSwitchController::class, 'store'])->name('profile.switch');
+
+    // Vínculo consultor↔cliente quando o e-mail convidado já tem conta —
+    // ver ConsultantLinkService. Só "show" carrega assinatura (vem do
+    // e-mail/link mostrado na tela); accept/decline são POST comuns
+    // dentro da própria página, protegidos pela policy.
+    Route::get('/vinculo/{consultantClient}', [ConsultantLinkController::class, 'show'])->name('link.show')->middleware('signed');
+    Route::post('/vinculo/{consultantClient}/autorizar', [ConsultantLinkController::class, 'accept'])->name('link.accept');
+    Route::post('/vinculo/{consultantClient}/recusar', [ConsultantLinkController::class, 'decline'])->name('link.decline');
 
     Route::post('/sair', [LoginController::class, 'destroy'])->name('logout');
 });

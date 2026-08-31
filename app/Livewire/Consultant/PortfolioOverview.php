@@ -4,8 +4,11 @@ namespace App\Livewire\Consultant;
 
 use App\Enums\ConsultantClientStatus;
 use App\Enums\InviteStatus;
+use App\Models\ConsultantClient;
 use App\Models\ConsultantInvite;
+use App\Models\User;
 use App\Services\ClientInviteService;
+use App\Services\ConsultantLinkService;
 use App\Services\ConsultantPortfolioService;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Layout;
@@ -89,7 +92,13 @@ class PortfolioOverview extends Component
         }
     }
 
-    public function invite(ClientInviteService $invites): void
+    /**
+     * E-mail novo vira convite de cadastro (ClientInviteService); e-mail
+     * que já tem conta vira pedido de autorização de vínculo
+     * (ConsultantLinkService) — ninguém ganha uma segunda conta só porque
+     * um consultor diferente tentou convidar o mesmo endereço.
+     */
+    public function invite(ClientInviteService $invites, ConsultantLinkService $links): void
     {
         $this->validate([
             'inviteName' => ['required', 'string', 'max:255'],
@@ -99,11 +108,43 @@ class PortfolioOverview extends Component
             'inviteEmail' => 'e-mail',
         ]);
 
-        $this->lastInviteLink = $invites->send(auth()->user(), $this->inviteName, $this->inviteEmail);
+        $consultor = auth()->user();
+        $existente = User::where('email', $this->inviteEmail)->first();
 
+        if ($existente === null) {
+            $this->lastInviteLink = $invites->send($consultor, $this->inviteName, $this->inviteEmail);
+            $this->reset('inviteName', 'inviteEmail');
+            session()->flash('status', 'Convite enviado.');
+
+            return;
+        }
+
+        if (! $existente->isClient()) {
+            $this->addError('inviteEmail', 'Esse e-mail já pertence a uma conta que não é de cliente.');
+
+            return;
+        }
+
+        $vinculo = ConsultantClient::query()
+            ->where('consultant_id', $consultor->id)
+            ->where('client_id', $existente->id)
+            ->first();
+
+        if ($vinculo?->status === ConsultantClientStatus::Active) {
+            $this->addError('inviteEmail', 'Esse e-mail já é seu cliente.');
+
+            return;
+        }
+
+        if ($vinculo?->status === ConsultantClientStatus::Pending) {
+            $this->addError('inviteEmail', 'Já existe uma autorização pendente pra esse e-mail.');
+
+            return;
+        }
+
+        $this->lastInviteLink = $links->request($consultor, $existente);
         $this->reset('inviteName', 'inviteEmail');
-
-        session()->flash('status', 'Convite enviado.');
+        session()->flash('status', 'Esse e-mail já tem conta no Cerne — enviamos um pedido de autorização de vínculo.');
     }
 
     /** @return Collection<int, ConsultantInvite> */
