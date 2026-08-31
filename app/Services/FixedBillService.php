@@ -6,10 +6,16 @@ use App\Enums\FixedBillPaymentStatus;
 use App\Enums\Necessity;
 use App\Models\BankAccount;
 use App\Models\ExpenseRecord;
+use App\Models\FinancialProfile;
 use App\Models\FixedBill;
 use App\Models\FixedBillPayment;
+use App\Models\ProfileMember;
+use App\Models\Scopes\MemberPrivacyScope;
+use App\Models\Scopes\ProfileScope;
+use App\Notifications\FixedBillDueSoon;
 use App\Support\Money;
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 class FixedBillService
@@ -194,5 +200,71 @@ class FixedBillService
             'gerados' => $this->generateForMonth($hoje->year, $hoje->month),
             'vencidos' => $this->markOverdue($hoje),
         ];
+    }
+
+    /**
+     * Notifica quem vai ter uma conta fixa vencendo daqui a
+     * `cerne.notifications.days_before_due` dias.
+     *
+     * @return int quantas notificações foram enviadas
+     */
+    public function notifyUpcomingDueDates(?CarbonImmutable $hoje = null, ?int $diasAntes = null): int
+    {
+        $hoje ??= CarbonImmutable::now();
+        $alvo = $hoje->addDays($diasAntes ?? config('cerne.notifications.days_before_due'))->toDateString();
+        $notificados = 0;
+
+        FixedBillPayment::withoutProfileScope()
+            ->where('status', FixedBillPaymentStatus::Pending)
+            ->whereDate('due_date', $alvo)
+            ->with(['fixedBill' => fn ($q) => $q
+                ->withoutGlobalScope(ProfileScope::class)
+                ->withoutGlobalScope(MemberPrivacyScope::class)])
+            ->chunkById(200, function ($vencimentos) use (&$notificados): void {
+                foreach ($vencimentos as $pagamento) {
+                    if ($pagamento->fixedBill === null) {
+                        continue;
+                    }
+
+                    foreach ($this->recipientsFor($pagamento->fixedBill) as $user) {
+                        if ($this->alreadyNotifiedToday($user, FixedBillDueSoon::class, 'fixed_bill_payment_id', $pagamento->id)) {
+                            continue;
+                        }
+
+                        $user->notify(FixedBillDueSoon::forPayment($pagamento));
+                        $notificados++;
+                    }
+                }
+            });
+
+        return $notificados;
+    }
+
+    /**
+     * Réplica manual da lógica de MemberPrivacyScope pra FixedBill — sem
+     * ProfileContext ativo aqui (é o cron), o escopo global não tem como
+     * decidir isso sozinho.
+     *
+     * @return Collection<int, \App\Models\User>
+     */
+    private function recipientsFor(FixedBill $bill): Collection
+    {
+        if ($bill->member_id === null || ! $bill->is_private) {
+            return FinancialProfile::find($bill->profile_id)
+                ?->activeMembers()->whereNotNull('user_id')->with('user')->get()
+                ->pluck('user')->filter()->values() ?? collect();
+        }
+
+        return collect([ProfileMember::find($bill->member_id)?->user])->filter();
+    }
+
+    /** Evita duplicar aviso se a rotina for reexecutada manualmente no mesmo dia. */
+    private function alreadyNotifiedToday(\App\Models\User $user, string $tipo, string $chave, string $id): bool
+    {
+        return $user->notifications()
+            ->where('type', $tipo)
+            ->whereJsonContains("data->{$chave}", $id)
+            ->whereDate('created_at', today())
+            ->exists();
     }
 }

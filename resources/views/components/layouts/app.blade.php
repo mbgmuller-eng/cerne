@@ -54,6 +54,7 @@
     </script>
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="csrf-token" content="{{ csrf_token() }}">
+    <meta name="vapid-public-key" content="{{ config('webpush.vapid.public_key') }}">
     <title>{{ $title ?? 'Cerne' }}</title>
 
     {{-- PWA --}}
@@ -65,7 +66,7 @@
     <link rel="apple-touch-icon" href="{{ asset('icons/icon-180.png') }}">
     <link rel="icon" href="{{ asset('icons/icon-192.png') }}" type="image/png">
 
-    @vite(['resources/css/app.css', 'resources/js/app.js'])
+    @vite(['resources/css/app.css', 'resources/js/app.js', 'resources/js/push.js'])
     {{-- Preload + @font-face de Fraunces/Inter — sem isto os arquivos são
          baixados no build (ver vite.config.js) mas nunca ficam ligados à
          página, e o navegador cai no fallback do sistema silenciosamente. --}}
@@ -119,10 +120,11 @@
                     </div>
                     <form method="POST" action="{{ route('logout') }}">
                         @csrf
-                        <button type="submit" class="btn-ghost -mr-1 px-2" title="Sair">
+                        <button type="submit" class="btn-ghost px-2" title="Sair">
                             <x-nav-icon name="logout" class="h-4 w-4" />
                         </button>
                     </form>
+                    <livewire:notifications.notification-center />
                 </div>
 
                 @if ($user->isConsultant())
@@ -182,10 +184,11 @@
                     </div>
                     <form method="POST" action="{{ route('logout') }}">
                         @csrf
-                        <button type="submit" class="btn-ghost -mr-1 px-2" title="Sair">
+                        <button type="submit" class="btn-ghost px-2" title="Sair">
                             <x-nav-icon name="logout" class="h-4 w-4" />
                         </button>
                     </form>
+                    <livewire:notifications.notification-center />
                 </div>
 
                 <div class="mt-2 flex justify-center">
@@ -241,6 +244,10 @@
                             <span class="ml-1.5 hidden sm:inline">Sair</span>
                         </button>
                     </form>
+
+                    @auth
+                        <livewire:notifications.notification-center />
+                    @endauth
                 </div>
             </div>
         </header>

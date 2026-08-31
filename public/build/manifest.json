@@ -60,7 +60,7 @@
     "src": "_inter-700-normal-Yt3aPRUw.woff2"
   },
   "resources/css/app.css": {
-    "file": "assets/app-DlJSvIxu.css",
+    "file": "assets/app-DJGcI1hG.css",
     "name": "app",
     "names": [
       "app.css"
@@ -72,6 +72,12 @@
     "file": "assets/app-CKJHdliy.js",
     "name": "app",
     "src": "resources/js/app.js",
+    "isEntry": true
+  },
+  "resources/js/push.js": {
+    "file": "assets/push-YAqYcvaz.js",
+    "name": "push",
+    "src": "resources/js/push.js",
     "isEntry": true
   }
 }

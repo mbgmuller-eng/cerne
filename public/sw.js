@@ -75,3 +75,22 @@ self.addEventListener('fetch', (evento) => {
         })
     );
 });
+
+// Notificação push: o payload já vem pronto (title/body) do
+// NotificationChannels\WebPush — ver app/Notifications/*.php.
+self.addEventListener('push', (evento) => {
+    const dados = evento.data ? evento.data.json() : {};
+
+    evento.waitUntil(
+        self.registration.showNotification(dados.title ?? 'Cerne', {
+            body: dados.body,
+            icon: '/icons/icon-192.png',
+            data: dados.data ?? {},
+        })
+    );
+});
+
+self.addEventListener('notificationclick', (evento) => {
+    evento.notification.close();
+    evento.waitUntil(clients.openWindow(evento.notification.data?.url ?? '/'));
+});

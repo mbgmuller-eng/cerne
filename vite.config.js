@@ -6,7 +6,7 @@ import tailwindcss from '@tailwindcss/vite';
 export default defineConfig({
     plugins: [
         laravel({
-            input: ['resources/css/app.css', 'resources/js/app.js'],
+            input: ['resources/css/app.css', 'resources/js/app.js', 'resources/js/push.js'],
             refresh: true,
             // Bunny em vez de Google Fonts: espelho de mesmo catálogo, sem
             // rastreamento — e os arquivos são baixados no BUILD e servidos

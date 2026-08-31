@@ -29,9 +29,12 @@ Schedule::call(function (): void {
     Cache::put('cerne:scheduler:heartbeat', now()->toIso8601String(), now()->addDays(2));
 })->everyMinute()->name('batimento');
 
-// Contas fixas: gera os vencimentos do mês e marca os atrasos.
+// Contas fixas: gera os vencimentos do mês, marca os atrasos e avisa quem
+// tem conta vencendo em breve.
 Schedule::call(function (): void {
-    $resultado = app(FixedBillService::class)->runDailyMaintenance();
+    $service = app(FixedBillService::class);
+    $resultado = $service->runDailyMaintenance();
+    $resultado['notificados'] = $service->notifyUpcomingDueDates();
 
     logger()->info('Contas fixas', $resultado);
 })->dailyAt('03:10')->name('contas-fixas')->withoutOverlapping();
@@ -43,9 +46,13 @@ Schedule::call(function (): void {
     logger()->info('Receitas recorrentes', $resultado);
 })->dailyAt('03:15')->name('receitas-recorrentes')->withoutOverlapping();
 
-// Faturas de cartão: fecha o que passou do fechamento, marca as vencidas.
+// Faturas de cartão: fecha o que passou do fechamento, marca as vencidas e
+// avisa quem tem fatura vencendo em breve (nessa ordem: precisa fechar antes
+// de decidir quem está "vencendo em breve").
 Schedule::call(function (): void {
-    $resultado = app(InvoiceService::class)->runDailyMaintenance();
+    $service = app(InvoiceService::class);
+    $resultado = $service->runDailyMaintenance();
+    $resultado['notificados'] = $service->notifyUpcomingDueDates();
 
     logger()->info('Faturas', $resultado);
 })->dailyAt('03:20')->name('faturas')->withoutOverlapping();

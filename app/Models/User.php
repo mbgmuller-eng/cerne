@@ -12,13 +12,17 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use NotificationChannels\WebPush\HasPushSubscriptions;
 
-#[Fillable(['name', 'email', 'password', 'role', 'phone', 'avatar_url', 'is_active', 'theme'])]
+#[Fillable([
+    'name', 'email', 'password', 'role', 'phone', 'avatar_url', 'is_active', 'theme',
+    'notify_email_enabled', 'notify_push_enabled',
+])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
-    use HasFactory, HasUuids, Notifiable;
+    use HasFactory, HasPushSubscriptions, HasUuids, Notifiable;
 
     /**
      * @return array<string, string>
@@ -32,6 +36,8 @@ class User extends Authenticatable
             'role' => UserRole::class,
             'is_active' => 'boolean',
             'theme' => ThemePreference::class,
+            'notify_email_enabled' => 'boolean',
+            'notify_push_enabled' => 'boolean',
         ];
     }
 

@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Models\DocumentUpload;
+use App\Notifications\DocumentProcessed;
 use App\Services\Extraction\DocumentExtractionService;
 use App\Support\ProfileContext;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -61,5 +62,11 @@ class ProcessDocumentJob implements ShouldQueue
                 'error_message' => 'Falhou após várias tentativas: '.$e->getMessage(),
                 'processed_at' => now(),
             ]);
+
+        // Caminho de falha separado do DocumentExtractionService::fail(): só
+        // dispara quando algo FORA do try/catch do serviço estoura (ex.:
+        // falha ao ler o arquivo do disco) e as tentativas se esgotam.
+        $documento = DocumentUpload::withoutProfileScope()->find($this->documentId);
+        $documento?->uploadedBy?->notify(DocumentProcessed::forDocument($documento));
     }
 }

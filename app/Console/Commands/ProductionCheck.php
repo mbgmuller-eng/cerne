@@ -73,6 +73,10 @@ class ProductionCheck extends Command
             'public'
         ), 'Extrato bancário em pasta pública é acessível por URL.');
 
+        $this->secao('Notificações');
+        $this->item('Chaves VAPID configuradas', filled(config('webpush.vapid.public_key')) && filled(config('webpush.vapid.private_key')),
+            'Sem elas, notificação push falha silenciosamente mesmo com o usuário inscrito.', aviso: true);
+
         $this->secao('Cache');
         $this->item('Configuração em cache', file_exists(base_path('bootstrap/cache/config.php')),
             'Sem cache o Laravel lê e analisa todos os arquivos de config a cada requisição.');

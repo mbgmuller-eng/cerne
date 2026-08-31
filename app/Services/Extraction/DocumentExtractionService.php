@@ -4,6 +4,7 @@ namespace App\Services\Extraction;
 
 use App\Enums\ProcessingStatus;
 use App\Models\DocumentUpload;
+use App\Notifications\DocumentProcessed;
 use Anthropic\Client;
 use RuntimeException;
 
@@ -63,7 +64,10 @@ class DocumentExtractionService
             'error_message' => null,
         ]);
 
-        return $documento->refresh();
+        $documento->refresh();
+        $this->notify($documento);
+
+        return $documento;
     }
 
     /**
@@ -151,6 +155,14 @@ class DocumentExtractionService
             'processed_at' => now(),
         ]);
 
-        return $documento->refresh();
+        $documento->refresh();
+        $this->notify($documento);
+
+        return $documento;
+    }
+
+    private function notify(DocumentUpload $documento): void
+    {
+        $documento->uploadedBy?->notify(DocumentProcessed::forDocument($documento));
     }
 }

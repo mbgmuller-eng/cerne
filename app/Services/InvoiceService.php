@@ -6,8 +6,14 @@ use App\Enums\InvoiceStatus;
 use App\Models\BankAccount;
 use App\Models\CreditCard;
 use App\Models\CreditCardInvoice;
+use App\Models\FinancialProfile;
+use App\Models\ProfileMember;
+use App\Models\Scopes\MemberPrivacyScope;
+use App\Models\Scopes\ProfileScope;
+use App\Notifications\CreditCardInvoiceDueSoon;
 use App\Support\Money;
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 class InvoiceService
@@ -127,5 +133,70 @@ class InvoiceService
             ->update(['status' => InvoiceStatus::Overdue]);
 
         return ['closed' => $closed, 'overdue' => $overdue];
+    }
+
+    /**
+     * Notifica quem vai ter uma fatura vencendo daqui a
+     * `cerne.notifications.days_before_due` dias.
+     *
+     * @return int quantas notificações foram enviadas
+     */
+    public function notifyUpcomingDueDates(?CarbonImmutable $hoje = null, ?int $diasAntes = null): int
+    {
+        $hoje ??= CarbonImmutable::now();
+        $alvo = $hoje->addDays($diasAntes ?? config('cerne.notifications.days_before_due'))->toDateString();
+        $notificados = 0;
+
+        CreditCardInvoice::withoutProfileScope()
+            ->whereIn('status', [InvoiceStatus::Open, InvoiceStatus::Closed])
+            ->whereDate('due_date', $alvo)
+            ->with(['creditCard' => fn ($q) => $q
+                ->withoutGlobalScope(ProfileScope::class)
+                ->withoutGlobalScope(MemberPrivacyScope::class)])
+            ->chunkById(200, function ($faturas) use (&$notificados): void {
+                foreach ($faturas as $fatura) {
+                    if ($fatura->creditCard === null) {
+                        continue;
+                    }
+
+                    foreach ($this->recipientsFor($fatura->creditCard) as $user) {
+                        if ($this->alreadyNotifiedToday($user, CreditCardInvoiceDueSoon::class, 'credit_card_invoice_id', $fatura->id)) {
+                            continue;
+                        }
+
+                        $user->notify(CreditCardInvoiceDueSoon::forInvoice($fatura));
+                        $notificados++;
+                    }
+                }
+            });
+
+        return $notificados;
+    }
+
+    /**
+     * Réplica manual da lógica de MemberPrivacyScope pra CreditCard — sem
+     * ProfileContext ativo aqui (é o cron).
+     *
+     * @return Collection<int, \App\Models\User>
+     */
+    private function recipientsFor(CreditCard $card): Collection
+    {
+        if ($card->member_id === null || $card->visible_to_partner || $card->is_joint) {
+            return FinancialProfile::find($card->profile_id)
+                ?->activeMembers()->whereNotNull('user_id')->with('user')->get()
+                ->pluck('user')->filter()->values() ?? collect();
+        }
+
+        return collect([ProfileMember::find($card->member_id)?->user])->filter();
+    }
+
+    /** Evita duplicar aviso se a rotina for reexecutada manualmente no mesmo dia. */
+    private function alreadyNotifiedToday(\App\Models\User $user, string $tipo, string $chave, string $id): bool
+    {
+        return $user->notifications()
+            ->where('type', $tipo)
+            ->whereJsonContains("data->{$chave}", $id)
+            ->whereDate('created_at', today())
+            ->exists();
     }
 }

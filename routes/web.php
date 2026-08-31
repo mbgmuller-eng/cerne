@@ -5,6 +5,7 @@ use App\Http\Controllers\Auth\AcceptPartnerInviteController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\ConsultantLinkController;
 use App\Http\Controllers\ProfileSwitchController;
+use App\Http\Controllers\PushSubscriptionController;
 use App\Http\Controllers\PwaController;
 use App\Http\Controllers\ThemePreferenceController;
 use App\Livewire\Accounts\AccountsIndex;
@@ -52,6 +53,7 @@ Route::middleware('auth')->group(function (): void {
     Route::get('/painel', Dashboard::class)->name('dashboard');
     Route::get('/minha-conta', MyAccount::class)->name('my-account');
     Route::post('/preferencias/tema', [ThemePreferenceController::class, 'store'])->name('theme.update');
+    Route::post('/preferencias/push', [PushSubscriptionController::class, 'store'])->name('push.subscribe');
 
     Route::get('/fluxo-de-caixa', CashFlowIndex::class)->name('cashflow.index');
     Route::get('/contas-fixas', FixedBillsIndex::class)->name('fixedbills.index');

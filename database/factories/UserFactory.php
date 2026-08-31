@@ -32,6 +32,12 @@ class UserFactory extends Factory
             'phone' => fake()->numerify('(##) 9####-####'),
             'is_active' => true,
             'email_verified_at' => now(),
+            // Precisam estar aqui, não só no default da coluna: create()
+            // não busca de volta o valor que o MySQL aplicou — sem isto, o
+            // objeto em memória logo após o factory fica com o atributo
+            // simplesmente ausente (null), mesmo a linha no banco estando 1/0.
+            'notify_email_enabled' => true,
+            'notify_push_enabled' => false,
             'password' => static::$password ??= Hash::make('password'),
             'remember_token' => Str::random(10),
         ];

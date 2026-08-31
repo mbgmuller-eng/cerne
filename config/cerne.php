@@ -52,6 +52,20 @@ return [
 
     /*
     |---------------------------------------------------------------------------
+    | Notificações
+    |---------------------------------------------------------------------------
+    | Aviso de vencimento (conta fixa, fatura de cartão) sai com esta
+    | antecedência. Não confundir com dashboard.upcoming_bills_days acima —
+    | aquele alimenta o card da Visão Geral, este dispara notificação de
+    | verdade (sino/e-mail/push).
+    */
+
+    'notifications' => [
+        'days_before_due' => env('CERNE_NOTIFY_DAYS_BEFORE_DUE', 3),
+    ],
+
+    /*
+    |---------------------------------------------------------------------------
     | Importação de documentos com IA
     |---------------------------------------------------------------------------
     | Limites da API: 32 MB por requisição e 600 páginas por PDF. O limite de

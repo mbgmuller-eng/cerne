@@ -35,9 +35,35 @@ class MyAccount extends Component
 
     public ?string $lastInviteLink = null;
 
+    public bool $notifyEmail = false;
+
+    public bool $notifyPush = false;
+
     public function mount(): void
     {
         $this->redirectOrAbortWithoutProfile();
+
+        $this->notifyEmail = auth()->user()->notify_email_enabled;
+        $this->notifyPush = auth()->user()->notify_push_enabled;
+    }
+
+    public function updatedNotifyEmail(bool $value): void
+    {
+        auth()->user()->update(['notify_email_enabled' => $value]);
+    }
+
+    /**
+     * Desligar persiste na hora. Ligar NÃO persiste aqui — quem liga de
+     * verdade é PushSubscriptionController::store, chamado pelo JS só
+     * depois que o navegador confirma a inscrição. Persistir "true" já
+     * aqui deixaria a flag mentindo (ligada, mas sem inscrição nenhuma)
+     * se a pessoa negar a permissão do navegador.
+     */
+    public function updatedNotifyPush(bool $value): void
+    {
+        if (! $value) {
+            auth()->user()->update(['notify_push_enabled' => false]);
+        }
     }
 
     public function toggleInviteForm(): void
