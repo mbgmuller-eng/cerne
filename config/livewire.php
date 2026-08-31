@@ -134,7 +134,12 @@ return [
 
     'temporary_file_upload' => [
         'disk' => env('LIVEWIRE_TEMPORARY_FILE_UPLOAD_DISK'), // Example: 'local', 's3'             | Default: 'default'
-        'rules' => null,                                      // Example: ['file', 'mimes:png,jpg'] | Default: ['required', 'file', 'max:12288'] (12MB)
+
+        // O padrão do Livewire (12MB) rejeita o upload nesta etapa, ANTES da
+        // validação do próprio Cerne rodar — precisa acompanhar
+        // cerne.ai.max_upload_mb, senão a tela promete 32MB e barra a 12MB
+        // sem avisar por quê.
+        'rules' => ['required', 'file', 'max:32768'],
         'directory' => null,                                  // Example: 'tmp'                     | Default: 'livewire-tmp'
         'middleware' => null,                                 // Example: 'throttle:5,1'            | Default: 'throttle:60,1'
         'preview_mimes' => [                                  // Supported file types for temporary pre-signed file URLs...
