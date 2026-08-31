@@ -23,7 +23,7 @@
     @endunless
 
     {{-- Upload ---------------------------------------------------------- --}}
-    <form wire:submit="upload" class="card p-5">
+    <form wire:submit="enviar" class="card p-5">
         <div class="grid gap-4 sm:grid-cols-[1fr_auto_auto] sm:items-end">
             <div>
                 <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Arquivo PDF</label>
@@ -52,8 +52,8 @@
                 wire:loading.attr="disabled"
                 class="btn-primary"
             >
-                <span wire:loading.remove wire:target="upload">Enviar</span>
-                <span wire:loading wire:target="upload">Enviando…</span>
+                <span wire:loading.remove wire:target="enviar">Enviar</span>
+                <span wire:loading wire:target="enviar">Enviando…</span>
             </button>
         </div>
 

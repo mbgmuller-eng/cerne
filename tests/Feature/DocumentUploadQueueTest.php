@@ -35,7 +35,7 @@ class DocumentUploadQueueTest extends TestCase
 
         Livewire::test(DocumentsIndex::class)
             ->set('arquivo', UploadedFile::fake()->create('extrato.pdf', 100, 'application/pdf'))
-            ->call('upload')
+            ->call('enviar')
             ->assertHasNoErrors();
 
         Queue::assertNotPushed(ProcessDocumentJob::class);
@@ -52,7 +52,7 @@ class DocumentUploadQueueTest extends TestCase
 
         Livewire::test(DocumentsIndex::class)
             ->set('arquivo', UploadedFile::fake()->create('extrato.pdf', 100, 'application/pdf'))
-            ->call('upload')
+            ->call('enviar')
             ->assertHasNoErrors();
 
         $documento = DocumentUpload::withoutProfileScope()->sole();

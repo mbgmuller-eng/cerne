@@ -56,7 +56,7 @@ class DocumentsIndex extends Component
         ];
     }
 
-    public function upload(): void
+    public function enviar(): void
     {
         $this->validate();
 
