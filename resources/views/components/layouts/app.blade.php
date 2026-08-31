@@ -104,6 +104,11 @@
                     </div>
                 @endif
 
+                <a href="{{ route('my-account') }}" @class(['nav-item mb-1', 'nav-item-active' => request()->routeIs('my-account')])>
+                    <x-nav-icon name="users" />
+                    <span>Minha conta</span>
+                </a>
+
                 <div class="flex items-center gap-3 px-2 py-1.5">
                     <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-100 text-xs font-semibold text-brand-800 dark:bg-white/10 dark:text-white">
                         {{ mb_strtoupper(mb_substr($user->name, 0, 1)) }}
@@ -287,6 +292,10 @@
                         <span>{{ $curto }}</span>
                     </a>
                 @endforeach
+                <a href="{{ route('my-account') }}" @class(['tab-item rounded-xl py-3', 'tab-item-active bg-brand-50 dark:bg-accent-500/15' => request()->routeIs('my-account')])>
+                    <x-nav-icon name="users" class="h-6 w-6" />
+                    <span>Minha conta</span>
+                </a>
             </div>
         </div>
 

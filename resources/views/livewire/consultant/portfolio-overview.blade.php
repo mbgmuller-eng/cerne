@@ -374,15 +374,50 @@
                                     </span>
                                 </td>
                                 <td class="px-5 py-3 text-right">
-                                    @if ($linha['profile_id'])
-                                        {{-- Form puro: abrir o perfil não pode depender de JS. --}}
-                                        <form method="POST" action="{{ route('profile.switch', $linha['profile_id']) }}">
-                                            @csrf
-                                            <button type="submit" class="btn-secondary px-3 py-1.5 whitespace-nowrap">Abrir perfil</button>
-                                        </form>
-                                    @endif
+                                    <div class="flex justify-end gap-2">
+                                        @if ($linha['profile_id'] && $linha['tipo_perfil'] === ProfileType::Single && $linha['status'] === ConsultantClientStatus::Active)
+                                            <button type="button" wire:click="togglePartnerInviteForm('{{ $linha['profile_id'] }}')" class="btn-ghost px-2 py-1.5 text-xs whitespace-nowrap">
+                                                {{ $invitingPartnerProfileId === $linha['profile_id'] ? 'Cancelar' : 'Convidar cônjuge' }}
+                                            </button>
+                                        @endif
+                                        @if ($linha['profile_id'])
+                                            {{-- Form puro: abrir o perfil não pode depender de JS. --}}
+                                            <form method="POST" action="{{ route('profile.switch', $linha['profile_id']) }}">
+                                                @csrf
+                                                <button type="submit" class="btn-secondary px-3 py-1.5 whitespace-nowrap">Abrir perfil</button>
+                                            </form>
+                                        @endif
+                                    </div>
                                 </td>
                             </tr>
+                            @if ($invitingPartnerProfileId === $linha['profile_id'])
+                                <tr>
+                                    <td colspan="7" class="bg-slate-50 px-5 py-4 dark:bg-slate-800/60">
+                                        <form wire:submit="sendPartnerInvite" class="grid gap-4 sm:grid-cols-[1fr_1fr_auto]">
+                                            <div>
+                                                <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Nome do cônjuge</label>
+                                                <input type="text" wire:model="partnerName" class="input mt-1.5" placeholder="Nome">
+                                                @error('partnerName') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                                            </div>
+                                            <div>
+                                                <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">E-mail</label>
+                                                <input type="email" wire:model="partnerEmail" class="input mt-1.5" placeholder="email@exemplo.com">
+                                                @error('partnerEmail') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                                            </div>
+                                            <div class="flex items-end">
+                                                <button type="submit" class="btn-primary px-4 py-2 whitespace-nowrap" wire:loading.attr="disabled">Convidar</button>
+                                            </div>
+                                        </form>
+
+                                        @if ($lastPartnerInviteLink)
+                                            <div class="mt-3 rounded-lg bg-white p-3 dark:bg-slate-700">
+                                                <p class="text-xs font-medium text-slate-600 dark:text-slate-400">Link do convite</p>
+                                                <p class="mt-1 font-mono text-xs break-all text-slate-700 dark:text-slate-300">{{ $lastPartnerInviteLink }}</p>
+                                            </div>
+                                        @endif
+                                    </td>
+                                </tr>
+                            @endif
                         @endforeach
                     </tbody>
                 </table>

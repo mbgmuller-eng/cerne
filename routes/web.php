@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Auth\AcceptInviteController;
+use App\Http\Controllers\Auth\AcceptPartnerInviteController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\ConsultantLinkController;
 use App\Http\Controllers\ProfileSwitchController;
@@ -18,6 +19,7 @@ use App\Livewire\FixedBills\FixedBillsIndex;
 use App\Livewire\Goals\GoalsIndex;
 use App\Livewire\Insurance\InsuranceIndex;
 use App\Livewire\Investments\InvestmentsIndex;
+use App\Livewire\Profile\MyAccount;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/manifest.webmanifest', [PwaController::class, 'manifest'])->name('pwa.manifest');
@@ -38,6 +40,9 @@ Route::middleware('guest')->group(function (): void {
 
     Route::get('/convite/{token}', [AcceptInviteController::class, 'show'])->name('invite.accept');
     Route::post('/convite/{token}', [AcceptInviteController::class, 'store'])->name('invite.store');
+
+    Route::get('/convite-conjuge/{token}', [AcceptPartnerInviteController::class, 'show'])->name('partner-invite.accept');
+    Route::post('/convite-conjuge/{token}', [AcceptPartnerInviteController::class, 'store'])->name('partner-invite.store');
 });
 
 /*
@@ -45,6 +50,7 @@ Route::middleware('guest')->group(function (): void {
 */
 Route::middleware('auth')->group(function (): void {
     Route::get('/painel', Dashboard::class)->name('dashboard');
+    Route::get('/minha-conta', MyAccount::class)->name('my-account');
     Route::post('/preferencias/tema', [ThemePreferenceController::class, 'store'])->name('theme.update');
 
     Route::get('/fluxo-de-caixa', CashFlowIndex::class)->name('cashflow.index');

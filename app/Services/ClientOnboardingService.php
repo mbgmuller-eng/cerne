@@ -10,6 +10,7 @@ use App\Enums\UserRole;
 use App\Models\ConsultantClient;
 use App\Models\ConsultantInvite;
 use App\Models\FinancialProfile;
+use App\Models\PartnerInvite;
 use App\Models\ProfileMember;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
@@ -83,9 +84,9 @@ class ClientOnboardingService
      * Perfil de casal exige login próprio para cada membro — é o que torna
      * a privacidade granular aplicável (ver ProfileType::requiresMemberLogin).
      */
-    public function addPartner(FinancialProfile $profile, string $name, string $email, string $password): ProfileMember
+    public function addPartner(FinancialProfile $profile, string $name, string $email, string $password): User
     {
-        return DB::transaction(function () use ($profile, $name, $email, $password): ProfileMember {
+        return DB::transaction(function () use ($profile, $name, $email, $password): User {
             $partner = User::create([
                 'name' => $name,
                 'email' => $email,
@@ -94,15 +95,38 @@ class ClientOnboardingService
                 'is_active' => true,
             ]);
 
+            $partner->forceFill(['email_verified_at' => now()])->save();
+
             $profile->update(['profile_type' => ProfileType::Couple]);
 
-            return ProfileMember::create([
+            ProfileMember::create([
                 'profile_id' => $profile->id,
                 'user_id' => $partner->id,
                 'name' => $name,
                 'role' => MemberRole::Secondary,
                 'is_active' => true,
             ]);
+
+            return $partner;
+        });
+    }
+
+    /**
+     * Aceite do convite de cônjuge (PartnerInvite) — chama addPartner() e
+     * baixa o convite na mesma transação, mesmo raciocínio de
+     * acceptInvite() com o convite de cliente.
+     */
+    public function acceptPartnerInvite(PartnerInvite $invite, string $password): User
+    {
+        return DB::transaction(function () use ($invite, $password): User {
+            $partner = $this->addPartner($invite->profile, $invite->partner_name, $invite->partner_email, $password);
+
+            $invite->update([
+                'status' => InviteStatus::Accepted,
+                'accepted_at' => now(),
+            ]);
+
+            return $partner;
         });
     }
 }

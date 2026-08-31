@@ -23,7 +23,7 @@ enum ProfileType: string
 
     /**
      * Perfis de casal exigem login próprio para cada membro — é o que
-     * torna a privacidade granular (profile_access_settings) aplicável.
+     * torna a privacidade granular (is_private por lançamento) aplicável.
      */
     public function requiresMemberLogin(): bool
     {

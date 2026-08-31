@@ -44,10 +44,10 @@ class FinancialProfilePolicy
         return $this->isLinkedConsultant($user, $profile) || $user->isAdmin();
     }
 
-    /** Convidar membros para o perfil. */
+    /** Convidar o cônjuge pro perfil — titular ou consultor vinculado, os dois podem. */
     public function manageMembers(User $user, FinancialProfile $profile): bool
     {
-        return $this->isOwner($user, $profile);
+        return $this->isOwner($user, $profile) || $this->isLinkedConsultant($user, $profile);
     }
 
     // ---------------------------------------------------------------------

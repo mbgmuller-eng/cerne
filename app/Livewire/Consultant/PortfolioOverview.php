@@ -6,10 +6,12 @@ use App\Enums\ConsultantClientStatus;
 use App\Enums\InviteStatus;
 use App\Models\ConsultantClient;
 use App\Models\ConsultantInvite;
+use App\Models\FinancialProfile;
 use App\Models\User;
 use App\Services\ClientInviteService;
 use App\Services\ConsultantLinkService;
 use App\Services\ConsultantPortfolioService;
+use App\Services\PartnerInviteService;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Url;
@@ -35,6 +37,15 @@ class PortfolioOverview extends Component
     public ?string $lastInviteLink = null;
 
     public bool $showInviteForm = false;
+
+    /** profile_id da linha com o formulário de convidar cônjuge aberto, ou nulo. */
+    public ?string $invitingPartnerProfileId = null;
+
+    public string $partnerName = '';
+
+    public string $partnerEmail = '';
+
+    public ?string $lastPartnerInviteLink = null;
 
 
     /** @var array<string, string> chave usada na URL/dropdown => rótulo, na ordem de exibição */
@@ -145,6 +156,37 @@ class PortfolioOverview extends Component
         $this->lastInviteLink = $links->request($consultor, $existente);
         $this->reset('inviteName', 'inviteEmail');
         session()->flash('status', 'Esse e-mail já tem conta no Cerne — enviamos um pedido de autorização de vínculo.');
+    }
+
+    /**
+     * Abre/fecha o formulário de convidar cônjuge pra uma linha da tabela
+     * — só uma por vez (abrir outra fecha a anterior).
+     */
+    public function togglePartnerInviteForm(?string $profileId = null): void
+    {
+        $this->invitingPartnerProfileId = $this->invitingPartnerProfileId === $profileId ? null : $profileId;
+        $this->reset('partnerName', 'partnerEmail', 'lastPartnerInviteLink');
+        $this->resetErrorBag();
+    }
+
+    public function sendPartnerInvite(PartnerInviteService $service): void
+    {
+        $profile = FinancialProfile::findOrFail($this->invitingPartnerProfileId);
+
+        $this->authorize('manageMembers', $profile);
+
+        $data = $this->validate([
+            'partnerName' => ['required', 'string', 'max:255'],
+            'partnerEmail' => ['required', 'email', 'max:255'],
+        ], attributes: [
+            'partnerName' => 'nome',
+            'partnerEmail' => 'e-mail',
+        ]);
+
+        $this->lastPartnerInviteLink = $service->send($profile, auth()->user(), $data['partnerName'], $data['partnerEmail']);
+
+        $this->reset('partnerName', 'partnerEmail');
+        session()->flash('status', 'Convite enviado.');
     }
 
     /** @return Collection<int, ConsultantInvite> */
