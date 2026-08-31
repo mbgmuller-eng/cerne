@@ -15,6 +15,18 @@ use Livewire\Component;
  */
 class NotificationCenter extends Component
 {
+    /**
+     * 'down' no cabeçalho (sobra espaço embaixo); 'up' na barra lateral,
+     * onde o sino fica perto do rodapé da tela — abrir pra baixo ali
+     * derrubaria o painel pra fora da viewport.
+     */
+    public string $direction = 'down';
+
+    public function mount(string $direction = 'down'): void
+    {
+        $this->direction = $direction;
+    }
+
     public function markAsRead(string $id): void
     {
         auth()->user()->unreadNotifications()->where('id', $id)->first()?->markAsRead();

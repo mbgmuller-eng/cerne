@@ -124,7 +124,7 @@
                             <x-nav-icon name="logout" class="h-4 w-4" />
                         </button>
                     </form>
-                    <livewire:notifications.notification-center />
+                    <livewire:notifications.notification-center direction="up" />
                 </div>
 
                 @if ($user->isConsultant())
@@ -188,7 +188,7 @@
                             <x-nav-icon name="logout" class="h-4 w-4" />
                         </button>
                     </form>
-                    <livewire:notifications.notification-center />
+                    <livewire:notifications.notification-center direction="up" />
                 </div>
 
                 <div class="mt-2 flex justify-center">

@@ -12,7 +12,15 @@
         x-show="open"
         x-transition
         x-cloak
-        class="absolute right-0 z-30 mt-2 w-80 max-w-[90vw] rounded-xl border border-slate-200 bg-white shadow-lg dark:border-white/10 dark:bg-slate-800"
+        @class([
+            'absolute z-30 w-80 max-w-[90vw] rounded-xl border border-slate-200 bg-white shadow-lg dark:border-white/10 dark:bg-slate-800',
+            // "down" (cabeçalho): o botão fica perto da borda direita, então
+            // ancora à direita dele. "up" (barra lateral): a barra é mais
+            // estreita que os 320px do painel, então ancora à ESQUERDA do
+            // botão — right-0 aqui empurraria o painel pra fora da tela.
+            'right-0 top-full mt-2' => $direction === 'down',
+            'left-0 bottom-full mb-2' => $direction === 'up',
+        ])
     >
         <div class="flex items-center justify-between border-b border-slate-100 px-4 py-2.5 dark:border-white/10">
             <p class="text-sm font-semibold text-slate-900 dark:text-white">Notificações</p>
