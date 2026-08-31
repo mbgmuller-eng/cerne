@@ -6,6 +6,7 @@ use App\Enums\InsuranceType;
 use App\Enums\PaymentFrequency;
 use App\Models\Concerns\Auditable;
 use App\Models\Concerns\BelongsToProfile;
+use App\Models\Concerns\HasBadgeInitials;
 use App\Models\Concerns\InvalidatesDashboard;
 use App\Models\Concerns\RespectsMemberPrivacy;
 use App\Support\Money;
@@ -24,7 +25,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 ])]
 class InsurancePolicy extends Model
 {
-    use Auditable, BelongsToProfile, InvalidatesDashboard, HasFactory, HasUuids, RespectsMemberPrivacy;
+    use Auditable, BelongsToProfile, HasBadgeInitials, InvalidatesDashboard, HasFactory, HasUuids, RespectsMemberPrivacy;
 
     protected function casts(): array
     {
@@ -148,28 +149,11 @@ class InsurancePolicy extends Model
     }
 
     /**
-     * Versões estáticas dos dois métodos acima — para telas que listam
-     * seguradoras por NOME (ex.: o painel do consultor, que agrega vários
-     * clientes e não tem a instância de InsurancePolicy à mão), mas
-     * precisam do mesmo selo/cor da tela de uma apólice só.
+     * Versão estática do método acima — para telas que listam seguradoras
+     * por NOME (ex.: o painel do consultor, que agrega vários clientes e
+     * não tem a instância de InsurancePolicy à mão), mas precisam da mesma
+     * cor da tela de uma apólice só. initialsFor() vem de HasBadgeInitials.
      */
-    public static function initialsFor(string $insurerName): string
-    {
-        $palavras = preg_split('/\s+/', trim($insurerName)) ?: [];
-
-        // "Icatu Seguros" -> "IS" (1ª letra de cada palavra). Nome de uma
-        // palavra só ("AZOS", "Allianz") usaria só 1 letra por esta regra
-        // — e "Allianz"/"AZOS" colidiriam as duas em "A". Pega as 2
-        // primeiras letras da palavra única para desambiguar.
-        if (count($palavras) === 1) {
-            return mb_strtoupper(mb_substr($palavras[0], 0, 2));
-        }
-
-        $primeiras = array_map(fn (string $p) => mb_strtoupper(mb_substr($p, 0, 1)), array_slice($palavras, 0, 2));
-
-        return implode('', $primeiras) ?: '?';
-    }
-
     public static function colorIndexFor(string $insurerName, int $paletteSize): int
     {
         return crc32($insurerName) % $paletteSize;

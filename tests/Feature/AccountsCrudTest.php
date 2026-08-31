@@ -214,6 +214,39 @@ class AccountsCrudTest extends TestCase
         self::assertNull(CreditCard::withoutProfileScope()->find($cartao->id));
     }
 
+    public function test_escolher_banco_conhecido_preenche_a_cor_sozinha(): void
+    {
+        [, $membro] = $this->criarPerfil();
+
+        Livewire::test(AccountsIndex::class)
+            ->set('accountBankName', 'Itaú')
+            ->assertSet('accountColor', '#EC7000');
+    }
+
+    public function test_banco_desconhecido_nao_mexe_na_cor_ja_escolhida(): void
+    {
+        [, $membro] = $this->criarPerfil();
+
+        Livewire::test(AccountsIndex::class)
+            ->set('accountColor', '#123456')
+            ->set('accountBankName', 'Banco da Esquina Ltda')
+            ->assertSet('accountColor', '#123456');
+    }
+
+    public function test_editar_conta_nao_sobrescreve_a_cor_ja_salva(): void
+    {
+        [$perfil, $membro] = $this->criarPerfil();
+        $conta = BankAccount::factory()->for($perfil, 'profile')->for($membro, 'member')
+            ->create(['bank_name' => 'Itaú', 'color_hex' => '#123456']);
+
+        // editAccount() carrega os dados via PHP, não via wire:model — não
+        // deve disparar o updatedAccountBankName() e trocar a cor que a
+        // pessoa já tinha escolhido.
+        Livewire::test(AccountsIndex::class)
+            ->call('editAccount', $conta->id)
+            ->assertSet('accountColor', '#123456');
+    }
+
     /** @return array{0: FinancialProfile, 1: ProfileMember} */
     private function criarPerfil(): array
     {

@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Enums\AccountType;
 use App\Models\Concerns\Auditable;
 use App\Models\Concerns\BelongsToProfile;
+use App\Models\Concerns\HasBadgeInitials;
 use App\Models\Concerns\InvalidatesDashboard;
 use App\Models\Concerns\HasSharingFlags;
 use App\Models\Concerns\RespectsMemberPrivacy;
@@ -22,7 +23,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 ])]
 class BankAccount extends Model
 {
-    use Auditable, BelongsToProfile, InvalidatesDashboard, HasFactory, HasSharingFlags, HasUuids, RespectsMemberPrivacy;
+    use Auditable, BelongsToProfile, HasBadgeInitials, InvalidatesDashboard, HasFactory, HasSharingFlags, HasUuids, RespectsMemberPrivacy;
 
     protected function casts(): array
     {
@@ -44,6 +45,12 @@ class BankAccount extends Model
     public function displayName(): string
     {
         return $this->bank_name.' · '.$this->account_type->label();
+    }
+
+    /** Iniciais do selo — "Banco Inter" vira "BI" (ver HasBadgeInitials). */
+    public function bankInitials(): string
+    {
+        return self::initialsFor($this->bank_name);
     }
 
     /**

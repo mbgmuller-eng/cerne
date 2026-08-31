@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Enums\CardBrand;
 use App\Models\Concerns\Auditable;
 use App\Models\Concerns\BelongsToProfile;
+use App\Models\Concerns\HasBadgeInitials;
 use App\Models\Concerns\HasSharingFlags;
 use App\Models\Concerns\RespectsMemberPrivacy;
 use Carbon\CarbonImmutable;
@@ -22,7 +23,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 ])]
 class CreditCard extends Model
 {
-    use Auditable, BelongsToProfile, HasFactory, HasSharingFlags, HasUuids, RespectsMemberPrivacy;
+    use Auditable, BelongsToProfile, HasBadgeInitials, HasFactory, HasSharingFlags, HasUuids, RespectsMemberPrivacy;
 
     protected function casts(): array
     {
@@ -53,6 +54,12 @@ class CreditCard extends Model
         $suffix = $this->last_four_digits ? " ····{$this->last_four_digits}" : '';
 
         return $this->card_name.$suffix;
+    }
+
+    /** Iniciais do selo — a partir do banco emissor, não do apelido do cartão. */
+    public function bankInitials(): string
+    {
+        return self::initialsFor($this->bank_name);
     }
 
     /**

@@ -10,6 +10,7 @@ use App\Models\BankAccount;
 use App\Models\CreditCard;
 use App\Models\CreditCardInvoice;
 use App\Models\ProfileMember;
+use App\Support\KnownBanks;
 use App\Support\Money;
 use App\Support\ProfileContext;
 use Illuminate\Database\Eloquent\Builder;
@@ -109,6 +110,30 @@ class AccountsIndex extends Component
     public function mount(): void
     {
         $this->redirectOrAbortWithoutProfile();
+    }
+
+    /**
+     * Bateu num banco conhecido? Preenche a cor sozinha — só dispara em
+     * digitação de verdade (wire:model.live), nunca quando editAccount()
+     * carrega um valor já salvo, então não sobrescreve uma cor que a
+     * pessoa escolheu de propósito.
+     */
+    public function updatedAccountBankName(string $value): void
+    {
+        $cor = KnownBanks::colorFor($value);
+
+        if ($cor !== null) {
+            $this->accountColor = $cor;
+        }
+    }
+
+    public function updatedCardBankName(string $value): void
+    {
+        $cor = KnownBanks::colorFor($value);
+
+        if ($cor !== null) {
+            $this->cardColor = $cor;
+        }
     }
 
     // -----------------------------------------------------------------
@@ -505,6 +530,7 @@ class AccountsIndex extends Component
                 ->where('is_active', true)
                 ->orderBy('name')
                 ->get(),
+            'knownBanks' => KnownBanks::names(),
         ]);
     }
 }

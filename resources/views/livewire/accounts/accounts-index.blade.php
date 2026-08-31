@@ -4,6 +4,13 @@
 
 <div class="space-y-8">
 
+    {{-- Compartilhada pelos dois campos "Banco" (conta e cartão) abaixo. --}}
+    <datalist id="known-banks">
+        @foreach ($knownBanks as $banco)
+            <option value="{{ $banco }}"></option>
+        @endforeach
+    </datalist>
+
     <div class="flex flex-wrap items-end justify-between gap-4">
         <div>
             <h1 class="font-display text-3xl font-semibold tracking-tight text-slate-900 dark:text-white">Contas &amp; Cartões</h1>
@@ -32,8 +39,9 @@
             <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 <div>
                     <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Banco</label>
-                    <input type="text" wire:model="accountBankName" class="input mt-1.5" placeholder="Ex.: Itaú">
+                    <input type="text" wire:model.live.blur="accountBankName" list="known-banks" class="input mt-1.5" placeholder="Ex.: Itaú">
                     @error('accountBankName') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                    <p class="mt-1 text-xs text-slate-400">Escolhendo um banco conhecido, a cor abaixo já vem preenchida.</p>
                 </div>
 
                 <div>
@@ -130,8 +138,9 @@
 
                 <div>
                     <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Banco / emissor</label>
-                    <input type="text" wire:model="cardBankName" class="input mt-1.5" placeholder="Ex.: Nubank">
+                    <input type="text" wire:model.live.blur="cardBankName" list="known-banks" class="input mt-1.5" placeholder="Ex.: Nubank">
                     @error('cardBankName') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                    <p class="mt-1 text-xs text-slate-400">Escolhendo um banco conhecido, a cor abaixo já vem preenchida.</p>
                 </div>
 
                 <div>
@@ -241,7 +250,7 @@
                 @foreach ($accounts as $account)
                     <li class="flex items-center justify-between gap-4 px-5 py-4">
                         <div class="flex min-w-0 items-center gap-3">
-                            <span class="h-9 w-1.5 shrink-0 rounded-full" style="background: {{ $account->color_hex ?? '#0F766E' }}"></span>
+                            <x-bank-badge :initials="$account->bankInitials()" :color="$account->color_hex ?? '#0F766E'" />
                             <div class="min-w-0">
                                 <p class="truncate text-sm font-medium text-slate-800 dark:text-slate-200">{{ $account->bank_name }}</p>
                                 <p class="truncate text-xs text-slate-500 dark:text-slate-400">
@@ -321,7 +330,7 @@
                     <li class="card">
                         <div class="flex items-center justify-between gap-4 px-5 py-4">
                             <div class="flex min-w-0 items-center gap-3">
-                                <span class="h-9 w-1.5 shrink-0 rounded-full" style="background: {{ $card->color_hex ?? '#B45309' }}"></span>
+                                <x-bank-badge :initials="$card->bankInitials()" :color="$card->color_hex ?? '#B45309'" />
                                 <div class="min-w-0">
                                     <p class="truncate text-sm font-medium text-slate-800 dark:text-slate-200">{{ $card->displayName() }}</p>
                                     <p class="truncate text-xs text-slate-500 dark:text-slate-400">
