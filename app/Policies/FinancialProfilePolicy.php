@@ -38,12 +38,6 @@ class FinancialProfilePolicy
         return $this->isOwner($user, $profile);
     }
 
-    /** Só o dono redefine a privacidade do casal (tela 9). */
-    public function updatePrivacy(User $user, FinancialProfile $profile): bool
-    {
-        return $this->isOwner($user, $profile);
-    }
-
     /** A trilha de auditoria é visível apenas ao consultor. */
     public function viewAuditLog(User $user, FinancialProfile $profile): bool
     {

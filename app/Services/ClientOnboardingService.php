@@ -10,7 +10,6 @@ use App\Enums\UserRole;
 use App\Models\ConsultantClient;
 use App\Models\ConsultantInvite;
 use App\Models\FinancialProfile;
-use App\Models\ProfileAccessSettings;
 use App\Models\ProfileMember;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
@@ -18,11 +17,10 @@ use Illuminate\Support\Facades\DB;
 /**
  * Transforma um convite aceito em cliente operante.
  *
- * São seis inserções que precisam acontecer juntas ou não acontecer:
- * usuário, perfil, membro titular, configuração de privacidade, vínculo
- * com o consultor e baixa do convite. Um cliente com perfil mas sem
- * membro titular, ou com perfil mas sem privacidade configurada, é um
- * estado quebrado difícil de diagnosticar depois — daí a transação.
+ * São cinco inserções que precisam acontecer juntas ou não acontecer:
+ * usuário, perfil, membro titular, vínculo com o consultor e baixa do
+ * convite. Um cliente com perfil mas sem membro titular é um estado
+ * quebrado difícil de diagnosticar depois — daí a transação.
  */
 class ClientOnboardingService
 {
@@ -61,16 +59,6 @@ class ClientOnboardingService
                 'role' => MemberRole::Primary,
                 'is_active' => true,
             ]);
-
-            // Perfil individual nasce transparente; a tela 9 só passa a
-            // fazer diferença quando o perfil vira casal.
-            ProfileAccessSettings::create(array_merge(
-                ProfileAccessSettings::transparentPreset(),
-                [
-                    'profile_id' => $profile->id,
-                    'updated_by_user_id' => $user->id,
-                ],
-            ));
 
             ConsultantClient::create([
                 'consultant_id' => $invite->consultant_id,

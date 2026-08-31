@@ -47,9 +47,9 @@ class CashFlowIndex extends Component
     use RequiresActiveProfile;
     use HasPrivacyTabs;
 
-    protected function privacyDomains(): array
+    protected function privacyModels(): array
     {
-        return ['expense_visibility', 'income_visibility'];
+        return [ExpenseRecord::class, IncomeRecord::class];
     }
 
     /** Estado na URL: o mês visto sobrevive ao recarregar e é linkável. */
@@ -89,6 +89,8 @@ class CashFlowIndex extends Component
     public string $expenseNewSubcategory = '';
 
     public string $expenseMemberId = '';
+
+    public bool $expenseIsPrivate = false;
 
     /** 'outro' (conta bancária opcional) ou 'cartao' (via InstallmentService). */
     public string $expensePaymentMethod = 'outro';
@@ -235,6 +237,7 @@ class CashFlowIndex extends Component
                 'subcategory_id' => $subcategoriaId,
                 'member_id' => $memberId,
                 'notes' => $this->expenseNotes !== '' ? $this->expenseNotes : null,
+                'is_private' => $memberId !== null && $this->expenseIsPrivate,
             ], auth()->id());
         } else {
             $conta = $this->expenseBankAccountId !== ''
@@ -252,6 +255,7 @@ class CashFlowIndex extends Component
                 'bank_account_id' => $conta?->id,
                 'notes' => $this->expenseNotes !== '' ? $this->expenseNotes : null,
                 'created_by_user_id' => auth()->id(),
+                'is_private' => $memberId !== null && $this->expenseIsPrivate,
             ]);
 
             $conta?->applyToBalance('-'.$data['expenseAmount']);
@@ -281,8 +285,9 @@ class CashFlowIndex extends Component
     {
         $this->reset(
             'expenseDescription', 'expenseAmount', 'expenseNecessity', 'expenseCategoryId',
-            'expenseSubcategoryId', 'expenseNewSubcategory', 'expenseMemberId', 'expensePaymentMethod',
-            'expenseBankAccountId', 'expenseCreditCardId', 'expenseInstallments', 'expenseNotes',
+            'expenseSubcategoryId', 'expenseNewSubcategory', 'expenseMemberId', 'expenseIsPrivate',
+            'expensePaymentMethod', 'expenseBankAccountId', 'expenseCreditCardId', 'expenseInstallments',
+            'expenseNotes',
         );
         $this->expenseDate = CarbonImmutable::now()->toDateString();
         $this->expensePaymentMethod = 'outro';

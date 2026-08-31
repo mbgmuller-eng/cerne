@@ -18,7 +18,6 @@ use App\Livewire\FixedBills\FixedBillsIndex;
 use App\Livewire\Goals\GoalsIndex;
 use App\Livewire\Insurance\InsuranceIndex;
 use App\Livewire\Investments\InvestmentsIndex;
-use App\Livewire\Profile\PrivacySettings;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/manifest.webmanifest', [PwaController::class, 'manifest'])->name('pwa.manifest');
@@ -46,7 +45,6 @@ Route::middleware('guest')->group(function (): void {
 */
 Route::middleware('auth')->group(function (): void {
     Route::get('/painel', Dashboard::class)->name('dashboard');
-    Route::get('/privacidade', PrivacySettings::class)->name('profile.privacy');
     Route::post('/preferencias/tema', [ThemePreferenceController::class, 'store'])->name('theme.update');
 
     Route::get('/fluxo-de-caixa', CashFlowIndex::class)->name('cashflow.index');

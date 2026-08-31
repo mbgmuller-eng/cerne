@@ -24,8 +24,6 @@ class BankAccount extends Model
 {
     use Auditable, BelongsToProfile, InvalidatesDashboard, HasFactory, HasSharingFlags, HasUuids, RespectsMemberPrivacy;
 
-    protected static string $privacyDomain = 'bank_account_visibility';
-
     protected function casts(): array
     {
         return [

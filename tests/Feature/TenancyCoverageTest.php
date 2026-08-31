@@ -7,7 +7,6 @@ use App\Models\Concerns\BelongsToProfileOrShared;
 use App\Models\ConsultantClient;
 use App\Models\ConsultantInvite;
 use App\Models\FinancialProfile;
-use App\Models\ProfileAccessSettings;
 use App\Models\ProfileMember;
 use App\Models\Subscription;
 use App\Models\User;
@@ -46,7 +45,6 @@ class TenancyCoverageTest extends TestCase
         // profile_id ativo. Cada consulta a estes models já filtra
         // profile_id explicitamente no ponto de uso.
         ProfileMember::class => 'usado para RESOLVER o perfil ativo — não pode depender do contexto que ele ajuda a formar',
-        ProfileAccessSettings::class => 'configuração 1:1, sempre acessada via profile->accessSettings(), nunca consultada isolada',
     ];
 
     public function test_todo_model_de_dominio_usa_belongs_to_profile(): void

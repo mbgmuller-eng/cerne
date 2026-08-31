@@ -5,8 +5,6 @@ namespace Tests\Feature;
 use App\Enums\AccountType;
 use App\Enums\InsuranceType;
 use App\Enums\MemberRole;
-use App\Enums\Necessity;
-use App\Enums\Visibility;
 use App\Livewire\Accounts\AccountsIndex;
 use App\Livewire\CashFlow\CashFlowIndex;
 use App\Livewire\FixedBills\FixedBillsIndex;
@@ -28,10 +26,9 @@ use Tests\TestCase;
 
 /**
  * As 3 abas (Casal / cada membro) só existem pra casal que de fato tem
- * algo marcado como oculto (own_only) — pra quem nunca mexeu na
- * privacidade, a tela continua igual, sem aba nenhuma. Testa a
- * decisão de mostrar/esconder e o filtro em cada padrão de tela
- * (coluna direta, relação, is_joint).
+ * algum lançamento marcado como oculto — pra quem nunca marcou nada, a
+ * tela continua igual, sem aba nenhuma. Testa a decisão de mostrar/esconder
+ * e o filtro em cada padrão de tela (coluna direta, relação, is_joint).
  */
 class PrivacyTabsTest extends TestCase
 {
@@ -47,15 +44,16 @@ class PrivacyTabsTest extends TestCase
         Livewire::test(CashFlowIndex::class)->assertSet('showPrivacyTabs', false);
     }
 
-    public function test_abas_nao_aparecem_para_solteiro_mesmo_com_own_only(): void
+    public function test_abas_nao_aparecem_para_solteiro_mesmo_com_algo_marcado_oculto(): void
     {
         $usuario = User::factory()->create();
         $perfil = FinancialProfile::factory()->create(['owner_user_id' => $usuario->id]);
         $membro = ProfileMember::factory()->create(['profile_id' => $perfil->id, 'user_id' => $usuario->id]);
-        $perfil->settings()->update(['expense_visibility' => Visibility::OwnOnly]);
 
         $this->actingAs($usuario);
         app(ProfileContext::class)->set($perfil, $membro);
+
+        ExpenseRecord::factory()->for($perfil, 'profile')->create(['member_id' => $membro->id, 'is_private' => true]);
 
         Livewire::test(CashFlowIndex::class)->assertSet('showPrivacyTabs', false);
     }
@@ -63,10 +61,11 @@ class PrivacyTabsTest extends TestCase
     public function test_abas_aparecem_quando_casal_tem_algo_oculto(): void
     {
         [$perfil, , $ana] = $this->criarCasal();
-        $perfil->settings()->update(['expense_visibility' => Visibility::OwnOnly]);
 
         $this->actingAs($ana->user);
         app(ProfileContext::class)->set($perfil, $ana->member);
+
+        ExpenseRecord::factory()->for($perfil, 'profile')->create(['member_id' => $ana->member->id, 'is_private' => true]);
 
         Livewire::test(CashFlowIndex::class)->assertSet('showPrivacyTabs', true);
     }
@@ -74,13 +73,12 @@ class PrivacyTabsTest extends TestCase
     public function test_fluxo_de_caixa_filtra_por_coluna_direta(): void
     {
         [$perfil, $bruno, $ana] = $this->criarCasal();
-        $perfil->settings()->update(['expense_visibility' => Visibility::OwnOnly]);
         $this->actingAs($ana->user);
         app(ProfileContext::class)->set($perfil, $ana->member);
 
         $categoria = ExpenseCategory::factory()->shared()->create();
         $hoje = \Carbon\CarbonImmutable::now();
-        $deAna = ExpenseRecord::factory()->for($perfil, 'profile')->create(['member_id' => $ana->member->id, 'category_id' => $categoria->id, 'expense_date' => $hoje]);
+        $deAna = ExpenseRecord::factory()->for($perfil, 'profile')->create(['member_id' => $ana->member->id, 'category_id' => $categoria->id, 'expense_date' => $hoje, 'is_private' => true]);
         $deBruno = ExpenseRecord::factory()->for($perfil, 'profile')->create(['member_id' => $bruno->member->id, 'category_id' => $categoria->id, 'expense_date' => $hoje]);
         $daFamilia = ExpenseRecord::factory()->for($perfil, 'profile')->create(['member_id' => null, 'category_id' => $categoria->id, 'expense_date' => $hoje]);
 
@@ -99,12 +97,11 @@ class PrivacyTabsTest extends TestCase
     public function test_contas_fixas_filtra_pela_relacao(): void
     {
         [$perfil, $bruno, $ana] = $this->criarCasal();
-        $perfil->settings()->update(['expense_visibility' => Visibility::OwnOnly]);
         $this->actingAs($ana->user);
         app(ProfileContext::class)->set($perfil, $ana->member);
 
         $categoria = ExpenseCategory::factory()->shared()->create();
-        $contaDeAna = FixedBill::factory()->for($perfil, 'profile')->create(['member_id' => $ana->member->id, 'category_id' => $categoria->id, 'due_day' => 5]);
+        $contaDeAna = FixedBill::factory()->for($perfil, 'profile')->create(['member_id' => $ana->member->id, 'category_id' => $categoria->id, 'due_day' => 5, 'is_private' => true]);
         $contaDeBruno = FixedBill::factory()->for($perfil, 'profile')->create(['member_id' => $bruno->member->id, 'category_id' => $categoria->id, 'due_day' => 5]);
 
         $vistaDeAna = Livewire::test(FixedBillsIndex::class)->set('viewAs', $ana->member->id)->get('payments');
@@ -115,12 +112,11 @@ class PrivacyTabsTest extends TestCase
     public function test_contas_e_cartoes_filtra_por_is_joint(): void
     {
         [$perfil, $bruno, $ana] = $this->criarCasal();
-        $perfil->settings()->update(['bank_account_visibility' => Visibility::OwnOnly]);
         $this->actingAs($ana->user);
         app(ProfileContext::class)->set($perfil, $ana->member);
 
-        $contaDeAna = BankAccount::factory()->for($perfil, 'profile')->for($ana->member, 'member')->create(['is_joint' => false]);
-        $contaConjunta = BankAccount::factory()->for($perfil, 'profile')->for($bruno->member, 'member')->create(['is_joint' => true]);
+        $contaDeAna = BankAccount::factory()->for($perfil, 'profile')->for($ana->member, 'member')->create(['is_joint' => false, 'is_private' => true, 'account_type' => AccountType::Checking]);
+        $contaConjunta = BankAccount::factory()->for($perfil, 'profile')->for($bruno->member, 'member')->create(['is_joint' => true, 'account_type' => AccountType::Checking]);
 
         $abaCasal = Livewire::test(AccountsIndex::class)->set('viewAs', '')->get('accounts');
         self::assertTrue($abaCasal->contains($contaConjunta));
@@ -134,11 +130,10 @@ class PrivacyTabsTest extends TestCase
     public function test_seguros_filtra_por_coluna_direta_nulavel(): void
     {
         [$perfil, $bruno, $ana] = $this->criarCasal();
-        $perfil->settings()->update(['insurance_visibility' => Visibility::OwnOnly]);
         $this->actingAs($ana->user);
         app(ProfileContext::class)->set($perfil, $ana->member);
 
-        $seguroDeAna = InsurancePolicy::factory()->for($perfil, 'profile')->create(['member_id' => $ana->member->id, 'insurance_type' => InsuranceType::Vida]);
+        $seguroDeAna = InsurancePolicy::factory()->for($perfil, 'profile')->create(['member_id' => $ana->member->id, 'insurance_type' => InsuranceType::Vida, 'is_private' => true]);
         $seguroDaFamilia = InsurancePolicy::factory()->for($perfil, 'profile')->create(['member_id' => null, 'insurance_type' => InsuranceType::Residencia]);
 
         $abaCasal = Livewire::test(InsuranceIndex::class)->set('viewAs', '')->get('policies');
@@ -149,11 +144,10 @@ class PrivacyTabsTest extends TestCase
     public function test_investimentos_aba_casal_fica_vazia_pois_investimento_sempre_tem_dono(): void
     {
         [$perfil, $bruno, $ana] = $this->criarCasal();
-        $perfil->settings()->update(['investment_visibility' => Visibility::OwnOnly]);
         $this->actingAs($ana->user);
         app(ProfileContext::class)->set($perfil, $ana->member);
 
-        InvestmentRecord::factory()->for($perfil, 'profile')->for($ana->member, 'member')->create();
+        InvestmentRecord::factory()->for($perfil, 'profile')->for($ana->member, 'member')->create(['is_private' => true]);
 
         $abaCasal = Livewire::test(InvestmentsIndex::class)->set('viewAs', '')->get('bySector');
         self::assertTrue($abaCasal->isEmpty());

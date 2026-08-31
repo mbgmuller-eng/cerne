@@ -40,9 +40,9 @@ class InvestmentsIndex extends Component
     use RequiresActiveProfile;
     use HasPrivacyTabs;
 
-    protected function privacyDomains(): array
+    protected function privacyModels(): array
     {
-        return ['investment_visibility'];
+        return [InvestmentRecord::class];
     }
 
     #[Url]

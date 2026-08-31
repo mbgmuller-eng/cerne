@@ -28,8 +28,6 @@ class RecurringIncome extends Model
 {
     use Auditable, BelongsToProfile, HasFactory, HasUuids, RespectsMemberPrivacy;
 
-    protected static string $privacyDomain = 'income_visibility';
-
     protected function casts(): array
     {
         return [

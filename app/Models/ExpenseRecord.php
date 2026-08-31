@@ -20,13 +20,11 @@ use LogicException;
     'profile_id', 'member_id', 'description', 'necessity', 'category_id', 'subcategory_id',
     'amount', 'expense_date', 'bank_account_id', 'credit_card_id', 'credit_card_invoice_id',
     'installment_group_id', 'installment_number', 'notes', 'source_document_id',
-    'created_by_user_id',
+    'created_by_user_id', 'is_private',
 ])]
 class ExpenseRecord extends Model
 {
     use Auditable, BelongsToProfile, InvalidatesDashboard, HasCompetence, HasFactory, HasUuids, RespectsMemberPrivacy;
-
-    protected static string $privacyDomain = 'expense_visibility';
 
     protected static string $competenceDate = 'expense_date';
 
@@ -39,6 +37,7 @@ class ExpenseRecord extends Model
             'year' => 'integer',
             'month' => 'integer',
             'installment_number' => 'integer',
+            'is_private' => 'boolean',
         ];
     }
 

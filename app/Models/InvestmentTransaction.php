@@ -5,7 +5,7 @@ namespace App\Models;
 use App\Enums\TransactionType;
 use App\Models\Concerns\Auditable;
 use App\Models\Concerns\BelongsToProfile;
-use App\Models\Concerns\RespectsMemberPrivacy;
+use App\Models\Scopes\InheritedInvestmentPrivacyScope;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -19,9 +19,12 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 ])]
 class InvestmentTransaction extends Model
 {
-    use Auditable, BelongsToProfile, HasFactory, HasUuids, RespectsMemberPrivacy;
+    use Auditable, BelongsToProfile, HasFactory, HasUuids;
 
-    protected static string $privacyDomain = 'investment_visibility';
+    protected static function booted(): void
+    {
+        static::addGlobalScope(new InheritedInvestmentPrivacyScope);
+    }
 
     protected function casts(): array
     {

@@ -30,8 +30,6 @@ class InvestmentRecord extends Model
 {
     use Auditable, BelongsToProfile, InvalidatesDashboard, HasFactory, HasUuids, RespectsMemberPrivacy;
 
-    protected static string $privacyDomain = 'investment_visibility';
-
     protected function casts(): array
     {
         return [

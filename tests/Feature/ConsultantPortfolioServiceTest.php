@@ -9,11 +9,11 @@ use App\Models\BankAccount;
 use App\Models\ConsultantClient;
 use App\Models\CreditCard;
 use App\Models\CreditCardInvoice;
+use App\Models\ExpenseRecord;
 use App\Models\FinancialProfile;
 use App\Models\InsurancePolicy;
 use App\Models\InvestmentRecord;
 use App\Models\InvestmentSnapshot;
-use App\Models\ProfileAccessSettings;
 use App\Models\ProfileMember;
 use App\Models\User;
 use App\Services\ConsultantPortfolioService;
@@ -337,13 +337,16 @@ class ConsultantPortfolioServiceTest extends TestCase
         // Individual.
         $this->criarClienteVinculado($consultor);
 
-        // Casal com vida financeira única (preset transparente).
-        [$perfilTransparente] = $this->criarCasalVinculado($consultor);
-        $perfilTransparente->settings()->update(ProfileAccessSettings::transparentPreset());
+        // Casal com vida financeira única (nada marcado como oculto).
+        $this->criarCasalVinculado($consultor);
 
-        // Casal com vida financeira separada (preset privado).
-        [$perfilPrivado] = $this->criarCasalVinculado($consultor);
-        $perfilPrivado->settings()->update(ProfileAccessSettings::privatePreset());
+        // Casal com vida financeira separada (o titular esconde um gasto do cônjuge).
+        [$perfilPrivado, $titularPrivado] = $this->criarCasalVinculado($consultor);
+        $membroPrivado = $perfilPrivado->members()->where('user_id', $titularPrivado->id)->first();
+        ExpenseRecord::factory()->for($perfilPrivado, 'profile')->create([
+            'member_id' => $membroPrivado->id,
+            'is_private' => true,
+        ]);
 
         // Vínculo pendente não entra na distribuição — só a carteira ativa.
         $pendente = User::factory()->create();

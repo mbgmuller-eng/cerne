@@ -24,9 +24,6 @@ class FixedBill extends Model
 {
     use Auditable, BelongsToProfile, HasFactory, HasUuids, RespectsMemberPrivacy;
 
-    // Conta fixa é despesa: segue a mesma visibilidade das despesas.
-    protected static string $privacyDomain = 'expense_visibility';
-
     protected function casts(): array
     {
         return [

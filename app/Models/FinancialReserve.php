@@ -5,7 +5,7 @@ namespace App\Models;
 use App\Enums\ReserveType;
 use App\Models\Concerns\Auditable;
 use App\Models\Concerns\BelongsToProfile;
-use App\Models\Concerns\RespectsMemberPrivacy;
+use App\Models\Scopes\ReservePrivacyScope;
 use App\Support\Money;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
@@ -19,9 +19,21 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 ])]
 class FinancialReserve extends Model
 {
-    use Auditable, BelongsToProfile, HasFactory, HasUuids, RespectsMemberPrivacy;
+    use Auditable, BelongsToProfile, HasFactory, HasUuids;
 
-    protected static string $privacyDomain = 'investment_visibility';
+    protected static function booted(): void
+    {
+        static::addGlobalScope(new ReservePrivacyScope);
+
+        // member_key mantém a unicidade (profile_id, member_key, reserve_type)
+        // funcionando mesmo com member_id nulo — MySQL trata todo NULL como
+        // distinto num índice único, então duas "reservas da família" caberiam
+        // ao mesmo tempo sem isso. Nunca setado à mão (ver #[Fillable] acima,
+        // member_key não está lá).
+        static::saving(function (self $reserva): void {
+            $reserva->member_key = $reserva->member_id ?? self::SHARED_MEMBER_KEY;
+        });
+    }
 
     private ?string $targetAmountCache = null;
 
@@ -38,18 +50,6 @@ class FinancialReserve extends Model
 
     /** member_id nulo é sentinela numa constante fixa — nunca colide com um UUID real (HasUuids é v7, ordenado no tempo). */
     private const SHARED_MEMBER_KEY = '00000000-0000-0000-0000-000000000000';
-
-    protected static function booted(): void
-    {
-        // member_key mantém a unicidade (profile_id, member_key, reserve_type)
-        // funcionando mesmo com member_id nulo — MySQL trata todo NULL como
-        // distinto num índice único, então duas "reservas da família" caberiam
-        // ao mesmo tempo sem isso. Nunca setado à mão (ver #[Fillable] acima,
-        // member_key não está lá).
-        static::saving(function (self $reserva): void {
-            $reserva->member_key = $reserva->member_id ?? self::SHARED_MEMBER_KEY;
-        });
-    }
 
     public function member(): BelongsTo
     {

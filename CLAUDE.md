@@ -28,14 +28,21 @@ adicione o model à lista de exceções sem entender por quê.
 Exceções legítimas já existentes: taxonomia compartilhada (categorias padrão com
 `profile_id = null`) usa `BelongsToProfileOrShared`.
 
-### 2. Privacidade do casal é uma camada *acima* do tenancy
+### 2. Privacidade do casal é uma camada *acima* do tenancy, e é SIMÉTRICA
 
-`profile_access_settings` decide o que o cônjuge secundário enxerga. Passar no
-teste de tenancy não significa passar na privacidade.
+Cada lançamento decide por si (`is_private`, ver `MemberPrivacyScope`) se fica
+oculto do cônjuge — não existe mais uma configuração por casal nem um "dono"
+que enxerga tudo por natureza. Passar no teste de tenancy não significa passar
+na privacidade.
 
-- `is_joint = true` → sempre visível para os dois, ignora as settings.
-- `expense_visibility = own_only` → o secundário só vê `member_id` dele ou nulo.
+- `is_joint = true` → sempre visível para os dois, ignora `is_private`.
+- Um lançamento com `is_private = true` só é visível a quem é o dono dele
+  (`member_id`) — **vale igual pros dois do casal**, titular incluído.
 - **Consultor vinculado e ativo vê tudo**, inclusive o que é privado entre o casal.
+- `FinancialReserve` não tem `is_private` próprio — ela fica oculta
+  automaticamente se o dono tem QUALQUER gasto essencial marcado como oculto
+  (ver `ReservePrivacyScope`), porque o total já entregaria o que o gasto
+  escondido devia proteger.
 
 Ao mexer em qualquer listagem, pergunte: *isso vaza por agregado?* Um total
 consolidado pode revelar um gasto privado por subtração. Por isso o cache do

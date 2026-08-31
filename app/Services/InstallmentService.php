@@ -96,6 +96,7 @@ class InstallmentService
                     'installment_number' => $numero,
                     'notes' => $dados['notes'] ?? null,
                     'created_by_user_id' => $userId,
+                    'is_private' => $dados['is_private'] ?? false,
                 ]);
             }
 

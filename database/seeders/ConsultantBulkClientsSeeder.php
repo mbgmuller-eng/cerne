@@ -25,7 +25,6 @@ use App\Models\Goal;
 use App\Models\InsurancePolicy;
 use App\Models\InvestmentRecord;
 use App\Models\InvestmentSnapshot;
-use App\Models\ProfileAccessSettings;
 use App\Models\ProfileMember;
 use App\Models\User;
 use App\Support\ProfileContext;
@@ -182,15 +181,6 @@ class ConsultantBulkClientsSeeder extends Seeder
                     'color_hex' => fake()->hexColor(),
                     'is_active' => true,
                 ]);
-
-                // Dos casais com os dois logados, ~30% escolhem manter cada
-                // um a própria vida financeira (own_only em tudo); o resto
-                // fica na vida financeira única (transparente).
-                $vidaFinanceiraSeparada = random_int(1, 100) <= 30;
-                ProfileAccessSettings::create(array_merge(
-                    $vidaFinanceiraSeparada ? ProfileAccessSettings::privatePreset() : ProfileAccessSettings::transparentPreset(),
-                    ['profile_id' => $profile->id, 'updated_by_user_id' => $titular->id],
-                ));
             } else {
                 $conjugeMember = ProfileMember::create([
                     'profile_id' => $profile->id,

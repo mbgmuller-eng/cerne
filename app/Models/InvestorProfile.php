@@ -55,39 +55,46 @@ class InvestorProfile extends Model
     }
 
     /**
-     * Só os gastos essenciais da FAMÍLIA (member_id nulo em
-     * expense_records) — o que é visível aos dois do casal por
-     * definição, independente da configuração de privacidade. Base da
-     * reserva compartilhada (ver sharedPeaceReserveTarget()).
+     * Gastos essenciais VISÍVEIS AOS DOIS — família (member_id nulo) +
+     * qualquer lançamento de um membro que ELE NÃO marcou como oculto.
+     * Base da reserva compartilhada (ver sharedPeaceReserveTarget()):
+     * é sempre seguro somar, porque nada aqui é privado de ninguém.
      */
     private function sharedEssentialMonthlyAverage(): string
     {
-        return $this->averageOf($this->closedMonthsEssentialTotals(onlyFamily: true));
+        return $this->averageOf($this->closedMonthsEssentialTotals(onlyVisible: true));
     }
 
     /**
-     * Só os gastos essenciais deste MEMBRO especificamente (member_id =
-     * o dele) — o que, numa "vida financeira" com dado oculto, só ele
-     * enxerga. Base da reserva individual dele (ver peaceReserveTarget()).
+     * Só os gastos essenciais que ESTE MEMBRO marcou como ocultos do
+     * cônjuge — a parte que a reserva do casal (baseada no que é visível
+     * aos dois) não cobre. Base da reserva individual dele (ver
+     * peaceReserveTarget()).
      */
     private function ownEssentialMonthlyAverage(): string
     {
-        return $this->averageOf($this->closedMonthsEssentialTotals(memberId: $this->member_id));
+        return $this->averageOf($this->closedMonthsEssentialTotals(memberId: $this->member_id, onlyPrivate: true));
     }
 
     /**
-     * Totais essenciais por mês fechado, com o filtro de dono que a
-     * chamada pedir — nenhum filtro (casa inteira), só família
-     * (member_id nulo), ou só de um membro específico. A parte cara
-     * (agregação por mês) sempre roda no banco — CLAUDE.md regra 3.
+     * Totais essenciais por mês fechado, com o filtro que a chamada pedir
+     * — nenhum filtro (casa inteira, todo mundo, oculto ou não), só o
+     * que é visível aos dois (família + não marcado como oculto), ou só
+     * o oculto de um membro específico. A parte cara (agregação por mês)
+     * sempre roda no banco — CLAUDE.md regra 3.
+     *
+     * Ignora o escopo de privacidade da própria query (withoutPrivacyScope):
+     * este cálculo PRECISA enxergar os lançamentos ocultos de ambos os
+     * membros pra somar a fatia certa — quem vê o RESULTADO é decidido à
+     * parte, pela reserva ficar oculta ou não (ver hasHiddenExpenses()).
      *
      * @return Collection<int, string>
      */
-    private function closedMonthsEssentialTotals(bool $onlyFamily = false, ?string $memberId = null): Collection
+    private function closedMonthsEssentialTotals(bool $onlyVisible = false, ?string $memberId = null, bool $onlyPrivate = false): Collection
     {
         $hoje = CarbonImmutable::now();
 
-        $query = ExpenseRecord::query()
+        $query = ExpenseRecord::withoutPrivacyScope()
             ->ofNecessity(Necessity::Essential)
             ->where(function ($query) use ($hoje) {
                 $query->where('year', '<', $hoje->year)
@@ -96,10 +103,14 @@ class InvestorProfile extends Model
                     });
             });
 
-        if ($onlyFamily) {
-            $query->whereNull('member_id');
+        if ($onlyVisible) {
+            $query->where(fn ($q) => $q->whereNull('member_id')->orWhere('is_private', false));
         } elseif ($memberId !== null) {
             $query->where('member_id', $memberId);
+
+            if ($onlyPrivate) {
+                $query->where('is_private', true);
+            }
         }
 
         return $query->selectRaw('SUM(amount) as total')
@@ -123,17 +134,20 @@ class InvestorProfile extends Model
      * Meta da reserva de paz DESTE membro. Sem tipo de atuação definido,
      * não há meta — o consultor ainda precisa informar.
      *
-     * Duas bases possíveis:
-     *   - Casal com gasto oculto entre os dois (own_only em
-     *     expense_visibility): a base é só o que é PRIVADO deste membro
-     *     — o que o outro não vê. Sem divisão: é gasto que só ele tem,
-     *     ninguém mais está cobrindo. A fatia visível aos dois vira uma
-     *     reserva À PARTE (ver sharedPeaceReserveTarget()).
-     *   - Sem gasto oculto (solteiro, ou casal 100% transparente): a
-     *     base é o gasto essencial da casa inteira, dividido pelo número
-     *     de provedores (membros com perfil de investidor e tipo de
-     *     atuação definidos) — cada um cobre sua fatia com o PRÓPRIO
-     *     multiplicador.
+     * Três casos:
+     *   - Solteiro, ou casal com só um provedor rastreado: não há com
+     *     quem dividir nem "reserva do casal" — a meta é sempre o total
+     *     essencial próprio, não importa se algo está marcado como
+     *     oculto (não há "o outro" pra esconder de quem).
+     *   - Casal com 2+ provedores e NINGUÉM esconde nada: a base é o
+     *     gasto essencial da casa inteira, dividido pelo número de
+     *     provedores — cada um cobre sua fatia com o PRÓPRIO
+     *     multiplicador. Sem reserva do casal separada (ver
+     *     sharedPeaceReserveTarget()).
+     *   - Casal com 2+ provedores e ALGUÉM esconde algo: a fatia
+     *     VISÍVEL aos dois já é coberta pela reserva do casal — este
+     *     membro só precisa de reserva individual se ELE PRÓPRIO tem
+     *     gasto oculto, cobrindo exatamente essa parte.
      */
     public function peaceReserveTarget(): string
     {
@@ -141,13 +155,23 @@ class InvestorProfile extends Model
             return '0.00';
         }
 
-        if ($this->hasHiddenExpenses()) {
-            return bcmul($this->ownEssentialMonthlyAverage(), (string) $this->employment_type->reserveMonths(), 2);
+        if ($this->providersCount() < 2) {
+            return bcmul($this->essentialMonthlyAverage(), (string) $this->employment_type->reserveMonths(), 2);
         }
 
-        $fatiaEssencial = bcdiv($this->essentialMonthlyAverage(), (string) $this->providersCount(), 2);
+        if (! $this->householdHasHiddenExpenses()) {
+            $fatiaEssencial = bcdiv($this->essentialMonthlyAverage(), (string) $this->providersCount(), 2);
 
-        return bcmul($fatiaEssencial, (string) $this->employment_type->reserveMonths(), 2);
+            return bcmul($fatiaEssencial, (string) $this->employment_type->reserveMonths(), 2);
+        }
+
+        if (! $this->hasHiddenExpenses()) {
+            // Alguém no casal esconde algo, mas não este membro — a
+            // fatia dele já está coberta pela reserva do casal.
+            return '0.00';
+        }
+
+        return bcmul($this->ownEssentialMonthlyAverage(), (string) $this->employment_type->reserveMonths(), 2);
     }
 
     /** Reserva de oportunidade DESTE membro: sempre 1/3 da reserva de paz dele. */
@@ -158,22 +182,22 @@ class InvestorProfile extends Model
 
     /**
      * Meta da reserva de paz DO CASAL (member_id nulo em
-     * financial_reserves) — só existe quando há gasto oculto entre os
-     * dois (senão não há "fatia visível aos dois" separada da casa
-     * inteira, e cada um já cobre tudo via peaceReserveTarget()).
+     * financial_reserves) — só existe com 2+ provedores E alguém
+     * escondendo algo (senão não há "fatia visível aos dois" separada da
+     * casa inteira, e cada um já cobre tudo via peaceReserveTarget()).
      *
-     * A base é o gasto essencial da FAMÍLIA (visível aos dois), dividida
-     * entre os provedores; cada um cobre sua fatia com o PRÓPRIO
-     * multiplicador, e a reserva do casal é a SOMA das fatias — mesma
-     * lógica de "dois provedores" de peaceReserveTarget(), só que o
-     * resultado vira UM valor em vez de ficar em duas reservas
-     * separadas. Pode ser chamado a partir do InvestorProfile de
-     * qualquer um dos dois — o cálculo soma todos os provedores do
-     * mesmo perfil de qualquer forma.
+     * A base é o gasto essencial VISÍVEL AOS DOIS (família + o que
+     * ninguém marcou como oculto), dividida entre os provedores; cada um
+     * cobre sua fatia com o PRÓPRIO multiplicador, e a reserva do casal
+     * é a SOMA das fatias — mesma lógica de "dois provedores" de
+     * peaceReserveTarget(), só que o resultado vira UM valor em vez de
+     * ficar em duas reservas separadas. Pode ser chamado a partir do
+     * InvestorProfile de qualquer um dos dois — o cálculo soma todos os
+     * provedores do mesmo perfil de qualquer forma.
      */
     public function sharedPeaceReserveTarget(): string
     {
-        if (! $this->hasHiddenExpenses()) {
+        if ($this->providersCount() < 2 || ! $this->householdHasHiddenExpenses()) {
             return '0.00';
         }
 
@@ -181,15 +205,6 @@ class InvestorProfile extends Model
             ->where('profile_id', $this->profile_id)
             ->whereNotNull('employment_type')
             ->get();
-
-        // Reserva "do casal" só faz sentido com os dois de fato
-        // rastreados como provedores — com um só, não há ninguém pra
-        // dividir a fatia compartilhada com ele. Fica em 0 até o
-        // segundo se cadastrar (o essencial de família nesse meio-tempo
-        // simplesmente ainda não tem reserva cobrindo ele).
-        if ($provedores->count() < 2) {
-            return '0.00';
-        }
 
         $fatia = bcdiv($this->sharedEssentialMonthlyAverage(), (string) $provedores->count(), 2);
 
@@ -205,25 +220,27 @@ class InvestorProfile extends Model
         return bcdiv($this->sharedPeaceReserveTarget(), '3', 2);
     }
 
-    /**
-     * Este casal esconde gasto essencial entre si? Domínio
-     * `expense_visibility` de ProfileAccessSettings — é sobre o dado de
-     * despesa em si, diferente de `investment_visibility` (que governa
-     * se a reserva RESULTANTE é visível ao outro, uma questão à parte).
-     * Solteiro nunca tem — não há "o outro" pra esconder de quem.
-     *
-     * Consulta direta por profile_id, não a relação `profile` — evitar
-     * lazy load (Model::shouldBeStrict() derruba a página em ambiente
-     * local se este método for chamado sem o relacionamento já
-     * carregado, e não dá pra garantir isso em todo lugar que cria ou
-     * busca um InvestorProfile). Sem configuração ainda salva, o padrão
-     * é transparente — mesmo raciocínio de FinancialProfile::settings().
-     */
+    /** Algum provedor deste perfil (qualquer um, não só este membro) tem
+     * gasto essencial marcado como oculto? Decide se o casal entra no
+     * modo "reserva do casal + individuais" ou continua no modo simples
+     * (fatia da casa inteira dividida, sem reserva separada). */
+    private function householdHasHiddenExpenses(): bool
+    {
+        return ExpenseRecord::withoutPrivacyScope()
+            ->ofNecessity(Necessity::Essential)
+            ->where('profile_id', $this->profile_id)
+            ->where('is_private', true)
+            ->exists();
+    }
+
+    /** ESTE membro específico tem gasto essencial marcado como oculto? */
     private function hasHiddenExpenses(): bool
     {
-        $settings = ProfileAccessSettings::query()->where('profile_id', $this->profile_id)->first();
-
-        return $settings !== null && ! $settings->sharesDomain('expense_visibility');
+        return ExpenseRecord::withoutPrivacyScope()
+            ->ofNecessity(Necessity::Essential)
+            ->where('member_id', $this->member_id)
+            ->where('is_private', true)
+            ->exists();
     }
 
     /**

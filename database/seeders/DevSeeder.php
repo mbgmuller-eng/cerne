@@ -8,7 +8,6 @@ use App\Enums\ProfileType;
 use App\Enums\UserRole;
 use App\Models\ConsultantClient;
 use App\Models\FinancialProfile;
-use App\Models\ProfileAccessSettings;
 use App\Models\ProfileMember;
 use App\Models\User;
 use Database\Seeders\Concerns\DevOnlySeeder;
@@ -80,11 +79,6 @@ class DevSeeder extends Seeder
             'color_hex' => '#B45309',
             'is_active' => true,
         ]);
-
-        ProfileAccessSettings::create(array_merge(
-            ProfileAccessSettings::transparentPreset(),
-            ['profile_id' => $profile->id, 'updated_by_user_id' => $ana->id],
-        ));
 
         ConsultantClient::create([
             'consultant_id' => $consultor->id,

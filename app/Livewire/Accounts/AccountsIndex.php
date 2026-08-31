@@ -35,9 +35,9 @@ class AccountsIndex extends Component
     use RequiresActiveProfile;
     use HasPrivacyTabs;
 
-    protected function privacyDomains(): array
+    protected function privacyModels(): array
     {
-        return ['bank_account_visibility', 'credit_card_visibility'];
+        return [BankAccount::class, CreditCard::class];
     }
 
     // -----------------------------------------------------------------

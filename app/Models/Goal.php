@@ -25,10 +25,6 @@ class Goal extends Model
 {
     use Auditable, BelongsToProfile, InvalidatesDashboard, HasFactory, HasUuids, RespectsMemberPrivacy;
 
-    // Objetivo é aspiração financeira do casal: segue a visibilidade de
-    // investimentos, que é o domínio mais próximo.
-    protected static string $privacyDomain = 'investment_visibility';
-
     protected function casts(): array
     {
         return [

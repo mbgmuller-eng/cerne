@@ -24,8 +24,6 @@ class CreditCard extends Model
 {
     use Auditable, BelongsToProfile, HasFactory, HasSharingFlags, HasUuids, RespectsMemberPrivacy;
 
-    protected static string $privacyDomain = 'credit_card_visibility';
-
     protected function casts(): array
     {
         return [

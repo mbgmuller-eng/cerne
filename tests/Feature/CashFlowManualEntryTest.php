@@ -104,6 +104,57 @@ class CashFlowManualEntryTest extends TestCase
         self::assertCount(4, $parcelas->pluck('credit_card_invoice_id')->unique());
     }
 
+    public function test_despesa_marcada_oculta_grava_is_private_e_fica_escondida_do_conjuge(): void
+    {
+        $titular = User::factory()->create();
+        $perfil = FinancialProfile::factory()->couple()->create(['owner_user_id' => $titular->id]);
+        $membroTitular = ProfileMember::factory()->create(['profile_id' => $perfil->id, 'user_id' => $titular->id]);
+        $conjuge = User::factory()->create();
+        $membroConjuge = ProfileMember::factory()->secondary()->create(['profile_id' => $perfil->id, 'user_id' => $conjuge->id]);
+        $this->actingAs($titular);
+        app(ProfileContext::class)->set($perfil, $membroTitular);
+
+        $categoria = ExpenseCategory::factory()->create();
+
+        Livewire::test(CashFlowIndex::class)
+            ->set('expenseDescription', 'Tratamento particular')
+            ->set('expenseAmount', '400.00')
+            ->set('expenseDate', '2026-08-10')
+            ->set('expenseNecessity', 'essential')
+            ->set('expenseCategoryId', $categoria->id)
+            ->set('expenseMemberId', $membroTitular->id)
+            ->set('expenseIsPrivate', true)
+            ->call('saveExpense')
+            ->assertHasNoErrors();
+
+        $lancamento = ExpenseRecord::withoutProfileScope()->where('description', 'Tratamento particular')->firstOrFail();
+        self::assertTrue($lancamento->is_private);
+
+        $this->actingAs($conjuge);
+        app(ProfileContext::class)->set($perfil, $membroConjuge);
+        self::assertFalse(ExpenseRecord::all()->contains($lancamento));
+    }
+
+    public function test_despesa_da_familia_nunca_grava_como_oculta_mesmo_marcando_o_campo(): void
+    {
+        [$perfil, $membro] = $this->criarPerfil();
+        $categoria = ExpenseCategory::factory()->create();
+
+        Livewire::test(CashFlowIndex::class)
+            ->set('expenseDescription', 'Aluguel')
+            ->set('expenseAmount', '1500.00')
+            ->set('expenseDate', '2026-08-10')
+            ->set('expenseNecessity', 'essential')
+            ->set('expenseCategoryId', $categoria->id)
+            ->set('expenseMemberId', '') // conjunta/família
+            ->set('expenseIsPrivate', true)
+            ->call('saveExpense')
+            ->assertHasNoErrors();
+
+        $lancamento = ExpenseRecord::withoutProfileScope()->where('description', 'Aluguel')->firstOrFail();
+        self::assertFalse($lancamento->is_private);
+    }
+
     public function test_receita_creditada_em_conta_atualiza_o_saldo_exato(): void
     {
         [$perfil, $membro] = $this->criarPerfil();

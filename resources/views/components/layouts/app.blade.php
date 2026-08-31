@@ -95,16 +95,6 @@
                         <span>{{ $label }}</span>
                     </a>
                 @endforeach
-
-                @can('updatePrivacy', $profile)
-                    <div class="pt-4">
-                        <p class="px-3 pb-1 text-[11px] font-semibold tracking-wider text-slate-400 uppercase">Configurações</p>
-                        <a href="{{ route('profile.privacy') }}" @class(['nav-item', 'nav-item-active' => request()->routeIs('profile.privacy')])>
-                            <x-nav-icon name="lock" />
-                            <span>Privacidade do casal</span>
-                        </a>
-                    </div>
-                @endcan
             </nav>
 
             <div class="border-t border-brand-950/5 p-3 dark:border-white/10">
@@ -297,12 +287,6 @@
                         <span>{{ $curto }}</span>
                     </a>
                 @endforeach
-                @can('updatePrivacy', $profile)
-                    <a href="{{ route('profile.privacy') }}" @class(['tab-item rounded-xl py-3', 'tab-item-active bg-brand-50 dark:bg-accent-500/15' => request()->routeIs('profile.privacy')])>
-                        <x-nav-icon name="lock" class="h-6 w-6" />
-                        <span>Privacidade</span>
-                    </a>
-                @endcan
             </div>
         </div>
 

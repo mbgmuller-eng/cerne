@@ -20,9 +20,9 @@ class InsuranceIndex extends Component
     use RequiresActiveProfile;
     use HasPrivacyTabs;
 
-    protected function privacyDomains(): array
+    protected function privacyModels(): array
     {
-        return ['insurance_visibility'];
+        return [InsurancePolicy::class];
     }
 
     public function mount(): void

@@ -43,9 +43,9 @@ class FixedBillsIndex extends Component
     use RequiresActiveProfile;
     use HasPrivacyTabs;
 
-    protected function privacyDomains(): array
+    protected function privacyModels(): array
     {
-        return ['expense_visibility', 'income_visibility'];
+        return [FixedBill::class, RecurringIncome::class];
     }
 
     #[Url]

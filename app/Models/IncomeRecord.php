@@ -21,8 +21,6 @@ class IncomeRecord extends Model
 {
     use Auditable, BelongsToProfile, InvalidatesDashboard, HasCompetence, HasFactory, HasUuids, RespectsMemberPrivacy;
 
-    protected static string $privacyDomain = 'income_visibility';
-
     protected static string $competenceDate = 'received_date';
 
     protected function casts(): array

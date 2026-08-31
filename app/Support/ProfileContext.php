@@ -4,7 +4,6 @@ namespace App\Support;
 
 use App\Models\FinancialProfile;
 use App\Models\ProfileMember;
-use App\Models\User;
 
 /**
  * O perfil financeiro ativo da requisição.
@@ -63,33 +62,11 @@ class ProfileContext
     }
 
     /**
-     * Consultor vinculado enxerga tudo, independentemente das configurações
-     * de privacidade do casal (seção 14 da especificação).
+     * Consultor vinculado enxerga tudo, independentemente do que cada
+     * lançamento tem marcado como privado (seção 14 da especificação).
      */
     public function isConsultant(): bool
     {
         return $this->asConsultant;
-    }
-
-    /** O usuário é o dono do perfil? Dono também ignora a privacidade. */
-    public function isOwner(?User $user = null): bool
-    {
-        $user ??= auth()->user();
-
-        return $user !== null
-            && $this->profile !== null
-            && $this->profile->owner_user_id === $user->id;
-    }
-
-    /**
-     * Membro secundário do casal: é a única situação em que
-     * profile_access_settings restringe o que se enxerga.
-     */
-    public function isRestrictedMember(): bool
-    {
-        return $this->hasProfile()
-            && ! $this->isConsultant()
-            && ! $this->isOwner()
-            && $this->member !== null;
     }
 }

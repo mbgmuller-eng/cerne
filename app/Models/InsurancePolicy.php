@@ -26,8 +26,6 @@ class InsurancePolicy extends Model
 {
     use Auditable, BelongsToProfile, InvalidatesDashboard, HasFactory, HasUuids, RespectsMemberPrivacy;
 
-    protected static string $privacyDomain = 'insurance_visibility';
-
     protected function casts(): array
     {
         return [

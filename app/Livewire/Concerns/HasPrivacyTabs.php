@@ -3,6 +3,7 @@
 namespace App\Livewire\Concerns;
 
 use App\Models\ProfileMember;
+use App\Support\PrivacyGovernedModels;
 use App\Support\ProfileContext;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Url;
@@ -10,10 +11,10 @@ use Livewire\Attributes\Url;
 /**
  * 3 abas — Casal / cada membro — pras telas do consultor que listam
  * dado com privacidade entre o casal (despesas, contas, investimentos,
- * seguros...). Só aparecem quando o casal de fato tem algum domínio
- * marcado como own_only (ver privacyDomains()); pra quem nunca mexeu
- * na privacidade, a tela continua igual, sem aba nenhuma — não é um
- * controle de acesso novo, é só uma lente de apresentação a mais.
+ * seguros...). Só aparecem quando o casal de fato tem algum lançamento
+ * marcado como oculto (ver privacyModels()); pra quem nunca marcou nada,
+ * a tela continua igual, sem aba nenhuma — não é um controle de acesso
+ * novo, é só uma lente de apresentação a mais.
  *
  * Cada tela decide, na própria query de listagem, o que "casal" e
  * "membro X" significam pra ela (coluna direta, relação, is_joint...)
@@ -24,8 +25,8 @@ trait HasPrivacyTabs
     #[Url]
     public string $viewAs = '';
 
-    /** Colunas de profile_access_settings relevantes pra esta tela. */
-    abstract protected function privacyDomains(): array;
+    /** Models relevantes pra esta tela — ver PrivacyGovernedModels. */
+    abstract protected function privacyModels(): array;
 
     public function setViewAs(string $viewAs): void
     {
@@ -38,19 +39,13 @@ trait HasPrivacyTabs
             return false;
         }
 
-        $settings = app(ProfileContext::class)->profile()?->settings();
+        $profileId = app(ProfileContext::class)->profileId();
 
-        if ($settings === null) {
+        if ($profileId === null) {
             return false;
         }
 
-        foreach ($this->privacyDomains() as $domain) {
-            if (! $settings->sharesDomain($domain)) {
-                return true;
-            }
-        }
-
-        return false;
+        return PrivacyGovernedModels::anyPrivate($profileId, $this->privacyModels());
     }
 
     /** @return Collection<int, ProfileMember> */

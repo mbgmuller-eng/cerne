@@ -17,6 +17,7 @@ use App\Models\InvestmentSnapshot;
 use App\Models\Scopes\MemberPrivacyScope;
 use App\Models\User;
 use App\Support\Money;
+use App\Support\PrivacyGovernedModels;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
 
@@ -239,7 +240,7 @@ class ConsultantPortfolioService
     private function perClientBreakdown(User $consultant, Collection $profileIds, Collection $apolicesPorPerfil): array
     {
         $links = ConsultantClient::query()
-            ->with(['client.ownedProfiles.owner', 'client.ownedProfiles.members.user', 'client.ownedProfiles.accessSettings'])
+            ->with(['client.ownedProfiles.owner', 'client.ownedProfiles.members.user'])
             ->where('consultant_id', $consultant->id)
             ->orderBy('status')
             ->get();
@@ -290,9 +291,9 @@ class ConsultantPortfolioService
      * ("Roberto Rodrigues e Fernanda Albuquerque").
      *
      * "Vida financeira" só existe quando há 2 acessos — com 1 acesso não
-     * há de quem esconder nada ainda. É o preset de profile_access_settings
-     * (ver ProfileAccessSettings::preset()): transparente = única (os dois
-     * veem 100%), privado ou personalizado = separada.
+     * há de quem esconder nada ainda. Única = nenhum lançamento do casal
+     * está marcado como oculto; separada = existe pelo menos um (ver
+     * PrivacyGovernedModels::anyPrivate()).
      *
      * @return array{name: string, tipo_perfil: ProfileType, parceiro: ?string, acessos: int, vida_financeira: ?string}
      */
@@ -323,7 +324,7 @@ class ConsultantPortfolioService
             'tipo_perfil' => $tipoPerfil,
             'parceiro' => $conjuge->name,
             'acessos' => 2,
-            'vida_financeira' => $profile->settings()->preset() === 'transparent' ? 'unica' : 'separada',
+            'vida_financeira' => PrivacyGovernedModels::anyPrivate($profile->id) ? 'separada' : 'unica',
         ];
     }
 
