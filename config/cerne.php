@@ -85,9 +85,12 @@ return [
         // mais por token sem ganho perceptível aqui.
         'model' => env('CERNE_AI_MODEL', 'claude-sonnet-5'),
 
-        // Extrato de um mês pode ter centenas de linhas; o teto precisa
-        // acomodar o JSON inteiro, senão a resposta vem truncada.
-        'max_tokens' => 16000,
+        // Extrato de dois meses de conta bancária movimentada passa de 150
+        // lançamentos reais — o teto precisa acomodar o JSON inteiro, senão
+        // a resposta vem truncada (stop_reason "max_tokens") antes de listar
+        // tudo. 16000 dava conta de um mês; dobrado pra cobrir período maior
+        // com folga.
+        'max_tokens' => 32000,
 
         // 'high' lê melhor as tabelas mal formatadas de PDF escaneado,
         // que é o caso comum de extrato bancário brasileiro.
