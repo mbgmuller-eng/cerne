@@ -65,7 +65,11 @@ return [
 
     'ai' => [
         'api_key' => env('ANTHROPIC_API_KEY'),
-        'model' => env('CERNE_AI_MODEL', 'claude-opus-5'),
+
+        // Sonnet, não Opus: é leitura de documento estruturado (extrato,
+        // fatura, apólice), não raciocínio complexo — Opus custaria muito
+        // mais por token sem ganho perceptível aqui.
+        'model' => env('CERNE_AI_MODEL', 'claude-sonnet-5'),
 
         // Extrato de um mês pode ter centenas de linhas; o teto precisa
         // acomodar o JSON inteiro, senão a resposta vem truncada.

@@ -78,7 +78,12 @@ class DocumentsIndex extends Component
             'processing_status' => ProcessingStatus::Pending,
         ]);
 
-        ProcessDocumentJob::dispatch($documento->id);
+        // Sem chave configurada, despachar agora só produziria uma falha
+        // imediata — o documento fica "Na fila" de verdade e a rotina
+        // agendada (routes/console.php) o pega assim que a chave existir.
+        if (filled(config('cerne.ai.api_key'))) {
+            ProcessDocumentJob::dispatch($documento->id);
+        }
 
         $this->reset('arquivo');
         session()->flash('status', 'Documento enviado. A leitura acontece em segundo plano.');

@@ -56,3 +56,18 @@ Schedule::call(function (): void {
 
     logger()->info('Snapshots de investimento', ['criadas' => $criadas]);
 })->monthlyOn(1, '03:30')->name('snapshots')->withoutOverlapping();
+
+// Documentos: os que ficaram "Na fila" porque a ANTHROPIC_API_KEY ainda
+// não estava configurada no envio. Idempotente pelo próprio estado — um
+// documento sai de Pending assim que o job o pega, então despachar de
+// novo antes disso não duplica nada de errado.
+Schedule::call(function (): void {
+    if (blank(config('cerne.ai.api_key'))) {
+        return;
+    }
+
+    \App\Models\DocumentUpload::withoutProfileScope()
+        ->where('processing_status', \App\Enums\ProcessingStatus::Pending)
+        ->pluck('id')
+        ->each(fn (string $id) => \App\Jobs\ProcessDocumentJob::dispatch($id));
+})->everyFiveMinutes()->name('documentos-pendentes')->withoutOverlapping();
