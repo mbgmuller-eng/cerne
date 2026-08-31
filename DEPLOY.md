@@ -117,10 +117,10 @@ Um único cron a cada minuto cobre agendador e fila:
 E a fila, também a cada minuto (planos com cron de 5 min funcionam igual, só com mais latência):
 
 ```bash
-* * * * * cd /home/uXXXXXXX/cerne && php artisan queue:work --stop-when-empty --max-time=50 --tries=3 >> /dev/null 2>&1
+* * * * * cd /home/uXXXXXXX/cerne && php artisan queue:work --stop-when-empty --max-time=50 --timeout=280 --tries=3 >> /dev/null 2>&1
 ```
 
-`--stop-when-empty` e `--max-time=50` garantem que o processo termina antes do próximo cron — sem isso, processos se acumulam até estourar o limite do plano.
+`--stop-when-empty` e `--max-time=50` garantem que o processo termina antes do próximo cron — sem isso, processos se acumulam até estourar o limite do plano. `--timeout=280` é outra coisa: é quanto tempo UM job pode rodar antes do worker matá-lo à força — o padrão do Laravel é 60s, curto demais pra extração de PDF grande por IA (um extrato de dois meses chegou a levar 3min31s). Sem esse valor, o worker mata a extração no meio, o documento fica preso em "processing" e — pior — o job volta pra fila e roda de novo do zero, podendo dar um resultado diferente da tentativa anterior (a resposta da IA não é 100% determinística). 280s fica um pouco abaixo do `$timeout = 300` declarado em `ProcessDocumentJob`, dando margem pro worker desistir antes do limite do próprio job.
 
 ### 4. Permissões
 
