@@ -151,6 +151,7 @@ na seção **Checklist antes de publicar**, mais abaixo):
 ```bash
 composer install --no-dev --optimize-autoloader --no-scripts
 php artisan package:discover --ansi
+php artisan config:clear
 php artisan migrate --force
 php artisan config:cache && php artisan route:cache && php artisan view:cache
 ```
@@ -185,6 +186,7 @@ Ele **não** tem acesso SSH ao servidor — depois do push, no servidor:
 git pull origin master
 composer install --no-dev --optimize-autoloader --no-scripts
 php artisan package:discover --ansi
+php artisan config:clear
 php artisan migrate --force
 php artisan config:cache && php artisan route:cache && php artisan view:cache
 chmod -R 775 storage bootstrap/cache
@@ -201,6 +203,16 @@ package:discover` direto no shell não tem esse problema, porque aí é o bash c
 o PHP diretamente, sem o Composer tentar abrir um subprocesso por dentro do PHP.
 
 `cerne:check --strict` confere ambiente, cookies, banco, fila, agendador, importação por IA e caches, e explica o porquê de cada item que falhar — sai com erro, útil para travar uma publicação automática.
+
+**Por que `config:clear` antes do `migrate`:** um deploy que adiciona um `config/*.php`
+novo (aconteceu ao integrar o pacote de push) quebra `migrate`/qualquer comando
+seguinte com `Return value must be of type array, null returned` — o
+`bootstrap/cache/config.php` da publicação ANTERIOR ainda está em disco e não
+tem a chave nova, e o Laravel usa esse cache em vez de reler `config/`. Sem o
+`config:clear` explícito aqui, `php artisan config:cache` no fim do bloco reescreve
+o cache a partir do config ATUAL, mas tarde demais — os comandos entre o
+`git pull` e o `config:cache` já rodaram contra o cache velho e podem falhar
+antes de chegar lá.
 
 O que **não** se verifica sozinho:
 
