@@ -1,4 +1,6 @@
 @use('App\Support\Money')
+@use('App\Enums\DocumentType')
+@use('App\Enums\Necessity')
 
 <div class="space-y-6">
 
@@ -105,7 +107,10 @@
                 <p class="mt-3 text-sm text-red-700 dark:text-red-400">{{ $message }}</p>
             @enderror
 
-            @php $itens = $revisando->extractedItems(); @endphp
+            @php
+                $itens = $revisando->extractedItems();
+                $temCategorizacao = in_array($revisando->document_type, [DocumentType::BankStatement, DocumentType::CreditCardInvoice], true);
+            @endphp
 
             @if ($itens === [])
                 <p class="mt-4 text-sm text-slate-500 dark:text-slate-400">Nada foi extraído deste documento.</p>
@@ -118,6 +123,11 @@
                                 @foreach (array_keys($itens[0]) as $coluna)
                                     <th class="px-3 py-2 text-left font-medium">{{ str_replace('_', ' ', $coluna) }}</th>
                                 @endforeach
+                                @if ($temCategorizacao)
+                                    <th class="px-3 py-2 text-left font-medium">categoria</th>
+                                    <th class="px-3 py-2 text-left font-medium">subcategoria</th>
+                                    <th class="px-3 py-2 text-left font-medium">necessidade</th>
+                                @endif
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-100 dark:divide-white/10">
@@ -135,7 +145,47 @@
                                             @endif
                                         </td>
                                     @endforeach
+
+                                    @if ($temCategorizacao)
+                                        @php $ehReceita = ($item['tipo'] ?? null) === 'receita'; @endphp
+                                        <td class="px-3 py-2">
+                                            <select wire:model.live="categoriaPorItem.{{ $i }}" class="select w-full text-xs">
+                                                <option value="">—</option>
+                                                @foreach (($ehReceita ? $incomeCategories : $expenseCategories) as $categoria)
+                                                    <option value="{{ $categoria->id }}">{{ $categoria->name }}</option>
+                                                @endforeach
+                                            </select>
+                                        </td>
+                                        <td class="px-3 py-2">
+                                            @unless ($ehReceita)
+                                                <select wire:model="subcategoriaPorItem.{{ $i }}" class="select w-full text-xs">
+                                                    <option value="">—</option>
+                                                    @foreach ($expenseSubcategories->where('category_id', $categoriaPorItem[$i] ?? null) as $subcategoria)
+                                                        <option value="{{ $subcategoria->id }}">{{ $subcategoria->name }}</option>
+                                                    @endforeach
+                                                </select>
+                                            @endunless
+                                        </td>
+                                        <td class="px-3 py-2">
+                                            @unless ($ehReceita)
+                                                <select wire:model="necessidadePorItem.{{ $i }}" class="select w-full text-xs">
+                                                    @foreach (Necessity::options() as $valorNecessidade => $rotulo)
+                                                        <option value="{{ $valorNecessidade }}">{{ $rotulo }}</option>
+                                                    @endforeach
+                                                </select>
+                                            @endunless
+                                        </td>
+                                    @endif
                                 </tr>
+
+                                @if ($temCategorizacao && ($notaPorItem[$i] ?? null))
+                                    <tr class="{{ in_array($i, $aceitos) ? '' : 'opacity-40' }}">
+                                        <td></td>
+                                        <td colspan="{{ count($item) + 3 }}" class="px-3 pb-2 text-xs text-brand-700 dark:text-brand-300">
+                                            {{ $notaPorItem[$i] }}
+                                        </td>
+                                    </tr>
+                                @endif
                             @endforeach
                         </tbody>
                     </table>

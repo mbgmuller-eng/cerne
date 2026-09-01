@@ -14,6 +14,7 @@
         ['insurance.index', 'Seguros', 'Seguros', 'shield'],
         ['goals.index', 'Objetivos', 'Metas', 'target'],
         ['documents.index', 'Importar', 'Importar', 'upload'],
+        ['categorization-rules.index', 'Regras de categorização', 'Regras', 'tag'],
     ];
 
     // Na barra inferior cabem 5; o resto vai para "Mais".

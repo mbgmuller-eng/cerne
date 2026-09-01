@@ -11,6 +11,7 @@ use App\Http\Controllers\ThemePreferenceController;
 use App\Livewire\Accounts\AccountsIndex;
 use App\Livewire\Accounts\InvoiceShow;
 use App\Livewire\CashFlow\CashFlowIndex;
+use App\Livewire\CategorizationRules\CategorizationRulesIndex;
 use App\Livewire\Consultant\PortfolioInsurance;
 use App\Livewire\Consultant\PortfolioInvestments;
 use App\Livewire\Consultant\PortfolioOverview;
@@ -61,6 +62,7 @@ Route::middleware('auth')->group(function (): void {
     Route::get('/seguros', InsuranceIndex::class)->name('insurance.index');
     Route::get('/objetivos', GoalsIndex::class)->name('goals.index');
     Route::get('/importar', DocumentsIndex::class)->name('documents.index');
+    Route::get('/regras-de-categorizacao', CategorizationRulesIndex::class)->name('categorization-rules.index');
     Route::get('/contas', AccountsIndex::class)->name('accounts.index');
     Route::get('/faturas/{invoice}', InvoiceShow::class)->name('invoices.show');
 

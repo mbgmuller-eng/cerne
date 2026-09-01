@@ -1,0 +1,135 @@
+<?php
+
+namespace Tests\Feature;
+
+use App\Enums\MemberRole;
+use App\Livewire\CategorizationRules\CategorizationRulesIndex;
+use App\Models\ExpenseCategorizationRule;
+use App\Models\ExpenseCategory;
+use App\Models\FinancialProfile;
+use App\Models\IncomeCategorizationRule;
+use App\Models\IncomeCategory;
+use App\Models\ProfileMember;
+use App\Models\User;
+use App\Support\ProfileContext;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Livewire\Livewire;
+use Tests\TestCase;
+
+class CategorizationRulesManagementTest extends TestCase
+{
+    use RefreshDatabase;
+
+    public function test_cria_regra_de_despesa(): void
+    {
+        [$perfil] = $this->criarPerfil();
+        $categoria = ExpenseCategory::factory()->create();
+
+        Livewire::test(CategorizationRulesIndex::class)
+            ->set('expensePattern', 'ADRIANA')
+            ->set('expenseCategoryId', $categoria->id)
+            ->set('expenseNecessity', 'essential')
+            ->call('saveExpenseRule')
+            ->assertHasNoErrors();
+
+        $regra = ExpenseCategorizationRule::sole();
+        self::assertSame('ADRIANA', $regra->pattern);
+        self::assertSame($categoria->id, $regra->category_id);
+        self::assertSame($perfil->id, $regra->profile_id);
+    }
+
+    public function test_editar_regra_de_despesa_atualiza_o_registro_existente(): void
+    {
+        [$perfil] = $this->criarPerfil();
+        $categoria = ExpenseCategory::factory()->create();
+        $regra = ExpenseCategorizationRule::factory()->for($perfil, 'profile')->create(['pattern' => 'ORIGINAL', 'category_id' => $categoria->id]);
+
+        Livewire::test(CategorizationRulesIndex::class)
+            ->call('editExpenseRule', $regra->id)
+            ->set('expensePattern', 'EDITADO')
+            ->call('saveExpenseRule')
+            ->assertHasNoErrors();
+
+        self::assertSame(1, ExpenseCategorizationRule::count());
+        self::assertSame('EDITADO', $regra->fresh()->pattern);
+    }
+
+    public function test_excluir_regra_de_despesa(): void
+    {
+        [$perfil] = $this->criarPerfil();
+        $regra = ExpenseCategorizationRule::factory()->for($perfil, 'profile')->create();
+
+        Livewire::test(CategorizationRulesIndex::class)
+            ->call('confirmDeleteExpenseRule', $regra->id)
+            ->call('deleteExpenseRule', $regra->id);
+
+        self::assertSame(0, ExpenseCategorizationRule::count());
+    }
+
+    public function test_regra_de_despesa_exige_padrao_e_categoria(): void
+    {
+        $this->criarPerfil();
+
+        Livewire::test(CategorizationRulesIndex::class)
+            ->set('expensePattern', '')
+            ->set('expenseCategoryId', '')
+            ->call('saveExpenseRule')
+            ->assertHasErrors(['expensePattern', 'expenseCategoryId']);
+    }
+
+    public function test_cria_regra_de_receita(): void
+    {
+        [$perfil] = $this->criarPerfil();
+        $categoria = IncomeCategory::factory()->create();
+
+        Livewire::test(CategorizationRulesIndex::class)
+            ->set('incomePattern', 'SALARIO')
+            ->set('incomeCategoryId', $categoria->id)
+            ->call('saveIncomeRule')
+            ->assertHasNoErrors();
+
+        $regra = IncomeCategorizationRule::sole();
+        self::assertSame('SALARIO', $regra->pattern);
+        self::assertSame($perfil->id, $regra->profile_id);
+    }
+
+    public function test_excluir_regra_de_receita(): void
+    {
+        [$perfil] = $this->criarPerfil();
+        $regra = IncomeCategorizationRule::factory()->for($perfil, 'profile')->create();
+
+        Livewire::test(CategorizationRulesIndex::class)
+            ->call('confirmDeleteIncomeRule', $regra->id)
+            ->call('deleteIncomeRule', $regra->id);
+
+        self::assertSame(0, IncomeCategorizationRule::count());
+    }
+
+    /** Regra de outro perfil não aparece nem pode ser editada — mesmo isolamento de BelongsToProfile. */
+    public function test_isolamento_por_perfil(): void
+    {
+        $outroPerfil = FinancialProfile::factory()->create();
+        $regraDeOutroPerfil = ExpenseCategorizationRule::factory()->for($outroPerfil, 'profile')->create();
+
+        $this->criarPerfil();
+
+        $component = Livewire::test(CategorizationRulesIndex::class);
+        self::assertTrue($component->get('expenseRules')->doesntContain('id', $regraDeOutroPerfil->id));
+
+        $this->expectException(\Illuminate\Database\Eloquent\ModelNotFoundException::class);
+
+        $component->call('editExpenseRule', $regraDeOutroPerfil->id);
+    }
+
+    /** @return array{0: FinancialProfile} */
+    private function criarPerfil(): array
+    {
+        $usuario = User::factory()->create();
+        $perfil = FinancialProfile::factory()->create(['owner_user_id' => $usuario->id]);
+        $membro = ProfileMember::factory()->create(['profile_id' => $perfil->id, 'user_id' => $usuario->id, 'role' => MemberRole::Primary]);
+        $this->actingAs($usuario);
+        app(ProfileContext::class)->set($perfil, $membro);
+
+        return [$perfil];
+    }
+}

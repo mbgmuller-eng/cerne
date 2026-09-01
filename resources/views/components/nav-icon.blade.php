@@ -58,6 +58,9 @@
         @case('dots')
             <circle cx="12" cy="5" r="1.25" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.25" fill="currentColor" stroke="none"/><circle cx="12" cy="19" r="1.25" fill="currentColor" stroke="none"/>
             @break
+        @case('tag')
+            <path d="M12.5 3H5a2 2 0 0 0-2 2v7.5a1 1 0 0 0 .3.7l8.5 8.5a1 1 0 0 0 1.4 0l7.5-7.5a1 1 0 0 0 0-1.4l-8.5-8.5a1 1 0 0 0-.7-.3Z"/><circle cx="8" cy="8" r="1.5" fill="currentColor" stroke="none"/>
+            @break
         @default
             <circle cx="12" cy="12" r="9"/>
     @endswitch
