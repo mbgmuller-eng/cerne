@@ -26,6 +26,13 @@ $maxWidthClass = [
     Livewire confirmar a propriedade como true — a mecânica de transição do
     Alpine não lida bem com essa mudança "de fora". x-show puro (sem
     transição) sincroniza certo nos dois sentidos.
+
+    `@container`: o popup fica no máximo com `max-w-lg` (32rem) mesmo numa
+    tela grande — um grid de formulário com `lg:grid-cols-3` reage ao
+    VIEWPORT, não a essa largura real, e espremia 3 colunas num espaço que
+    não cabia (select cortado, layout quebrado). Os formulários usam
+    `@sm:`/`@lg:` (variante de container query do Tailwind 4) em vez de
+    `sm:`/`lg:` pra reagir à largura do próprio popup.
 --}}
 <div
     x-data="{ show: @entangle($wireModel) }"
@@ -38,7 +45,7 @@ $maxWidthClass = [
 
     <div class="fixed inset-0 overflow-y-auto">
         <div class="flex min-h-full items-start justify-center p-4 pt-10 sm:items-center sm:pt-4">
-            <div class="relative w-full {{ $maxWidthClass }} card max-h-[85vh] overflow-y-auto p-5">
+            <div class="relative w-full {{ $maxWidthClass }} card @container max-h-[85vh] overflow-y-auto p-5">
                 {{ $slot }}
             </div>
         </div>

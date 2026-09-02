@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Livewire\FixedBills\FixedBillsIndex;
 use App\Models\ExpenseCategory;
+use App\Models\ExpenseSubcategory;
 use App\Models\FinancialProfile;
 use App\Models\FixedBill;
 use App\Models\IncomeCategory;
@@ -28,12 +29,15 @@ class FixedBillsManualEntryTest extends TestCase
     {
         [, $membro] = $this->criarPerfil();
         $categoria = ExpenseCategory::factory()->create();
+        $subcategoria = ExpenseSubcategory::factory()->create(['category_id' => $categoria->id]);
 
         Livewire::test(FixedBillsIndex::class)
             ->set('billName', 'Plano de saúde particular')
             ->set('billAmount', '450.00')
             ->set('billDueDay', '10')
+            ->set('billNecessity', 'essential')
             ->set('billCategoryId', $categoria->id)
+            ->set('billSubcategoryId', $subcategoria->id)
             ->set('billMemberId', $membro->id)
             ->set('billIsPrivate', true)
             ->call('saveBill')

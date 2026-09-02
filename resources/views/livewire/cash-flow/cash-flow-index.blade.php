@@ -47,8 +47,8 @@
                 <button type="button" wire:click="toggleExpenseForm" class="btn-ghost px-2 py-1 text-xs">Cancelar</button>
             </div>
 
-            <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                <div class="lg:col-span-2">
+            <div class="grid gap-4 @sm:grid-cols-2 @lg:grid-cols-3">
+                <div class="@lg:col-span-2">
                     <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Descrição</label>
                     <input type="text" wire:model="expenseDescription" class="input mt-1.5" placeholder="Ex.: Supermercado">
                     @error('expenseDescription') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
@@ -127,7 +127,7 @@
                     {{-- Editar não troca cartão/conta de lugar — é mudança
                          estrutural (fatura, parcelamento), não cabe aqui. --}}
                     @if ($expensePaymentMethod === 'cartao')
-                        <div class="sm:col-span-2 lg:col-span-3 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-500 dark:bg-slate-700 dark:text-slate-400">
+                        <div class="@sm:col-span-2 @lg:col-span-3 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-500 dark:bg-slate-700 dark:text-slate-400">
                             Despesa de cartão — cartão e parcelamento não podem ser alterados por aqui.
                         </div>
                     @else
@@ -181,7 +181,7 @@
                     @endif
                 @endif
 
-                <div class="sm:col-span-2 lg:col-span-3">
+                <div class="@sm:col-span-2 @lg:col-span-3">
                     <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Notas (opcional)</label>
                     <textarea wire:model="expenseNotes" rows="2" class="input mt-1.5"></textarea>
                 </div>
@@ -201,8 +201,8 @@
                 <button type="button" wire:click="toggleIncomeForm" class="btn-ghost px-2 py-1 text-xs">Cancelar</button>
             </div>
 
-            <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                <div class="lg:col-span-2">
+            <div class="grid gap-4 @sm:grid-cols-2 @lg:grid-cols-3">
+                <div class="@lg:col-span-2">
                     <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Descrição (opcional)</label>
                     <input type="text" wire:model="incomeDescription" class="input mt-1.5" placeholder="Ex.: Salário de agosto">
                 </div>
@@ -262,7 +262,7 @@
                     <label for="incomeRecurring" class="text-sm text-slate-600 dark:text-slate-400">Recorrente</label>
                 </div>
 
-                <div class="sm:col-span-2 lg:col-span-3">
+                <div class="@sm:col-span-2 @lg:col-span-3">
                     <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Notas (opcional)</label>
                     <textarea wire:model="incomeNotes" rows="2" class="input mt-1.5"></textarea>
                 </div>

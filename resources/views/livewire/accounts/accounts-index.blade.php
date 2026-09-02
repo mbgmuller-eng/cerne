@@ -36,7 +36,7 @@
                 <button type="button" wire:click="toggleAccountForm" class="btn-ghost px-2 py-1 text-xs">Cancelar</button>
             </div>
 
-            <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <div class="grid gap-4 @sm:grid-cols-2 @lg:grid-cols-3">
                 <div>
                     <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Banco</label>
                     <input type="text" wire:model.live.blur="accountBankName" list="known-banks" class="input mt-1.5" placeholder="Ex.: Itaú">
@@ -107,7 +107,7 @@
                     <p class="self-end pb-2 text-xs text-slate-400">Conjunta é sempre visível e entra no consolidado.</p>
                 @endunless
 
-                <div class="sm:col-span-2 lg:col-span-3">
+                <div class="@sm:col-span-2 @lg:col-span-3">
                     <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Notas (opcional)</label>
                     <textarea wire:model="accountNotes" rows="2" class="input mt-1.5"></textarea>
                 </div>
@@ -129,7 +129,7 @@
                 <button type="button" wire:click="toggleCardForm" class="btn-ghost px-2 py-1 text-xs">Cancelar</button>
             </div>
 
-            <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <div class="grid gap-4 @sm:grid-cols-2 @lg:grid-cols-3">
                 <div>
                     <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Nome do cartão</label>
                     <input type="text" wire:model="cardName" class="input mt-1.5" placeholder="Ex.: Nubank Roxinho">

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\Necessity;
 use App\Enums\RecurrenceType;
 use App\Models\Concerns\Auditable;
 use App\Models\Concerns\BelongsToProfile;
@@ -17,7 +18,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 #[Fillable([
     'profile_id', 'member_id', 'name', 'amount', 'due_day', 'recurrence', 'due_weekday',
-    'due_month', 'bank_account_id', 'credit_card_id', 'category_id', 'subcategory_id',
+    'due_month', 'bank_account_id', 'credit_card_id', 'necessity', 'category_id', 'subcategory_id',
     'is_variable', 'is_active', 'notes', 'is_private',
 ])]
 class FixedBill extends Model
@@ -32,6 +33,7 @@ class FixedBill extends Model
             'recurrence' => RecurrenceType::class,
             'due_weekday' => 'integer',
             'due_month' => 'integer',
+            'necessity' => Necessity::class,
             'is_variable' => 'boolean',
             'is_active' => 'boolean',
             'is_private' => 'boolean',
@@ -46,6 +48,11 @@ class FixedBill extends Model
     public function category(): BelongsTo
     {
         return $this->belongsTo(ExpenseCategory::class, 'category_id');
+    }
+
+    public function subcategory(): BelongsTo
+    {
+        return $this->belongsTo(ExpenseSubcategory::class, 'subcategory_id');
     }
 
     public function payments(): HasMany

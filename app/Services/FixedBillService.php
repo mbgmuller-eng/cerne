@@ -29,7 +29,8 @@ class FixedBillService
      *     name: string, amount: string, recurrence: \App\Enums\RecurrenceType,
      *     due_day?: ?int, due_weekday?: ?int, due_month?: ?int,
      *     member_id?: ?string, bank_account_id?: ?string, credit_card_id?: ?string,
-     *     category_id?: ?string, subcategory_id?: ?string, is_variable?: bool, notes?: ?string,
+     *     necessity?: ?Necessity, category_id?: ?string, subcategory_id?: ?string,
+     *     is_variable?: bool, notes?: ?string,
      * }  $dados
      */
     public function create(array $dados): FixedBill
@@ -158,7 +159,7 @@ class FixedBillService
                     'profile_id' => $bill->profile_id,
                     'member_id' => $bill->member_id,
                     'description' => $bill->name,
-                    'necessity' => Necessity::Essential,
+                    'necessity' => $bill->necessity ?? Necessity::Essential,
                     'category_id' => $bill->category_id,
                     'subcategory_id' => $bill->subcategory_id,
                     'amount' => $valor,

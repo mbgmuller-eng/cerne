@@ -3,12 +3,14 @@
 namespace App\Livewire\FixedBills;
 
 use App\Enums\FixedBillPaymentStatus;
+use App\Enums\Necessity;
 use App\Enums\RecurrenceType;
 use App\Enums\RecurringIncomeStatus;
 use App\Livewire\Concerns\HasPrivacyTabs;
 use App\Livewire\Concerns\RequiresActiveProfile;
 use App\Models\BankAccount;
 use App\Models\ExpenseCategory;
+use App\Models\ExpenseSubcategory;
 use App\Models\FixedBill;
 use App\Models\FixedBillPayment;
 use App\Models\IncomeCategory;
@@ -23,6 +25,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -78,7 +81,13 @@ class FixedBillsIndex extends Component
 
     public string $billDueMonth = '';
 
+    public string $billNecessity = '';
+
     public string $billCategoryId = '';
+
+    public string $billSubcategoryId = '';
+
+    public string $billNewSubcategory = '';
 
     public string $billMemberId = '';
 
@@ -198,6 +207,51 @@ class FixedBillsIndex extends Component
         }
     }
 
+    /**
+     * Mesmo raciocínio de CashFlowIndex::updatedExpenseNecessity(): só
+     * limpa a categoria se ela deixou de valer pra nova necessidade, e
+     * Investimento nunca usa subcategoria.
+     */
+    public function updatedBillNecessity(): void
+    {
+        if ($this->billNecessity === Necessity::Investment->value) {
+            $this->billSubcategoryId = '';
+            $this->billNewSubcategory = '';
+        }
+
+        if ($this->billCategoryId === '' || $this->billFormCategories->contains('id', $this->billCategoryId)) {
+            return;
+        }
+
+        $this->billCategoryId = '';
+        $this->billSubcategoryId = '';
+    }
+
+    /** @return Collection<int, ExpenseCategory> */
+    public function getBillFormCategoriesProperty(): Collection
+    {
+        return ExpenseCategory::available()
+            ->when(
+                $this->billNecessity === Necessity::Investment->value,
+                fn (Builder $query) => $query->where('necessity', Necessity::Investment->value),
+                fn (Builder $query) => $query->whereNull('necessity'),
+            )
+            ->get();
+    }
+
+    /** @return Collection<int, ExpenseSubcategory> */
+    public function getBillSubcategoriesProperty(): Collection
+    {
+        if ($this->billCategoryId === '') {
+            return collect();
+        }
+
+        return ExpenseSubcategory::query()
+            ->where('category_id', $this->billCategoryId)
+            ->available()
+            ->get();
+    }
+
     public function saveBill(FixedBillService $service): void
     {
         $data = $this->validate([
@@ -207,7 +261,10 @@ class FixedBillsIndex extends Component
             'billDueDay' => ['required_if:billRecurrence,monthly,annual', 'nullable', 'integer', 'between:1,31'],
             'billDueWeekday' => ['required_if:billRecurrence,weekly', 'nullable', 'integer', 'between:0,6'],
             'billDueMonth' => ['required_if:billRecurrence,annual', 'nullable', 'integer', 'between:1,12'],
+            'billNecessity' => ['required', Rule::enum(Necessity::class)],
             'billCategoryId' => ['required'],
+            'billSubcategoryId' => ['nullable'],
+            'billNewSubcategory' => ['nullable', 'string', 'max:255'],
             'billMemberId' => ['nullable'],
             'billBankAccountId' => ['nullable'],
             'billNotes' => ['nullable', 'string'],
@@ -218,10 +275,15 @@ class FixedBillsIndex extends Component
             'billDueDay' => 'dia do vencimento',
             'billDueWeekday' => 'dia da semana',
             'billDueMonth' => 'mês',
+            'billNecessity' => 'necessidade',
             'billCategoryId' => 'categoria',
+            'billSubcategoryId' => 'subcategoria',
         ]);
 
+        $this->validarSubcategoriaObrigatoria();
+
         $categoria = ExpenseCategory::query()->findOrFail($data['billCategoryId']);
+        $subcategoriaId = $this->resolveSubcategoryId($categoria);
         $memberId = $this->validarMembro($this->billMemberId);
         $conta = $this->billBankAccountId !== ''
             ? BankAccount::query()->findOrFail($this->billBankAccountId)
@@ -234,7 +296,9 @@ class FixedBillsIndex extends Component
             'due_day' => $data['billDueDay'] !== null ? (int) $data['billDueDay'] : null,
             'due_weekday' => $data['billDueWeekday'] !== null ? (int) $data['billDueWeekday'] : null,
             'due_month' => $data['billDueMonth'] !== null ? (int) $data['billDueMonth'] : null,
+            'necessity' => Necessity::from($data['billNecessity']),
             'category_id' => $categoria->id,
+            'subcategory_id' => $subcategoriaId,
             'member_id' => $memberId,
             'bank_account_id' => $conta?->id,
             'is_variable' => $this->billIsVariable,
@@ -247,11 +311,45 @@ class FixedBillsIndex extends Component
         $this->showBillForm = false;
     }
 
+    /**
+     * Mesma checagem manual de CashFlowIndex::validarSubcategoriaObrigatoria()
+     * — subcategoria vem de um select OU de um campo de texto livre, e
+     * `Rule::requiredIf` não expressa "um destes dois" sozinho.
+     */
+    private function validarSubcategoriaObrigatoria(): void
+    {
+        if ($this->billNecessity === Necessity::Investment->value) {
+            return;
+        }
+
+        if ($this->billSubcategoryId !== '' || trim($this->billNewSubcategory) !== '') {
+            return;
+        }
+
+        throw ValidationException::withMessages([
+            'billSubcategoryId' => 'Selecione uma subcategoria (ou crie uma nova).',
+        ]);
+    }
+
+    private function resolveSubcategoryId(ExpenseCategory $categoria): ?string
+    {
+        if (trim($this->billNewSubcategory) !== '') {
+            return ExpenseSubcategory::createCustom($categoria, $this->billNewSubcategory)->id;
+        }
+
+        if ($this->billSubcategoryId === '') {
+            return null;
+        }
+
+        return ExpenseSubcategory::query()->findOrFail($this->billSubcategoryId)->id;
+    }
+
     private function resetBillForm(): void
     {
         $this->reset(
-            'billName', 'billAmount', 'billDueDay', 'billDueWeekday', 'billDueMonth',
-            'billCategoryId', 'billMemberId', 'billIsPrivate', 'billBankAccountId', 'billIsVariable', 'billNotes',
+            'billName', 'billAmount', 'billDueDay', 'billDueWeekday', 'billDueMonth', 'billNecessity',
+            'billCategoryId', 'billSubcategoryId', 'billNewSubcategory',
+            'billMemberId', 'billIsPrivate', 'billBankAccountId', 'billIsVariable', 'billNotes',
         );
         $this->billRecurrence = 'monthly';
         $this->resetErrorBag();
@@ -478,7 +576,8 @@ class FixedBillsIndex extends Component
             'periodLabel' => CarbonImmutable::create($this->year, $this->month, 1)->translatedFormat('F \d\e Y'),
             'hasBills' => FixedBill::query()->active()->exists(),
             'hasIncomes' => RecurringIncome::query()->active()->exists(),
-            'expenseCategories' => ExpenseCategory::available()->get(),
+            'billFormCategories' => $this->billFormCategories,
+            'billSubcategories' => $this->billSubcategories,
             'incomeCategories' => IncomeCategory::available()->get(),
             'bankAccounts' => BankAccount::query()->active()->orderBy('bank_name')->get(),
             'members' => ProfileMember::query()

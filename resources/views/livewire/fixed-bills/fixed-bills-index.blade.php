@@ -2,6 +2,7 @@
 @use('App\Enums\FixedBillPaymentStatus')
 @use('App\Enums\RecurringIncomeStatus')
 @use('App\Enums\RecurrenceType')
+@use('App\Enums\Necessity')
 
 <div class="space-y-6">
 
@@ -51,8 +52,8 @@
                     <button type="button" wire:click="toggleBillForm" class="btn-ghost px-2 py-1 text-xs">Cancelar</button>
                 </div>
 
-                <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                    <div class="lg:col-span-2">
+                <div class="grid gap-4 @sm:grid-cols-2 @lg:grid-cols-3">
+                    <div class="@lg:col-span-2">
                         <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Nome</label>
                         <input type="text" wire:model="billName" class="input mt-1.5" placeholder="Ex.: Aluguel">
                         @error('billName') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
@@ -109,15 +110,44 @@
                     @endif
 
                     <div>
-                        <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Categoria</label>
-                        <select wire:model="billCategoryId" class="select mt-1.5 w-full">
+                        <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Necessidade</label>
+                        <select wire:model.live="billNecessity" class="select mt-1.5 w-full">
                             <option value="">Selecione</option>
-                            @foreach ($expenseCategories as $categoria)
+                            @foreach (Necessity::options() as $valor => $rotulo)
+                                <option value="{{ $valor }}">{{ $rotulo }}</option>
+                            @endforeach
+                        </select>
+                        @error('billNecessity') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Categoria</label>
+                        <select wire:model.live="billCategoryId" class="select mt-1.5 w-full">
+                            <option value="">Selecione</option>
+                            @foreach ($billFormCategories as $categoria)
                                 <option value="{{ $categoria->id }}">{{ $categoria->name }}</option>
                             @endforeach
                         </select>
                         @error('billCategoryId') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
                     </div>
+
+                    @unless ($billNecessity === Necessity::Investment->value)
+                        <div>
+                            <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Subcategoria</label>
+                            <select wire:model="billSubcategoryId" class="select mt-1.5 w-full" @if ($billCategoryId === '') disabled @endif>
+                                <option value="">Selecione</option>
+                                @foreach ($billSubcategories as $sub)
+                                    <option value="{{ $sub->id }}">{{ $sub->name }}</option>
+                                @endforeach
+                            </select>
+                            @error('billSubcategoryId') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Ou crie uma subcategoria</label>
+                            <input type="text" wire:model="billNewSubcategory" class="input mt-1.5" placeholder="Ex.: Terapia">
+                        </div>
+                    @endunless
 
                     <div>
                         <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Membro</label>
@@ -151,7 +181,7 @@
                         <label for="billIsVariable" class="text-sm text-slate-600 dark:text-slate-400">Valor variável (luz, água...)</label>
                     </div>
 
-                    <div class="sm:col-span-2 lg:col-span-3">
+                    <div class="@sm:col-span-2 @lg:col-span-3">
                         <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Notas (opcional)</label>
                         <textarea wire:model="billNotes" rows="2" class="input mt-1.5"></textarea>
                     </div>

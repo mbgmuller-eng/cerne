@@ -59,8 +59,8 @@
                     <button type="button" wire:click="toggleExpenseForm" class="btn-ghost px-2 py-1 text-xs">Cancelar</button>
                 </div>
 
-                <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                    <div class="sm:col-span-2 lg:col-span-3">
+                <div class="grid gap-4 @sm:grid-cols-2 @lg:grid-cols-3">
+                    <div class="@sm:col-span-2 @lg:col-span-3">
                         <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Descrição contém</label>
                         <input type="text" wire:model="expensePattern" class="input mt-1.5" placeholder="Ex.: ADRIANA">
                         @error('expensePattern') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
@@ -100,7 +100,7 @@
                         </div>
                     @endunless
 
-                    <div class="sm:col-span-2 lg:col-span-3">
+                    <div class="@sm:col-span-2 @lg:col-span-3">
                         <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Vincular a uma conta fixa (opcional)</label>
                         <select wire:model="expenseFixedBillId" class="select mt-1.5 w-full">
                             <option value="">Nenhuma — só categoriza</option>
@@ -179,8 +179,8 @@
                     <button type="button" wire:click="toggleIncomeForm" class="btn-ghost px-2 py-1 text-xs">Cancelar</button>
                 </div>
 
-                <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                    <div class="sm:col-span-2 lg:col-span-3">
+                <div class="grid gap-4 @sm:grid-cols-2 @lg:grid-cols-3">
+                    <div class="@sm:col-span-2 @lg:col-span-3">
                         <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Descrição contém</label>
                         <input type="text" wire:model="incomePattern" class="input mt-1.5">
                         @error('incomePattern') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
@@ -197,7 +197,7 @@
                         @error('incomeCategoryId') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
                     </div>
 
-                    <div class="sm:col-span-2">
+                    <div class="@sm:col-span-2">
                         <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Vincular a uma receita recorrente (opcional)</label>
                         <select wire:model="incomeRecurringIncomeId" class="select mt-1.5 w-full">
                             <option value="">Nenhuma — só categoriza</option>

@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Enums\Necessity;
 use App\Enums\RecurrenceType;
 use App\Models\ExpenseCategory;
 use App\Models\FinancialProfile;
@@ -24,6 +25,7 @@ class FixedBillFactory extends Factory
             'amount' => fake()->randomFloat(2, 50, 2000),
             'recurrence' => RecurrenceType::Monthly,
             'due_day' => fake()->numberBetween(1, 28),
+            'necessity' => Necessity::Essential,
             'category_id' => ExpenseCategory::factory()->shared(),
             'is_variable' => false,
             'is_active' => true,
