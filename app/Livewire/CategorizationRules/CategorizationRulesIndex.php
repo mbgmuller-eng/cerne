@@ -376,21 +376,21 @@ class CategorizationRulesIndex extends Component
 
     /**
      * Mesmo raciocínio de CashFlowIndex::getExpenseFormCategoriesProperty():
-     * categoria sem necessidade fixa aparece sempre, "Investimentos" só
-     * quando a regra é de necessidade Investimento.
+     * categoria sem necessidade fixa aparece pra Essencial/Supérfluo;
+     * categorias de Investimento são de outra natureza e só aparecem (com
+     * exclusividade — nada de Habitação/Transporte junto) quando a regra é
+     * de necessidade Investimento.
      *
      * @return Collection<int, ExpenseCategory>
      */
     public function getExpenseFormCategoriesProperty(): Collection
     {
         return ExpenseCategory::query()->available()
-            ->where(function (Builder $query): void {
-                $query->whereNull('necessity');
-
-                if ($this->expenseNecessity !== '') {
-                    $query->orWhere('necessity', $this->expenseNecessity);
-                }
-            })
+            ->when(
+                $this->expenseNecessity === Necessity::Investment->value,
+                fn (Builder $query) => $query->where('necessity', Necessity::Investment->value),
+                fn (Builder $query) => $query->whereNull('necessity'),
+            )
             ->get();
     }
 

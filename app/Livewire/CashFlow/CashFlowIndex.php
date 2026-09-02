@@ -224,23 +224,22 @@ class CashFlowIndex extends Component
     }
 
     /**
-     * Categoria sem necessidade fixa (a maioria) aparece pra qualquer
-     * necessidade; "Investimentos" só aparece pra quem escolheu
-     * Investimento — sem isso, quem marca Investimento não via categoria
-     * nenhuma que fizesse sentido (ver TaxonomySeeder).
+     * Categoria sem necessidade fixa (a maioria) aparece pra Essencial e
+     * Supérfluo; categorias de Investimento (Aporte, Previdência etc.) são
+     * de outra natureza (não são "gastos" no sentido de casa/transporte) e
+     * só aparecem pra quem escolheu Investimento — nem elas se misturam com
+     * as demais, nem as demais aparecem pra Investimento (ver TaxonomySeeder).
      *
      * @return Collection<int, ExpenseCategory>
      */
     public function getExpenseFormCategoriesProperty(): Collection
     {
         return ExpenseCategory::available()
-            ->where(function (Builder $query): void {
-                $query->whereNull('necessity');
-
-                if ($this->expenseNecessity !== '') {
-                    $query->orWhere('necessity', $this->expenseNecessity);
-                }
-            })
+            ->when(
+                $this->expenseNecessity === Necessity::Investment->value,
+                fn (Builder $query) => $query->where('necessity', Necessity::Investment->value),
+                fn (Builder $query) => $query->whereNull('necessity'),
+            )
             ->get();
     }
 

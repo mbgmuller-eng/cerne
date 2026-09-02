@@ -27,7 +27,13 @@ class ExpenseCategoryByNecessityTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_categoria_sem_necessidade_fixa_aparece_pra_qualquer_necessidade(): void
+    /**
+     * Categoria sem necessidade fixa (Habitação, Transporte etc.) serve
+     * pra Essencial e Supérfluo, mas não faz sentido nenhum pra
+     * Investimento — categoria de investimento é de outra natureza (ver
+     * TaxonomySeeder), não se mistura com as demais.
+     */
+    public function test_categoria_sem_necessidade_fixa_aparece_pra_essencial_e_superfluo_mas_nao_pra_investimento(): void
     {
         $this->criarPerfil();
         $generica = ExpenseCategory::factory()->create(['necessity' => null]);
@@ -35,8 +41,11 @@ class ExpenseCategoryByNecessityTest extends TestCase
         $component = Livewire::test(CashFlowIndex::class)->set('expenseNecessity', 'essential');
         self::assertTrue($component->get('expenseFormCategories')->contains('id', $generica->id));
 
-        $component->set('expenseNecessity', 'investment');
+        $component->set('expenseNecessity', 'discretionary');
         self::assertTrue($component->get('expenseFormCategories')->contains('id', $generica->id));
+
+        $component->set('expenseNecessity', 'investment');
+        self::assertFalse($component->get('expenseFormCategories')->contains('id', $generica->id));
     }
 
     public function test_categoria_de_investimento_so_aparece_quando_necessidade_e_investimento(): void
@@ -89,7 +98,7 @@ class ExpenseCategoryByNecessityTest extends TestCase
 
         Livewire::test(CashFlowIndex::class)
             ->set('expenseCategoryId', $categoria->id)
-            ->set('expenseNecessity', 'investment')
+            ->set('expenseNecessity', 'discretionary')
             ->assertSet('expenseCategoryId', $categoria->id);
     }
 
