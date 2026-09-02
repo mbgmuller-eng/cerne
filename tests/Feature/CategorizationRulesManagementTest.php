@@ -3,12 +3,15 @@
 namespace Tests\Feature;
 
 use App\Enums\MemberRole;
+use App\Enums\Necessity;
 use App\Livewire\CategorizationRules\CategorizationRulesIndex;
 use App\Models\ExpenseCategorizationRule;
 use App\Models\ExpenseCategory;
+use App\Models\ExpenseRecord;
 use App\Models\FinancialProfile;
 use App\Models\IncomeCategorizationRule;
 use App\Models\IncomeCategory;
+use App\Models\IncomeRecord;
 use App\Models\ProfileMember;
 use App\Models\User;
 use App\Support\ProfileContext;
@@ -103,6 +106,100 @@ class CategorizationRulesManagementTest extends TestCase
             ->call('deleteIncomeRule', $regra->id);
 
         self::assertSame(0, IncomeCategorizationRule::count());
+    }
+
+    public function test_criar_regra_detecta_lancamentos_existentes_que_batem_com_o_padrao(): void
+    {
+        [$perfil] = $this->criarPerfil();
+        $categoriaAntiga = ExpenseCategory::factory()->create();
+        $categoriaNova = ExpenseCategory::factory()->create();
+        $bate1 = ExpenseRecord::factory()->for($perfil, 'profile')->create(['description' => 'Pix Adriana', 'category_id' => $categoriaAntiga->id]);
+        $bate2 = ExpenseRecord::factory()->for($perfil, 'profile')->create(['description' => 'PIX ADRIANA RODRIGUES', 'category_id' => $categoriaAntiga->id]);
+        $naoBate = ExpenseRecord::factory()->for($perfil, 'profile')->create(['description' => 'Mercado', 'category_id' => $categoriaAntiga->id]);
+
+        $component = Livewire::test(CategorizationRulesIndex::class)
+            ->set('expensePattern', 'adriana')
+            ->set('expenseCategoryId', $categoriaNova->id)
+            ->set('expenseNecessity', 'essential')
+            ->call('saveExpenseRule')
+            ->assertHasNoErrors();
+
+        $oferta = $component->get('regraAplicavelExistentes');
+        self::assertNotNull($oferta);
+        self::assertSame(2, $oferta['quantidade']);
+        self::assertEqualsCanonicalizing([$bate1->id, $bate2->id], $oferta['ids']);
+
+        // Ainda não mudou nada — só a oferta apareceu.
+        self::assertSame($categoriaAntiga->id, $bate1->fresh()->category_id);
+        self::assertSame($categoriaAntiga->id, $naoBate->fresh()->category_id);
+    }
+
+    public function test_aplicar_regra_recategoriza_os_lancamentos_existentes(): void
+    {
+        [$perfil] = $this->criarPerfil();
+        $categoriaAntiga = ExpenseCategory::factory()->create();
+        $categoriaNova = ExpenseCategory::factory()->create();
+        $bate = ExpenseRecord::factory()->for($perfil, 'profile')->create([
+            'description' => 'Pix Adriana', 'category_id' => $categoriaAntiga->id, 'necessity' => Necessity::Discretionary,
+        ]);
+
+        Livewire::test(CategorizationRulesIndex::class)
+            ->set('expensePattern', 'adriana')
+            ->set('expenseCategoryId', $categoriaNova->id)
+            ->set('expenseNecessity', 'essential')
+            ->call('saveExpenseRule')
+            ->call('aplicarRegraAosExistentes')
+            ->assertSet('regraAplicavelExistentes', null);
+
+        $bate->refresh();
+        self::assertSame($categoriaNova->id, $bate->category_id);
+        self::assertSame(Necessity::Essential, $bate->necessity);
+    }
+
+    public function test_descartar_nao_altera_os_lancamentos_existentes(): void
+    {
+        [$perfil] = $this->criarPerfil();
+        $categoriaAntiga = ExpenseCategory::factory()->create();
+        $categoriaNova = ExpenseCategory::factory()->create();
+        $bate = ExpenseRecord::factory()->for($perfil, 'profile')->create(['description' => 'Pix Adriana', 'category_id' => $categoriaAntiga->id]);
+
+        Livewire::test(CategorizationRulesIndex::class)
+            ->set('expensePattern', 'adriana')
+            ->set('expenseCategoryId', $categoriaNova->id)
+            ->call('saveExpenseRule')
+            ->call('descartarAplicacaoAosExistentes')
+            ->assertSet('regraAplicavelExistentes', null);
+
+        self::assertSame($categoriaAntiga->id, $bate->fresh()->category_id);
+    }
+
+    public function test_sem_lancamento_existente_batendo_nao_mostra_oferta(): void
+    {
+        [$perfil] = $this->criarPerfil();
+        $categoria = ExpenseCategory::factory()->create();
+
+        $component = Livewire::test(CategorizationRulesIndex::class)
+            ->set('expensePattern', 'PADRAO-INEDITO')
+            ->set('expenseCategoryId', $categoria->id)
+            ->call('saveExpenseRule');
+
+        self::assertNull($component->get('regraAplicavelExistentes'));
+    }
+
+    public function test_regra_de_receita_tambem_detecta_e_aplica_aos_existentes(): void
+    {
+        [$perfil] = $this->criarPerfil();
+        $categoriaAntiga = IncomeCategory::factory()->create();
+        $categoriaNova = IncomeCategory::factory()->create();
+        $bate = IncomeRecord::factory()->for($perfil, 'profile')->create(['description' => 'Salario Empresa X', 'category_id' => $categoriaAntiga->id]);
+
+        Livewire::test(CategorizationRulesIndex::class)
+            ->set('incomePattern', 'salario')
+            ->set('incomeCategoryId', $categoriaNova->id)
+            ->call('saveIncomeRule')
+            ->call('aplicarRegraAosExistentes');
+
+        self::assertSame($categoriaNova->id, $bate->fresh()->category_id);
     }
 
     /** Regra de outro perfil não aparece nem pode ser editada — mesmo isolamento de BelongsToProfile. */

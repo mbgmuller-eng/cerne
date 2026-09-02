@@ -15,6 +15,21 @@
         </div>
     @endif
 
+    {{-- Aplicar regra a lançamentos já existentes ------------------------ --}}
+    @if ($regraAplicavelExistentes)
+        <div class="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
+            <p>
+                {{ $regraAplicavelExistentes['quantidade'] }}
+                {{ $regraAplicavelExistentes['quantidade'] === 1 ? 'lançamento já existente bate' : 'lançamentos já existentes batem' }}
+                com essa regra — aplicar a categorização a eles também, ou só nas próximas importações?
+            </p>
+            <div class="flex shrink-0 gap-2">
+                <button wire:click="descartarAplicacaoAosExistentes" class="text-sm text-amber-700 hover:underline dark:text-amber-300">Só nas futuras</button>
+                <button wire:click="aplicarRegraAosExistentes" class="btn-primary px-3 py-1.5">Aplicar aos já existentes</button>
+            </div>
+        </div>
+    @endif
+
     {{-- Abas ------------------------------------------------------------ --}}
     <div class="flex items-center gap-1 border-b border-slate-200 dark:border-white/10">
         <button

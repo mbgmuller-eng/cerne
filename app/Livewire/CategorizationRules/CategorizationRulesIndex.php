@@ -6,13 +6,16 @@ use App\Enums\Necessity;
 use App\Livewire\Concerns\RequiresActiveProfile;
 use App\Models\ExpenseCategory;
 use App\Models\ExpenseCategorizationRule;
+use App\Models\ExpenseRecord;
 use App\Models\ExpenseSubcategory;
 use App\Models\FixedBill;
 use App\Models\IncomeCategory;
 use App\Models\IncomeCategorizationRule;
+use App\Models\IncomeRecord;
 use App\Models\RecurringIncome;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Url;
@@ -31,6 +34,15 @@ class CategorizationRulesIndex extends Component
 
     #[Url]
     public string $tab = 'despesas';
+
+    /**
+     * Depois de salvar uma regra, quantos lançamentos já existentes batem
+     * com o padrão dela — oferta de recategorizar em bloco, nunca
+     * automático (ver aplicarRegraAosExistentes()).
+     *
+     * @var array{tipo: 'despesa'|'receita', ids: list<string>, quantidade: int, categoria_id: string, subcategoria_id: ?string, necessidade: ?string}|null
+     */
+    public ?array $regraAplicavelExistentes = null;
 
     // -----------------------------------------------------------------
     // Formulário — Regra de despesa
@@ -153,6 +165,10 @@ class CategorizationRulesIndex extends Component
             session()->flash('status', 'Regra de despesa cadastrada.');
         }
 
+        $this->detectarLancamentosExistentesParaRegra(
+            'despesa', $data['expensePattern'], $categoria->id, $subcategoria?->id, $data['expenseNecessity'],
+        );
+
         $this->resetExpenseForm();
         $this->showExpenseForm = false;
     }
@@ -238,6 +254,8 @@ class CategorizationRulesIndex extends Component
             session()->flash('status', 'Regra de receita cadastrada.');
         }
 
+        $this->detectarLancamentosExistentesParaRegra('receita', $data['incomePattern'], $categoria->id, null, null);
+
         $this->resetIncomeForm();
         $this->showIncomeForm = false;
     }
@@ -268,6 +286,73 @@ class CategorizationRulesIndex extends Component
     // -----------------------------------------------------------------
     // Comum
     // -----------------------------------------------------------------
+
+    /**
+     * Depois de salvar a regra, confere se algum lançamento JÁ existente
+     * bate com o padrão — mesma lógica "contém" do
+     * CategorizationRuleMatcher, mas aqui é sobre o passado, não sobre
+     * importação. Nunca aplica sozinho: só guarda a oferta pra
+     * aplicarRegraAosExistentes() confirmar.
+     */
+    private function detectarLancamentosExistentesParaRegra(
+        string $tipo, string $pattern, string $categoriaId, ?string $subcategoriaId, ?string $necessidade,
+    ): void {
+        $modelo = $tipo === 'despesa' ? ExpenseRecord::class : IncomeRecord::class;
+
+        $ids = $modelo::query()
+            ->whereRaw('LOWER(description) LIKE ?', ['%'.mb_strtolower($pattern).'%'])
+            ->pluck('id')
+            ->all();
+
+        if ($ids === []) {
+            $this->regraAplicavelExistentes = null;
+
+            return;
+        }
+
+        $this->regraAplicavelExistentes = [
+            'tipo' => $tipo,
+            'ids' => $ids,
+            'quantidade' => count($ids),
+            'categoria_id' => $categoriaId,
+            'subcategoria_id' => $subcategoriaId,
+            'necessidade' => $necessidade,
+        ];
+    }
+
+    public function aplicarRegraAosExistentes(): void
+    {
+        if ($this->regraAplicavelExistentes === null) {
+            return;
+        }
+
+        $r = $this->regraAplicavelExistentes;
+        $modelo = $r['tipo'] === 'despesa' ? ExpenseRecord::class : IncomeRecord::class;
+
+        $payload = ['category_id' => $r['categoria_id']];
+
+        if ($r['tipo'] === 'despesa') {
+            $payload['subcategory_id'] = $r['subcategoria_id'];
+            $payload['necessity'] = $r['necessidade'];
+        }
+
+        // Um a um, não whereIn()->update() em massa — é o update() por
+        // instância que dispara Auditable/InvalidatesDashboard (mesmo
+        // raciocínio de CashFlowIndex::aplicarCategoriaAosDuplicados()).
+        DB::transaction(function () use ($modelo, $r, $payload): void {
+            foreach ($modelo::query()->whereIn('id', $r['ids'])->get() as $registro) {
+                $registro->update($payload);
+            }
+        });
+
+        session()->flash('status', "{$r['quantidade']} lançamento(s) já existente(s) recategorizado(s).");
+        $this->regraAplicavelExistentes = null;
+    }
+
+    public function descartarAplicacaoAosExistentes(): void
+    {
+        $this->regraAplicavelExistentes = null;
+    }
 
     /** @return Collection<int, ExpenseSubcategory> */
     public function getExpenseSubcategoriesProperty(): Collection
