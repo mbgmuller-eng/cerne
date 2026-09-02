@@ -177,9 +177,18 @@ class MyAccount extends Component
             ->latest()
             ->first();
 
+        // "Meus dados" mostra a pessoa DONA do perfil sendo visto, não
+        // quem está logado — pro consultor, isso é o titular do cliente
+        // (mesmo raciocínio do resto do app: consultor com cliente aberto
+        // vê os dados do cliente, não os próprios). Quando quem está
+        // logado É um membro de verdade (titular ou cônjuge vendo a
+        // própria conta), member()->user já é ele mesmo, então o
+        // comportamento de sempre não muda.
+        $donoDosDados = $context->member()?->user ?? $profile->owner;
+
         return view('livewire.profile.my-account', [
             'profile' => $profile,
-            'user' => auth()->user(),
+            'user' => $donoDosDados,
             'consultant' => $consultantLink?->consultant,
             'partner' => $partnerMember,
             'pendingInvite' => $pendingInvite,

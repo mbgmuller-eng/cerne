@@ -111,10 +111,11 @@ class PartnerWithoutLoginTest extends TestCase
         $this->actingAs($consultor);
         app(ProfileContext::class)->set($perfil, member: null, asConsultant: true);
 
+        // "Meus dados" mostra o e-mail do André normalmente (ver teste
+        // dedicado abaixo) — o que este teste prova é que a seção Cônjuge
+        // não é ELE de novo: mostra o convite pendente da Chantal.
         Livewire::test(MyAccount::class)
-            ->assertSee('Chantal')
-            ->assertSee('aguardando aceite')
-            ->assertDontSee('andre.owner@example.com');
+            ->assertSeeInOrder(['Cônjuge', 'Convite enviado', 'Chantal', 'aguardando aceite']);
     }
 
     /** Mesmo cenário, mas o cônjuge já é um membro de verdade (aceitou ou foi cadastrado sem login) — o consultor precisa ver ELE, não o titular. */
@@ -133,6 +134,42 @@ class PartnerWithoutLoginTest extends TestCase
         Livewire::test(MyAccount::class)
             ->assertSee('Chantal')
             ->assertSee('Cadastrado sem login');
+    }
+
+    /**
+     * "Meus dados" precisa mostrar o TITULAR do perfil sendo visto, não
+     * quem está logado — pro consultor, isso é o cliente (André), não o
+     * próprio consultor. Antes deste ajuste, render() sempre usava
+     * auth()->user() direto, então o consultor via o próprio nome/e-mail
+     * em "Meus dados" mesmo estando dentro do perfil do cliente.
+     */
+    public function test_consultor_ve_os_dados_do_titular_em_meus_dados_nao_os_proprios(): void
+    {
+        $owner = User::factory()->create(['name' => 'André Albuquerque', 'email' => 'andre.owner@example.com']);
+        $perfil = FinancialProfile::factory()->create(['owner_user_id' => $owner->id]);
+        ProfileMember::factory()->create(['profile_id' => $perfil->id, 'user_id' => $owner->id, 'role' => MemberRole::Primary]);
+
+        $consultor = User::factory()->consultant()->create(['name' => 'Marcelo Müller', 'email' => 'marcelo@example.com']);
+
+        $this->actingAs($consultor);
+        app(ProfileContext::class)->set($perfil, member: null, asConsultant: true);
+
+        Livewire::test(MyAccount::class)
+            ->assertSee('André Albuquerque')
+            ->assertSee('andre.owner@example.com')
+            ->assertDontSee('Marcelo Müller')
+            ->assertDontSee('marcelo@example.com');
+    }
+
+    /** O titular vendo a própria conta continua vendo os próprios dados — não muda com este ajuste. */
+    public function test_titular_continua_vendo_os_proprios_dados(): void
+    {
+        [$owner, , $ownerMember] = $this->criarTitular();
+        $owner->update(['name' => 'André Albuquerque', 'email' => 'andre.owner@example.com']);
+
+        Livewire::test(MyAccount::class)
+            ->assertSee('André Albuquerque')
+            ->assertSee('andre.owner@example.com');
     }
 
     public function test_livewire_cadastra_conjuge_sem_login_pela_tela(): void
