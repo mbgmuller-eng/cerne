@@ -66,19 +66,22 @@ class TaxonomySeeder extends Seeder
             'Juros', 'IOF de Lis', 'Empréstimo', 'Tarifa Conta', 'Seg Cartão',
             'Anuidade', 'Saques Cx Eletrônico', 'Pix Diversos',
         ],
-        // Necessidade "Investimento" não tinha categoria nenhuma pra cair —
-        // a lista de categoria do formulário passou a filtrar por
-        // necessidade (CashFlowIndex::getExpenseFormCategoriesProperty()),
-        // e sem isso ela ficava vazia quando a pessoa escolhia Investimento.
-        'Investimentos' => ['Aporte', 'Previdência Privada', 'Tesouro Direto', 'Compra de Ativos'],
         // Subcategorias por membro entram no onboarding do perfil —
         // é o que suporta o conceito de mesada dentro do orçamento conjunto.
         'Família' => [],
     ];
 
-    /** Categoria cuja necessidade é fixa — só aparece pra quem escolheu essa necessidade. Ausente = qualquer necessidade. */
-    private const NECESSIDADE_POR_CATEGORIA = [
-        'Investimentos' => Necessity::Investment,
+    /**
+     * Necessidade "Investimento" tem sua própria lista de categorias — não
+     * são "gastos" no sentido de casa/transporte, então não entram em
+     * DESPESAS. Nenhuma delas usa subcategoria (necessidade Investimento
+     * nunca exige, ver CashFlowIndex::validarSubcategoriaObrigatoria()).
+     *
+     * @var list<string>
+     */
+    private const CATEGORIAS_INVESTIMENTO = [
+        'Reserva de Paz', 'Reserva de Oportunidade', 'Seguro de Vida', 'Previdência Privada',
+        'Ações', 'FIIs', 'Fundos', 'ETFs', 'Dólar', 'ETFs Exterior', 'Poupança', 'Consórcio',
     ];
 
     /** @var list<string> */
@@ -96,10 +99,7 @@ class TaxonomySeeder extends Seeder
             // enxergar o que já existe para não duplicar.
             $cat = ExpenseCategory::withoutTaxonomyScope()->firstOrCreate(
                 ['profile_id' => null, 'name' => $categoria],
-                [
-                    'is_default' => true, 'is_active' => true, 'sort_order' => $ordem++,
-                    'necessity' => self::NECESSIDADE_POR_CATEGORIA[$categoria] ?? null,
-                ],
+                ['is_default' => true, 'is_active' => true, 'sort_order' => $ordem++, 'necessity' => null],
             );
 
             $ordemSub = 0;
@@ -109,6 +109,13 @@ class TaxonomySeeder extends Seeder
                     ['is_customizada' => false, 'is_active' => true, 'sort_order' => $ordemSub++],
                 );
             }
+        }
+
+        foreach (self::CATEGORIAS_INVESTIMENTO as $categoria) {
+            ExpenseCategory::withoutTaxonomyScope()->firstOrCreate(
+                ['profile_id' => null, 'name' => $categoria],
+                ['is_default' => true, 'is_active' => true, 'sort_order' => $ordem++, 'necessity' => Necessity::Investment],
+            );
         }
 
         $ordem = 0;
