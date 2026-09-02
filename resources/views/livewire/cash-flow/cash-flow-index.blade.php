@@ -25,6 +25,20 @@
         <x-privacy-tabs :members="$privacyMembers" :view-as="$viewAs" />
     @endif
 
+    {{-- Aplicar categoria a lançamentos com mesma descrição e valor ---- --}}
+    @if ($duplicatas)
+        <div class="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
+            <p>
+                {{ $duplicatas['quantidade'] }} {{ $duplicatas['quantidade'] === 1 ? 'lançamento tem' : 'lançamentos têm' }}
+                a mesma descrição e valor — aplicar essa categoria a eles também?
+            </p>
+            <div class="flex shrink-0 gap-2">
+                <button wire:click="descartarDuplicatas" class="text-sm text-amber-700 hover:underline dark:text-amber-300">Não, só este</button>
+                <button wire:click="aplicarCategoriaAosDuplicados" class="btn-primary px-3 py-1.5">Aplicar a todos</button>
+            </div>
+        </div>
+    @endif
+
     {{-- Nova despesa ----------------------------------------------------- --}}
     @if ($showExpenseForm)
         <form wire:submit="saveExpense" class="card space-y-4 p-5">

@@ -71,6 +71,15 @@ class CashFlowIndex extends Component
     #[Url]
     public string $memberId = '';
 
+    /**
+     * Depois de editar um lançamento, outros com a mesma descrição e valor
+     * que ainda não têm a mesma categorização — oferta de aplicar em bloco.
+     * Nulo = nada pendente.
+     *
+     * @var array{tipo: 'despesa'|'receita', ids: list<string>, quantidade: int, categoria_id: string, subcategoria_id: ?string, necessidade: ?string}|null
+     */
+    public ?array $duplicatas = null;
+
     // -----------------------------------------------------------------
     // Formulário — Despesa
     // -----------------------------------------------------------------
@@ -436,6 +445,8 @@ class CashFlowIndex extends Component
             $contaNova?->applyToBalance('-'.$data['expenseAmount']);
         });
 
+        $this->detectarDuplicatas('despesa', $despesa);
+
         session()->flash('status', 'Despesa atualizada.');
         $this->resetExpenseForm();
         $this->showExpenseForm = false;
@@ -622,6 +633,8 @@ class CashFlowIndex extends Component
             $contaNova?->applyToBalance($data['incomeAmount']);
         });
 
+        $this->detectarDuplicatas('receita', $receita);
+
         session()->flash('status', 'Receita atualizada.');
         $this->resetIncomeForm();
         $this->showIncomeForm = false;
@@ -635,6 +648,80 @@ class CashFlowIndex extends Component
         );
         $this->incomeDate = CarbonImmutable::now()->toDateString();
         $this->resetErrorBag();
+    }
+
+    // -----------------------------------------------------------------
+    // Aplicar categoria a lançamentos com a mesma descrição e valor
+    // -----------------------------------------------------------------
+
+    /**
+     * Depois de editar, verifica se existem outros lançamentos com a
+     * mesma descrição e valor — oferece aplicar a categorização em bloco,
+     * mas nunca sozinho: descrição igual não garante que seja a mesma
+     * coisa de verdade (ex.: "Uber" pode ser corrida ou Uber Eats), então
+     * a pessoa confirma antes de qualquer coisa mudar.
+     */
+    private function detectarDuplicatas(string $tipo, ExpenseRecord|IncomeRecord $registro): void
+    {
+        if (blank($registro->description)) {
+            return;
+        }
+
+        $modelo = $tipo === 'despesa' ? ExpenseRecord::class : IncomeRecord::class;
+
+        $ids = $modelo::query()
+            ->where('description', $registro->description)
+            ->where('amount', $registro->amount)
+            ->where('id', '!=', $registro->id)
+            ->pluck('id')
+            ->all();
+
+        if ($ids === []) {
+            return;
+        }
+
+        $this->duplicatas = [
+            'tipo' => $tipo,
+            'ids' => $ids,
+            'quantidade' => count($ids),
+            'categoria_id' => $registro->category_id,
+            'subcategoria_id' => $tipo === 'despesa' ? $registro->subcategory_id : null,
+            'necessidade' => $tipo === 'despesa' ? $registro->necessity->value : null,
+        ];
+    }
+
+    public function aplicarCategoriaAosDuplicados(): void
+    {
+        if ($this->duplicatas === null) {
+            return;
+        }
+
+        $d = $this->duplicatas;
+        $modelo = $d['tipo'] === 'despesa' ? ExpenseRecord::class : IncomeRecord::class;
+
+        $payload = ['category_id' => $d['categoria_id']];
+
+        if ($d['tipo'] === 'despesa') {
+            $payload['subcategory_id'] = $d['subcategoria_id'];
+            $payload['necessity'] = $d['necessidade'];
+        }
+
+        // Um a um, não whereIn()->update() em massa: é o update() por
+        // instância que dispara Auditable/InvalidatesDashboard — update em
+        // massa do query builder não passa pelos eventos do model.
+        DB::transaction(function () use ($modelo, $d, $payload): void {
+            foreach ($modelo::query()->whereIn('id', $d['ids'])->get() as $registro) {
+                $registro->update($payload);
+            }
+        });
+
+        session()->flash('status', "{$d['quantidade']} lançamento(s) atualizado(s) também.");
+        $this->duplicatas = null;
+    }
+
+    public function descartarDuplicatas(): void
+    {
+        $this->duplicatas = null;
     }
 
     /**
