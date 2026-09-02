@@ -3,6 +3,7 @@
 namespace App\Livewire\Documents;
 
 use App\Enums\DocumentType;
+use App\Enums\Necessity;
 use App\Enums\ProcessingStatus;
 use App\Jobs\ProcessDocumentJob;
 use App\Livewire\Concerns\RequiresActiveProfile;
@@ -56,6 +57,9 @@ class DocumentsIndex extends Component
     public array $subcategoriaPorItem = [];
 
     public array $necessidadePorItem = [];
+
+    /** Padrão da regra que pré-preencheu o item (null = ninguém casou, categorização é manual). */
+    public array $regraAplicadaPorItem = [];
 
     /** Ocorrência de conta fixa/receita recorrente casada, por item — ver DocumentCommitService. */
     public array $fixedBillPaymentPorItem = [];
@@ -137,6 +141,7 @@ class DocumentsIndex extends Component
         $this->categoriaPorItem = [];
         $this->subcategoriaPorItem = [];
         $this->necessidadePorItem = [];
+        $this->regraAplicadaPorItem = [];
         $this->fixedBillPaymentPorItem = [];
         $this->recurringIncomeOccurrencePorItem = [];
         $this->notaPorItem = [];
@@ -176,6 +181,7 @@ class DocumentsIndex extends Component
         $this->categoriaPorItem[$i] = $match['category_id'];
         $this->subcategoriaPorItem[$i] = (string) $match['subcategory_id'];
         $this->necessidadePorItem[$i] = $match['necessity']->value;
+        $this->regraAplicadaPorItem[$i] = $match['rule']->pattern;
 
         $pagamento = $casaContaFixa ? $match['fixed_bill_payment'] : null;
 
@@ -202,6 +208,7 @@ class DocumentsIndex extends Component
         }
 
         $this->categoriaPorItem[$i] = $match['category_id'];
+        $this->regraAplicadaPorItem[$i] = $match['rule']->pattern;
 
         $ocorrencia = $casaContaFixa ? $match['recurring_income_occurrence'] : null;
 
@@ -237,12 +244,97 @@ class DocumentsIndex extends Component
     {
         $this->reset(
             'revisandoId', 'aceitos', 'categoriaPorItem', 'subcategoriaPorItem', 'necessidadePorItem',
-            'fixedBillPaymentPorItem', 'recurringIncomeOccurrencePorItem', 'notaPorItem',
+            'regraAplicadaPorItem', 'fixedBillPaymentPorItem', 'recurringIncomeOccurrencePorItem', 'notaPorItem',
         );
+    }
+
+    /**
+     * Trocar a necessidade de um item pode invalidar a categoria já
+     * escolhida (ex.: categoria de Investimento com a necessidade trocada
+     * pra Essencial) — mesmo raciocínio de
+     * CashFlowIndex::updatedExpenseNecessity(), só que por item da tabela.
+     */
+    public function updated(string $name): void
+    {
+        if (! str_starts_with($name, 'necessidadePorItem.')) {
+            return;
+        }
+
+        $i = (int) substr($name, strlen('necessidadePorItem.'));
+        $necessidade = $this->necessidadePorItem[$i] ?? '';
+
+        if ($necessidade === Necessity::Investment->value) {
+            $this->subcategoriaPorItem[$i] = '';
+        }
+
+        $categoriaId = $this->categoriaPorItem[$i] ?? '';
+
+        if ($categoriaId === '' || $this->expenseCategoriesForNecessity($necessidade)->contains('id', $categoriaId)) {
+            return;
+        }
+
+        $this->categoriaPorItem[$i] = '';
+        $this->subcategoriaPorItem[$i] = '';
+    }
+
+    /** @return Collection<int, ExpenseCategory> */
+    private function expenseCategoriesForNecessity(string $necessity): Collection
+    {
+        return ExpenseCategory::available()
+            ->when(
+                $necessity === Necessity::Investment->value,
+                fn ($query) => $query->where('necessity', Necessity::Investment->value),
+                fn ($query) => $query->whereNull('necessity'),
+            )
+            ->get();
+    }
+
+    /**
+     * Índice do item (despesa aceita) => falta necessidade, categoria ou
+     * subcategoria. Sem regra que bateu, a IA não decide isso sozinha —
+     * vira revisão humana obrigatória, não um lembrete que dá pra ignorar.
+     *
+     * @return array<int, bool>
+     */
+    public function getItensFaltandoCategoriaProperty(): array
+    {
+        if ($this->revisando === null) {
+            return [];
+        }
+
+        $faltando = [];
+
+        foreach ($this->revisando->extractedItems() as $i => $item) {
+            if (($item['tipo'] ?? null) === 'receita') {
+                continue;
+            }
+
+            $necessidade = $this->necessidadePorItem[$i] ?? '';
+            $categoria = $this->categoriaPorItem[$i] ?? '';
+            $subcategoria = $this->subcategoriaPorItem[$i] ?? '';
+
+            $faltando[$i] = $necessidade === ''
+                || $categoria === ''
+                || ($necessidade !== Necessity::Investment->value && $subcategoria === '');
+        }
+
+        return $faltando;
     }
 
     public function confirmar(DocumentCommitService $commit): void
     {
+        $faltandoNosAceitos = array_filter(
+            $this->itensFaltandoCategoria,
+            fn (bool $falta, int $i) => $falta && in_array($i, $this->aceitos, true),
+            ARRAY_FILTER_USE_BOTH,
+        );
+
+        if ($faltandoNosAceitos !== []) {
+            $this->addError('confirmar', 'Categorize necessidade, categoria e subcategoria de todos os itens selecionados antes de importar.');
+
+            return;
+        }
+
         $documento = DocumentUpload::findOrFail($this->revisandoId);
 
         try {
@@ -301,6 +393,7 @@ class DocumentsIndex extends Component
             'expenseCategories' => ExpenseCategory::query()->available()->get(),
             'expenseSubcategories' => ExpenseSubcategory::query()->available()->get(),
             'incomeCategories' => IncomeCategory::query()->available()->get(),
+            'itensFaltandoCategoria' => $this->itensFaltandoCategoria,
         ]);
     }
 }

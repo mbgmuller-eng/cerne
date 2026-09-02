@@ -124,14 +124,22 @@
                                     <th class="px-3 py-2 text-left font-medium">{{ str_replace('_', ' ', $coluna) }}</th>
                                 @endforeach
                                 @if ($temCategorizacao)
+                                    <th class="px-3 py-2 text-left font-medium">necessidade</th>
                                     <th class="px-3 py-2 text-left font-medium">categoria</th>
                                     <th class="px-3 py-2 text-left font-medium">subcategoria</th>
-                                    <th class="px-3 py-2 text-left font-medium">necessidade</th>
                                 @endif
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-100 dark:divide-white/10">
                             @foreach ($itens as $i => $item)
+                                @php
+                                    $ehReceita = ($item['tipo'] ?? null) === 'receita';
+                                    $necessidadeItem = $necessidadePorItem[$i] ?? '';
+                                    $faltaCategorizar = ! $ehReceita && ($itensFaltandoCategoria[$i] ?? false);
+                                    $categoriasDoItem = $necessidadeItem === Necessity::Investment->value
+                                        ? $expenseCategories->filter(fn ($c) => $c->necessity === Necessity::Investment)
+                                        : $expenseCategories->filter(fn ($c) => $c->necessity === null);
+                                @endphp
                                 <tr class="{{ in_array($i, $aceitos) ? '' : 'opacity-40' }}">
                                     <td class="px-3 py-2">
                                         <input type="checkbox" wire:model.live="aceitos" value="{{ $i }}" class="rounded border-slate-300 dark:border-slate-600 text-brand-700 dark:text-brand-400 focus:ring-brand-500">
@@ -147,37 +155,30 @@
                                     @endforeach
 
                                     @if ($temCategorizacao)
-                                        @php $ehReceita = ($item['tipo'] ?? null) === 'receita'; @endphp
                                         <td class="px-3 py-2">
-                                            <select wire:model.live="categoriaPorItem.{{ $i }}" class="select w-full text-xs">
+                                            @unless ($ehReceita)
+                                                <select wire:model.live="necessidadePorItem.{{ $i }}" @class(['select w-full text-xs', 'ring-2 ring-amber-400 dark:ring-amber-500' => $faltaCategorizar && $necessidadeItem === ''])>
+                                                    <option value="">Selecione</option>
+                                                    @foreach (Necessity::options() as $valorNecessidade => $rotulo)
+                                                        <option value="{{ $valorNecessidade }}">{{ $rotulo }}</option>
+                                                    @endforeach
+                                                </select>
+                                            @endunless
+                                        </td>
+                                        <td class="px-3 py-2">
+                                            <select wire:model.live="categoriaPorItem.{{ $i }}" @class(['select w-full text-xs', 'ring-2 ring-amber-400 dark:ring-amber-500' => $faltaCategorizar && ($categoriaPorItem[$i] ?? '') === '']) @if (! $ehReceita && $necessidadeItem === '') disabled @endif>
                                                 <option value="">—</option>
-                                                @foreach (($ehReceita ? $incomeCategories : $expenseCategories) as $categoria)
+                                                @foreach (($ehReceita ? $incomeCategories : $categoriasDoItem) as $categoria)
                                                     <option value="{{ $categoria->id }}">{{ $categoria->name }}</option>
                                                 @endforeach
                                             </select>
                                         </td>
                                         <td class="px-3 py-2">
-                                            @unless ($ehReceita)
-                                                @php
-                                                    $necessidadeItem = $necessidadePorItem[$i] ?? '';
-                                                    $semSubcategoria = $necessidadeItem !== Necessity::Investment->value && ($subcategoriaPorItem[$i] ?? '') === '';
-                                                @endphp
-                                                <select wire:model="subcategoriaPorItem.{{ $i }}" @class(['select w-full text-xs', 'ring-2 ring-amber-400 dark:ring-amber-500' => $semSubcategoria])>
+                                            @unless ($ehReceita || $necessidadeItem === Necessity::Investment->value)
+                                                <select wire:model="subcategoriaPorItem.{{ $i }}" @class(['select w-full text-xs', 'ring-2 ring-amber-400 dark:ring-amber-500' => $faltaCategorizar && ($subcategoriaPorItem[$i] ?? '') === '']) @if (($categoriaPorItem[$i] ?? '') === '') disabled @endif>
                                                     <option value="">—</option>
                                                     @foreach ($expenseSubcategories->where('category_id', $categoriaPorItem[$i] ?? null) as $subcategoria)
                                                         <option value="{{ $subcategoria->id }}">{{ $subcategoria->name }}</option>
-                                                    @endforeach
-                                                </select>
-                                                @if ($semSubcategoria)
-                                                    <p class="mt-1 text-xs whitespace-nowrap font-medium text-amber-700 dark:text-amber-400">Falta subcategoria</p>
-                                                @endif
-                                            @endunless
-                                        </td>
-                                        <td class="px-3 py-2">
-                                            @unless ($ehReceita)
-                                                <select wire:model="necessidadePorItem.{{ $i }}" class="select w-full text-xs">
-                                                    @foreach (Necessity::options() as $valorNecessidade => $rotulo)
-                                                        <option value="{{ $valorNecessidade }}">{{ $rotulo }}</option>
                                                     @endforeach
                                                 </select>
                                             @endunless
@@ -185,11 +186,21 @@
                                     @endif
                                 </tr>
 
-                                @if ($temCategorizacao && ($notaPorItem[$i] ?? null))
+                                @if ($temCategorizacao && ($faltaCategorizar || ($regraAplicadaPorItem[$i] ?? null) || ($notaPorItem[$i] ?? null)))
                                     <tr class="{{ in_array($i, $aceitos) ? '' : 'opacity-40' }}">
                                         <td></td>
-                                        <td colspan="{{ count($item) + 3 }}" class="px-3 pb-2 text-xs text-brand-700 dark:text-brand-300">
-                                            {{ $notaPorItem[$i] }}
+                                        <td colspan="{{ count($item) + 3 }}" class="px-3 pb-2 text-xs">
+                                            <div class="flex flex-wrap gap-x-3 gap-y-1">
+                                                @if ($faltaCategorizar)
+                                                    <span class="font-medium text-amber-700 dark:text-amber-400">Falta categorizar</span>
+                                                @endif
+                                                @if ($regraAplicadaPorItem[$i] ?? null)
+                                                    <span class="text-slate-500 dark:text-slate-400">Categorizado pela regra "{{ $regraAplicadaPorItem[$i] }}"</span>
+                                                @endif
+                                                @if ($notaPorItem[$i] ?? null)
+                                                    <span class="text-brand-700 dark:text-brand-300">{{ $notaPorItem[$i] }}</span>
+                                                @endif
+                                            </div>
                                         </td>
                                     </tr>
                                 @endif
@@ -199,13 +210,7 @@
                 </div>
 
                 @php
-                    $semSubcategoriaCount = collect($aceitos)->filter(function ($i) use ($itens, $necessidadePorItem, $subcategoriaPorItem) {
-                        if (($itens[$i]['tipo'] ?? null) === 'receita') {
-                            return false;
-                        }
-
-                        return ($necessidadePorItem[$i] ?? '') !== Necessity::Investment->value && ($subcategoriaPorItem[$i] ?? '') === '';
-                    })->count();
+                    $faltandoCount = collect($aceitos)->filter(fn ($i) => $itensFaltandoCategoria[$i] ?? false)->count();
                 @endphp
 
                 <div class="mt-4 flex flex-wrap items-center justify-between gap-3">
@@ -213,9 +218,9 @@
                         <p class="text-sm text-slate-600 dark:text-slate-300">
                             {{ count($aceitos) }} de {{ count($itens) }} selecionados
                         </p>
-                        @if ($semSubcategoriaCount > 0)
+                        @if ($faltandoCount > 0)
                             <p class="text-xs font-medium text-amber-700 dark:text-amber-400">
-                                {{ $semSubcategoriaCount }} {{ $semSubcategoriaCount === 1 ? 'selecionado está' : 'selecionados estão' }} sem subcategoria — corrija antes de importar.
+                                {{ $faltandoCount }} {{ $faltandoCount === 1 ? 'selecionado está' : 'selecionados estão' }} sem categorização completa — corrija antes de importar.
                             </p>
                         @endif
                     </div>

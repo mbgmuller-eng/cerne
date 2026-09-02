@@ -126,6 +126,7 @@ class DocumentImportCategorizationTest extends TestCase
 
         Livewire::test(DocumentsIndex::class)
             ->call('revisar', $documento->id)
+            ->assertSee('Categorizado pela regra "UBER"', false)
             ->call('confirmar')
             ->assertHasNoErrors();
 
@@ -137,11 +138,12 @@ class DocumentImportCategorizationTest extends TestCase
     }
 
     /**
-     * Sem regra que bata, o item chega na revisão sem subcategoria — a
-     * tela precisa avisar que falta, pra pessoa corrigir antes de
-     * confirmar (subcategoria virou obrigatória pra despesa).
+     * Sem regra que bata, o item chega na revisão sem necessidade,
+     * categoria nem subcategoria — a tela precisa avisar que falta
+     * categorizar, pra pessoa corrigir antes de confirmar (categorização
+     * completa virou obrigatória pra despesa importada).
      */
-    public function test_item_sem_regra_que_bata_mostra_aviso_de_subcategoria_faltando(): void
+    public function test_item_sem_regra_que_bata_mostra_aviso_de_categorizacao_faltando(): void
     {
         [$perfil, $membro] = $this->criarPerfil();
         $conta = BankAccount::factory()->for($perfil, 'profile')->for($membro, 'member')->create();
@@ -152,7 +154,51 @@ class DocumentImportCategorizationTest extends TestCase
 
         Livewire::test(DocumentsIndex::class)
             ->call('revisar', $documento->id)
-            ->assertSee('Falta subcategoria');
+            ->assertSee('Falta categorizar');
+    }
+
+    /** Categorização incompleta bloqueia mesmo que a pessoa tente confirmar assim mesmo — não é só um lembrete visual. */
+    public function test_confirmar_e_bloqueado_quando_falta_categorizar_item_sem_regra(): void
+    {
+        [$perfil, $membro] = $this->criarPerfil();
+        $conta = BankAccount::factory()->for($perfil, 'profile')->for($membro, 'member')->create();
+
+        $documento = $this->criarExtrato($perfil, $membro, $conta, [
+            ['data' => '2026-09-10', 'descricao' => 'PAGAMENTO SEM REGRA', 'valor' => '35.00', 'tipo' => 'despesa', 'categoria_sugerida' => null],
+        ]);
+
+        Livewire::test(DocumentsIndex::class)
+            ->call('revisar', $documento->id)
+            ->call('confirmar')
+            ->assertHasErrors('confirmar');
+
+        self::assertSame(0, ExpenseRecord::where('source_document_id', $documento->id)->count());
+    }
+
+    /** Depois de categorizar manualmente (sem regra nenhuma), a importação segue normal. */
+    public function test_confirmar_funciona_apos_categorizar_manualmente_o_item_sem_regra(): void
+    {
+        [$perfil, $membro] = $this->criarPerfil();
+        $conta = BankAccount::factory()->for($perfil, 'profile')->for($membro, 'member')->create();
+        $categoria = ExpenseCategory::factory()->create(['necessity' => null]);
+        $subcategoria = ExpenseSubcategory::factory()->create(['category_id' => $categoria->id]);
+
+        $documento = $this->criarExtrato($perfil, $membro, $conta, [
+            ['data' => '2026-09-10', 'descricao' => 'PAGAMENTO SEM REGRA', 'valor' => '35.00', 'tipo' => 'despesa', 'categoria_sugerida' => null],
+        ]);
+
+        Livewire::test(DocumentsIndex::class)
+            ->call('revisar', $documento->id)
+            ->set('necessidadePorItem.0', 'essential')
+            ->set('categoriaPorItem.0', $categoria->id)
+            ->set('subcategoriaPorItem.0', $subcategoria->id)
+            ->call('confirmar')
+            ->assertHasNoErrors();
+
+        $lancamento = ExpenseRecord::where('source_document_id', $documento->id)->sole();
+        self::assertSame($categoria->id, $lancamento->category_id);
+        self::assertSame($subcategoria->id, $lancamento->subcategory_id);
+        self::assertSame(Necessity::Essential, $lancamento->necessity);
     }
 
     /** @param  list<array<string, mixed>>  $itens */
