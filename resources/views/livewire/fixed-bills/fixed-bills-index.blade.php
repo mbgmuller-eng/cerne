@@ -44,8 +44,8 @@
             <button wire:click="toggleBillForm" class="btn-primary px-3 py-1.5">+ Conta fixa</button>
         </div>
 
-        @if ($showBillForm)
-            <form wire:submit="saveBill" class="card space-y-4 p-5">
+        <x-modal wire-model="showBillForm">
+            <form wire:submit="saveBill" class="space-y-4">
                 <div class="flex items-baseline justify-between">
                     <h2 class="text-sm font-semibold text-slate-900 dark:text-white">Nova conta fixa</h2>
                     <button type="button" wire:click="toggleBillForm" class="btn-ghost px-2 py-1 text-xs">Cancelar</button>
@@ -161,7 +161,7 @@
                     <button type="submit" class="btn-primary px-4 py-2" wire:loading.attr="disabled">Salvar conta fixa</button>
                 </div>
             </form>
-        @endif
+        </x-modal>
 
         <div class="grid gap-4 sm:grid-cols-2">
             <div class="card p-5">
@@ -250,8 +250,8 @@
             <button wire:click="toggleIncomeForm" class="btn-primary px-3 py-1.5">+ Receita recorrente</button>
         </div>
 
-        @if ($showIncomeForm)
-            <form wire:submit="saveIncome" class="card space-y-4 p-5">
+        <x-modal wire-model="showIncomeForm">
+            <form wire:submit="saveIncome" class="space-y-4">
                 <div class="flex items-baseline justify-between">
                     <h2 class="text-sm font-semibold text-slate-900 dark:text-white">Nova receita recorrente</h2>
                     <button type="button" wire:click="toggleIncomeForm" class="btn-ghost px-2 py-1 text-xs">Cancelar</button>
@@ -367,7 +367,7 @@
                     <button type="submit" class="btn-primary px-4 py-2" wire:loading.attr="disabled">Salvar receita recorrente</button>
                 </div>
             </form>
-        @endif
+        </x-modal>
 
         <div class="grid gap-4 sm:grid-cols-2">
             <div class="card p-5">

@@ -52,7 +52,13 @@
                 </div>
                 <div>
                     <dt class="text-xs text-slate-500 dark:text-slate-400">E-mail</dt>
-                    <dd class="mt-0.5 text-sm text-slate-800 dark:text-slate-200">{{ $partner->user->email }}</dd>
+                    <dd class="mt-0.5 text-sm text-slate-800 dark:text-slate-200">
+                        @if ($partner->user)
+                            {{ $partner->user->email }}
+                        @else
+                            <span class="text-slate-400">Cadastrado sem login</span>
+                        @endif
+                    </dd>
                 </div>
             </dl>
         @elseif ($pendingInvite)
@@ -67,16 +73,22 @@
                 </button>
             @endif
         @elseif ($canInvitePartner)
-            <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">Você ainda não convidou seu cônjuge.</p>
-            <button type="button" wire:click="toggleInviteForm" class="btn-secondary mt-3 px-3 py-1.5">
-                {{ $showInviteForm ? 'Cancelar' : '+ Convidar cônjuge' }}
-            </button>
+            <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">Você ainda não tem cônjuge vinculado a este perfil.</p>
+            <div class="mt-3 flex flex-wrap gap-2">
+                <button type="button" wire:click="toggleInviteForm" class="btn-secondary px-3 py-1.5">+ Convidar por e-mail</button>
+                <button type="button" wire:click="togglePartnerOnlyForm" class="btn-ghost px-3 py-1.5">Cadastrar sem login</button>
+            </div>
         @else
             <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">Nenhum cônjuge vinculado a este perfil.</p>
         @endif
 
-        @if ($showInviteForm && $canInvitePartner)
-            <form wire:submit="invitePartner" class="mt-4 space-y-4 border-t border-slate-100 pt-4 dark:border-white/10">
+        <x-modal wire-model="showInviteForm">
+            <form wire:submit="invitePartner" class="space-y-4">
+                <div class="flex items-baseline justify-between">
+                    <h2 class="text-sm font-semibold text-slate-900 dark:text-white">Convidar cônjuge por e-mail</h2>
+                    <button type="button" wire:click="toggleInviteForm" class="btn-ghost px-2 py-1 text-xs">Cancelar</button>
+                </div>
+
                 <div class="grid gap-4 sm:grid-cols-2">
                     <div>
                         <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Nome</label>
@@ -92,17 +104,40 @@
                 </div>
 
                 <button type="submit" class="btn-primary" wire:loading.attr="disabled">Convidar</button>
-            </form>
 
-            @if ($lastInviteLink)
-                {{-- O link é mostrado para o caso de o e-mail não chegar; dá
-                     pra repassar por outro canal. --}}
-                <div class="mt-4 rounded-lg bg-slate-50 p-3 dark:bg-slate-700">
-                    <p class="text-xs font-medium text-slate-600 dark:text-slate-400">Link do convite</p>
-                    <p class="mt-1 font-mono text-xs break-all text-slate-700 dark:text-slate-300">{{ $lastInviteLink }}</p>
+                @if ($lastInviteLink)
+                    {{-- O link é mostrado para o caso de o e-mail não chegar; dá
+                         pra repassar por outro canal. --}}
+                    <div class="rounded-lg bg-slate-50 p-3 dark:bg-slate-700">
+                        <p class="text-xs font-medium text-slate-600 dark:text-slate-400">Link do convite</p>
+                        <p class="mt-1 font-mono text-xs break-all text-slate-700 dark:text-slate-300">{{ $lastInviteLink }}</p>
+                    </div>
+                @endif
+            </form>
+        </x-modal>
+
+        <x-modal wire-model="showPartnerOnlyForm">
+            <form wire:submit="addPartnerWithoutLogin" class="space-y-4">
+                <div class="flex items-baseline justify-between">
+                    <h2 class="text-sm font-semibold text-slate-900 dark:text-white">Cadastrar cônjuge sem login</h2>
+                    <button type="button" wire:click="togglePartnerOnlyForm" class="btn-ghost px-2 py-1 text-xs">Cancelar</button>
                 </div>
-            @endif
-        @endif
+
+                <p class="text-xs text-slate-500 dark:text-slate-400">
+                    Ele(a) não vai poder acessar a plataforma. Conta bancária, gastos e investimentos em nome
+                    dele(a) funcionam normal — só não vai dar pra marcar nada como privado, porque sem login
+                    ninguém veria esse dado, nem ele(a) mesmo(a).
+                </p>
+
+                <div>
+                    <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Nome</label>
+                    <input type="text" wire:model="partnerOnlyName" class="input mt-1.5" placeholder="Nome do cônjuge">
+                    @error('partnerOnlyName') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                </div>
+
+                <button type="submit" class="btn-primary" wire:loading.attr="disabled">Cadastrar</button>
+            </form>
+        </x-modal>
     </section>
 
     {{-- Notificações ---------------------------------------------------- --}}

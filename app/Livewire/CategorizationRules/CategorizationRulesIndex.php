@@ -11,6 +11,7 @@ use App\Models\FixedBill;
 use App\Models\IncomeCategory;
 use App\Models\IncomeCategorizationRule;
 use App\Models\RecurringIncome;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Layout;
@@ -75,6 +76,17 @@ class CategorizationRulesIndex extends Component
     public function setTab(string $tab): void
     {
         $this->tab = in_array($tab, ['despesas', 'receitas'], true) ? $tab : 'despesas';
+    }
+
+    /** Mesmo raciocínio de CashFlowIndex::updatedExpenseNecessity() — só limpa se a categoria deixou de valer. */
+    public function updatedExpenseNecessity(): void
+    {
+        if ($this->expenseCategoryId === '' || $this->expenseFormCategories->contains('id', $this->expenseCategoryId)) {
+            return;
+        }
+
+        $this->expenseCategoryId = '';
+        $this->expenseSubcategoryId = '';
     }
 
     // -----------------------------------------------------------------
@@ -270,6 +282,26 @@ class CategorizationRulesIndex extends Component
             ->get();
     }
 
+    /**
+     * Mesmo raciocínio de CashFlowIndex::getExpenseFormCategoriesProperty():
+     * categoria sem necessidade fixa aparece sempre, "Investimentos" só
+     * quando a regra é de necessidade Investimento.
+     *
+     * @return Collection<int, ExpenseCategory>
+     */
+    public function getExpenseFormCategoriesProperty(): Collection
+    {
+        return ExpenseCategory::query()->available()
+            ->where(function (Builder $query): void {
+                $query->whereNull('necessity');
+
+                if ($this->expenseNecessity !== '') {
+                    $query->orWhere('necessity', $this->expenseNecessity);
+                }
+            })
+            ->get();
+    }
+
     /** @return Collection<int, ExpenseCategorizationRule> */
     public function getExpenseRulesProperty(): Collection
     {
@@ -293,7 +325,7 @@ class CategorizationRulesIndex extends Component
         return view('livewire.categorization-rules.categorization-rules-index', [
             'expenseRules' => $this->expenseRules,
             'incomeRules' => $this->incomeRules,
-            'expenseCategories' => ExpenseCategory::query()->available()->get(),
+            'expenseCategories' => $this->expenseFormCategories,
             'expenseSubcategories' => $this->expenseSubcategories,
             'incomeCategories' => IncomeCategory::query()->available()->get(),
             'fixedBills' => FixedBill::query()->active()->orderBy('name')->get(),

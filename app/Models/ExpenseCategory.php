@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\Necessity;
 use App\Models\Concerns\BelongsToProfileOrShared;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
@@ -18,7 +19,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * todos os perfis, mas uma categoria criada por um casal não pode
  * aparecer para outro.
  */
-#[Fillable(['profile_id', 'name', 'icon', 'color_hex', 'is_default', 'is_active', 'sort_order'])]
+#[Fillable(['profile_id', 'name', 'icon', 'color_hex', 'necessity', 'is_default', 'is_active', 'sort_order'])]
 class ExpenseCategory extends Model
 {
     use BelongsToProfileOrShared, HasFactory, HasUuids;
@@ -26,6 +27,7 @@ class ExpenseCategory extends Model
     protected function casts(): array
     {
         return [
+            'necessity' => Necessity::class,
             'is_default' => 'boolean',
             'is_active' => 'boolean',
             'sort_order' => 'integer',

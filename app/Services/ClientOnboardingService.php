@@ -81,8 +81,9 @@ class ClientOnboardingService
     /**
      * Acrescenta o cônjuge a um perfil, promovendo-o a `couple`.
      *
-     * Perfil de casal exige login próprio para cada membro — é o que torna
-     * a privacidade granular aplicável (ver ProfileType::requiresMemberLogin).
+     * Casal ganha privacidade granular (`is_private` por lançamento) quando
+     * cada membro loga — mas login não é obrigatório: ver
+     * addPartnerWithoutLogin() pra quem não quer conta nenhuma.
      */
     public function addPartner(FinancialProfile $profile, string $name, string $email, string $password): User
     {
@@ -108,6 +109,33 @@ class ClientOnboardingService
             ]);
 
             return $partner;
+        });
+    }
+
+    /**
+     * Acrescenta o cônjuge sem criar login nenhum — caso do casal em que
+     * um dos dois não quer (ou não vai) acessar a plataforma. Conta
+     * bancária, gasto e investimento em nome dele(a) funcionam normal
+     * (tudo é vinculado por `member_id`, não por usuário); a única
+     * consequência real é que nada dele(a) pode ser marcado como privado —
+     * sem login, ninguém (nem ele(a)) veria esse dado, então
+     * `MemberPrivacyScope` simplesmente esconde de todo mundo menos do
+     * consultor. Ver `PartnerInviteService::alreadyHasPartner()`: verifica
+     * por `role === Secondary`, não por `user_id`, então já bloqueia um
+     * convite por e-mail depois deste cadastro sozinho.
+     */
+    public function addPartnerWithoutLogin(FinancialProfile $profile, string $name): ProfileMember
+    {
+        return DB::transaction(function () use ($profile, $name): ProfileMember {
+            $profile->update(['profile_type' => ProfileType::Couple]);
+
+            return ProfileMember::create([
+                'profile_id' => $profile->id,
+                'user_id' => null,
+                'name' => $name,
+                'role' => MemberRole::Secondary,
+                'is_active' => true,
+            ]);
         });
     }
 

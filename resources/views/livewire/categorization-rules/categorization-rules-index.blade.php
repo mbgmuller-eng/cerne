@@ -37,8 +37,8 @@
             <button wire:click="toggleExpenseForm" class="btn-primary px-3 py-1.5">+ Regra</button>
         </div>
 
-        @if ($showExpenseForm)
-            <form wire:submit="saveExpenseRule" class="card space-y-4 p-5">
+        <x-modal wire-model="showExpenseForm">
+            <form wire:submit="saveExpenseRule" class="space-y-4">
                 <div class="flex items-baseline justify-between">
                     <h2 class="text-sm font-semibold text-slate-900 dark:text-white">{{ $editingExpenseRuleId ? 'Editar regra' : 'Nova regra de despesa' }}</h2>
                     <button type="button" wire:click="toggleExpenseForm" class="btn-ghost px-2 py-1 text-xs">Cancelar</button>
@@ -75,7 +75,7 @@
 
                     <div>
                         <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Necessidade</label>
-                        <select wire:model="expenseNecessity" class="select mt-1.5 w-full">
+                        <select wire:model.live="expenseNecessity" class="select mt-1.5 w-full">
                             @foreach (Necessity::options() as $valor => $rotulo)
                                 <option value="{{ $valor }}">{{ $rotulo }}</option>
                             @endforeach
@@ -102,7 +102,7 @@
                     </button>
                 </div>
             </form>
-        @endif
+        </x-modal>
 
         @if ($expenseRules->isEmpty())
             <div class="mt-3 rounded-2xl border border-dashed border-slate-300 dark:border-slate-600 bg-white/60 dark:bg-slate-800/40 px-5 py-10 text-center">
@@ -154,8 +154,8 @@
             <button wire:click="toggleIncomeForm" class="btn-primary px-3 py-1.5">+ Regra</button>
         </div>
 
-        @if ($showIncomeForm)
-            <form wire:submit="saveIncomeRule" class="card space-y-4 p-5">
+        <x-modal wire-model="showIncomeForm">
+            <form wire:submit="saveIncomeRule" class="space-y-4">
                 <div class="flex items-baseline justify-between">
                     <h2 class="text-sm font-semibold text-slate-900 dark:text-white">{{ $editingIncomeRuleId ? 'Editar regra' : 'Nova regra de receita' }}</h2>
                     <button type="button" wire:click="toggleIncomeForm" class="btn-ghost px-2 py-1 text-xs">Cancelar</button>
@@ -196,7 +196,7 @@
                     </button>
                 </div>
             </form>
-        @endif
+        </x-modal>
 
         @if ($incomeRules->isEmpty())
             <div class="mt-3 rounded-2xl border border-dashed border-slate-300 dark:border-slate-600 bg-white/60 dark:bg-slate-800/40 px-5 py-10 text-center">

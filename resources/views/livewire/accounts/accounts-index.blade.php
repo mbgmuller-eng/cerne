@@ -29,8 +29,8 @@
     @endif
 
     {{-- Nova/editar conta -------------------------------------------------- --}}
-    @if ($showAccountForm)
-        <form wire:submit="saveAccount" class="card space-y-4 p-5">
+    <x-modal wire-model="showAccountForm">
+        <form wire:submit="saveAccount" class="space-y-4">
             <div class="flex items-baseline justify-between">
                 <h2 class="text-sm font-semibold text-slate-900 dark:text-white">{{ $editingAccountId ? 'Editar conta' : 'Nova conta' }}</h2>
                 <button type="button" wire:click="toggleAccountForm" class="btn-ghost px-2 py-1 text-xs">Cancelar</button>
@@ -119,11 +119,11 @@
                 </button>
             </div>
         </form>
-    @endif
+    </x-modal>
 
     {{-- Novo/editar cartão --------------------------------------------------- --}}
-    @if ($showCardForm)
-        <form wire:submit="saveCard" class="card space-y-4 p-5">
+    <x-modal wire-model="showCardForm">
+        <form wire:submit="saveCard" class="space-y-4">
             <div class="flex items-baseline justify-between">
                 <h2 class="text-sm font-semibold text-slate-900 dark:text-white">{{ $editingCardId ? 'Editar cartão' : 'Novo cartão' }}</h2>
                 <button type="button" wire:click="toggleCardForm" class="btn-ghost px-2 py-1 text-xs">Cancelar</button>
@@ -220,7 +220,7 @@
                 </button>
             </div>
         </form>
-    @endif
+    </x-modal>
 
     {{-- Totais ------------------------------------------------------- --}}
     <div class="grid gap-4 sm:grid-cols-2">

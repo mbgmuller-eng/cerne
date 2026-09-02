@@ -40,8 +40,8 @@
     @endif
 
     {{-- Nova despesa ----------------------------------------------------- --}}
-    @if ($showExpenseForm)
-        <form wire:submit="saveExpense" class="card space-y-4 p-5">
+    <x-modal wire-model="showExpenseForm">
+        <form wire:submit="saveExpense" class="space-y-4">
             <div class="flex items-baseline justify-between">
                 <h2 class="text-sm font-semibold text-slate-900 dark:text-white">{{ $editingExpenseId ? 'Editar despesa' : 'Nova despesa' }}</h2>
                 <button type="button" wire:click="toggleExpenseForm" class="btn-ghost px-2 py-1 text-xs">Cancelar</button>
@@ -68,7 +68,7 @@
 
                 <div>
                     <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Necessidade</label>
-                    <select wire:model="expenseNecessity" class="select mt-1.5 w-full">
+                    <select wire:model.live="expenseNecessity" class="select mt-1.5 w-full">
                         <option value="">Selecione</option>
                         @foreach (Necessity::options() as $valor => $rotulo)
                             <option value="{{ $valor }}">{{ $rotulo }}</option>
@@ -81,7 +81,7 @@
                     <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Categoria</label>
                     <select wire:model.live="expenseCategoryId" class="select mt-1.5 w-full">
                         <option value="">Selecione</option>
-                        @foreach ($categories as $categoria)
+                        @foreach ($expenseFormCategories as $categoria)
                             <option value="{{ $categoria->id }}">{{ $categoria->name }}</option>
                         @endforeach
                     </select>
@@ -188,11 +188,11 @@
                 <button type="submit" class="btn-primary px-4 py-2" wire:loading.attr="disabled">{{ $editingExpenseId ? 'Salvar alterações' : 'Salvar despesa' }}</button>
             </div>
         </form>
-    @endif
+    </x-modal>
 
     {{-- Nova receita ------------------------------------------------------ --}}
-    @if ($showIncomeForm)
-        <form wire:submit="saveIncome" class="card space-y-4 p-5">
+    <x-modal wire-model="showIncomeForm">
+        <form wire:submit="saveIncome" class="space-y-4">
             <div class="flex items-baseline justify-between">
                 <h2 class="text-sm font-semibold text-slate-900 dark:text-white">{{ $editingIncomeId ? 'Editar receita' : 'Nova receita' }}</h2>
                 <button type="button" wire:click="toggleIncomeForm" class="btn-ghost px-2 py-1 text-xs">Cancelar</button>
@@ -269,7 +269,7 @@
                 <button type="submit" class="btn-primary px-4 py-2" wire:loading.attr="disabled">{{ $editingIncomeId ? 'Salvar alterações' : 'Salvar receita' }}</button>
             </div>
         </form>
-    @endif
+    </x-modal>
 
     {{-- Totais -------------------------------------------------------- --}}
     <div class="grid gap-4 sm:grid-cols-3">

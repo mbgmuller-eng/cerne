@@ -200,6 +200,44 @@ class CashFlowIndex extends Component
         }
     }
 
+    /**
+     * Só limpa a categoria se ela deixou de valer pra nova necessidade
+     * (ex.: categoria de Investimento com necessidade trocada pra
+     * Essencial) — senão um simples "confirmar de novo" a mesma
+     * necessidade (como o formulário de editar faz ao carregar) apagaria
+     * uma categoria que continua perfeitamente válida.
+     */
+    public function updatedExpenseNecessity(): void
+    {
+        if ($this->expenseCategoryId === '' || $this->expenseFormCategories->contains('id', $this->expenseCategoryId)) {
+            return;
+        }
+
+        $this->expenseCategoryId = '';
+        $this->expenseSubcategoryId = '';
+    }
+
+    /**
+     * Categoria sem necessidade fixa (a maioria) aparece pra qualquer
+     * necessidade; "Investimentos" só aparece pra quem escolheu
+     * Investimento — sem isso, quem marca Investimento não via categoria
+     * nenhuma que fizesse sentido (ver TaxonomySeeder).
+     *
+     * @return Collection<int, ExpenseCategory>
+     */
+    public function getExpenseFormCategoriesProperty(): Collection
+    {
+        return ExpenseCategory::available()
+            ->where(function (Builder $query): void {
+                $query->whereNull('necessity');
+
+                if ($this->expenseNecessity !== '') {
+                    $query->orWhere('necessity', $this->expenseNecessity);
+                }
+            })
+            ->get();
+    }
+
     /** @return Collection<int, ExpenseSubcategory> */
     public function getExpenseSubcategoriesProperty(): Collection
     {
@@ -851,6 +889,7 @@ class CashFlowIndex extends Component
             'balance' => $this->balance,
             'byNecessity' => $this->byNecessity,
             'categories' => ExpenseCategory::available()->get(),
+            'expenseFormCategories' => $this->expenseFormCategories,
             'incomeCategories' => IncomeCategory::available()->get(),
             'expenseSubcategories' => $this->expenseSubcategories,
             'bankAccounts' => BankAccount::query()->active()->orderBy('bank_name')->get(),

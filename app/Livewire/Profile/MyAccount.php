@@ -8,6 +8,7 @@ use App\Livewire\Concerns\RequiresActiveProfile;
 use App\Models\ConsultantClient;
 use App\Models\PartnerInvite;
 use App\Models\ProfileMember;
+use App\Services\ClientOnboardingService;
 use App\Services\PartnerInviteService;
 use App\Support\ProfileContext;
 use Livewire\Attributes\Layout;
@@ -34,6 +35,10 @@ class MyAccount extends Component
     public string $partnerEmail = '';
 
     public ?string $lastInviteLink = null;
+
+    public bool $showPartnerOnlyForm = false;
+
+    public string $partnerOnlyName = '';
 
     public bool $notifyEmail = false;
 
@@ -96,6 +101,41 @@ class MyAccount extends Component
         session()->flash('status', 'Convite enviado.');
     }
 
+    public function togglePartnerOnlyForm(): void
+    {
+        $this->showPartnerOnlyForm = ! $this->showPartnerOnlyForm;
+
+        if ($this->showPartnerOnlyForm) {
+            $this->reset('partnerOnlyName');
+            $this->resetErrorBag();
+        }
+    }
+
+    /**
+     * Cadastra o cônjuge sem login nenhum — quem não quer acessar a
+     * plataforma ainda pode ter conta bancária, gasto e investimento em
+     * nome próprio dentro do casal (ver
+     * ClientOnboardingService::addPartnerWithoutLogin()).
+     */
+    public function addPartnerWithoutLogin(ClientOnboardingService $service): void
+    {
+        $profile = app(ProfileContext::class)->profile();
+
+        $this->authorize('manageMembers', $profile);
+
+        $data = $this->validate([
+            'partnerOnlyName' => ['required', 'string', 'max:255'],
+        ], attributes: [
+            'partnerOnlyName' => 'nome',
+        ]);
+
+        $service->addPartnerWithoutLogin($profile, $data['partnerOnlyName']);
+
+        $this->reset('partnerOnlyName');
+        $this->showPartnerOnlyForm = false;
+        session()->flash('status', 'Cônjuge cadastrado — sem login, só você (e o consultor) acessam os dados dele(a).');
+    }
+
     public function render()
     {
         $context = app(ProfileContext::class);
@@ -109,10 +149,12 @@ class MyAccount extends Component
 
         // "Meu cônjuge" é sempre o OUTRO membro, não "o secundário" — pra
         // quem é o secundário, o cônjuge é o titular, não ele mesmo.
+        // Compara pelo id do MEMBRO, não do usuário: um cônjuge sem login
+        // tem user_id nulo, e em SQL "NULL != X" nunca é verdadeiro — um
+        // filtro por user_id excluiria ele sozinho, mesmo sem querer.
         $partnerMember = ProfileMember::query()
             ->where('profile_id', $profile->id)
-            ->where('user_id', '!=', auth()->id())
-            ->whereNotNull('user_id')
+            ->where('id', '!=', $context->memberId())
             ->with('user')
             ->first();
 
