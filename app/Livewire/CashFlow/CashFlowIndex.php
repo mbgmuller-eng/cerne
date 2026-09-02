@@ -23,6 +23,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -209,6 +210,11 @@ class CashFlowIndex extends Component
      */
     public function updatedExpenseNecessity(): void
     {
+        if ($this->expenseNecessity === Necessity::Investment->value) {
+            $this->expenseSubcategoryId = '';
+            $this->expenseNewSubcategory = '';
+        }
+
         if ($this->expenseCategoryId === '' || $this->expenseFormCategories->contains('id', $this->expenseCategoryId)) {
             return;
         }
@@ -353,6 +359,8 @@ class CashFlowIndex extends Component
             'expenseInstallments' => 'parcelas',
         ]);
 
+        $this->validarSubcategoriaObrigatoria();
+
         // find() dentro do escopo do perfil ativo: se o category_id veio
         // adulterado (outro perfil), simplesmente não existe aqui — falha
         // fechado por conta do BelongsToProfileOrShared, não por checagem
@@ -439,6 +447,8 @@ class CashFlowIndex extends Component
             'expenseCategoryId' => 'categoria',
         ]);
 
+        $this->validarSubcategoriaObrigatoria();
+
         $categoria = ExpenseCategory::query()->findOrFail($data['expenseCategoryId']);
         $subcategoriaId = $this->resolveSubcategoryId($categoria);
         $memberId = $this->validarMembro($this->expenseMemberId);
@@ -488,6 +498,27 @@ class CashFlowIndex extends Component
         session()->flash('status', 'Despesa atualizada.');
         $this->resetExpenseForm();
         $this->showExpenseForm = false;
+    }
+
+    /**
+     * Subcategoria é obrigatória pra despesa — só não existe pra
+     * necessidade Investimento, que nem mostra o campo. `$validate()` não
+     * dá pra expressar "um destes dois campos" sozinho (select existente
+     * OU nome novo), por isso a checagem manual aqui.
+     */
+    private function validarSubcategoriaObrigatoria(): void
+    {
+        if ($this->expenseNecessity === Necessity::Investment->value) {
+            return;
+        }
+
+        if ($this->expenseSubcategoryId !== '' || trim($this->expenseNewSubcategory) !== '') {
+            return;
+        }
+
+        throw ValidationException::withMessages([
+            'expenseSubcategoryId' => 'Selecione uma subcategoria (ou crie uma nova).',
+        ]);
     }
 
     private function resolveSubcategoryId(ExpenseCategory $categoria): ?string

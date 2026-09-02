@@ -158,12 +158,19 @@
                                         </td>
                                         <td class="px-3 py-2">
                                             @unless ($ehReceita)
-                                                <select wire:model="subcategoriaPorItem.{{ $i }}" class="select w-full text-xs">
+                                                @php
+                                                    $necessidadeItem = $necessidadePorItem[$i] ?? '';
+                                                    $semSubcategoria = $necessidadeItem !== Necessity::Investment->value && ($subcategoriaPorItem[$i] ?? '') === '';
+                                                @endphp
+                                                <select wire:model="subcategoriaPorItem.{{ $i }}" @class(['select w-full text-xs', 'ring-2 ring-amber-400 dark:ring-amber-500' => $semSubcategoria])>
                                                     <option value="">—</option>
                                                     @foreach ($expenseSubcategories->where('category_id', $categoriaPorItem[$i] ?? null) as $subcategoria)
                                                         <option value="{{ $subcategoria->id }}">{{ $subcategoria->name }}</option>
                                                     @endforeach
                                                 </select>
+                                                @if ($semSubcategoria)
+                                                    <p class="mt-1 text-xs whitespace-nowrap font-medium text-amber-700 dark:text-amber-400">Falta subcategoria</p>
+                                                @endif
                                             @endunless
                                         </td>
                                         <td class="px-3 py-2">
@@ -191,10 +198,27 @@
                     </table>
                 </div>
 
+                @php
+                    $semSubcategoriaCount = collect($aceitos)->filter(function ($i) use ($itens, $necessidadePorItem, $subcategoriaPorItem) {
+                        if (($itens[$i]['tipo'] ?? null) === 'receita') {
+                            return false;
+                        }
+
+                        return ($necessidadePorItem[$i] ?? '') !== Necessity::Investment->value && ($subcategoriaPorItem[$i] ?? '') === '';
+                    })->count();
+                @endphp
+
                 <div class="mt-4 flex flex-wrap items-center justify-between gap-3">
-                    <p class="text-sm text-slate-600 dark:text-slate-300">
-                        {{ count($aceitos) }} de {{ count($itens) }} selecionados
-                    </p>
+                    <div>
+                        <p class="text-sm text-slate-600 dark:text-slate-300">
+                            {{ count($aceitos) }} de {{ count($itens) }} selecionados
+                        </p>
+                        @if ($semSubcategoriaCount > 0)
+                            <p class="text-xs font-medium text-amber-700 dark:text-amber-400">
+                                {{ $semSubcategoriaCount }} {{ $semSubcategoriaCount === 1 ? 'selecionado está' : 'selecionados estão' }} sem subcategoria — corrija antes de importar.
+                            </p>
+                        @endif
+                    </div>
                     <div class="flex gap-2">
                         <button wire:click="descartar('{{ $revisando->id }}')" class="btn-secondary px-3 py-1.5 hover:text-red-700 dark:hover:text-red-400">
                             Descartar documento

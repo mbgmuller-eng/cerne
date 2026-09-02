@@ -5,6 +5,7 @@ namespace Database\Factories;
 use App\Enums\Necessity;
 use App\Models\ExpenseCategory;
 use App\Models\ExpenseRecord;
+use App\Models\ExpenseSubcategory;
 use App\Models\FinancialProfile;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
@@ -24,6 +25,15 @@ class ExpenseRecordFactory extends Factory
             'description' => fake()->words(3, true),
             'necessity' => Necessity::Discretionary,
             'category_id' => ExpenseCategory::factory()->shared(),
+            // Subcategoria é obrigatória pra despesa (menos necessidade
+            // Investimento) — o padrão do factory já vem preenchida,
+            // vinculada à MESMA categoria acima, pra não quebrar em toda
+            // criação de teste. Sobrescreva 'subcategory_id' => null só
+            // quando o teste for especificamente sobre necessidade
+            // Investimento.
+            'subcategory_id' => function (array $attributes) {
+                return ExpenseSubcategory::factory()->create(['category_id' => $attributes['category_id']])->id;
+            },
             'amount' => fake()->randomFloat(2, 10, 1000),
             'expense_date' => fake()->dateTimeBetween('-2 months', 'now'),
             'created_by_user_id' => User::factory(),

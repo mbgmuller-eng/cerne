@@ -136,6 +136,25 @@ class DocumentImportCategorizationTest extends TestCase
         self::assertNotSame($categoriaPadrao->id, $lancamento->category_id);
     }
 
+    /**
+     * Sem regra que bata, o item chega na revisão sem subcategoria — a
+     * tela precisa avisar que falta, pra pessoa corrigir antes de
+     * confirmar (subcategoria virou obrigatória pra despesa).
+     */
+    public function test_item_sem_regra_que_bata_mostra_aviso_de_subcategoria_faltando(): void
+    {
+        [$perfil, $membro] = $this->criarPerfil();
+        $conta = BankAccount::factory()->for($perfil, 'profile')->for($membro, 'member')->create();
+
+        $documento = $this->criarExtrato($perfil, $membro, $conta, [
+            ['data' => '2026-09-10', 'descricao' => 'PAGAMENTO SEM REGRA', 'valor' => '35.00', 'tipo' => 'despesa', 'categoria_sugerida' => null],
+        ]);
+
+        Livewire::test(DocumentsIndex::class)
+            ->call('revisar', $documento->id)
+            ->assertSee('Falta subcategoria');
+    }
+
     /** @param  list<array<string, mixed>>  $itens */
     private function criarExtrato(FinancialProfile $perfil, ProfileMember $membro, BankAccount $conta, array $itens): DocumentUpload
     {

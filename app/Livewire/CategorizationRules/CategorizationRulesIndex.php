@@ -90,9 +90,13 @@ class CategorizationRulesIndex extends Component
         $this->tab = in_array($tab, ['despesas', 'receitas'], true) ? $tab : 'despesas';
     }
 
-    /** Mesmo raciocínio de CashFlowIndex::updatedExpenseNecessity() — só limpa se a categoria deixou de valer. */
+    /** Mesmo raciocínio de CashFlowIndex::updatedExpenseNecessity() — só limpa a categoria se ela deixou de valer, e sempre limpa a subcategoria pra Investimento (ela nem aparece nesse caso). */
     public function updatedExpenseNecessity(): void
     {
+        if ($this->expenseNecessity === Necessity::Investment->value) {
+            $this->expenseSubcategoryId = '';
+        }
+
         if ($this->expenseCategoryId === '' || $this->expenseFormCategories->contains('id', $this->expenseCategoryId)) {
             return;
         }
@@ -132,12 +136,15 @@ class CategorizationRulesIndex extends Component
         $data = $this->validate([
             'expensePattern' => ['required', 'string', 'max:255'],
             'expenseCategoryId' => ['required'],
-            'expenseSubcategoryId' => ['nullable'],
+            // Subcategoria é obrigatória — só não existe pra necessidade
+            // Investimento, que nem mostra o campo.
+            'expenseSubcategoryId' => [Rule::requiredIf($this->expenseNecessity !== Necessity::Investment->value)],
             'expenseNecessity' => ['required', Rule::enum(Necessity::class)],
             'expenseFixedBillId' => ['nullable'],
         ], attributes: [
             'expensePattern' => 'padrão',
             'expenseCategoryId' => 'categoria',
+            'expenseSubcategoryId' => 'subcategoria',
             'expenseNecessity' => 'necessidade',
         ]);
 

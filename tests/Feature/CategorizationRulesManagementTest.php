@@ -8,6 +8,7 @@ use App\Livewire\CategorizationRules\CategorizationRulesIndex;
 use App\Models\ExpenseCategorizationRule;
 use App\Models\ExpenseCategory;
 use App\Models\ExpenseRecord;
+use App\Models\ExpenseSubcategory;
 use App\Models\FinancialProfile;
 use App\Models\IncomeCategorizationRule;
 use App\Models\IncomeCategory;
@@ -27,10 +28,12 @@ class CategorizationRulesManagementTest extends TestCase
     {
         [$perfil] = $this->criarPerfil();
         $categoria = ExpenseCategory::factory()->create();
+        $subcategoria = ExpenseSubcategory::factory()->create(['category_id' => $categoria->id]);
 
         Livewire::test(CategorizationRulesIndex::class)
             ->set('expensePattern', 'ADRIANA')
             ->set('expenseCategoryId', $categoria->id)
+            ->set('expenseSubcategoryId', $subcategoria->id)
             ->set('expenseNecessity', 'essential')
             ->call('saveExpenseRule')
             ->assertHasNoErrors();
@@ -80,6 +83,38 @@ class CategorizationRulesManagementTest extends TestCase
             ->assertHasErrors(['expensePattern', 'expenseCategoryId']);
     }
 
+    public function test_regra_de_despesa_sem_subcategoria_e_bloqueada_fora_de_investimento(): void
+    {
+        $this->criarPerfil();
+        $categoria = ExpenseCategory::factory()->create();
+
+        Livewire::test(CategorizationRulesIndex::class)
+            ->set('expensePattern', 'ADRIANA')
+            ->set('expenseCategoryId', $categoria->id)
+            ->set('expenseNecessity', 'essential')
+            ->call('saveExpenseRule')
+            ->assertHasErrors(['expenseSubcategoryId']);
+
+        self::assertSame(0, ExpenseCategorizationRule::count());
+    }
+
+    public function test_regra_de_despesa_de_investimento_nao_exige_subcategoria(): void
+    {
+        [$perfil] = $this->criarPerfil();
+        $investimentos = ExpenseCategory::factory()->create(['necessity' => Necessity::Investment]);
+
+        Livewire::test(CategorizationRulesIndex::class)
+            ->set('expensePattern', 'APORTE')
+            ->set('expenseCategoryId', $investimentos->id)
+            ->set('expenseNecessity', 'investment')
+            ->call('saveExpenseRule')
+            ->assertHasNoErrors();
+
+        $regra = ExpenseCategorizationRule::sole();
+        self::assertNull($regra->subcategory_id);
+        self::assertSame(Necessity::Investment, $regra->necessity);
+    }
+
     public function test_cria_regra_de_receita(): void
     {
         [$perfil] = $this->criarPerfil();
@@ -113,6 +148,7 @@ class CategorizationRulesManagementTest extends TestCase
         [$perfil] = $this->criarPerfil();
         $categoriaAntiga = ExpenseCategory::factory()->create();
         $categoriaNova = ExpenseCategory::factory()->create();
+        $subcategoriaNova = ExpenseSubcategory::factory()->create(['category_id' => $categoriaNova->id]);
         $bate1 = ExpenseRecord::factory()->for($perfil, 'profile')->create(['description' => 'Pix Adriana', 'category_id' => $categoriaAntiga->id]);
         $bate2 = ExpenseRecord::factory()->for($perfil, 'profile')->create(['description' => 'PIX ADRIANA RODRIGUES', 'category_id' => $categoriaAntiga->id]);
         $naoBate = ExpenseRecord::factory()->for($perfil, 'profile')->create(['description' => 'Mercado', 'category_id' => $categoriaAntiga->id]);
@@ -120,6 +156,7 @@ class CategorizationRulesManagementTest extends TestCase
         $component = Livewire::test(CategorizationRulesIndex::class)
             ->set('expensePattern', 'adriana')
             ->set('expenseCategoryId', $categoriaNova->id)
+            ->set('expenseSubcategoryId', $subcategoriaNova->id)
             ->set('expenseNecessity', 'essential')
             ->call('saveExpenseRule')
             ->assertHasNoErrors();
@@ -139,6 +176,7 @@ class CategorizationRulesManagementTest extends TestCase
         [$perfil] = $this->criarPerfil();
         $categoriaAntiga = ExpenseCategory::factory()->create();
         $categoriaNova = ExpenseCategory::factory()->create();
+        $subcategoriaNova = ExpenseSubcategory::factory()->create(['category_id' => $categoriaNova->id]);
         $bate = ExpenseRecord::factory()->for($perfil, 'profile')->create([
             'description' => 'Pix Adriana', 'category_id' => $categoriaAntiga->id, 'necessity' => Necessity::Discretionary,
         ]);
@@ -146,6 +184,7 @@ class CategorizationRulesManagementTest extends TestCase
         Livewire::test(CategorizationRulesIndex::class)
             ->set('expensePattern', 'adriana')
             ->set('expenseCategoryId', $categoriaNova->id)
+            ->set('expenseSubcategoryId', $subcategoriaNova->id)
             ->set('expenseNecessity', 'essential')
             ->call('saveExpenseRule')
             ->call('aplicarRegraAosExistentes')
@@ -161,12 +200,15 @@ class CategorizationRulesManagementTest extends TestCase
         [$perfil] = $this->criarPerfil();
         $categoriaAntiga = ExpenseCategory::factory()->create();
         $categoriaNova = ExpenseCategory::factory()->create();
+        $subcategoriaNova = ExpenseSubcategory::factory()->create(['category_id' => $categoriaNova->id]);
         $bate = ExpenseRecord::factory()->for($perfil, 'profile')->create(['description' => 'Pix Adriana', 'category_id' => $categoriaAntiga->id]);
 
         Livewire::test(CategorizationRulesIndex::class)
             ->set('expensePattern', 'adriana')
             ->set('expenseCategoryId', $categoriaNova->id)
+            ->set('expenseSubcategoryId', $subcategoriaNova->id)
             ->call('saveExpenseRule')
+            ->assertHasNoErrors()
             ->call('descartarAplicacaoAosExistentes')
             ->assertSet('regraAplicavelExistentes', null);
 
@@ -177,11 +219,14 @@ class CategorizationRulesManagementTest extends TestCase
     {
         [$perfil] = $this->criarPerfil();
         $categoria = ExpenseCategory::factory()->create();
+        $subcategoria = ExpenseSubcategory::factory()->create(['category_id' => $categoria->id]);
 
         $component = Livewire::test(CategorizationRulesIndex::class)
             ->set('expensePattern', 'PADRAO-INEDITO')
             ->set('expenseCategoryId', $categoria->id)
-            ->call('saveExpenseRule');
+            ->set('expenseSubcategoryId', $subcategoria->id)
+            ->call('saveExpenseRule')
+            ->assertHasNoErrors();
 
         self::assertNull($component->get('regraAplicavelExistentes'));
     }

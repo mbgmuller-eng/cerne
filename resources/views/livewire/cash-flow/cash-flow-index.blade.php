@@ -88,20 +88,23 @@
                     @error('expenseCategoryId') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
                 </div>
 
-                <div>
-                    <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Subcategoria</label>
-                    <select wire:model="expenseSubcategoryId" class="select mt-1.5 w-full" @if ($expenseCategoryId === '') disabled @endif>
-                        <option value="">Nenhuma</option>
-                        @foreach ($expenseSubcategories as $sub)
-                            <option value="{{ $sub->id }}">{{ $sub->name }}</option>
-                        @endforeach
-                    </select>
-                </div>
+                @unless ($expenseNecessity === Necessity::Investment->value)
+                    <div>
+                        <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Subcategoria</label>
+                        <select wire:model="expenseSubcategoryId" class="select mt-1.5 w-full" @if ($expenseCategoryId === '') disabled @endif>
+                            <option value="">Selecione</option>
+                            @foreach ($expenseSubcategories as $sub)
+                                <option value="{{ $sub->id }}">{{ $sub->name }}</option>
+                            @endforeach
+                        </select>
+                        @error('expenseSubcategoryId') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                    </div>
 
-                <div>
-                    <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Ou crie uma subcategoria</label>
-                    <input type="text" wire:model="expenseNewSubcategory" class="input mt-1.5" placeholder="Ex.: Terapia">
-                </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Ou crie uma subcategoria</label>
+                        <input type="text" wire:model="expenseNewSubcategory" class="input mt-1.5" placeholder="Ex.: Terapia">
+                    </div>
+                @endunless
 
                 <div>
                     <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Membro</label>

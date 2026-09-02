@@ -7,6 +7,7 @@ use App\Enums\Necessity;
 use App\Livewire\CashFlow\CashFlowIndex;
 use App\Models\ExpenseCategory;
 use App\Models\ExpenseRecord;
+use App\Models\ExpenseSubcategory;
 use App\Models\FinancialProfile;
 use App\Models\ProfileMember;
 use App\Models\User;
@@ -104,6 +105,79 @@ class ExpenseCategoryByNecessityTest extends TestCase
         $component = Livewire::test(CashFlowIndex::class)->call('editExpense', $despesa->id);
 
         self::assertTrue($component->get('expenseFormCategories')->contains('id', $investimentos->id));
+    }
+
+    public function test_salvar_despesa_sem_subcategoria_e_bloqueado_quando_necessidade_nao_e_investimento(): void
+    {
+        [$perfil] = $this->criarPerfil();
+        $categoria = ExpenseCategory::factory()->create(['necessity' => null]);
+
+        Livewire::test(CashFlowIndex::class)
+            ->set('expenseDescription', 'Teste')
+            ->set('expenseAmount', '10.00')
+            ->set('expenseDate', '2026-09-01')
+            ->set('expenseNecessity', 'essential')
+            ->set('expenseCategoryId', $categoria->id)
+            ->call('saveExpense')
+            ->assertHasErrors(['expenseSubcategoryId']);
+
+        self::assertSame(0, ExpenseRecord::count());
+    }
+
+    public function test_criar_nova_subcategoria_no_texto_livre_tambem_satisfaz_a_obrigatoriedade(): void
+    {
+        [$perfil] = $this->criarPerfil();
+        $categoria = ExpenseCategory::factory()->create(['necessity' => null]);
+
+        Livewire::test(CashFlowIndex::class)
+            ->set('expenseDescription', 'Teste')
+            ->set('expenseAmount', '10.00')
+            ->set('expenseDate', '2026-09-01')
+            ->set('expenseNecessity', 'essential')
+            ->set('expenseCategoryId', $categoria->id)
+            ->set('expenseNewSubcategory', 'Subcategoria Nova')
+            ->call('saveExpense')
+            ->assertHasNoErrors();
+
+        $despesa = ExpenseRecord::where('description', 'Teste')->sole();
+        self::assertNotNull($despesa->subcategory_id);
+        self::assertSame('Subcategoria Nova', $despesa->subcategory->name);
+    }
+
+    public function test_salvar_despesa_de_investimento_nao_exige_subcategoria(): void
+    {
+        [$perfil] = $this->criarPerfil();
+        $investimentos = ExpenseCategory::factory()->create(['necessity' => Necessity::Investment]);
+
+        Livewire::test(CashFlowIndex::class)
+            ->set('expenseDescription', 'Aporte CDB')
+            ->set('expenseAmount', '500.00')
+            ->set('expenseDate', '2026-09-01')
+            ->set('expenseNecessity', 'investment')
+            ->set('expenseCategoryId', $investimentos->id)
+            ->call('saveExpense')
+            ->assertHasNoErrors();
+
+        $despesa = ExpenseRecord::where('description', 'Aporte CDB')->sole();
+        self::assertNull($despesa->subcategory_id);
+    }
+
+    public function test_editar_despesa_removendo_subcategoria_tambem_e_bloqueado(): void
+    {
+        [$perfil] = $this->criarPerfil();
+        $categoria = ExpenseCategory::factory()->create(['necessity' => null]);
+        $subcategoria = ExpenseSubcategory::factory()->create(['category_id' => $categoria->id]);
+        $despesa = ExpenseRecord::factory()->for($perfil, 'profile')->create([
+            'category_id' => $categoria->id, 'subcategory_id' => $subcategoria->id, 'necessity' => Necessity::Essential,
+        ]);
+
+        Livewire::test(CashFlowIndex::class)
+            ->call('editExpense', $despesa->id)
+            ->set('expenseSubcategoryId', '')
+            ->call('saveExpense')
+            ->assertHasErrors(['expenseSubcategoryId']);
+
+        self::assertSame($subcategoria->id, $despesa->fresh()->subcategory_id);
     }
 
     /** @return array{0: FinancialProfile} */

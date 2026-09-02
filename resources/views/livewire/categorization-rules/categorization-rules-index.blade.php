@@ -68,6 +68,15 @@
                     </div>
 
                     <div>
+                        <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Necessidade</label>
+                        <select wire:model.live="expenseNecessity" class="select mt-1.5 w-full">
+                            @foreach (Necessity::options() as $valor => $rotulo)
+                                <option value="{{ $valor }}">{{ $rotulo }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+
+                    <div>
                         <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Categoria</label>
                         <select wire:model.live="expenseCategoryId" class="select mt-1.5 w-full">
                             <option value="">Selecione</option>
@@ -78,24 +87,18 @@
                         @error('expenseCategoryId') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
                     </div>
 
-                    <div>
-                        <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Subcategoria (opcional)</label>
-                        <select wire:model="expenseSubcategoryId" class="select mt-1.5 w-full">
-                            <option value="">Nenhuma</option>
-                            @foreach ($expenseSubcategories as $subcategoria)
-                                <option value="{{ $subcategoria->id }}">{{ $subcategoria->name }}</option>
-                            @endforeach
-                        </select>
-                    </div>
-
-                    <div>
-                        <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Necessidade</label>
-                        <select wire:model.live="expenseNecessity" class="select mt-1.5 w-full">
-                            @foreach (Necessity::options() as $valor => $rotulo)
-                                <option value="{{ $valor }}">{{ $rotulo }}</option>
-                            @endforeach
-                        </select>
-                    </div>
+                    @unless ($expenseNecessity === Necessity::Investment->value)
+                        <div>
+                            <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Subcategoria</label>
+                            <select wire:model="expenseSubcategoryId" class="select mt-1.5 w-full">
+                                <option value="">Selecione</option>
+                                @foreach ($expenseSubcategories as $subcategoria)
+                                    <option value="{{ $subcategoria->id }}">{{ $subcategoria->name }}</option>
+                                @endforeach
+                            </select>
+                            @error('expenseSubcategoryId') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                        </div>
+                    @endunless
 
                     <div class="sm:col-span-2 lg:col-span-3">
                         <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Vincular a uma conta fixa (opcional)</label>

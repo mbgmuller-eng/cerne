@@ -7,6 +7,7 @@ use App\Models\BankAccount;
 use App\Models\CreditCard;
 use App\Models\ExpenseCategory;
 use App\Models\ExpenseRecord;
+use App\Models\ExpenseSubcategory;
 use App\Models\FinancialProfile;
 use App\Models\IncomeCategory;
 use App\Models\IncomeRecord;
@@ -33,6 +34,7 @@ class CashFlowManualEntryTest extends TestCase
         $conta = BankAccount::factory()->for($perfil, 'profile')->for($membro, 'member')
             ->create(['current_balance' => '1000.00']);
         $categoria = ExpenseCategory::factory()->create();
+        $subcategoria = ExpenseSubcategory::factory()->create(['category_id' => $categoria->id]);
 
         Livewire::test(CashFlowIndex::class)
             ->set('expenseDescription', 'Supermercado')
@@ -40,6 +42,7 @@ class CashFlowManualEntryTest extends TestCase
             ->set('expenseDate', '2026-08-10')
             ->set('expenseNecessity', 'essential')
             ->set('expenseCategoryId', $categoria->id)
+            ->set('expenseSubcategoryId', $subcategoria->id)
             ->set('expenseBankAccountId', $conta->id)
             ->call('saveExpense')
             ->assertHasNoErrors();
@@ -60,6 +63,7 @@ class CashFlowManualEntryTest extends TestCase
         $conta = BankAccount::factory()->for($perfil, 'profile')->for($membro, 'member')
             ->create(['current_balance' => '1000.00']);
         $categoria = ExpenseCategory::factory()->create();
+        $subcategoria = ExpenseSubcategory::factory()->create(['category_id' => $categoria->id]);
 
         Livewire::test(CashFlowIndex::class)
             ->set('expenseDescription', 'Dinheiro no bolso')
@@ -67,6 +71,7 @@ class CashFlowManualEntryTest extends TestCase
             ->set('expenseDate', '2026-08-10')
             ->set('expenseNecessity', 'discretionary')
             ->set('expenseCategoryId', $categoria->id)
+            ->set('expenseSubcategoryId', $subcategoria->id)
             ->call('saveExpense')
             ->assertHasNoErrors();
 
@@ -79,6 +84,7 @@ class CashFlowManualEntryTest extends TestCase
         [$perfil, $membro] = $this->criarPerfil();
         $cartao = CreditCard::factory()->for($perfil, 'profile')->for($membro, 'member')->create();
         $categoria = ExpenseCategory::factory()->create();
+        $subcategoria = ExpenseSubcategory::factory()->create(['category_id' => $categoria->id]);
 
         Livewire::test(CashFlowIndex::class)
             ->set('expenseDescription', 'Geladeira nova')
@@ -86,6 +92,7 @@ class CashFlowManualEntryTest extends TestCase
             ->set('expenseDate', '2026-08-15')
             ->set('expenseNecessity', 'essential')
             ->set('expenseCategoryId', $categoria->id)
+            ->set('expenseSubcategoryId', $subcategoria->id)
             ->set('expensePaymentMethod', 'cartao')
             ->set('expenseCreditCardId', $cartao->id)
             ->set('expenseInstallments', 4)
@@ -115,6 +122,7 @@ class CashFlowManualEntryTest extends TestCase
         app(ProfileContext::class)->set($perfil, $membroTitular);
 
         $categoria = ExpenseCategory::factory()->create();
+        $subcategoria = ExpenseSubcategory::factory()->create(['category_id' => $categoria->id]);
 
         Livewire::test(CashFlowIndex::class)
             ->set('expenseDescription', 'Tratamento particular')
@@ -122,6 +130,7 @@ class CashFlowManualEntryTest extends TestCase
             ->set('expenseDate', '2026-08-10')
             ->set('expenseNecessity', 'essential')
             ->set('expenseCategoryId', $categoria->id)
+            ->set('expenseSubcategoryId', $subcategoria->id)
             ->set('expenseMemberId', $membroTitular->id)
             ->set('expenseIsPrivate', true)
             ->call('saveExpense')
@@ -139,6 +148,7 @@ class CashFlowManualEntryTest extends TestCase
     {
         [$perfil, $membro] = $this->criarPerfil();
         $categoria = ExpenseCategory::factory()->create();
+        $subcategoria = ExpenseSubcategory::factory()->create(['category_id' => $categoria->id]);
 
         Livewire::test(CashFlowIndex::class)
             ->set('expenseDescription', 'Aluguel')
@@ -146,6 +156,7 @@ class CashFlowManualEntryTest extends TestCase
             ->set('expenseDate', '2026-08-10')
             ->set('expenseNecessity', 'essential')
             ->set('expenseCategoryId', $categoria->id)
+            ->set('expenseSubcategoryId', $subcategoria->id)
             ->set('expenseMemberId', '') // conjunta/família
             ->set('expenseIsPrivate', true)
             ->call('saveExpense')
@@ -199,6 +210,7 @@ class CashFlowManualEntryTest extends TestCase
     {
         [$perfil, $membro] = $this->criarPerfil();
         $categoria = ExpenseCategory::factory()->create();
+        $subcategoria = ExpenseSubcategory::factory()->create(['category_id' => $categoria->id]);
 
         // NÃO chama criarPerfil() de novo aqui — isso trocaria o
         // ProfileContext ativo pro perfil errado. Só cria o outro perfil e
@@ -212,6 +224,7 @@ class CashFlowManualEntryTest extends TestCase
             ->set('expenseDate', '2026-08-10')
             ->set('expenseNecessity', 'essential')
             ->set('expenseCategoryId', $categoria->id)
+            ->set('expenseSubcategoryId', $subcategoria->id)
             ->set('expenseMemberId', $membroDeOutroPerfil->id)
             ->call('saveExpense')
             ->assertHasNoErrors();
@@ -237,6 +250,10 @@ class CashFlowManualEntryTest extends TestCase
             ->set('expenseDate', '2026-08-10')
             ->set('expenseNecessity', 'essential')
             ->set('expenseCategoryId', $categoriaDeOutroPerfil->id)
+            // Subcategoria só precisa estar preenchida pra passar da
+            // checagem de obrigatoriedade — quem tem que barrar aqui é a
+            // categoria de outro perfil, não a subcategoria.
+            ->set('expenseSubcategoryId', 'qualquer-coisa')
             ->call('saveExpense');
     }
 
