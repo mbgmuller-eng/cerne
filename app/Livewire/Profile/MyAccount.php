@@ -4,6 +4,7 @@ namespace App\Livewire\Profile;
 
 use App\Enums\ConsultantClientStatus;
 use App\Enums\InviteStatus;
+use App\Enums\MemberRole;
 use App\Livewire\Concerns\RequiresActiveProfile;
 use App\Models\ConsultantClient;
 use App\Models\PartnerInvite;
@@ -148,15 +149,27 @@ class MyAccount extends Component
             ->first();
 
         // "Meu cônjuge" é sempre o OUTRO membro, não "o secundário" — pra
-        // quem é o secundário, o cônjuge é o titular, não ele mesmo.
-        // Compara pelo id do MEMBRO, não do usuário: um cônjuge sem login
-        // tem user_id nulo, e em SQL "NULL != X" nunca é verdadeiro — um
-        // filtro por user_id excluiria ele sozinho, mesmo sem querer.
-        $partnerMember = ProfileMember::query()
-            ->where('profile_id', $profile->id)
-            ->where('id', '!=', $context->memberId())
-            ->with('user')
-            ->first();
+        // quem é o secundário, o cônjuge é o titular, não ele mesmo. Mas
+        // isso só faz sentido quando QUEM ESTÁ VENDO é um membro de
+        // verdade: um consultor olhando o perfil do cliente não é membro
+        // nenhum, memberId() vem nulo, e where('id', '!=', null) do
+        // Eloquent vira WHERE id IS NOT NULL (Laravel converte comparação
+        // com null pra whereNull/whereNotNull) — ou seja, "qualquer
+        // membro", inclusive o titular, o que fazia o consultor ver o
+        // próprio cliente listado como cônjuge dele mesmo. Pro consultor,
+        // cônjuge só pode significar o membro Secondary mesmo (só existe
+        // um por perfil — ver PartnerInviteService::alreadyHasPartner()).
+        $partnerMember = $context->memberId() !== null
+            ? ProfileMember::query()
+                ->where('profile_id', $profile->id)
+                ->where('id', '!=', $context->memberId())
+                ->with('user')
+                ->first()
+            : ProfileMember::query()
+                ->where('profile_id', $profile->id)
+                ->where('role', MemberRole::Secondary)
+                ->with('user')
+                ->first();
 
         $pendingInvite = PartnerInvite::query()
             ->where('profile_id', $profile->id)

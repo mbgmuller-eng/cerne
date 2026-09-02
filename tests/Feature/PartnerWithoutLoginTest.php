@@ -2,9 +2,11 @@
 
 namespace Tests\Feature;
 
+use App\Enums\ConsultantClientStatus;
 use App\Enums\MemberRole;
 use App\Enums\ProfileType;
 use App\Livewire\Profile\MyAccount;
+use App\Models\ConsultantClient;
 use App\Models\ExpenseRecord;
 use App\Models\FinancialProfile;
 use App\Models\ProfileMember;
@@ -83,6 +85,54 @@ class PartnerWithoutLoginTest extends TestCase
 
         self::assertFalse($visiveis->contains($privado));
         self::assertTrue($visiveis->contains($visivel));
+    }
+
+    /**
+     * Bug real: um consultor vendo o perfil do cliente não é membro
+     * nenhum (memberId() vem nulo). Sem essa distinção,
+     * `where('id', '!=', null)` do Eloquent vira `WHERE id IS NOT NULL`
+     * (Laravel converte comparação com null pra whereNull/whereNotNull) —
+     * ou seja, "qualquer membro" — e o consultor via o próprio titular
+     * listado como cônjuge dele mesmo, mesmo sem cônjuge nenhum aceito
+     * ainda (só convite pendente).
+     */
+    public function test_consultor_vendo_convite_pendente_nao_mostra_o_titular_como_conjuge(): void
+    {
+        $owner = User::factory()->create(['name' => 'André Albuquerque', 'email' => 'andre.owner@example.com']);
+        $perfil = FinancialProfile::factory()->create(['owner_user_id' => $owner->id]);
+        ProfileMember::factory()->create(['profile_id' => $perfil->id, 'user_id' => $owner->id, 'role' => MemberRole::Primary]);
+
+        $consultor = User::factory()->consultant()->create();
+        ConsultantClient::factory()->create([
+            'consultant_id' => $consultor->id, 'client_id' => $owner->id, 'status' => ConsultantClientStatus::Active,
+        ]);
+        app(PartnerInviteService::class)->send($perfil, $owner, 'Chantal', 'chantal@example.com');
+
+        $this->actingAs($consultor);
+        app(ProfileContext::class)->set($perfil, member: null, asConsultant: true);
+
+        Livewire::test(MyAccount::class)
+            ->assertSee('Chantal')
+            ->assertSee('aguardando aceite')
+            ->assertDontSee('andre.owner@example.com');
+    }
+
+    /** Mesmo cenário, mas o cônjuge já é um membro de verdade (aceitou ou foi cadastrado sem login) — o consultor precisa ver ELE, não o titular. */
+    public function test_consultor_vendo_conjuge_ja_cadastrado_mostra_o_conjuge_certo(): void
+    {
+        $owner = User::factory()->create(['name' => 'André Albuquerque']);
+        $perfil = FinancialProfile::factory()->create(['owner_user_id' => $owner->id]);
+        ProfileMember::factory()->create(['profile_id' => $perfil->id, 'user_id' => $owner->id, 'role' => MemberRole::Primary]);
+        app(ClientOnboardingService::class)->addPartnerWithoutLogin($perfil, 'Chantal');
+
+        $consultor = User::factory()->consultant()->create();
+
+        $this->actingAs($consultor);
+        app(ProfileContext::class)->set($perfil, member: null, asConsultant: true);
+
+        Livewire::test(MyAccount::class)
+            ->assertSee('Chantal')
+            ->assertSee('Cadastrado sem login');
     }
 
     public function test_livewire_cadastra_conjuge_sem_login_pela_tela(): void
