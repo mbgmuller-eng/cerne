@@ -175,12 +175,19 @@
                                         </td>
                                         <td class="px-3 py-2">
                                             @unless ($ehReceita || $necessidadeItem === Necessity::Investment->value)
-                                                <select wire:model="subcategoriaPorItem.{{ $i }}" @class(['select w-full text-xs', 'ring-2 ring-amber-400 dark:ring-amber-500' => $faltaCategorizar && ($subcategoriaPorItem[$i] ?? '') === '']) @if (($categoriaPorItem[$i] ?? '') === '') disabled @endif>
+                                                <select wire:model="subcategoriaPorItem.{{ $i }}" @class(['select w-full text-xs', 'ring-2 ring-amber-400 dark:ring-amber-500' => $faltaCategorizar]) @if (($categoriaPorItem[$i] ?? '') === '') disabled @endif>
                                                     <option value="">—</option>
                                                     @foreach ($expenseSubcategories->where('category_id', $categoriaPorItem[$i] ?? null) as $subcategoria)
                                                         <option value="{{ $subcategoria->id }}">{{ $subcategoria->name }}</option>
                                                     @endforeach
                                                 </select>
+                                                <input
+                                                    type="text"
+                                                    wire:model="novaSubcategoriaPorItem.{{ $i }}"
+                                                    placeholder="ou crie uma"
+                                                    class="input mt-1 w-full py-1 text-xs"
+                                                    @if (($categoriaPorItem[$i] ?? '') === '') disabled @endif
+                                                >
                                             @endunless
                                         </td>
                                     @endif

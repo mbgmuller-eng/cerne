@@ -201,6 +201,30 @@ class DocumentImportCategorizationTest extends TestCase
         self::assertSame(Necessity::Essential, $lancamento->necessity);
     }
 
+    /** Sem subcategoria existente que sirva, a pessoa cria uma nova na hora — mesmo caminho de texto livre do Fluxo de Caixa. */
+    public function test_criar_nova_subcategoria_no_texto_livre_satisfaz_a_categorizacao(): void
+    {
+        [$perfil, $membro] = $this->criarPerfil();
+        $conta = BankAccount::factory()->for($perfil, 'profile')->for($membro, 'member')->create();
+        $categoria = ExpenseCategory::factory()->create(['necessity' => null]);
+
+        $documento = $this->criarExtrato($perfil, $membro, $conta, [
+            ['data' => '2026-09-10', 'descricao' => 'PAGAMENTO SEM REGRA', 'valor' => '35.00', 'tipo' => 'despesa', 'categoria_sugerida' => null],
+        ]);
+
+        Livewire::test(DocumentsIndex::class)
+            ->call('revisar', $documento->id)
+            ->set('necessidadePorItem.0', 'essential')
+            ->set('categoriaPorItem.0', $categoria->id)
+            ->set('novaSubcategoriaPorItem.0', 'Subcategoria Nova')
+            ->call('confirmar')
+            ->assertHasNoErrors();
+
+        $lancamento = ExpenseRecord::where('source_document_id', $documento->id)->sole();
+        self::assertNotNull($lancamento->subcategory_id);
+        self::assertSame('Subcategoria Nova', $lancamento->subcategory->name);
+    }
+
     /** @param  list<array<string, mixed>>  $itens */
     private function criarExtrato(FinancialProfile $perfil, ProfileMember $membro, BankAccount $conta, array $itens): DocumentUpload
     {

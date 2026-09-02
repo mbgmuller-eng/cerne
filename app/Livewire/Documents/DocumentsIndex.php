@@ -56,6 +56,9 @@ class DocumentsIndex extends Component
 
     public array $subcategoriaPorItem = [];
 
+    /** Nome de subcategoria nova, quando a existente não serve — mesmo caminho de CashFlowIndex::resolveSubcategoryId(). */
+    public array $novaSubcategoriaPorItem = [];
+
     public array $necessidadePorItem = [];
 
     /** Padrão da regra que pré-preencheu o item (null = ninguém casou, categorização é manual). */
@@ -140,6 +143,7 @@ class DocumentsIndex extends Component
         $this->aceitos = array_keys($itens);
         $this->categoriaPorItem = [];
         $this->subcategoriaPorItem = [];
+        $this->novaSubcategoriaPorItem = [];
         $this->necessidadePorItem = [];
         $this->regraAplicadaPorItem = [];
         $this->fixedBillPaymentPorItem = [];
@@ -243,8 +247,9 @@ class DocumentsIndex extends Component
     public function fecharRevisao(): void
     {
         $this->reset(
-            'revisandoId', 'aceitos', 'categoriaPorItem', 'subcategoriaPorItem', 'necessidadePorItem',
-            'regraAplicadaPorItem', 'fixedBillPaymentPorItem', 'recurringIncomeOccurrencePorItem', 'notaPorItem',
+            'revisandoId', 'aceitos', 'categoriaPorItem', 'subcategoriaPorItem', 'novaSubcategoriaPorItem',
+            'necessidadePorItem', 'regraAplicadaPorItem', 'fixedBillPaymentPorItem',
+            'recurringIncomeOccurrencePorItem', 'notaPorItem',
         );
     }
 
@@ -265,6 +270,7 @@ class DocumentsIndex extends Component
 
         if ($necessidade === Necessity::Investment->value) {
             $this->subcategoriaPorItem[$i] = '';
+            $this->novaSubcategoriaPorItem[$i] = '';
         }
 
         $categoriaId = $this->categoriaPorItem[$i] ?? '';
@@ -312,10 +318,11 @@ class DocumentsIndex extends Component
             $necessidade = $this->necessidadePorItem[$i] ?? '';
             $categoria = $this->categoriaPorItem[$i] ?? '';
             $subcategoria = $this->subcategoriaPorItem[$i] ?? '';
+            $novaSubcategoria = trim($this->novaSubcategoriaPorItem[$i] ?? '');
 
             $faltando[$i] = $necessidade === ''
                 || $categoria === ''
-                || ($necessidade !== Necessity::Investment->value && $subcategoria === '');
+                || ($necessidade !== Necessity::Investment->value && $subcategoria === '' && $novaSubcategoria === '');
         }
 
         return $faltando;
@@ -335,6 +342,8 @@ class DocumentsIndex extends Component
             return;
         }
 
+        $this->resolverNovasSubcategorias();
+
         $documento = DocumentUpload::findOrFail($this->revisandoId);
 
         try {
@@ -349,6 +358,31 @@ class DocumentsIndex extends Component
             $this->fecharRevisao();
         } catch (\Throwable $e) {
             $this->addError('confirmar', $e->getMessage());
+        }
+    }
+
+    /**
+     * Mesmo caminho de CashFlowIndex::resolveSubcategoryId(): texto livre
+     * vira subcategoria de verdade antes do commit, só pros itens que vão
+     * ser importados de fato.
+     */
+    private function resolverNovasSubcategorias(): void
+    {
+        foreach ($this->aceitos as $i) {
+            $novoNome = trim($this->novaSubcategoriaPorItem[$i] ?? '');
+            $categoriaId = $this->categoriaPorItem[$i] ?? '';
+
+            if ($novoNome === '' || $categoriaId === '') {
+                continue;
+            }
+
+            $categoria = ExpenseCategory::query()->find($categoriaId);
+
+            if ($categoria === null) {
+                continue;
+            }
+
+            $this->subcategoriaPorItem[$i] = ExpenseSubcategory::createCustom($categoria, $novoNome)->id;
         }
     }
 
