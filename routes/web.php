@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Admin\ImpersonationController;
 use App\Http\Controllers\Auth\AcceptInviteController;
 use App\Http\Controllers\Auth\AcceptPartnerInviteController;
 use App\Http\Controllers\Auth\LoginController;
@@ -77,6 +78,11 @@ Route::middleware('auth')->group(function (): void {
     // mount() do componente, mesmo padrão de PortfolioOverview::mount().
     Route::get('/admin', AdminUsers::class)->name('admin.users');
     Route::get('/admin/bancos', AdminBanks::class)->name('admin.banks');
+
+    // "Entrar como" começa dentro do componente Livewire (AdminUsers::
+    // entrarComo, Auth::login direto); só o "voltar" precisa de rota —
+    // o banner fica em todo canto do app enquanto a personificação dura.
+    Route::post('/admin/sair-da-personificacao', [ImpersonationController::class, 'stop'])->name('admin.impersonate.stop');
 
     // Vínculo consultor↔cliente quando o e-mail convidado já tem conta —
     // ver ConsultantLinkService. Só "show" carrega assinatura (vem do

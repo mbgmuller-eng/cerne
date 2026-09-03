@@ -285,6 +285,37 @@ class AdminUsersTest extends TestCase
         self::assertSame(1, User::query()->where('id', $cliente->id)->count());
     }
 
+    public function test_admin_entra_como_outra_conta_e_volta(): void
+    {
+        $admin = User::factory()->create(['is_platform_admin' => true]);
+        $cliente = User::factory()->create();
+        FinancialProfile::factory()->create(['owner_user_id' => $cliente->id]);
+
+        $this->actingAs($admin);
+
+        Livewire::test(AdminUsers::class)->call('entrarComo', $cliente->id);
+
+        $this->assertAuthenticatedAs($cliente);
+        self::assertSame($admin->id, session('impersonator_id'));
+
+        $this->post(route('admin.impersonate.stop'))->assertRedirect(route('admin.users'));
+
+        $this->assertAuthenticatedAs($admin);
+        self::assertNull(session('impersonator_id'));
+    }
+
+    public function test_admin_nao_pode_entrar_como_outro_admin(): void
+    {
+        $admin = User::factory()->create(['is_platform_admin' => true]);
+        $outroAdmin = User::factory()->create(['is_platform_admin' => true]);
+
+        $this->actingAs($admin);
+
+        Livewire::test(AdminUsers::class)->call('entrarComo', $outroAdmin->id);
+
+        $this->assertAuthenticatedAs($admin);
+    }
+
     public function test_excluir_conjuge_com_login_proprio_so_remove_o_login(): void
     {
         $admin = User::factory()->create(['is_platform_admin' => true]);

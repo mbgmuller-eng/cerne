@@ -18,9 +18,10 @@
                     <td class="px-5 py-2.5 text-slate-500 dark:text-slate-400">{{ $p->owner->email }}</td>
                     <td class="px-5 py-2.5 text-slate-500 dark:text-slate-400">{{ $p->profile_type->label() }}</td>
                     <td class="px-5 py-2.5 text-slate-500 dark:text-slate-400">{{ $p->created_at->format('d/m/Y') }}</td>
-                    <td class="px-5 py-2.5 text-right">
+                    <td class="px-5 py-2.5 text-right whitespace-nowrap">
                         @unless ($p->owner_user_id === auth()->id())
-                            <button type="button" wire:click="pedirExclusao('{{ $p->owner_user_id }}')" class="text-sm text-red-700 hover:underline dark:text-red-400">Excluir</button>
+                            <button type="button" wire:click="entrarComo('{{ $p->owner_user_id }}')" class="text-sm text-accent-700 hover:underline dark:text-accent-400">Entrar como</button>
+                            <button type="button" wire:click="pedirExclusao('{{ $p->owner_user_id }}')" class="ml-3 text-sm text-red-700 hover:underline dark:text-red-400">Excluir</button>
                         @endunless
                     </td>
                 </tr>

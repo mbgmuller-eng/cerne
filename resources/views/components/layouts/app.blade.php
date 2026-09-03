@@ -278,6 +278,16 @@
          ============================================================ --}}
     <div class="flex min-w-0 flex-1 flex-col">
 
+        @if (session('impersonator_id'))
+            <div class="flex items-center justify-between gap-3 bg-amber-500 px-4 py-2 text-sm text-amber-950">
+                <span>Você está vendo como <strong>{{ $user->name }}</strong>.</span>
+                <form method="POST" action="{{ route('admin.impersonate.stop') }}">
+                    @csrf
+                    <button type="submit" class="font-medium underline">Voltar pro admin</button>
+                </form>
+            </div>
+        @endif
+
         {{-- Cabeçalho compacto: em desktop com perfil ele some (a lateral
              já cumpre o papel); sem perfil ou no celular ele fica. --}}
         <header @class([

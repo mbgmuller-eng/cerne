@@ -10,6 +10,7 @@ use App\Models\FinancialProfile;
 use App\Models\User;
 use App\Services\ClientInviteService;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
@@ -174,6 +175,33 @@ class AdminUsers extends Component
             'nome' => $alvo->name,
             'email' => $alvo->email,
         ];
+    }
+
+    /**
+     * Entra na sessão como outra conta — único jeito de conferir uma
+     * tela de verdade, não só o banco (ex.: dado fictício recém-criado
+     * pra alguém sem consultor). Guarda quem começou, pra sempre voltar
+     * pra ele (ver ImpersonationController::stop()); nunca encadeia
+     * (personificar durante uma personificação continua guardando o
+     * MESMO admin original).
+     */
+    public function entrarComo(string $userId): void
+    {
+        $alvo = User::findOrFail($userId);
+
+        if ($alvo->isPlatformAdmin()) {
+            session()->flash('status', 'Não é possível entrar como outro administrador da plataforma.');
+
+            return;
+        }
+
+        if (! session()->has('impersonator_id')) {
+            session(['impersonator_id' => auth()->id()]);
+        }
+
+        Auth::login($alvo);
+
+        $this->redirect(route('dashboard'), navigate: false);
     }
 
     /** Convites sem consultor ainda aguardando cadastro. */
