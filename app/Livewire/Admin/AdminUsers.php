@@ -3,6 +3,7 @@
 namespace App\Livewire\Admin;
 
 use App\Enums\InviteStatus;
+use App\Enums\UserRole;
 use App\Models\ConsultantClient;
 use App\Models\ConsultantInvite;
 use App\Models\FinancialProfile;
@@ -149,6 +150,7 @@ class AdminUsers extends Component
             return [
                 'tipo' => 'dono_de_perfil',
                 'nome' => $alvo->name,
+                'email' => $alvo->email,
                 'perfil' => $perfil,
                 'membros' => $perfil->members()->count(),
                 'despesas' => DB::table('expense_records')->where('profile_id', $perfil->id)->count(),
@@ -162,6 +164,7 @@ class AdminUsers extends Component
             return [
                 'tipo' => 'consultor',
                 'nome' => $alvo->name,
+                'email' => $alvo->email,
                 'clientes_vinculados' => ConsultantClient::query()->where('consultant_id', $alvo->id)->count(),
             ];
         }
@@ -169,6 +172,7 @@ class AdminUsers extends Component
         return [
             'tipo' => 'sem_perfil_proprio',
             'nome' => $alvo->name,
+            'email' => $alvo->email,
         ];
     }
 
@@ -184,14 +188,49 @@ class AdminUsers extends Component
             ->values();
     }
 
+    /**
+     * Consultor → clientes vinculados → clientes sem consultor, nessa
+     * ordem — é como o consultor pensa a própria carteira (ver
+     * PortfolioOverview), então o admin devia ver a plataforma inteira do
+     * mesmo jeito, só que com todo mundo, não só quem está vinculado a
+     * ele. "Outras contas" pega o resto (cônjuge com login próprio, que
+     * não é dono de perfil nenhum; e qualquer conta que sobre) pra nenhuma
+     * conta ficar impossível de encontrar ou excluir por aqui.
+     */
     public function render()
     {
-        return view('livewire.admin.admin-users', [
-            'users' => User::query()->orderByDesc('created_at')->get(),
-            'profiles' => FinancialProfile::query()
-                ->with(['owner.consultantLinks' => fn ($q) => $q->active()->with('consultant')])
-                ->orderByDesc('created_at')
+        $consultores = User::query()->where('role', UserRole::Consultant)->orderBy('name')->get();
+
+        $idsClientesVinculados = ConsultantClient::query()->active()->pluck('client_id');
+
+        $grupos = $consultores->map(fn (User $consultor) => [
+            'consultor' => $consultor,
+            'perfis' => FinancialProfile::query()
+                ->whereIn('owner_user_id', ConsultantClient::query()
+                    ->where('consultant_id', $consultor->id)
+                    ->active()
+                    ->pluck('client_id'))
+                ->with('owner')
+                ->orderBy('profile_name')
                 ->get(),
+        ]);
+
+        $perfisSemConsultor = FinancialProfile::query()
+            ->whereNotIn('owner_user_id', $idsClientesVinculados->merge($consultores->pluck('id')))
+            ->with('owner')
+            ->orderBy('profile_name')
+            ->get();
+
+        $idsJaMostrados = $consultores->pluck('id')
+            ->merge($grupos->flatMap(fn (array $g) => $g['perfis'])->pluck('owner_user_id'))
+            ->merge($perfisSemConsultor->pluck('owner_user_id'));
+
+        return view('livewire.admin.admin-users', [
+            'totalUsuarios' => User::query()->count(),
+            'totalPerfis' => FinancialProfile::query()->count(),
+            'grupos' => $grupos,
+            'perfisSemConsultor' => $perfisSemConsultor,
+            'outrasContas' => User::query()->whereNotIn('id', $idsJaMostrados)->orderBy('name')->get(),
         ]);
     }
 }

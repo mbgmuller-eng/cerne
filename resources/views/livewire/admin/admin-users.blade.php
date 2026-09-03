@@ -7,7 +7,7 @@
         <div>
             <h1 class="font-display text-3xl font-semibold tracking-tight text-slate-900 dark:text-white">Painel admin</h1>
             <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                {{ $users->count() }} {{ $users->count() === 1 ? 'conta' : 'contas' }} · {{ $profiles->count() }} {{ $profiles->count() === 1 ? 'perfil' : 'perfis' }} na plataforma
+                {{ $totalUsuarios }} {{ $totalUsuarios === 1 ? 'conta' : 'contas' }} · {{ $totalPerfis }} {{ $totalPerfis === 1 ? 'perfil' : 'perfis' }} na plataforma
             </p>
         </div>
         <button type="button" wire:click="toggleInviteForm" class="btn-secondary">
@@ -95,7 +95,7 @@
 
             <div>
                 <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">
-                    Pra confirmar, digite o e-mail exatamente: <span class="font-mono">{{ $users->firstWhere('id', $excluindoUserId)?->email }}</span>
+                    Pra confirmar, digite o e-mail exatamente: <span class="font-mono">{{ $this->exclusaoInfo['email'] }}</span>
                 </label>
                 <input type="text" wire:model="confirmacaoExclusao" class="input mt-1.5" autocomplete="off">
                 @error('confirmacaoExclusao') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
@@ -108,71 +108,84 @@
         </div>
     @endif
 
-    <div class="card overflow-x-auto p-0">
-        <p class="border-b border-slate-100 px-5 py-3 text-sm font-semibold text-slate-900 dark:border-white/10 dark:text-white">Contas</p>
-        <table class="w-full text-left text-sm">
-            <thead class="text-xs text-slate-500 dark:text-slate-400">
-                <tr>
-                    <th class="px-5 py-2 font-medium">Nome</th>
-                    <th class="px-5 py-2 font-medium">E-mail</th>
-                    <th class="px-5 py-2 font-medium">Papel</th>
-                    <th class="px-5 py-2 font-medium">Criada em</th>
-                    <th class="px-5 py-2 font-medium"></th>
-                </tr>
-            </thead>
-            <tbody class="divide-y divide-slate-100 dark:divide-white/10">
-                @foreach ($users as $u)
-                    <tr>
-                        <td class="px-5 py-2.5 text-slate-800 dark:text-slate-200">
-                            {{ $u->name }}
-                            @if ($u->isPlatformAdmin())
+    <div class="space-y-4">
+        <h2 class="text-sm font-semibold text-slate-900 dark:text-white">Consultores e clientes</h2>
+
+        @forelse ($grupos as $grupo)
+            <div class="card overflow-hidden p-0">
+                <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 bg-slate-50/60 px-5 py-3 dark:border-white/10 dark:bg-white/5">
+                    <div>
+                        <p class="text-sm font-semibold text-slate-900 dark:text-white">
+                            {{ $grupo['consultor']->name }}
+                            @if ($grupo['consultor']->isPlatformAdmin())
                                 <span class="badge bg-brand-50 text-brand-800 ring-1 ring-brand-200 dark:bg-brand-500/10 dark:text-brand-300 dark:ring-brand-500/20 ml-1.5">admin</span>
                             @endif
-                        </td>
-                        <td class="px-5 py-2.5 text-slate-500 dark:text-slate-400">{{ $u->email }}</td>
-                        <td class="px-5 py-2.5 text-slate-500 dark:text-slate-400">{{ $u->role->label() }}</td>
-                        <td class="px-5 py-2.5 text-slate-500 dark:text-slate-400">{{ $u->created_at->format('d/m/Y') }}</td>
-                        <td class="px-5 py-2.5 text-right">
-                            @unless ($u->id === auth()->id())
-                                <button type="button" wire:click="pedirExclusao('{{ $u->id }}')" class="text-sm text-red-700 hover:underline dark:text-red-400">Excluir</button>
-                            @endunless
-                        </td>
-                    </tr>
-                @endforeach
-            </tbody>
-        </table>
+                        </p>
+                        <p class="text-xs text-slate-500 dark:text-slate-400">{{ $grupo['consultor']->email }}</p>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <span class="badge bg-brand-50 text-brand-800 ring-1 ring-brand-200 dark:bg-brand-500/10 dark:text-brand-300 dark:ring-brand-500/20">
+                            {{ $grupo['perfis']->count() }} {{ $grupo['perfis']->count() === 1 ? 'cliente' : 'clientes' }}
+                        </span>
+                        @unless ($grupo['consultor']->id === auth()->id())
+                            <button type="button" wire:click="pedirExclusao('{{ $grupo['consultor']->id }}')" class="text-sm text-red-700 hover:underline dark:text-red-400">Excluir</button>
+                        @endunless
+                    </div>
+                </div>
+
+                @include('livewire.admin._perfis-table', ['perfis' => $grupo['perfis'], 'vazio' => 'Nenhum cliente vinculado ainda.'])
+            </div>
+        @empty
+            <p class="text-sm text-slate-500 dark:text-slate-400">Nenhum consultor cadastrado ainda.</p>
+        @endforelse
     </div>
 
-    <div class="card overflow-x-auto p-0">
-        <p class="border-b border-slate-100 px-5 py-3 text-sm font-semibold text-slate-900 dark:border-white/10 dark:text-white">Perfis financeiros</p>
-        <table class="w-full text-left text-sm">
-            <thead class="text-xs text-slate-500 dark:text-slate-400">
-                <tr>
-                    <th class="px-5 py-2 font-medium">Perfil</th>
-                    <th class="px-5 py-2 font-medium">Dono</th>
-                    <th class="px-5 py-2 font-medium">Tipo</th>
-                    <th class="px-5 py-2 font-medium">Consultor</th>
-                    <th class="px-5 py-2 font-medium">Criado em</th>
-                </tr>
-            </thead>
-            <tbody class="divide-y divide-slate-100 dark:divide-white/10">
-                @foreach ($profiles as $p)
-                    <tr>
-                        <td class="px-5 py-2.5 text-slate-800 dark:text-slate-200">{{ $p->profile_name }}</td>
-                        <td class="px-5 py-2.5 text-slate-500 dark:text-slate-400">{{ $p->owner->email }}</td>
-                        <td class="px-5 py-2.5 text-slate-500 dark:text-slate-400">{{ $p->profile_type->label() }}</td>
-                        <td class="px-5 py-2.5 text-slate-500 dark:text-slate-400">
-                            @php $vinculo = $p->owner->consultantLinks->first(); @endphp
-                            @if ($vinculo)
-                                {{ $vinculo->consultant->name }}
-                            @else
-                                <span class="text-slate-400 dark:text-slate-500">Sem consultor</span>
-                            @endif
-                        </td>
-                        <td class="px-5 py-2.5 text-slate-500 dark:text-slate-400">{{ $p->created_at->format('d/m/Y') }}</td>
-                    </tr>
-                @endforeach
-            </tbody>
-        </table>
+    <div class="space-y-2">
+        <h2 class="text-sm font-semibold text-slate-900 dark:text-white">Clientes sem consultor</h2>
+
+        <div class="card overflow-hidden p-0">
+            @include('livewire.admin._perfis-table', ['perfis' => $perfisSemConsultor, 'vazio' => 'Nenhum cliente sem consultor no momento.'])
+        </div>
     </div>
+
+    @if ($outrasContas->isNotEmpty())
+        <div class="space-y-2">
+            <h2 class="text-sm font-semibold text-slate-900 dark:text-white">Outras contas</h2>
+            <p class="text-xs text-slate-500 dark:text-slate-400">Sem perfil próprio — cônjuge com login vinculado a um perfil de outra pessoa, ou conta sem papel de consultor.</p>
+
+            <div class="card overflow-x-auto p-0">
+                <table class="w-full text-left text-sm">
+                    <thead class="text-xs text-slate-500 dark:text-slate-400">
+                        <tr>
+                            <th class="px-5 py-2 font-medium">Nome</th>
+                            <th class="px-5 py-2 font-medium">E-mail</th>
+                            <th class="px-5 py-2 font-medium">Papel</th>
+                            <th class="px-5 py-2 font-medium">Criada em</th>
+                            <th class="px-5 py-2 font-medium"></th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100 dark:divide-white/10">
+                        @foreach ($outrasContas as $u)
+                            <tr>
+                                <td class="px-5 py-2.5 text-slate-800 dark:text-slate-200">
+                                    {{ $u->name }}
+                                    @if ($u->isPlatformAdmin())
+                                        <span class="badge bg-brand-50 text-brand-800 ring-1 ring-brand-200 dark:bg-brand-500/10 dark:text-brand-300 dark:ring-brand-500/20 ml-1.5">admin</span>
+                                    @endif
+                                </td>
+                                <td class="px-5 py-2.5 text-slate-500 dark:text-slate-400">{{ $u->email }}</td>
+                                <td class="px-5 py-2.5 text-slate-500 dark:text-slate-400">{{ $u->role->label() }}</td>
+                                <td class="px-5 py-2.5 text-slate-500 dark:text-slate-400">{{ $u->created_at->format('d/m/Y') }}</td>
+                                <td class="px-5 py-2.5 text-right">
+                                    @unless ($u->id === auth()->id())
+                                        <button type="button" wire:click="pedirExclusao('{{ $u->id }}')" class="text-sm text-red-700 hover:underline dark:text-red-400">Excluir</button>
+                                    @endunless
+                                </td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    @endif
 </div>

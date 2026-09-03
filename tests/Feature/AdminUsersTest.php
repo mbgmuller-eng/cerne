@@ -71,6 +71,45 @@ class AdminUsersTest extends TestCase
             ->assertSee($consultorB->name);
     }
 
+    public function test_clientes_aparecem_agrupados_por_consultor_e_sem_consultor_a_parte(): void
+    {
+        $admin = User::factory()->create(['is_platform_admin' => true]);
+        $consultorA = User::factory()->consultant()->create();
+        $consultorB = User::factory()->consultant()->create(); // sem clientes ainda
+
+        $clienteA = User::factory()->create();
+        $perfilA = FinancialProfile::factory()->create(['owner_user_id' => $clienteA->id]);
+        ConsultantClient::create([
+            'consultant_id' => $consultorA->id,
+            'client_id' => $clienteA->id,
+            'status' => ConsultantClientStatus::Active,
+            'invited_at' => now(),
+            'accepted_at' => now(),
+        ]);
+
+        $clienteSemConsultor = User::factory()->create();
+        $perfilSemConsultor = FinancialProfile::factory()->create(['owner_user_id' => $clienteSemConsultor->id]);
+
+        $this->actingAs($admin);
+
+        Livewire::test(AdminUsers::class)
+            ->assertOk()
+            ->assertViewHas('grupos', function ($grupos) use ($consultorA, $consultorB, $perfilA) {
+                $porConsultor = $grupos->keyBy(fn (array $g) => $g['consultor']->id);
+
+                self::assertTrue($porConsultor->get($consultorA->id)['perfis']->contains('id', $perfilA->id));
+                self::assertTrue($porConsultor->get($consultorB->id)['perfis']->isEmpty());
+
+                return true;
+            })
+            ->assertViewHas('perfisSemConsultor', function ($perfis) use ($perfilA, $perfilSemConsultor) {
+                self::assertTrue($perfis->contains('id', $perfilSemConsultor->id));
+                self::assertFalse($perfis->contains('id', $perfilA->id));
+
+                return true;
+            });
+    }
+
     public function test_admin_gera_convite_sem_consultor(): void
     {
         Mail::fake();
