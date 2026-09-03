@@ -225,12 +225,38 @@ class AdminUsers extends Component
             ->merge($grupos->flatMap(fn (array $g) => $g['perfis'])->pluck('owner_user_id'))
             ->merge($perfisSemConsultor->pluck('owner_user_id'));
 
+        $outrasContas = User::query()
+            ->whereNotIn('id', $idsJaMostrados)
+            ->orderBy('name')
+            ->get()
+            ->map(fn (User $u) => $this->contextoDeOutraConta($u));
+
         return view('livewire.admin.admin-users', [
             'totalUsuarios' => User::query()->count(),
             'totalPerfis' => FinancialProfile::query()->count(),
             'grupos' => $grupos,
             'perfisSemConsultor' => $perfisSemConsultor,
-            'outrasContas' => User::query()->whereNotIn('id', $idsJaMostrados)->orderBy('name')->get(),
+            'outrasContas' => $outrasContas,
         ]);
+    }
+
+    /**
+     * Perfil principal e consultor de quem não é dono de perfil nenhum —
+     * tipicamente o cônjuge com login próprio. O perfil vem da primeira
+     * associação em profile_members; o consultor, do vínculo ativo do
+     * TITULAR desse perfil (o cônjuge nunca tem vínculo de consultor
+     * próprio, só o dono tem).
+     *
+     * @return array{user: User, perfil: ?FinancialProfile, consultor: ?User}
+     */
+    private function contextoDeOutraConta(User $u): array
+    {
+        $perfil = $u->memberships()->with('profile.owner')->first()?->profile;
+
+        $consultor = $perfil
+            ? ConsultantClient::query()->where('client_id', $perfil->owner_user_id)->active()->with('consultant')->first()?->consultant
+            : null;
+
+        return ['user' => $u, 'perfil' => $perfil, 'consultor' => $consultor];
     }
 }

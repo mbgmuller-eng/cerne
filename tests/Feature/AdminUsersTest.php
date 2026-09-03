@@ -110,6 +110,39 @@ class AdminUsersTest extends TestCase
             });
     }
 
+    public function test_outras_contas_mostra_perfil_principal_e_consultor_do_conjuge(): void
+    {
+        $admin = User::factory()->create(['is_platform_admin' => true]);
+        $consultor = User::factory()->consultant()->create(['name' => 'Consultora Teste']);
+        $titular = User::factory()->create();
+        $perfil = FinancialProfile::factory()->create(['owner_user_id' => $titular->id, 'profile_name' => 'Família Teste']);
+        ConsultantClient::create([
+            'consultant_id' => $consultor->id,
+            'client_id' => $titular->id,
+            'status' => ConsultantClientStatus::Active,
+            'invited_at' => now(),
+            'accepted_at' => now(),
+        ]);
+
+        $conjuge = app(ClientOnboardingService::class)->addPartner($perfil, 'Cônjuge Teste', 'conjuge.teste@exemplo.com', 'Senha123');
+
+        $this->actingAs($admin);
+
+        Livewire::test(AdminUsers::class)
+            ->assertOk()
+            ->assertViewHas('outrasContas', function ($outrasContas) use ($conjuge, $perfil, $consultor) {
+                $linha = $outrasContas->firstWhere('user.id', $conjuge->id);
+
+                self::assertNotNull($linha);
+                self::assertSame($perfil->id, $linha['perfil']->id);
+                self::assertSame($consultor->id, $linha['consultor']->id);
+
+                return true;
+            })
+            ->assertSee('Família Teste')
+            ->assertSee('Consultora Teste');
+    }
+
     public function test_admin_gera_convite_sem_consultor(): void
     {
         Mail::fake();

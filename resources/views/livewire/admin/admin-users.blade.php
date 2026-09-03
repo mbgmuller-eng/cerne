@@ -159,13 +159,15 @@
                         <tr>
                             <th class="px-5 py-2 font-medium">Nome</th>
                             <th class="px-5 py-2 font-medium">E-mail</th>
-                            <th class="px-5 py-2 font-medium">Papel</th>
+                            <th class="px-5 py-2 font-medium">Perfil principal</th>
+                            <th class="px-5 py-2 font-medium">Consultor</th>
                             <th class="px-5 py-2 font-medium">Criada em</th>
                             <th class="px-5 py-2 font-medium"></th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-100 dark:divide-white/10">
-                        @foreach ($outrasContas as $u)
+                        @foreach ($outrasContas as $linha)
+                            @php $u = $linha['user']; @endphp
                             <tr>
                                 <td class="px-5 py-2.5 text-slate-800 dark:text-slate-200">
                                     {{ $u->name }}
@@ -174,7 +176,20 @@
                                     @endif
                                 </td>
                                 <td class="px-5 py-2.5 text-slate-500 dark:text-slate-400">{{ $u->email }}</td>
-                                <td class="px-5 py-2.5 text-slate-500 dark:text-slate-400">{{ $u->role->label() }}</td>
+                                <td class="px-5 py-2.5 text-slate-500 dark:text-slate-400">
+                                    @if ($linha['perfil'])
+                                        {{ $linha['perfil']->profile_name }} <span class="text-xs text-slate-400 dark:text-slate-500">({{ $linha['perfil']->owner->name }})</span>
+                                    @else
+                                        <span class="text-slate-400 dark:text-slate-500">—</span>
+                                    @endif
+                                </td>
+                                <td class="px-5 py-2.5 text-slate-500 dark:text-slate-400">
+                                    @if ($linha['consultor'])
+                                        {{ $linha['consultor']->name }}
+                                    @else
+                                        <span class="text-slate-400 dark:text-slate-500">{{ $linha['perfil'] ? 'Sem consultor' : '—' }}</span>
+                                    @endif
+                                </td>
                                 <td class="px-5 py-2.5 text-slate-500 dark:text-slate-400">{{ $u->created_at->format('d/m/Y') }}</td>
                                 <td class="px-5 py-2.5 text-right">
                                     @unless ($u->id === auth()->id())
