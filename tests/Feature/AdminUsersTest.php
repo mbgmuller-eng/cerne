@@ -5,10 +5,14 @@ namespace Tests\Feature;
 use App\Enums\ConsultantClientStatus;
 use App\Livewire\Admin\AdminUsers;
 use App\Mail\ClientInviteMail;
+use App\Models\BankAccount;
 use App\Models\ConsultantClient;
 use App\Models\ConsultantInvite;
+use App\Models\ExpenseRecord;
 use App\Models\FinancialProfile;
+use App\Models\ProfileMember;
 use App\Models\User;
+use App\Services\ClientOnboardingService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Mail;
 use Livewire\Livewire;
@@ -125,5 +129,109 @@ class AdminUsersTest extends TestCase
 
         self::assertTrue(FinancialProfile::query()->where('owner_user_id', $usuario->id)->exists());
         self::assertSame(0, ConsultantClient::query()->where('client_id', $usuario->id)->count());
+    }
+
+    public function test_admin_exclui_conta_dona_de_perfil_e_apaga_tudo_em_cascata(): void
+    {
+        $admin = User::factory()->create(['is_platform_admin' => true]);
+        $cliente = User::factory()->create();
+        $perfil = FinancialProfile::factory()->create(['owner_user_id' => $cliente->id]);
+        $membro = ProfileMember::factory()->create(['profile_id' => $perfil->id, 'user_id' => $cliente->id]);
+        BankAccount::factory()->create(['profile_id' => $perfil->id, 'member_id' => $membro->id]);
+        ExpenseRecord::factory()->create(['profile_id' => $perfil->id]);
+
+        $this->actingAs($admin);
+
+        Livewire::test(AdminUsers::class)
+            ->call('pedirExclusao', $cliente->id)
+            ->set('confirmacaoExclusao', $cliente->email)
+            ->call('excluirConta')
+            ->assertHasNoErrors();
+
+        self::assertSame(0, User::query()->where('id', $cliente->id)->count());
+        self::assertSame(0, FinancialProfile::query()->where('id', $perfil->id)->count());
+        self::assertSame(0, BankAccount::query()->where('profile_id', $perfil->id)->count());
+        self::assertSame(0, ExpenseRecord::query()->where('profile_id', $perfil->id)->count());
+    }
+
+    public function test_admin_exclui_consultor_sem_afetar_dados_do_cliente(): void
+    {
+        $admin = User::factory()->create(['is_platform_admin' => true]);
+        $consultor = User::factory()->consultant()->create();
+        $cliente = User::factory()->create();
+        $perfil = FinancialProfile::factory()->create(['owner_user_id' => $cliente->id]);
+        ConsultantClient::create([
+            'consultant_id' => $consultor->id,
+            'client_id' => $cliente->id,
+            'status' => ConsultantClientStatus::Active,
+            'invited_at' => now(),
+            'accepted_at' => now(),
+        ]);
+
+        $this->actingAs($admin);
+
+        Livewire::test(AdminUsers::class)
+            ->call('pedirExclusao', $consultor->id)
+            ->set('confirmacaoExclusao', $consultor->email)
+            ->call('excluirConta')
+            ->assertHasNoErrors();
+
+        self::assertSame(0, User::query()->where('id', $consultor->id)->count());
+        self::assertSame(0, ConsultantClient::query()->where('consultant_id', $consultor->id)->count());
+        self::assertSame(1, User::query()->where('id', $cliente->id)->count());
+        self::assertSame(1, FinancialProfile::query()->where('id', $perfil->id)->count());
+    }
+
+    public function test_admin_nao_pode_excluir_a_propria_conta(): void
+    {
+        $admin = User::factory()->create(['is_platform_admin' => true]);
+        $this->actingAs($admin);
+
+        Livewire::test(AdminUsers::class)
+            ->call('pedirExclusao', $admin->id)
+            ->set('confirmacaoExclusao', $admin->email)
+            ->call('excluirConta')
+            ->assertHasErrors(['confirmacaoExclusao']);
+
+        self::assertSame(1, User::query()->where('id', $admin->id)->count());
+    }
+
+    public function test_confirmacao_com_email_errado_bloqueia_exclusao(): void
+    {
+        $admin = User::factory()->create(['is_platform_admin' => true]);
+        $cliente = User::factory()->create();
+        FinancialProfile::factory()->create(['owner_user_id' => $cliente->id]);
+
+        $this->actingAs($admin);
+
+        Livewire::test(AdminUsers::class)
+            ->call('pedirExclusao', $cliente->id)
+            ->set('confirmacaoExclusao', 'email-errado@exemplo.com')
+            ->call('excluirConta')
+            ->assertHasErrors(['confirmacaoExclusao']);
+
+        self::assertSame(1, User::query()->where('id', $cliente->id)->count());
+    }
+
+    public function test_excluir_conjuge_com_login_proprio_so_remove_o_login(): void
+    {
+        $admin = User::factory()->create(['is_platform_admin' => true]);
+        $titular = User::factory()->create();
+        $perfil = FinancialProfile::factory()->create(['owner_user_id' => $titular->id]);
+
+        $conjuge = app(ClientOnboardingService::class)->addPartner($perfil, 'Cônjuge Teste', 'conjuge@exemplo.com', 'Senha123');
+        $membro = $conjuge->memberships()->sole();
+
+        $this->actingAs($admin);
+
+        Livewire::test(AdminUsers::class)
+            ->call('pedirExclusao', $conjuge->id)
+            ->set('confirmacaoExclusao', $conjuge->email)
+            ->call('excluirConta')
+            ->assertHasNoErrors();
+
+        self::assertSame(0, User::query()->where('id', $conjuge->id)->count());
+        self::assertSame(1, FinancialProfile::query()->where('id', $perfil->id)->count());
+        self::assertNull(ProfileMember::query()->find($membro->id)->user_id);
     }
 }
