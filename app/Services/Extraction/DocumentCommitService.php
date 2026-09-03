@@ -36,9 +36,15 @@ class DocumentCommitService
     ) {}
 
     /**
-     * @param  list<int>  $indicesAceitos  posições dos itens aprovados na revisão
+     * Importação parcial: só quem passou aqui vira lançamento — o resto
+     * fica pendente pra uma próxima revisão, sem perder o que já foi
+     * decidido. O documento só vira "Importado" quando TODO item extraído
+     * tiver um destino (importado aqui, ou excluído via
+     * DocumentUpload::excluded_item_indices) — ver isFullyResolved().
+     *
+     * @param  list<int>  $indicesAceitos  posições dos itens aprovados nesta rodada de revisão
      * @param  array{categoria?: array<int, string>, subcategoria?: array<int, string>, necessidade?: array<int, string>, fixedBillPayment?: array<int, string>, recurringIncomeOccurrence?: array<int, string>}  $overrides  escolha da revisão (ver CategorizationRuleMatcher/DocumentsIndex), indexada pela MESMA posição do item na extração — na ausência de uma regra que bateu, cai no comportamento de sempre (categoria_sugerida da IA, necessidade essencial)
-     * @return int quantos lançamentos foram criados
+     * @return int quantos lançamentos foram criados NESTA chamada
      */
     public function commit(DocumentUpload $documento, array $indicesAceitos, string $userId, array $overrides = []): int
     {
@@ -47,15 +53,19 @@ class DocumentCommitService
         }
 
         $itens = $documento->extractedItems();
+        // Nunca reprocessa o que já tem destino — mesmo que a tela mande de
+        // novo por engano (ex.: duplo clique), não duplica lançamento nem
+        // briga com um item já excluído.
+        $indicesAceitos = array_values(array_diff($indicesAceitos, $documento->resolvedItemIndices()));
         // Preserva o índice original (não usa array_values): é a chave que
         // liga cada item ao seu pré-preenchimento em $overrides.
         $aceitos = array_intersect_key($itens, array_flip($indicesAceitos));
 
         if ($aceitos === []) {
-            throw new RuntimeException('Nenhum item foi selecionado para importar.');
+            throw new RuntimeException('Nenhum item pronto foi selecionado para importar.');
         }
 
-        return DB::transaction(function () use ($documento, $aceitos, $overrides, $userId): int {
+        return DB::transaction(function () use ($documento, $aceitos, $overrides, $userId, $itens): int {
             $criados = match ($documento->document_type) {
                 DocumentType::BankStatement => $this->bankStatement($documento, $aceitos, $overrides, $userId),
                 DocumentType::CreditCardInvoice => $this->creditCardInvoice($documento, $aceitos, $overrides, $userId),
@@ -64,10 +74,16 @@ class DocumentCommitService
                 ),
             };
 
+            $importados = array_values(array_unique(array_merge(
+                $documento->imported_item_indices ?? [], array_keys($aceitos),
+            )));
+            $finalizado = count(array_unique(array_merge($importados, $documento->excluded_item_indices ?? []))) >= count($itens);
+
             $documento->update([
-                'processing_status' => ProcessingStatus::Committed,
-                'records_extracted' => $criados,
-                'committed_at' => now(),
+                'imported_item_indices' => $importados,
+                'records_extracted' => count($importados),
+                'processing_status' => $finalizado ? ProcessingStatus::Committed : ProcessingStatus::Completed,
+                'committed_at' => $finalizado ? now() : null,
             ]);
 
             return $criados;

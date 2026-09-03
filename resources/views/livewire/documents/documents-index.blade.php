@@ -134,6 +134,9 @@
                         <tbody class="divide-y divide-slate-100 dark:divide-white/10">
                             @foreach ($itens as $i => $item)
                                 @php
+                                    $jaImportado = in_array($i, $revisando->imported_item_indices ?? [], true);
+                                    $jaExcluido = in_array($i, $revisando->excluded_item_indices ?? [], true);
+                                    $resolvido = $jaImportado || $jaExcluido;
                                     $ehReceita = ($item['tipo'] ?? null) === 'receita';
                                     $necessidadeItem = $necessidadePorItem[$i] ?? '';
                                     $faltaCategorizar = ! $ehReceita && ($itensFaltandoCategoria[$i] ?? false);
@@ -141,6 +144,35 @@
                                         ? $expenseCategories->filter(fn ($c) => $c->necessity === Necessity::Investment)
                                         : $expenseCategories->filter(fn ($c) => $c->necessity === null);
                                 @endphp
+
+                                @if ($resolvido)
+                                    {{-- Item já teve destino numa rodada anterior (ou nesta)
+                                         — não volta a ser oferecido, só mostrado como referência. --}}
+                                    <tr class="opacity-50">
+                                        <td class="px-3 py-2"></td>
+                                        @foreach ($item as $chave => $valor)
+                                            <td class="px-3 py-2 text-slate-500 dark:text-slate-500 {{ in_array($chave, ['valor', 'valor_atual', 'valor_bruto', 'premio']) ? 'text-right tabular-nums' : '' }}">
+                                                @if (is_array($valor))
+                                                    {{ collect($valor)->map(fn ($v) => is_array($v) ? implode(' ', $v) : $v)->implode(', ') }}
+                                                @else
+                                                    {{ $valor ?? '—' }}
+                                                @endif
+                                            </td>
+                                        @endforeach
+                                        @if ($temCategorizacao)
+                                            <td colspan="3" class="px-3 py-2 text-xs">
+                                                @if ($jaImportado)
+                                                    <span class="font-medium text-brand-700 dark:text-brand-300">✓ Já importado</span>
+                                                @else
+                                                    <span class="font-medium text-slate-500 dark:text-slate-400">Não será importado</span>
+                                                @endif
+                                            </td>
+                                        @endif
+                                    </tr>
+
+                                    @continue
+                                @endif
+
                                 <tr class="{{ in_array($i, $aceitos) ? '' : 'opacity-40' }}">
                                     <td class="px-3 py-2">
                                         <input type="checkbox" wire:model.live="aceitos" value="{{ $i }}" class="rounded border-slate-300 dark:border-slate-600 text-brand-700 dark:text-brand-400 focus:ring-brand-500">
@@ -234,6 +266,16 @@
                                                         só quando o valor for exatamente {{ Money::format($item['valor'] ?? 0) }}
                                                     </label>
                                                 @endif
+
+                                                <span class="text-slate-300 dark:text-slate-600">·</span>
+
+                                                @if ($confirmandoExclusaoItem === $i)
+                                                    <span class="text-slate-500 dark:text-slate-400">Não importar este item?</span>
+                                                    <button type="button" wire:click="excluirItem({{ $i }})" class="font-medium text-red-700 hover:underline dark:text-red-400">Sim</button>
+                                                    <button type="button" wire:click="cancelarExclusaoItem" class="text-slate-400 hover:text-slate-700 dark:hover:text-slate-300">Não</button>
+                                                @else
+                                                    <button type="button" wire:click="confirmarExclusaoItem({{ $i }})" class="text-red-600 hover:underline dark:text-red-400">Não importar este item</button>
+                                                @endif
                                             </div>
                                         </td>
                                     </tr>
@@ -245,16 +287,24 @@
 
                 @php
                     $faltandoCount = collect($aceitos)->filter(fn ($i) => $itensFaltandoCategoria[$i] ?? false)->count();
+                    $importadosCount = count($revisando->imported_item_indices ?? []);
+                    $excluidosCount = count($revisando->excluded_item_indices ?? []);
                 @endphp
 
                 <div class="mt-4 flex flex-wrap items-center justify-between gap-3">
                     <div>
                         <p class="text-sm text-slate-600 dark:text-slate-300">
-                            {{ count($aceitos) }} de {{ count($itens) }} selecionados
+                            {{ count($aceitos) }} de {{ count($itens) }} pendentes selecionados
+                            @if ($importadosCount > 0 || $excluidosCount > 0)
+                                <span class="text-slate-400">
+                                    · {{ $importadosCount }} {{ $importadosCount === 1 ? 'já importado' : 'já importados' }},
+                                    {{ $excluidosCount }} {{ $excluidosCount === 1 ? 'não será importado' : 'não serão importados' }}
+                                </span>
+                            @endif
                         </p>
                         @if ($faltandoCount > 0)
                             <p class="text-xs font-medium text-amber-700 dark:text-amber-400">
-                                {{ $faltandoCount }} {{ $faltandoCount === 1 ? 'selecionado está' : 'selecionados estão' }} sem categorização completa — corrija antes de importar.
+                                {{ $faltandoCount }} {{ $faltandoCount === 1 ? 'selecionado ainda está' : 'selecionados ainda estão' }} sem categorização completa — {{ $faltandoCount === 1 ? 'fica' : 'ficam' }} pendente{{ $faltandoCount === 1 ? '' : 's' }}, pode continuar depois.
                             </p>
                         @endif
                         @if (count($duplicataPorItem) > 0)

@@ -100,6 +100,9 @@ class DocumentsIndex extends Component
     /** Trava a regra pelo valor exato do próprio item (ver ExpenseCategorizationRule::$amount) — caso comum: PIX recorrente de valor fixo pra si mesmo. */
     public array $regraValorExatoPorItem = [];
 
+    /** Índice do item com o "confirma?" de exclusão aberto — nulo = nenhum. */
+    public ?int $confirmandoExclusaoItem = null;
+
     public function mount(): void
     {
         $this->redirectOrAbortWithoutProfile();
@@ -166,9 +169,12 @@ class DocumentsIndex extends Component
         $itens = $documento->extractedItems();
 
         $this->revisandoId = $id;
-        // Todos marcados por padrão: o usuário desmarca o que estiver
-        // errado, que é mais rápido do que marcar dezenas de linhas certas.
-        $this->aceitos = array_keys($itens);
+        // Todo item ainda PENDENTE marcado por padrão — o usuário desmarca
+        // o que estiver errado, que é mais rápido do que marcar dezenas de
+        // linhas certas. Item já importado ou excluído numa rodada
+        // anterior nunca volta a ser oferecido (ver
+        // DocumentUpload::resolvedItemIndices()).
+        $this->aceitos = $documento->pendingItemIndices();
         $this->categoriaPorItem = [];
         $this->subcategoriaPorItem = [];
         $this->novaSubcategoriaPorItem = [];
@@ -181,6 +187,7 @@ class DocumentsIndex extends Component
         $this->criarRegraPorItem = [];
         $this->regraPatternPorItem = [];
         $this->regraValorExatoPorItem = [];
+        $this->confirmandoExclusaoItem = null;
 
         // Casamento com conta fixa (ver Parte B do plano) só faz sentido
         // pra extrato bancário — fatura de cartão não debita conta nenhuma
@@ -329,6 +336,7 @@ class DocumentsIndex extends Component
             'necessidadePorItem', 'regraAplicadaPorItem', 'fixedBillPaymentPorItem',
             'recurringIncomeOccurrencePorItem', 'notaPorItem', 'duplicataPorItem',
             'criarRegraPorItem', 'regraPatternPorItem', 'regraValorExatoPorItem',
+            'confirmandoExclusaoItem',
         );
     }
 
@@ -424,22 +432,35 @@ class DocumentsIndex extends Component
         return $faltando;
     }
 
+    /**
+     * Importação parcial de propósito: só quem já está com a
+     * categorização completa entra nesta rodada — o resto (ainda em
+     * revisão) fica pendente, e o documento continua "Aguardando revisão"
+     * até TODO item ter um destino (importado ou excluído — ver
+     * DocumentUpload::isFullyResolved()). Evita perder o trabalho já
+     * feito só porque falta categorizar algumas linhas.
+     */
     public function confirmar(DocumentCommitService $commit): void
     {
-        $faltandoNosAceitos = array_filter(
-            $this->itensFaltandoCategoria,
-            fn (bool $falta, int $i) => $falta && in_array($i, $this->aceitos, true),
-            ARRAY_FILTER_USE_BOTH,
-        );
+        if ($this->aceitos === []) {
+            $this->addError('confirmar', 'Nenhum item selecionado para importar.');
 
-        if ($faltandoNosAceitos !== []) {
-            $this->addError('confirmar', 'Categorize necessidade, categoria e subcategoria de todos os itens selecionados antes de importar.');
+            return;
+        }
+
+        $prontos = array_values(array_filter(
+            $this->aceitos,
+            fn (int $i) => ! ($this->itensFaltandoCategoria[$i] ?? false),
+        ));
+
+        if ($prontos === []) {
+            $this->addError('confirmar', 'Nenhum item selecionado está com a categorização completa ainda — pode continuar depois, o documento fica aberto.');
 
             return;
         }
 
         $semPatternDeRegra = array_filter(
-            $this->aceitos,
+            $prontos,
             fn (int $i) => ($this->criarRegraPorItem[$i] ?? false) && trim($this->regraPatternPorItem[$i] ?? '') === '',
         );
 
@@ -455,7 +476,7 @@ class DocumentsIndex extends Component
         $itens = $documento->extractedItems();
 
         try {
-            $criados = $commit->commit($documento, array_map('intval', $this->aceitos), auth()->id(), [
+            $criados = $commit->commit($documento, array_map('intval', $prontos), auth()->id(), [
                 'categoria' => $this->categoriaPorItem,
                 'subcategoria' => $this->subcategoriaPorItem,
                 'necessidade' => $this->necessidadePorItem,
@@ -463,18 +484,89 @@ class DocumentsIndex extends Component
                 'recurringIncomeOccurrence' => $this->recurringIncomeOccurrencePorItem,
             ]);
 
-            $regrasCriadas = $this->criarRegrasMarcadas($itens);
+            $regrasCriadas = $this->criarRegrasMarcadas($itens, $prontos);
+
+            $documento->refresh();
+            // $this->revisando é computed property — Livewire memoiza o
+            // resultado por request, então sem isso a tela renderia com o
+            // documento de ANTES do commit() (é por causa disso que o
+            // painel parecia não fechar / os contadores ficavam errados
+            // depois de importar).
+            unset($this->revisando);
 
             $mensagem = "{$criados} lançamentos importados.";
             if ($regrasCriadas > 0) {
                 $mensagem .= " {$regrasCriadas} regra(s) de categorização criada(s)/atualizada(s).";
             }
 
+            if ($documento->isFullyResolved()) {
+                session()->flash('status', $mensagem);
+                $this->fecharRevisao();
+
+                return;
+            }
+
+            $pendentes = count($documento->pendingItemIndices());
+            $mensagem .= ' '.$pendentes.' '.($pendentes === 1 ? 'item ainda falta categorizar' : 'itens ainda faltam categorizar').' — o documento continua aberto pra revisão.';
             session()->flash('status', $mensagem);
-            $this->fecharRevisao();
+            // Só tira do "selecionado" quem acabou de ser importado — o
+            // resto (ainda pendente) mantém o que a pessoa já digitou,
+            // não reseta o formulário dela à toa.
+            $this->aceitos = array_values(array_diff($this->aceitos, $prontos));
         } catch (\Throwable $e) {
             $this->addError('confirmar', $e->getMessage());
         }
+    }
+
+    /**
+     * Marca o item pra NUNCA ser importado — diferente de só desmarcar o
+     * checkbox (que dura só a sessão de revisão): fica gravado no
+     * documento, então numa próxima rodada esse item não volta a ser
+     * oferecido. Só faz sentido pra item ainda pendente.
+     */
+    public function excluirItem(int $i): void
+    {
+        $documento = DocumentUpload::findOrFail($this->revisandoId);
+
+        if (! $documento->isAwaitingReview() || in_array($i, $documento->resolvedItemIndices(), true)) {
+            $this->confirmandoExclusaoItem = null;
+
+            return;
+        }
+
+        $excluidos = array_values(array_unique([...($documento->excluded_item_indices ?? []), $i]));
+        $finalizado = count(array_unique(array_merge($documento->imported_item_indices ?? [], $excluidos))) >= count($documento->extractedItems());
+
+        $documento->update([
+            'excluded_item_indices' => $excluidos,
+            'processing_status' => $finalizado ? ProcessingStatus::Committed : ProcessingStatus::Completed,
+            'committed_at' => $finalizado ? now() : null,
+        ]);
+        // Mesmo raciocínio de confirmar() — sem isso a tela ainda mostraria
+        // o item como pendente depois de excluído.
+        unset($this->revisando);
+
+        $this->aceitos = array_values(array_diff($this->aceitos, [$i]));
+        $this->confirmandoExclusaoItem = null;
+
+        if ($finalizado) {
+            session()->flash('status', 'Item marcado pra não importar — documento totalmente resolvido e finalizado.');
+            $this->fecharRevisao();
+
+            return;
+        }
+
+        session()->flash('status', 'Item marcado pra não ser importado.');
+    }
+
+    public function confirmarExclusaoItem(int $i): void
+    {
+        $this->confirmandoExclusaoItem = $i;
+    }
+
+    public function cancelarExclusaoItem(): void
+    {
+        $this->confirmandoExclusaoItem = null;
     }
 
     /**
@@ -486,12 +578,13 @@ class DocumentsIndex extends Component
      * expense_categorization_rules).
      *
      * @param  array<int, array<string, mixed>>  $itens
+     * @param  list<int>  $indices  só os itens que acabaram de ser importados nesta rodada
      */
-    private function criarRegrasMarcadas(array $itens): int
+    private function criarRegrasMarcadas(array $itens, array $indices): int
     {
         $criadas = 0;
 
-        foreach ($this->aceitos as $i) {
+        foreach ($indices as $i) {
             if (($this->criarRegraPorItem[$i] ?? false) !== true) {
                 continue;
             }

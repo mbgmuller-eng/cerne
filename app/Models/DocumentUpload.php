@@ -18,8 +18,8 @@ use Illuminate\Support\Facades\Storage;
     'profile_id', 'uploaded_by_user_id', 'member_id', 'bank_account_id', 'document_type',
     'original_filename', 'storage_path', 'size_bytes', 'institution_name',
     'reference_month', 'reference_year', 'processing_status',
-    'records_extracted', 'extraction_summary', 'error_message',
-    'processed_at', 'committed_at',
+    'records_extracted', 'extraction_summary', 'imported_item_indices',
+    'excluded_item_indices', 'error_message', 'processed_at', 'committed_at',
 ])]
 class DocumentUpload extends Model
 {
@@ -31,6 +31,8 @@ class DocumentUpload extends Model
             'document_type' => DocumentType::class,
             'processing_status' => ProcessingStatus::class,
             'extraction_summary' => 'array',
+            'imported_item_indices' => 'array',
+            'excluded_item_indices' => 'array',
             'reference_month' => 'integer',
             'reference_year' => 'integer',
             'records_extracted' => 'integer',
@@ -104,5 +106,37 @@ class DocumentUpload extends Model
     public function isAwaitingReview(): bool
     {
         return $this->processing_status === ProcessingStatus::Completed;
+    }
+
+    /**
+     * Índices (dentro de extractedItems()) que já tiveram uma decisão
+     * definitiva — viraram lançamento, ou foram marcados pra nunca virar.
+     * Nenhum dos dois volta a ser oferecido numa próxima revisão.
+     *
+     * @return list<int>
+     */
+    public function resolvedItemIndices(): array
+    {
+        return array_values(array_unique(array_merge(
+            $this->imported_item_indices ?? [],
+            $this->excluded_item_indices ?? [],
+        )));
+    }
+
+    /**
+     * Índices ainda sem decisão — o que falta pra pessoa revisar (ou
+     * excluir) antes do documento poder finalizar.
+     *
+     * @return list<int>
+     */
+    public function pendingItemIndices(): array
+    {
+        return array_values(array_diff(array_keys($this->extractedItems()), $this->resolvedItemIndices()));
+    }
+
+    /** Todo item extraído já tem um destino — dá pra finalizar (ver ProcessingStatus::Committed). */
+    public function isFullyResolved(): bool
+    {
+        return $this->pendingItemIndices() === [];
     }
 }
