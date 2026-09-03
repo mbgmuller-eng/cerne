@@ -22,7 +22,7 @@ enum EmploymentType: string
         return match ($this) {
             self::PublicServant => 'Funcionário público',
             self::Clt => 'CLT',
-            self::SelfEmployed => 'Autônomo',
+            self::SelfEmployed => 'Autônomo/Empreendedor',
         };
     }
 

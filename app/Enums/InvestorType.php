@@ -11,7 +11,6 @@ enum InvestorType: string
     case Conservative = 'conservative';
     case Moderate = 'moderate';
     case Aggressive = 'aggressive';
-    case Entrepreneur = 'entrepreneur';
 
     public function label(): string
     {
@@ -19,7 +18,6 @@ enum InvestorType: string
             self::Conservative => 'Conservador',
             self::Moderate => 'Moderado',
             self::Aggressive => 'Arrojado',
-            self::Entrepreneur => 'Empreendedor',
         };
     }
 }
