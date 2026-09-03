@@ -272,7 +272,13 @@
      Barra inferior (celular e tablet)
      ============================================================ --}}
 @if ($dentroDoPerfil)
-    <div class="fixed inset-x-0 bottom-0 z-30 lg:hidden">
+    {{-- transform-gpu/will-change-transform: em alguns Android (Chrome,
+         principalmente com o app instalado na tela inicial), um elemento
+         fixed com backdrop-blur some durante a rolagem rápida — o
+         navegador falha em recompor a camada em GPUs mais fracas. Forçar
+         a própria camada de composição evita isso; não muda nada visual
+         nos aparelhos que já funcionavam. --}}
+    <div class="fixed inset-x-0 bottom-0 z-30 lg:hidden transform-gpu will-change-transform">
         {{-- Gaveta "Mais" --}}
         <div
             x-show="mais"
