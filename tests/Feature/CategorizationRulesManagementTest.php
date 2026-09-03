@@ -44,6 +44,67 @@ class CategorizationRulesManagementTest extends TestCase
         self::assertSame($perfil->id, $regra->profile_id);
     }
 
+    /** Motivado por um caso real: PIX mensal pra si mesmo — o valor exato evita que a regra casse qualquer PIX daquele nome. */
+    public function test_cria_regra_de_despesa_com_valor_exato(): void
+    {
+        [$perfil] = $this->criarPerfil();
+        $categoria = ExpenseCategory::factory()->create();
+        $subcategoria = ExpenseSubcategory::factory()->create(['category_id' => $categoria->id]);
+
+        Livewire::test(CategorizationRulesIndex::class)
+            ->set('expensePattern', 'PIX MARCELO')
+            ->set('expenseAmount', '199.58')
+            ->set('expenseCategoryId', $categoria->id)
+            ->set('expenseSubcategoryId', $subcategoria->id)
+            ->set('expenseNecessity', 'essential')
+            ->call('saveExpenseRule')
+            ->assertHasNoErrors();
+
+        self::assertSame('199.58', ExpenseCategorizationRule::sole()->amount);
+    }
+
+    public function test_valor_exato_e_opcional_e_fica_nulo_quando_nao_preenchido(): void
+    {
+        [$perfil] = $this->criarPerfil();
+        $categoria = ExpenseCategory::factory()->create();
+        $subcategoria = ExpenseSubcategory::factory()->create(['category_id' => $categoria->id]);
+
+        Livewire::test(CategorizationRulesIndex::class)
+            ->set('expensePattern', 'ADRIANA')
+            ->set('expenseCategoryId', $categoria->id)
+            ->set('expenseSubcategoryId', $subcategoria->id)
+            ->set('expenseNecessity', 'essential')
+            ->call('saveExpenseRule')
+            ->assertHasNoErrors();
+
+        self::assertNull(ExpenseCategorizationRule::sole()->amount);
+    }
+
+    public function test_editar_regra_de_despesa_preenche_o_valor_exato_ja_cadastrado(): void
+    {
+        [$perfil] = $this->criarPerfil();
+        $regra = ExpenseCategorizationRule::factory()->for($perfil, 'profile')->create(['amount' => '199.58']);
+
+        Livewire::test(CategorizationRulesIndex::class)
+            ->call('editExpenseRule', $regra->id)
+            ->assertSet('expenseAmount', '199.58');
+    }
+
+    public function test_cria_regra_de_receita_com_valor_exato(): void
+    {
+        [$perfil] = $this->criarPerfil();
+        $categoria = IncomeCategory::factory()->create();
+
+        Livewire::test(CategorizationRulesIndex::class)
+            ->set('incomePattern', 'REEMBOLSO')
+            ->set('incomeAmount', '500.00')
+            ->set('incomeCategoryId', $categoria->id)
+            ->call('saveIncomeRule')
+            ->assertHasNoErrors();
+
+        self::assertSame('500.00', IncomeCategorizationRule::sole()->amount);
+    }
+
     public function test_editar_regra_de_despesa_atualiza_o_registro_existente(): void
     {
         [$perfil] = $this->criarPerfil();

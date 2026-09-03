@@ -9,9 +9,11 @@ use App\Jobs\ProcessDocumentJob;
 use App\Livewire\Concerns\RequiresActiveProfile;
 use App\Models\BankAccount;
 use App\Models\DocumentUpload;
+use App\Models\ExpenseCategorizationRule;
 use App\Models\ExpenseCategory;
 use App\Models\ExpenseRecord;
 use App\Models\ExpenseSubcategory;
+use App\Models\IncomeCategorizationRule;
 use App\Models\IncomeCategory;
 use App\Models\IncomeRecord;
 use App\Services\Extraction\CategorizationRuleMatcher;
@@ -82,6 +84,21 @@ class DocumentsIndex extends Component
      * demais arrays; item com aviso começa desmarcado.
      */
     public array $duplicataPorItem = [];
+
+    /**
+     * "Criar regra também" — quando marcado num item, além de importar o
+     * lançamento, também cadastra (ou atualiza, se o padrão já existir) uma
+     * ExpenseCategorizationRule/IncomeCategorizationRule com a mesma
+     * categorização escolhida pra ele. Evita ter que ir até a tela de
+     * Regras logo depois de revisar um extrato.
+     */
+    public array $criarRegraPorItem = [];
+
+    /** Padrão da regra a criar — pré-preenchido com a descrição do item ao marcar, mas editável. */
+    public array $regraPatternPorItem = [];
+
+    /** Trava a regra pelo valor exato do próprio item (ver ExpenseCategorizationRule::$amount) — caso comum: PIX recorrente de valor fixo pra si mesmo. */
+    public array $regraValorExatoPorItem = [];
 
     public function mount(): void
     {
@@ -161,6 +178,9 @@ class DocumentsIndex extends Component
         $this->recurringIncomeOccurrencePorItem = [];
         $this->notaPorItem = [];
         $this->duplicataPorItem = [];
+        $this->criarRegraPorItem = [];
+        $this->regraPatternPorItem = [];
+        $this->regraValorExatoPorItem = [];
 
         // Casamento com conta fixa (ver Parte B do plano) só faz sentido
         // pra extrato bancário — fatura de cartão não debita conta nenhuma
@@ -234,7 +254,7 @@ class DocumentsIndex extends Component
 
     private function preencherDespesa(int $i, array $item, CarbonImmutable $data, CategorizationRuleMatcher $matcher, bool $casaContaFixa): void
     {
-        $match = $matcher->matchExpense($item['descricao'] ?? '', $data);
+        $match = $matcher->matchExpense($item['descricao'] ?? '', $data, Money::parse($item['valor'] ?? 0));
 
         if ($match === null) {
             return;
@@ -263,7 +283,7 @@ class DocumentsIndex extends Component
 
     private function preencherReceita(int $i, array $item, CarbonImmutable $data, CategorizationRuleMatcher $matcher, bool $casaContaFixa): void
     {
-        $match = $matcher->matchIncome($item['descricao'] ?? '', $data);
+        $match = $matcher->matchIncome($item['descricao'] ?? '', $data, Money::parse($item['valor'] ?? 0));
 
         if ($match === null) {
             return;
@@ -308,6 +328,7 @@ class DocumentsIndex extends Component
             'revisandoId', 'aceitos', 'categoriaPorItem', 'subcategoriaPorItem', 'novaSubcategoriaPorItem',
             'necessidadePorItem', 'regraAplicadaPorItem', 'fixedBillPaymentPorItem',
             'recurringIncomeOccurrencePorItem', 'notaPorItem', 'duplicataPorItem',
+            'criarRegraPorItem', 'regraPatternPorItem', 'regraValorExatoPorItem',
         );
     }
 
@@ -319,6 +340,12 @@ class DocumentsIndex extends Component
      */
     public function updated(string $name): void
     {
+        if (str_starts_with($name, 'criarRegraPorItem.')) {
+            $this->prefillRegraPattern((int) substr($name, strlen('criarRegraPorItem.')));
+
+            return;
+        }
+
         if (! str_starts_with($name, 'necessidadePorItem.')) {
             return;
         }
@@ -339,6 +366,17 @@ class DocumentsIndex extends Component
 
         $this->categoriaPorItem[$i] = '';
         $this->subcategoriaPorItem[$i] = '';
+    }
+
+    /** Padrão sugerido = a própria descrição do item, editável — só na primeira vez que a pessoa marca "criar regra" pra esse item. */
+    private function prefillRegraPattern(int $i): void
+    {
+        if (($this->criarRegraPorItem[$i] ?? false) !== true || trim($this->regraPatternPorItem[$i] ?? '') !== '') {
+            return;
+        }
+
+        $itens = $this->revisando?->extractedItems() ?? [];
+        $this->regraPatternPorItem[$i] = trim($itens[$i]['descricao'] ?? '');
     }
 
     /** @return Collection<int, ExpenseCategory> */
@@ -400,9 +438,21 @@ class DocumentsIndex extends Component
             return;
         }
 
+        $semPatternDeRegra = array_filter(
+            $this->aceitos,
+            fn (int $i) => ($this->criarRegraPorItem[$i] ?? false) && trim($this->regraPatternPorItem[$i] ?? '') === '',
+        );
+
+        if ($semPatternDeRegra !== []) {
+            $this->addError('confirmar', 'Preencha o padrão da regra pros itens marcados para "criar regra também".');
+
+            return;
+        }
+
         $this->resolverNovasSubcategorias();
 
         $documento = DocumentUpload::findOrFail($this->revisandoId);
+        $itens = $documento->extractedItems();
 
         try {
             $criados = $commit->commit($documento, array_map('intval', $this->aceitos), auth()->id(), [
@@ -412,11 +462,76 @@ class DocumentsIndex extends Component
                 'fixedBillPayment' => $this->fixedBillPaymentPorItem,
                 'recurringIncomeOccurrence' => $this->recurringIncomeOccurrencePorItem,
             ]);
-            session()->flash('status', "{$criados} lançamentos importados.");
+
+            $regrasCriadas = $this->criarRegrasMarcadas($itens);
+
+            $mensagem = "{$criados} lançamentos importados.";
+            if ($regrasCriadas > 0) {
+                $mensagem .= " {$regrasCriadas} regra(s) de categorização criada(s)/atualizada(s).";
+            }
+
+            session()->flash('status', $mensagem);
             $this->fecharRevisao();
         } catch (\Throwable $e) {
             $this->addError('confirmar', $e->getMessage());
         }
+    }
+
+    /**
+     * Roda só depois que o commit deu certo — regra não nasce de um
+     * lançamento que não chegou a ser importado. `updateOrCreate` por
+     * padrão: se já existir uma regra com esse texto (mesmo padrão), ela é
+     * atualizada com a categorização de agora em vez de duplicar (o
+     * padrão é único por perfil — ver migration de
+     * expense_categorization_rules).
+     *
+     * @param  array<int, array<string, mixed>>  $itens
+     */
+    private function criarRegrasMarcadas(array $itens): int
+    {
+        $criadas = 0;
+
+        foreach ($this->aceitos as $i) {
+            if (($this->criarRegraPorItem[$i] ?? false) !== true) {
+                continue;
+            }
+
+            $pattern = trim($this->regraPatternPorItem[$i] ?? '');
+
+            if ($pattern === '') {
+                continue;
+            }
+
+            $item = $itens[$i] ?? [];
+            $ehReceita = ($item['tipo'] ?? null) === 'receita';
+            $valorExato = ($this->regraValorExatoPorItem[$i] ?? false) ? Money::parse($item['valor'] ?? 0) : null;
+
+            if ($ehReceita) {
+                IncomeCategorizationRule::query()->updateOrCreate(
+                    ['pattern' => $pattern],
+                    [
+                        'amount' => $valorExato,
+                        'category_id' => $this->categoriaPorItem[$i] ?? null,
+                        'is_active' => true,
+                    ],
+                );
+            } else {
+                ExpenseCategorizationRule::query()->updateOrCreate(
+                    ['pattern' => $pattern],
+                    [
+                        'amount' => $valorExato,
+                        'category_id' => $this->categoriaPorItem[$i] ?? null,
+                        'subcategory_id' => ($this->subcategoriaPorItem[$i] ?? '') !== '' ? $this->subcategoriaPorItem[$i] : null,
+                        'necessity' => $this->necessidadePorItem[$i] ?? null,
+                        'is_active' => true,
+                    ],
+                );
+            }
+
+            $criadas++;
+        }
+
+        return $criadas;
     }
 
     /**
@@ -442,6 +557,34 @@ class DocumentsIndex extends Component
 
             $this->subcategoriaPorItem[$i] = ExpenseSubcategory::createCustom($categoria, $novoNome)->id;
         }
+    }
+
+    /**
+     * Cria a subcategoria assim que a pessoa sai do campo (wire:blur), em
+     * vez de só no confirmar() — motivado por um caso real: extrato com
+     * mais de um gasto pra uma subcategoria que ainda não existe. Sem
+     * isso, a pessoa tinha que esperar confirmar a importação inteira pra
+     * a subcategoria existir e poder escolhê-la nos outros itens; criando
+     * na hora, ela já aparece no <select> de qualquer linha da mesma
+     * categoria no próximo render.
+     */
+    public function criarSubcategoriaAgora(int $i): void
+    {
+        $novoNome = trim($this->novaSubcategoriaPorItem[$i] ?? '');
+        $categoriaId = $this->categoriaPorItem[$i] ?? '';
+
+        if ($novoNome === '' || $categoriaId === '') {
+            return;
+        }
+
+        $categoria = ExpenseCategory::query()->find($categoriaId);
+
+        if ($categoria === null) {
+            return;
+        }
+
+        $this->subcategoriaPorItem[$i] = ExpenseSubcategory::createCustom($categoria, $novoNome)->id;
+        $this->novaSubcategoriaPorItem[$i] = '';
     }
 
     public function descartar(string $id): void

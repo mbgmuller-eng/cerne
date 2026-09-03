@@ -155,6 +155,82 @@ class CategorizationRuleMatcherTest extends TestCase
         self::assertSame($categoria->id, $match['category_id']);
     }
 
+    /**
+     * Motivado por um caso real: PIX mensal que a pessoa manda pra si
+     * mesma, sempre no mesmo valor — a descrição sozinha ("PIX MARCELO")
+     * casaria com qualquer PIX daquele nome, então o valor vira condição
+     * obrigatória, não só desempate.
+     */
+    public function test_regra_com_valor_so_casa_quando_o_valor_bate_exatamente(): void
+    {
+        [$perfil] = $this->criarPerfil();
+        $categoria = ExpenseCategory::factory()->create();
+        ExpenseCategorizationRule::factory()->for($perfil, 'profile')->create([
+            'pattern' => 'PIX MARCELO', 'amount' => '199.58', 'category_id' => $categoria->id,
+        ]);
+
+        $bate = app(CategorizationRuleMatcher::class)->matchExpense('PIX MARCELO MULLER 24/09', CarbonImmutable::parse('2026-09-24'), '199.58');
+        self::assertNotNull($bate);
+        self::assertSame($categoria->id, $bate['category_id']);
+
+        $naoBate = app(CategorizationRuleMatcher::class)->matchExpense('PIX MARCELO MULLER 24/09', CarbonImmutable::parse('2026-09-24'), '50.00');
+        self::assertNull($naoBate);
+    }
+
+    /** Sem valor pra comparar (chamada sem o parâmetro), regra com valor travado nunca casa — não dá pra confirmar a condição. */
+    public function test_regra_com_valor_nao_casa_sem_valor_do_item_pra_comparar(): void
+    {
+        [$perfil] = $this->criarPerfil();
+        ExpenseCategorizationRule::factory()->for($perfil, 'profile')->create(['pattern' => 'PIX MARCELO', 'amount' => '199.58']);
+
+        $match = app(CategorizationRuleMatcher::class)->matchExpense('PIX MARCELO MULLER 24/09', CarbonImmutable::parse('2026-09-24'));
+
+        self::assertNull($match);
+    }
+
+    /** Quando o valor não bate na regra travada, uma regra sem valor (mais genérica, padrão diferente) ainda pode assumir o casamento. */
+    public function test_regra_sem_valor_assume_quando_a_regra_com_valor_nao_bate(): void
+    {
+        [$perfil] = $this->criarPerfil();
+        $generica = ExpenseCategory::factory()->create(['name' => 'Genérica']);
+        $comValor = ExpenseCategory::factory()->create(['name' => 'Com valor']);
+        ExpenseCategorizationRule::factory()->for($perfil, 'profile')->create(['pattern' => 'PIX', 'category_id' => $generica->id]);
+        ExpenseCategorizationRule::factory()->for($perfil, 'profile')->create(['pattern' => 'PIX MARCELO', 'amount' => '199.58', 'category_id' => $comValor->id]);
+
+        $match = app(CategorizationRuleMatcher::class)->matchExpense('PIX MARCELO MULLER 24/09', CarbonImmutable::parse('2026-09-24'), '50.00');
+
+        self::assertSame($generica->id, $match['category_id']);
+    }
+
+    /** Regra com valor vence a sem valor mesmo com padrão mais curto — travar o valor é sinal de mais específica, não o tamanho do texto. */
+    public function test_regra_com_valor_vence_regra_sem_valor_mesmo_com_padrao_mais_curto(): void
+    {
+        [$perfil] = $this->criarPerfil();
+        $generica = ExpenseCategory::factory()->create(['name' => 'Genérica']);
+        $comValor = ExpenseCategory::factory()->create(['name' => 'Com valor']);
+        ExpenseCategorizationRule::factory()->for($perfil, 'profile')->create(['pattern' => 'PIX MARCELO MULLER LONGO', 'category_id' => $generica->id]);
+        ExpenseCategorizationRule::factory()->for($perfil, 'profile')->create(['pattern' => 'PIX', 'amount' => '199.58', 'category_id' => $comValor->id]);
+
+        $match = app(CategorizationRuleMatcher::class)->matchExpense('PIX MARCELO MULLER LONGO', CarbonImmutable::parse('2026-09-24'), '199.58');
+
+        self::assertSame($comValor->id, $match['category_id']);
+    }
+
+    public function test_matchincome_tambem_respeita_valor_exato(): void
+    {
+        [$perfil] = $this->criarPerfil();
+        $categoria = IncomeCategory::factory()->create();
+        IncomeCategorizationRule::factory()->for($perfil, 'profile')->create([
+            'pattern' => 'REEMBOLSO', 'amount' => '500.00', 'category_id' => $categoria->id,
+        ]);
+
+        $bate = app(CategorizationRuleMatcher::class)->matchIncome('REEMBOLSO VIAGEM', CarbonImmutable::parse('2026-09-05'), '500.00');
+        self::assertNotNull($bate);
+
+        $naoBate = app(CategorizationRuleMatcher::class)->matchIncome('REEMBOLSO VIAGEM', CarbonImmutable::parse('2026-09-05'), '10.00');
+        self::assertNull($naoBate);
+    }
+
     /** @return array{0: FinancialProfile} */
     private function criarPerfil(): array
     {

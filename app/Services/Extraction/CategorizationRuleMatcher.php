@@ -28,9 +28,9 @@ class CategorizationRuleMatcher
     /**
      * @return array{rule: ExpenseCategorizationRule, category_id: string, subcategory_id: ?string, necessity: \App\Enums\Necessity, fixed_bill_payment: ?FixedBillPayment}|null
      */
-    public function matchExpense(string $descricao, CarbonImmutable $data): ?array
+    public function matchExpense(string $descricao, CarbonImmutable $data, ?string $valor = null): ?array
     {
-        $regra = $this->bestRule(ExpenseCategorizationRule::query()->active()->get(), $descricao);
+        $regra = $this->bestRule(ExpenseCategorizationRule::query()->active()->get(), $descricao, $valor);
 
         if ($regra === null) {
             return null;
@@ -50,9 +50,9 @@ class CategorizationRuleMatcher
     /**
      * @return array{rule: IncomeCategorizationRule, category_id: string, recurring_income_occurrence: ?RecurringIncomeOccurrence}|null
      */
-    public function matchIncome(string $descricao, CarbonImmutable $data): ?array
+    public function matchIncome(string $descricao, CarbonImmutable $data, ?string $valor = null): ?array
     {
-        $regra = $this->bestRule(IncomeCategorizationRule::query()->active()->get(), $descricao);
+        $regra = $this->bestRule(IncomeCategorizationRule::query()->active()->get(), $descricao, $valor);
 
         if ($regra === null) {
             return null;
@@ -69,20 +69,24 @@ class CategorizationRuleMatcher
 
     /**
      * "Contém", sem diferenciar maiúscula/minúscula — descrição de extrato
-     * sempre tem ruído (data, ID de transação) junto do nome. Quando mais de
-     * uma regra bate, vence a mais específica (padrão mais longo); empate,
-     * a mais antiga.
+     * sempre tem ruído (data, ID de transação) junto do nome. Quando a
+     * regra tem `amount`, ele é uma condição obrigatória (não só um
+     * desempate): sem valor de item pra comparar, ou com valor diferente,
+     * a regra simplesmente não serve. Entre as que sobram, vence a mais
+     * específica — primeiro quem tem valor travado, depois o padrão mais
+     * longo; empate, a mais antiga.
      *
      * @template T of ExpenseCategorizationRule|IncomeCategorizationRule
      *
      * @param  Collection<int, T>  $regras
      * @return T|null
      */
-    private function bestRule(Collection $regras, string $descricao)
+    private function bestRule(Collection $regras, string $descricao, ?string $valor = null)
     {
         return $regras
             ->filter(fn ($regra) => mb_stripos($descricao, $regra->pattern) !== false)
-            ->sort(fn ($a, $b) => [mb_strlen($b->pattern), $a->created_at] <=> [mb_strlen($a->pattern), $b->created_at])
+            ->filter(fn ($regra) => $regra->amount === null || ($valor !== null && bccomp($regra->amount, $valor, 2) === 0))
+            ->sort(fn ($a, $b) => [$b->amount !== null, mb_strlen($b->pattern), $a->created_at] <=> [$a->amount !== null, mb_strlen($a->pattern), $b->created_at])
             ->first();
     }
 

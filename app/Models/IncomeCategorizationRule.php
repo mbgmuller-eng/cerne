@@ -14,7 +14,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * Espelho de ExpenseCategorizationRule do lado da receita — sem
  * subcategoria/necessidade, que não existem em IncomeCategory/IncomeRecord.
  */
-#[Fillable(['profile_id', 'pattern', 'category_id', 'recurring_income_id', 'is_active'])]
+#[Fillable(['profile_id', 'pattern', 'amount', 'category_id', 'recurring_income_id', 'is_active'])]
 class IncomeCategorizationRule extends Model
 {
     use BelongsToProfile, HasFactory, HasUuids;
@@ -22,6 +22,7 @@ class IncomeCategorizationRule extends Model
     protected function casts(): array
     {
         return [
+            'amount' => 'decimal:2',
             'is_active' => 'boolean',
         ];
     }

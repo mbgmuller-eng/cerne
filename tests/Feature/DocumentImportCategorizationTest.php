@@ -17,6 +17,8 @@ use App\Models\ExpenseSubcategory;
 use App\Models\FinancialProfile;
 use App\Models\FixedBill;
 use App\Models\FixedBillPayment;
+use App\Models\IncomeCategorizationRule;
+use App\Models\IncomeCategory;
 use App\Models\IncomeRecord;
 use App\Models\ProfileMember;
 use App\Models\User;
@@ -227,6 +229,42 @@ class DocumentImportCategorizationTest extends TestCase
     }
 
     /**
+     * Motivado por um caso real: extrato com mais de um gasto pra uma
+     * subcategoria que ainda não existe — antes, a pessoa só via a
+     * subcategoria nova no <select> depois de confirmar a importação
+     * inteira (ela só nascia no commit). Criando na hora (wire:blur), ela
+     * já aparece pra escolher no item seguinte, sem esperar nada.
+     */
+    public function test_criar_subcategoria_ao_sair_do_campo_fica_disponivel_pros_outros_itens(): void
+    {
+        [$perfil, $membro] = $this->criarPerfil();
+        $conta = BankAccount::factory()->for($perfil, 'profile')->for($membro, 'member')->create();
+        $categoria = ExpenseCategory::factory()->create(['necessity' => null]);
+
+        $documento = $this->criarExtrato($perfil, $membro, $conta, [
+            ['data' => '2026-09-10', 'descricao' => 'PRESENTE ANIVERSARIO 1', 'valor' => '80.00', 'tipo' => 'despesa', 'categoria_sugerida' => null],
+            ['data' => '2026-09-12', 'descricao' => 'PRESENTE ANIVERSARIO 2', 'valor' => '45.00', 'tipo' => 'despesa', 'categoria_sugerida' => null],
+        ]);
+
+        $component = Livewire::test(DocumentsIndex::class)
+            ->call('revisar', $documento->id)
+            ->set('categoriaPorItem.0', $categoria->id)
+            ->set('novaSubcategoriaPorItem.0', 'Presentes')
+            ->call('criarSubcategoriaAgora', 0);
+
+        $subcategoria = ExpenseSubcategory::where('name', 'Presentes')->where('category_id', $categoria->id)->sole();
+
+        // Já foi selecionada pro próprio item, e o texto livre foi limpo.
+        self::assertSame($subcategoria->id, $component->get('subcategoriaPorItem')[0]);
+        self::assertSame('', $component->get('novaSubcategoriaPorItem')[0]);
+
+        // Escolhendo a mesma categoria no item seguinte, "Presentes" já
+        // aparece como opção no <select> — sem precisar digitar de novo.
+        $component->set('categoriaPorItem.1', $categoria->id)
+            ->assertSee('Presentes');
+    }
+
+    /**
      * Motivado por um caso real: extrato de agosto reimportado num mês que
      * já tinha bastante coisa lançada — mesma conta, mesma data, mesmo
      * valor de um lançamento que já existe é sinal forte de duplicata.
@@ -323,6 +361,147 @@ class DocumentImportCategorizationTest extends TestCase
             ->assertSee('Possível duplicata', false);
 
         self::assertNotContains(0, $component->get('aceitos'));
+    }
+
+    /**
+     * Motivado por um caso real: PIX mensal pra si mesmo, sem regra
+     * nenhuma que bata — marca "criar regra também" na hora de revisar e
+     * confirmar já deixa a regra pronta pra próxima importação, sem
+     * precisar ir até a tela de Regras depois.
+     */
+    public function test_criar_regra_tambem_ao_confirmar_cadastra_a_regra_de_despesa(): void
+    {
+        [$perfil, $membro] = $this->criarPerfil();
+        $conta = BankAccount::factory()->for($perfil, 'profile')->for($membro, 'member')->create();
+        $categoria = ExpenseCategory::factory()->create(['necessity' => null]);
+        $subcategoria = ExpenseSubcategory::factory()->create(['category_id' => $categoria->id]);
+
+        $documento = $this->criarExtrato($perfil, $membro, $conta, [
+            ['data' => '2026-09-24', 'descricao' => 'PIX ENVIADO MARCELO MULLER', 'valor' => '199.58', 'tipo' => 'despesa', 'categoria_sugerida' => null],
+        ]);
+
+        Livewire::test(DocumentsIndex::class)
+            ->call('revisar', $documento->id)
+            ->set('necessidadePorItem.0', 'essential')
+            ->set('categoriaPorItem.0', $categoria->id)
+            ->set('subcategoriaPorItem.0', $subcategoria->id)
+            ->set('criarRegraPorItem.0', true)
+            ->set('regraPatternPorItem.0', 'PIX ENVIADO MARCELO')
+            ->set('regraValorExatoPorItem.0', true)
+            ->call('confirmar')
+            ->assertHasNoErrors();
+
+        $regra = ExpenseCategorizationRule::sole();
+        self::assertSame('PIX ENVIADO MARCELO', $regra->pattern);
+        self::assertSame('199.58', $regra->amount);
+        self::assertSame($categoria->id, $regra->category_id);
+        self::assertSame($subcategoria->id, $regra->subcategory_id);
+        self::assertSame(Necessity::Essential, $regra->necessity);
+    }
+
+    public function test_criar_regra_sem_travar_valor_deixa_amount_nulo(): void
+    {
+        [$perfil, $membro] = $this->criarPerfil();
+        $conta = BankAccount::factory()->for($perfil, 'profile')->for($membro, 'member')->create();
+        $categoria = ExpenseCategory::factory()->create(['necessity' => null]);
+        $subcategoria = ExpenseSubcategory::factory()->create(['category_id' => $categoria->id]);
+
+        $documento = $this->criarExtrato($perfil, $membro, $conta, [
+            ['data' => '2026-09-24', 'descricao' => 'UBER TRIP 123', 'valor' => '35.00', 'tipo' => 'despesa', 'categoria_sugerida' => null],
+        ]);
+
+        Livewire::test(DocumentsIndex::class)
+            ->call('revisar', $documento->id)
+            ->set('necessidadePorItem.0', 'discretionary')
+            ->set('categoriaPorItem.0', $categoria->id)
+            ->set('subcategoriaPorItem.0', $subcategoria->id)
+            ->set('criarRegraPorItem.0', true)
+            ->set('regraPatternPorItem.0', 'UBER')
+            ->call('confirmar')
+            ->assertHasNoErrors();
+
+        self::assertNull(ExpenseCategorizationRule::sole()->amount);
+    }
+
+    /** Marcar "criar regra" pré-preenche o padrão com a descrição (ver test_criar_regra_tambem_ao_confirmar_cadastra_a_regra_de_despesa) — o bloqueio cobre quem apaga esse texto de propósito e tenta confirmar mesmo assim. */
+    public function test_criar_regra_marcado_com_padrao_apagado_bloqueia_o_confirmar(): void
+    {
+        [$perfil, $membro] = $this->criarPerfil();
+        $conta = BankAccount::factory()->for($perfil, 'profile')->for($membro, 'member')->create();
+        $categoria = ExpenseCategory::factory()->create(['necessity' => null]);
+        $subcategoria = ExpenseSubcategory::factory()->create(['category_id' => $categoria->id]);
+
+        $documento = $this->criarExtrato($perfil, $membro, $conta, [
+            ['data' => '2026-09-24', 'descricao' => 'UBER TRIP 123', 'valor' => '35.00', 'tipo' => 'despesa', 'categoria_sugerida' => null],
+        ]);
+
+        Livewire::test(DocumentsIndex::class)
+            ->call('revisar', $documento->id)
+            ->set('necessidadePorItem.0', 'discretionary')
+            ->set('categoriaPorItem.0', $categoria->id)
+            ->set('subcategoriaPorItem.0', $subcategoria->id)
+            ->set('criarRegraPorItem.0', true)
+            ->set('regraPatternPorItem.0', '')
+            ->call('confirmar')
+            ->assertHasErrors('confirmar');
+
+        self::assertSame(0, ExpenseCategorizationRule::count());
+        self::assertSame(0, ExpenseRecord::count());
+    }
+
+    /** Padrão já usado por outra regra: updateOrCreate atualiza em vez de duplicar (padrão é único por perfil). */
+    public function test_criar_regra_com_padrao_ja_existente_atualiza_a_regra_em_vez_de_duplicar(): void
+    {
+        [$perfil, $membro] = $this->criarPerfil();
+        $conta = BankAccount::factory()->for($perfil, 'profile')->for($membro, 'member')->create();
+        $categoriaAntiga = ExpenseCategory::factory()->create(['necessity' => null]);
+        $categoriaNova = ExpenseCategory::factory()->create(['necessity' => null]);
+        $subcategoriaNova = ExpenseSubcategory::factory()->create(['category_id' => $categoriaNova->id]);
+        ExpenseCategorizationRule::factory()->for($perfil, 'profile')->create([
+            'pattern' => 'UBER', 'category_id' => $categoriaAntiga->id,
+        ]);
+
+        $documento = $this->criarExtrato($perfil, $membro, $conta, [
+            ['data' => '2026-09-24', 'descricao' => 'UBER TRIP 123', 'valor' => '35.00', 'tipo' => 'despesa', 'categoria_sugerida' => null],
+        ]);
+
+        Livewire::test(DocumentsIndex::class)
+            ->call('revisar', $documento->id)
+            ->set('necessidadePorItem.0', 'discretionary')
+            ->set('categoriaPorItem.0', $categoriaNova->id)
+            ->set('subcategoriaPorItem.0', $subcategoriaNova->id)
+            ->set('criarRegraPorItem.0', true)
+            ->set('regraPatternPorItem.0', 'UBER')
+            ->call('confirmar')
+            ->assertHasNoErrors();
+
+        $regra = ExpenseCategorizationRule::sole();
+        self::assertSame($categoriaNova->id, $regra->category_id);
+    }
+
+    public function test_criar_regra_tambem_funciona_pra_receita(): void
+    {
+        [$perfil, $membro] = $this->criarPerfil();
+        $conta = BankAccount::factory()->for($perfil, 'profile')->for($membro, 'member')->create();
+        $categoria = IncomeCategory::factory()->create();
+
+        $documento = $this->criarExtrato($perfil, $membro, $conta, [
+            ['data' => '2026-09-05', 'descricao' => 'REEMBOLSO EMPRESA X', 'valor' => '500.00', 'tipo' => 'receita', 'categoria_sugerida' => null],
+        ]);
+
+        Livewire::test(DocumentsIndex::class)
+            ->call('revisar', $documento->id)
+            ->set('categoriaPorItem.0', $categoria->id)
+            ->set('criarRegraPorItem.0', true)
+            ->set('regraPatternPorItem.0', 'REEMBOLSO')
+            ->set('regraValorExatoPorItem.0', true)
+            ->call('confirmar')
+            ->assertHasNoErrors();
+
+        $regra = IncomeCategorizationRule::sole();
+        self::assertSame('REEMBOLSO', $regra->pattern);
+        self::assertSame('500.00', $regra->amount);
+        self::assertSame($categoria->id, $regra->category_id);
     }
 
     /** @param  list<array<string, mixed>>  $itens */

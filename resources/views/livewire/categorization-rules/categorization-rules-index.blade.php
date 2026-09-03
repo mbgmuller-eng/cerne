@@ -1,4 +1,5 @@
 @use('App\Enums\Necessity')
+@use('App\Support\Money')
 
 <div class="space-y-6">
 
@@ -60,11 +61,18 @@
                 </div>
 
                 <div class="grid gap-4 @sm:grid-cols-2 @lg:grid-cols-3">
-                    <div class="@sm:col-span-2 @lg:col-span-3">
+                    <div class="@sm:col-span-2">
                         <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Descrição contém</label>
                         <input type="text" wire:model="expensePattern" class="input mt-1.5" placeholder="Ex.: ADRIANA">
                         @error('expensePattern') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
                         <p class="mt-1 text-xs text-slate-400">Sem diferenciar maiúscula/minúscula. Casa em qualquer parte da descrição do extrato.</p>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Valor exato (opcional)</label>
+                        <input type="number" step="0.01" min="0.01" wire:model="expenseAmount" class="input mt-1.5" placeholder="Qualquer valor">
+                        @error('expenseAmount') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                        <p class="mt-1 text-xs text-slate-400">Preenchido, a regra só casa quando o valor bater exatamente.</p>
                     </div>
 
                     <div>
@@ -136,6 +144,7 @@
                                 {{ $regra->category->name }}
                                 @if ($regra->subcategory) › {{ $regra->subcategory->name }} @endif
                                 · {{ $regra->necessity->label() }}
+                                @if ($regra->amount) · valor exato: {{ Money::format($regra->amount) }} @endif
                                 @if ($regra->fixedBill) · conta fixa: {{ $regra->fixedBill->name }} @endif
                             </p>
                         </div>
@@ -180,10 +189,16 @@
                 </div>
 
                 <div class="grid gap-4 @sm:grid-cols-2 @lg:grid-cols-3">
-                    <div class="@sm:col-span-2 @lg:col-span-3">
+                    <div class="@sm:col-span-2">
                         <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Descrição contém</label>
                         <input type="text" wire:model="incomePattern" class="input mt-1.5">
                         @error('incomePattern') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Valor exato (opcional)</label>
+                        <input type="number" step="0.01" min="0.01" wire:model="incomeAmount" class="input mt-1.5" placeholder="Qualquer valor">
+                        @error('incomeAmount') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
                     </div>
 
                     <div>
@@ -228,6 +243,7 @@
                             <p class="truncate text-sm font-medium text-slate-800 dark:text-slate-200">"{{ $regra->pattern }}"</p>
                             <p class="truncate text-xs text-slate-500 dark:text-slate-400">
                                 {{ $regra->category->name }}
+                                @if ($regra->amount) · valor exato: {{ Money::format($regra->amount) }} @endif
                                 @if ($regra->recurringIncome) · receita recorrente: {{ $regra->recurringIncome->name }} @endif
                             </p>
                         </div>

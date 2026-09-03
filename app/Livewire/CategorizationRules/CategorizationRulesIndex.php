@@ -54,6 +54,9 @@ class CategorizationRulesIndex extends Component
 
     public string $expensePattern = '';
 
+    /** Opcional — quando preenchido, a regra só casa se o valor do item bater exatamente (ver CategorizationRuleMatcher). */
+    public string $expenseAmount = '';
+
     public string $expenseCategoryId = '';
 
     public string $expenseSubcategoryId = '';
@@ -73,6 +76,9 @@ class CategorizationRulesIndex extends Component
     public ?string $editingIncomeRuleId = null;
 
     public string $incomePattern = '';
+
+    /** Opcional — mesmo raciocínio de $expenseAmount. */
+    public string $incomeAmount = '';
 
     public string $incomeCategoryId = '';
 
@@ -124,6 +130,7 @@ class CategorizationRulesIndex extends Component
 
         $this->editingExpenseRuleId = $regra->id;
         $this->expensePattern = $regra->pattern;
+        $this->expenseAmount = $regra->amount ?? '';
         $this->expenseCategoryId = $regra->category_id;
         $this->expenseSubcategoryId = (string) $regra->subcategory_id;
         $this->expenseNecessity = $regra->necessity->value;
@@ -135,6 +142,7 @@ class CategorizationRulesIndex extends Component
     {
         $data = $this->validate([
             'expensePattern' => ['required', 'string', 'max:255'],
+            'expenseAmount' => ['nullable', 'numeric', 'gt:0'],
             'expenseCategoryId' => ['required'],
             // Subcategoria é obrigatória — só não existe pra necessidade
             // Investimento, que nem mostra o campo.
@@ -143,6 +151,7 @@ class CategorizationRulesIndex extends Component
             'expenseFixedBillId' => ['nullable'],
         ], attributes: [
             'expensePattern' => 'padrão',
+            'expenseAmount' => 'valor exato',
             'expenseCategoryId' => 'categoria',
             'expenseSubcategoryId' => 'subcategoria',
             'expenseNecessity' => 'necessidade',
@@ -158,6 +167,7 @@ class CategorizationRulesIndex extends Component
 
         $payload = [
             'pattern' => $data['expensePattern'],
+            'amount' => $this->expenseAmount !== '' ? $data['expenseAmount'] : null,
             'category_id' => $categoria->id,
             'subcategory_id' => $subcategoria?->id,
             'necessity' => $data['expenseNecessity'],
@@ -200,7 +210,7 @@ class CategorizationRulesIndex extends Component
     private function resetExpenseForm(): void
     {
         $this->reset(
-            'editingExpenseRuleId', 'expensePattern', 'expenseCategoryId',
+            'editingExpenseRuleId', 'expensePattern', 'expenseAmount', 'expenseCategoryId',
             'expenseSubcategoryId', 'expenseFixedBillId',
         );
         $this->expenseNecessity = 'essential';
@@ -226,6 +236,7 @@ class CategorizationRulesIndex extends Component
 
         $this->editingIncomeRuleId = $regra->id;
         $this->incomePattern = $regra->pattern;
+        $this->incomeAmount = $regra->amount ?? '';
         $this->incomeCategoryId = $regra->category_id;
         $this->incomeRecurringIncomeId = (string) $regra->recurring_income_id;
         $this->showIncomeForm = true;
@@ -235,10 +246,12 @@ class CategorizationRulesIndex extends Component
     {
         $data = $this->validate([
             'incomePattern' => ['required', 'string', 'max:255'],
+            'incomeAmount' => ['nullable', 'numeric', 'gt:0'],
             'incomeCategoryId' => ['required'],
             'incomeRecurringIncomeId' => ['nullable'],
         ], attributes: [
             'incomePattern' => 'padrão',
+            'incomeAmount' => 'valor exato',
             'incomeCategoryId' => 'categoria',
         ]);
 
@@ -249,6 +262,7 @@ class CategorizationRulesIndex extends Component
 
         $payload = [
             'pattern' => $data['incomePattern'],
+            'amount' => $this->incomeAmount !== '' ? $data['incomeAmount'] : null,
             'category_id' => $categoria->id,
             'recurring_income_id' => $receitaRecorrente?->id,
         ];
@@ -286,7 +300,7 @@ class CategorizationRulesIndex extends Component
 
     private function resetIncomeForm(): void
     {
-        $this->reset('editingIncomeRuleId', 'incomePattern', 'incomeCategoryId', 'incomeRecurringIncomeId');
+        $this->reset('editingIncomeRuleId', 'incomePattern', 'incomeAmount', 'incomeCategoryId', 'incomeRecurringIncomeId');
         $this->resetErrorBag();
     }
 

@@ -185,6 +185,8 @@
                                                 <input
                                                     type="text"
                                                     wire:model="novaSubcategoriaPorItem.{{ $i }}"
+                                                    wire:blur="criarSubcategoriaAgora({{ $i }})"
+                                                    wire:keydown.enter.prevent="criarSubcategoriaAgora({{ $i }})"
                                                     placeholder="ou crie uma"
                                                     class="input mt-1 w-full py-1 text-xs"
                                                     @if (($categoriaPorItem[$i] ?? '') === '') disabled @endif
@@ -194,22 +196,43 @@
                                     @endif
                                 </tr>
 
-                                @if ($temCategorizacao && ($faltaCategorizar || ($duplicataPorItem[$i] ?? null) || ($regraAplicadaPorItem[$i] ?? null) || ($notaPorItem[$i] ?? null)))
+                                @if ($temCategorizacao)
                                     <tr class="{{ in_array($i, $aceitos) ? '' : 'opacity-40' }}">
                                         <td></td>
                                         <td colspan="{{ count($item) + 3 }}" class="px-3 pb-2 text-xs">
-                                            <div class="flex flex-wrap gap-x-3 gap-y-1">
-                                                @if ($faltaCategorizar)
-                                                    <span class="font-medium text-amber-700 dark:text-amber-400">Falta categorizar</span>
-                                                @endif
-                                                @if ($duplicataPorItem[$i] ?? null)
-                                                    <span class="font-medium text-red-700 dark:text-red-400">{{ $duplicataPorItem[$i] }}</span>
-                                                @endif
-                                                @if ($regraAplicadaPorItem[$i] ?? null)
-                                                    <span class="text-slate-500 dark:text-slate-400">Categorizado pela regra "{{ $regraAplicadaPorItem[$i] }}"</span>
-                                                @endif
-                                                @if ($notaPorItem[$i] ?? null)
-                                                    <span class="text-brand-700 dark:text-brand-300">{{ $notaPorItem[$i] }}</span>
+                                            @if ($faltaCategorizar || ($duplicataPorItem[$i] ?? null) || ($regraAplicadaPorItem[$i] ?? null) || ($notaPorItem[$i] ?? null))
+                                                <div class="flex flex-wrap gap-x-3 gap-y-1">
+                                                    @if ($faltaCategorizar)
+                                                        <span class="font-medium text-amber-700 dark:text-amber-400">Falta categorizar</span>
+                                                    @endif
+                                                    @if ($duplicataPorItem[$i] ?? null)
+                                                        <span class="font-medium text-red-700 dark:text-red-400">{{ $duplicataPorItem[$i] }}</span>
+                                                    @endif
+                                                    @if ($regraAplicadaPorItem[$i] ?? null)
+                                                        <span class="text-slate-500 dark:text-slate-400">Categorizado pela regra "{{ $regraAplicadaPorItem[$i] }}"</span>
+                                                    @endif
+                                                    @if ($notaPorItem[$i] ?? null)
+                                                        <span class="text-brand-700 dark:text-brand-300">{{ $notaPorItem[$i] }}</span>
+                                                    @endif
+                                                </div>
+                                            @endif
+
+                                            <div class="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
+                                                <label class="inline-flex items-center gap-1.5 text-slate-500 dark:text-slate-400">
+                                                    <input type="checkbox" wire:model.live="criarRegraPorItem.{{ $i }}" class="rounded border-slate-300 dark:border-slate-600 text-brand-700 dark:text-brand-400 focus:ring-brand-500">
+                                                    Criar regra de categorização também
+                                                </label>
+                                                @if ($criarRegraPorItem[$i] ?? false)
+                                                    <input
+                                                        type="text"
+                                                        wire:model="regraPatternPorItem.{{ $i }}"
+                                                        placeholder="Padrão da regra"
+                                                        class="input w-40 py-1 text-xs"
+                                                    >
+                                                    <label class="inline-flex items-center gap-1.5 text-slate-500 dark:text-slate-400">
+                                                        <input type="checkbox" wire:model="regraValorExatoPorItem.{{ $i }}" class="rounded border-slate-300 dark:border-slate-600 text-brand-700 dark:text-brand-400 focus:ring-brand-500">
+                                                        só quando o valor for exatamente {{ Money::format($item['valor'] ?? 0) }}
+                                                    </label>
                                                 @endif
                                             </div>
                                         </td>
