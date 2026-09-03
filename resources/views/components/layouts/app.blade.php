@@ -31,6 +31,10 @@
     $dentroDoPerfil = $profile && ! $areaConsultor && ! $areaAdmin;
     $mostraAsideDesktop = $dentroDoPerfil || $areaConsultor || $areaAdmin;
 
+    // Só conta se for mesmo relevante — poupa uma query em toda página
+    // pra quem não é admin.
+    $bancosPendentes = $user?->isPlatformAdmin() ? \App\Models\Bank::withoutTaxonomyScope()->pending()->count() : 0;
+
     // Preferência de tema da CONTA, não do navegador — ver
     // App\Enums\ThemePreference e resources/js/app.js.
     $theme = $user?->theme ?? \App\Enums\ThemePreference::System;
@@ -227,6 +231,13 @@
                 <a href="{{ route('admin.users') }}" @class(['nav-item', 'nav-item-active' => request()->routeIs('admin.users')])>
                     <x-nav-icon name="admin" />
                     <span>Contas e perfis</span>
+                </a>
+                <a href="{{ route('admin.banks') }}" @class(['nav-item', 'nav-item-active' => request()->routeIs('admin.banks')])>
+                    <x-nav-icon name="cards" />
+                    <span>Bancos</span>
+                    @if ($bancosPendentes > 0)
+                        <span class="badge ml-auto bg-amber-50 text-amber-900 ring-1 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-300 dark:ring-amber-500/20">{{ $bancosPendentes }}</span>
+                    @endif
                 </a>
 
                 @if ($user->isConsultant())

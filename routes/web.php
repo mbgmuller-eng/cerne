@@ -9,6 +9,7 @@ use App\Http\Controllers\PushSubscriptionController;
 use App\Http\Controllers\PwaController;
 use App\Http\Controllers\ThemePreferenceController;
 use App\Livewire\Accounts\AccountsIndex;
+use App\Livewire\Admin\AdminBanks;
 use App\Livewire\Admin\AdminUsers;
 use App\Livewire\Accounts\InvoiceShow;
 use App\Livewire\CashFlow\CashFlowIndex;
@@ -75,6 +76,7 @@ Route::middleware('auth')->group(function (): void {
     // Gestão de toda a plataforma — gate é isPlatformAdmin() dentro do
     // mount() do componente, mesmo padrão de PortfolioOverview::mount().
     Route::get('/admin', AdminUsers::class)->name('admin.users');
+    Route::get('/admin/bancos', AdminBanks::class)->name('admin.banks');
 
     // Vínculo consultor↔cliente quando o e-mail convidado já tem conta —
     // ver ConsultantLinkService. Só "show" carrega assinatura (vem do

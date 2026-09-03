@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Livewire\Accounts\AccountsIndex;
+use App\Models\Bank;
 use App\Models\BankAccount;
 use App\Models\CreditCard;
 use App\Models\ExpenseRecord;
@@ -231,6 +232,25 @@ class AccountsCrudTest extends TestCase
             ->set('accountColor', '#123456')
             ->set('accountBankName', 'Banco da Esquina Ltda')
             ->assertSet('accountColor', '#123456');
+    }
+
+    public function test_cadastrar_conta_com_banco_desconhecido_funciona_e_vira_sugestao(): void
+    {
+        [$perfil, $membro] = $this->criarPerfil();
+
+        Livewire::test(AccountsIndex::class)
+            ->set('accountBankName', 'Cooperativa do Vale')
+            ->set('accountType', 'checking')
+            ->set('accountBalance', '100.00')
+            ->set('accountMemberId', $membro->id)
+            ->set('accountColor', '#0F766E')
+            ->call('saveAccount')
+            ->assertHasNoErrors();
+
+        self::assertTrue(BankAccount::withoutProfileScope()->where('bank_name', 'Cooperativa do Vale')->exists());
+
+        $sugestao = Bank::query()->where('name', 'Cooperativa do Vale')->sole();
+        self::assertSame($perfil->id, $sugestao->profile_id);
     }
 
     public function test_editar_conta_nao_sobrescreve_a_cor_ja_salva(): void

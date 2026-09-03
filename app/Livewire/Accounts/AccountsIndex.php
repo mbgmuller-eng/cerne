@@ -6,11 +6,11 @@ use App\Enums\AccountType;
 use App\Enums\CardBrand;
 use App\Livewire\Concerns\HasPrivacyTabs;
 use App\Livewire\Concerns\RequiresActiveProfile;
+use App\Models\Bank;
 use App\Models\BankAccount;
 use App\Models\CreditCard;
 use App\Models\CreditCardInvoice;
 use App\Models\ProfileMember;
-use App\Support\KnownBanks;
 use App\Support\Money;
 use App\Support\ProfileContext;
 use Illuminate\Database\Eloquent\Builder;
@@ -120,7 +120,7 @@ class AccountsIndex extends Component
      */
     public function updatedAccountBankName(string $value): void
     {
-        $cor = KnownBanks::colorFor($value);
+        $cor = Bank::colorFor($value);
 
         if ($cor !== null) {
             $this->accountColor = $cor;
@@ -129,7 +129,7 @@ class AccountsIndex extends Component
 
     public function updatedCardBankName(string $value): void
     {
-        $cor = KnownBanks::colorFor($value);
+        $cor = Bank::colorFor($value);
 
         if ($cor !== null) {
             $this->cardColor = $cor;
@@ -189,6 +189,7 @@ class AccountsIndex extends Component
         ]);
 
         $memberId = $this->resolveMembro($data['accountMemberId'], 'accountMemberId');
+        Bank::resolveOrSuggest($data['accountBankName']);
 
         $payload = [
             'bank_name' => $data['accountBankName'],
@@ -326,6 +327,7 @@ class AccountsIndex extends Component
         ]);
 
         $memberId = $this->resolveMembro($data['cardMemberId'], 'cardMemberId');
+        Bank::resolveOrSuggest($data['cardBankName']);
 
         $payload = [
             'card_name' => $data['cardName'],
@@ -530,7 +532,7 @@ class AccountsIndex extends Component
                 ->where('is_active', true)
                 ->orderBy('name')
                 ->get(),
-            'knownBanks' => KnownBanks::names(),
+            'knownBanks' => Bank::names(),
         ]);
     }
 }
