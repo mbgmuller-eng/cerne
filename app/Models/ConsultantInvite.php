@@ -34,14 +34,18 @@ class ConsultantInvite extends Model
      * Cria o convite e devolve o token em claro junto — é a única vez que
      * ele existe fora do hash. O chamador monta o link com ele.
      *
+     * $consultant nulo é o convite emitido pelo painel admin: a conta
+     * nasce sem nenhum vínculo de consultor (ver ClientOnboardingService::
+     * acceptInvite()).
+     *
      * @return array{invite: self, token: string}
      */
-    public static function issue(User $consultant, string $name, string $email): array
+    public static function issue(?User $consultant, string $name, string $email): array
     {
         $plainToken = Str::random(48);
 
         $invite = self::create([
-            'consultant_id' => $consultant->id,
+            'consultant_id' => $consultant?->id,
             'client_name' => $name,
             'client_email' => $email,
             'token' => hash('sha256', $plainToken),

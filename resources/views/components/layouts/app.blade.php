@@ -27,8 +27,9 @@
     // último cliente aberto (guardado na sessão) continuava ditando o menu
     // de navegação mesmo aqui, como se ainda estivéssemos dentro dele.
     $areaConsultor = request()->routeIs('consultant.*');
-    $dentroDoPerfil = $profile && ! $areaConsultor;
-    $mostraAsideDesktop = $dentroDoPerfil || $areaConsultor;
+    $areaAdmin = request()->routeIs('admin.*');
+    $dentroDoPerfil = $profile && ! $areaConsultor && ! $areaAdmin;
+    $mostraAsideDesktop = $dentroDoPerfil || $areaConsultor || $areaAdmin;
 
     // Preferência de tema da CONTA, não do navegador — ver
     // App\Enums\ThemePreference e resources/js/app.js.
@@ -143,6 +144,13 @@
                     </a>
                 @endif
 
+                @if ($user->isPlatformAdmin())
+                    <a href="{{ route('admin.users') }}" class="nav-item mt-1">
+                        <x-nav-icon name="admin" />
+                        <span>Painel admin</span>
+                    </a>
+                @endif
+
                 <div class="mt-2 flex justify-center">
                     <x-theme-switcher :current="$theme" />
                 </div>
@@ -172,6 +180,61 @@
                     <x-nav-icon name="flow" />
                     <span>Investimentos da carteira</span>
                 </a>
+
+                @if ($user->isPlatformAdmin())
+                    <a href="{{ route('admin.users') }}" class="nav-item mt-1">
+                        <x-nav-icon name="admin" />
+                        <span>Painel admin</span>
+                    </a>
+                @endif
+            </nav>
+
+            <div class="border-t border-brand-950/5 p-3 dark:border-white/10">
+                <div class="flex items-center gap-3 px-2 py-1.5">
+                    <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-100 text-xs font-semibold text-brand-800 dark:bg-white/10 dark:text-white">
+                        {{ mb_strtoupper(mb_substr($user->name, 0, 1)) }}
+                    </div>
+                    <div class="min-w-0 flex-1">
+                        <p class="truncate text-sm font-medium text-slate-800 dark:text-slate-100">{{ $user->name }}</p>
+                        <p class="truncate text-xs text-slate-500 dark:text-slate-400">{{ $user->email }}</p>
+                    </div>
+                    <form method="POST" action="{{ route('logout') }}">
+                        @csrf
+                        <button type="submit" class="btn-ghost px-2" title="Sair">
+                            <x-nav-icon name="logout" class="h-4 w-4" />
+                        </button>
+                    </form>
+                    <livewire:notifications.notification-center direction="up" />
+                </div>
+
+                <div class="mt-2 flex justify-center">
+                    <x-theme-switcher :current="$theme" />
+                </div>
+            </div>
+        </aside>
+    @elseif ($areaAdmin)
+        {{-- Área de gestão da plataforma: toda conta, todo perfil. --}}
+        <aside class="sticky top-0 hidden h-screen w-64 shrink-0 flex-col border-r border-brand-950/5 bg-white lg:flex dark:border-white/10 dark:bg-slate-900">
+            <div class="px-6 pt-6 pb-4">
+                <a href="{{ route('admin.users') }}" class="flex items-center gap-2">
+                    <x-brand-mark class="h-7 w-7" />
+                    <span class="font-display text-2xl font-semibold tracking-tight text-brand-800 dark:text-white">Cerne</span>
+                </a>
+                <p class="mt-1 truncate text-xs text-slate-500 dark:text-slate-400">Painel admin</p>
+            </div>
+
+            <nav class="flex-1 space-y-0.5 overflow-y-auto px-3">
+                <a href="{{ route('admin.users') }}" @class(['nav-item', 'nav-item-active' => request()->routeIs('admin.users')])>
+                    <x-nav-icon name="admin" />
+                    <span>Contas e perfis</span>
+                </a>
+
+                @if ($user->isConsultant())
+                    <a href="{{ route('consultant.portfolio') }}" class="nav-item mt-1">
+                        <x-nav-icon name="invest" />
+                        <span>Painel da carteira</span>
+                    </a>
+                @endif
             </nav>
 
             <div class="border-t border-brand-950/5 p-3 dark:border-white/10">
@@ -233,6 +296,13 @@
                         <a href="{{ route('consultant.portfolio.investments') }}" class="btn-ghost" title="Investimentos da carteira">
                             <x-nav-icon name="flow" class="h-4 w-4" />
                             <span class="ml-1.5 hidden sm:inline">Invest.</span>
+                        </a>
+                    @endif
+
+                    @if ($user?->isPlatformAdmin())
+                        <a href="{{ route('admin.users') }}" class="btn-ghost" title="Painel admin">
+                            <x-nav-icon name="admin" class="h-4 w-4" />
+                            <span class="ml-1.5 hidden sm:inline">Admin</span>
                         </a>
                     @endif
 

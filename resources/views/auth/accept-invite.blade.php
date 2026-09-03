@@ -10,7 +10,11 @@
     @else
         <h1 class="text-lg font-semibold text-slate-900 dark:text-white">Olá, {{ $invite->client_name }}</h1>
         <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
-            {{ $invite->consultant->name }} convidou você para o Cerne. Defina sua senha para começar.
+            @if ($invite->consultant)
+                {{ $invite->consultant->name }} convidou você para o Cerne. Defina sua senha para começar.
+            @else
+                Você foi convidado para o Cerne. Defina sua senha para começar.
+            @endif
         </p>
 
         <form method="POST" action="{{ route('invite.store', ['token' => $token]) }}" class="mt-6 space-y-5">

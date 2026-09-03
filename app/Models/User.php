@@ -15,7 +15,7 @@ use Illuminate\Notifications\Notifiable;
 use NotificationChannels\WebPush\HasPushSubscriptions;
 
 #[Fillable([
-    'name', 'email', 'password', 'role', 'phone', 'avatar_url', 'is_active', 'theme',
+    'name', 'email', 'password', 'role', 'phone', 'avatar_url', 'is_active', 'is_platform_admin', 'theme',
     'notify_email_enabled', 'notify_push_enabled',
 ])]
 #[Hidden(['password', 'remember_token'])]
@@ -35,6 +35,7 @@ class User extends Authenticatable
             'password' => 'hashed',
             'role' => UserRole::class,
             'is_active' => 'boolean',
+            'is_platform_admin' => 'boolean',
             'theme' => ThemePreference::class,
             'notify_email_enabled' => 'boolean',
             'notify_push_enabled' => 'boolean',
@@ -58,6 +59,17 @@ class User extends Authenticatable
     public function isClient(): bool
     {
         return $this->role === UserRole::Client;
+    }
+
+    /**
+     * Acesso ao painel /admin — independente de `role`. Um consultor
+     * continua consultor (isConsultant() acima não muda); isto só soma a
+     * tela de gestão de toda a plataforma por cima. Nasce sempre false;
+     * vira true só via `php artisan cerne:tornar-admin`.
+     */
+    public function isPlatformAdmin(): bool
+    {
+        return (bool) $this->is_platform_admin;
     }
 
     // ---------------------------------------------------------------------

@@ -18,8 +18,9 @@ use Illuminate\Support\Facades\DB;
 /**
  * Transforma um convite aceito em cliente operante.
  *
- * São cinco inserções que precisam acontecer juntas ou não acontecer:
- * usuário, perfil, membro titular, vínculo com o consultor e baixa do
+ * São até cinco inserções que precisam acontecer juntas ou não acontecer:
+ * usuário, perfil, membro titular, vínculo com o consultor (pulado quando o
+ * convite não tem consultor — ver ConsultantInvite::issue()) e baixa do
  * convite. Um cliente com perfil mas sem membro titular é um estado
  * quebrado difícil de diagnosticar depois — daí a transação.
  */
@@ -61,13 +62,19 @@ class ClientOnboardingService
                 'is_active' => true,
             ]);
 
-            ConsultantClient::create([
-                'consultant_id' => $invite->consultant_id,
-                'client_id' => $user->id,
-                'status' => ConsultantClientStatus::Active,
-                'invited_at' => $invite->created_at,
-                'accepted_at' => now(),
-            ]);
+            // Convite emitido pelo painel admin (ver ClientInviteService::
+            // sendStandalone()) não tem consultor — a conta fica
+            // deliberadamente sem vínculo nenhum, ninguém além do próprio
+            // dono enxerga os dados dela.
+            if ($invite->consultant_id !== null) {
+                ConsultantClient::create([
+                    'consultant_id' => $invite->consultant_id,
+                    'client_id' => $user->id,
+                    'status' => ConsultantClientStatus::Active,
+                    'invited_at' => $invite->created_at,
+                    'accepted_at' => now(),
+                ]);
+            }
 
             $invite->update([
                 'status' => InviteStatus::Accepted,

@@ -1,7 +1,11 @@
 <x-mail::message>
 # Olá, {{ $clientName }}
 
+@if ($consultantName)
 **{{ $consultantName }}** convidou você para acompanhar suas finanças no Cerne.
+@else
+Você foi convidado para organizar suas finanças no Cerne.
+@endif
 
 Use o botão abaixo para definir sua senha e criar seu acesso.
 

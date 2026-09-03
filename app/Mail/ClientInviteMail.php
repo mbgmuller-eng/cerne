@@ -21,7 +21,9 @@ class ClientInviteMail extends Mailable
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: "{$this->invite->consultant->name} convidou você para o Cerne",
+            subject: $this->invite->consultant
+                ? "{$this->invite->consultant->name} convidou você para o Cerne"
+                : 'Seu acesso ao Cerne está pronto',
         );
     }
 
@@ -31,7 +33,7 @@ class ClientInviteMail extends Mailable
             markdown: 'mail.client-invite',
             with: [
                 'clientName' => $this->invite->client_name,
-                'consultantName' => $this->invite->consultant->name,
+                'consultantName' => $this->invite->consultant?->name,
                 'link' => $this->link,
                 'expiresAt' => $this->invite->expires_at,
             ],
