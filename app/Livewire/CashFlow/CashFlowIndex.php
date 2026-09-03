@@ -122,6 +122,23 @@ class CashFlowIndex extends Component
     public string $expenseNotes = '';
 
     // -----------------------------------------------------------------
+    // Edição em massa — Despesa
+    // -----------------------------------------------------------------
+
+    /** Ids marcados na lista de despesas pra edição em conjunto. */
+    public array $selecionadas = [];
+
+    public bool $showBulkEditForm = false;
+
+    public string $bulkNecessity = '';
+
+    public string $bulkCategoryId = '';
+
+    public string $bulkSubcategoryId = '';
+
+    public string $bulkNewSubcategory = '';
+
+    // -----------------------------------------------------------------
     // Formulário — Receita
     // -----------------------------------------------------------------
 
@@ -168,6 +185,7 @@ class CashFlowIndex extends Component
         $anterior = $this->periodStart()->subMonth();
         $this->year = $anterior->year;
         $this->month = $anterior->month;
+        $this->selecionadas = [];
     }
 
     public function nextMonth(): void
@@ -175,11 +193,21 @@ class CashFlowIndex extends Component
         $proximo = $this->periodStart()->addMonth();
         $this->year = $proximo->year;
         $this->month = $proximo->month;
+        $this->selecionadas = [];
     }
 
     public function clearFilters(): void
     {
         $this->reset('necessity', 'categoryId', 'memberId');
+        $this->selecionadas = [];
+    }
+
+    /** Trocar o recorte (necessidade/categoria/membro) pode deixar de mostrar itens marcados — evita "N selecionadas" fantasma. */
+    public function updated(string $name): void
+    {
+        if (in_array($name, ['necessity', 'categoryId', 'memberId'], true)) {
+            $this->selecionadas = [];
+        }
     }
 
     private function periodStart(): CarbonImmutable
@@ -195,6 +223,7 @@ class CashFlowIndex extends Component
     {
         $this->showExpenseForm = ! $this->showExpenseForm;
         $this->showIncomeForm = false;
+        $this->showBulkEditForm = false;
 
         if ($this->showExpenseForm) {
             $this->resetExpenseForm();
@@ -550,6 +579,152 @@ class CashFlowIndex extends Component
     }
 
     // -----------------------------------------------------------------
+    // Edição em massa — Despesa
+    // -----------------------------------------------------------------
+
+    public function limparSelecao(): void
+    {
+        $this->selecionadas = [];
+    }
+
+    /**
+     * Motivado por um caso real: várias parcelas de previdência privada
+     * com valores diferentes (R$ 330, R$ 340...) — a oferta de "aplicar
+     * aos duplicados" (ver detectarDuplicatas()) só casa por descrição +
+     * valor EXATOS, então não pegava esse caso. Aqui a pessoa escolhe à
+     * mão quais linhas entram, não importa o valor de cada uma.
+     */
+    public function toggleBulkEditForm(): void
+    {
+        $this->showBulkEditForm = ! $this->showBulkEditForm;
+        $this->showExpenseForm = false;
+        $this->showIncomeForm = false;
+
+        if ($this->showBulkEditForm) {
+            $this->bulkNecessity = '';
+            $this->bulkCategoryId = '';
+            $this->bulkSubcategoryId = '';
+            $this->bulkNewSubcategory = '';
+            $this->resetErrorBag();
+        }
+    }
+
+    /** Mesmo raciocínio de updatedExpenseNecessity(), pro formulário de edição em massa. */
+    public function updatedBulkNecessity(): void
+    {
+        if ($this->bulkNecessity === Necessity::Investment->value) {
+            $this->bulkSubcategoryId = '';
+            $this->bulkNewSubcategory = '';
+        }
+
+        if ($this->bulkCategoryId === '' || $this->bulkFormCategories->contains('id', $this->bulkCategoryId)) {
+            return;
+        }
+
+        $this->bulkCategoryId = '';
+        $this->bulkSubcategoryId = '';
+    }
+
+    /** @return Collection<int, ExpenseCategory> */
+    public function getBulkFormCategoriesProperty(): Collection
+    {
+        return ExpenseCategory::available()
+            ->when(
+                $this->bulkNecessity === Necessity::Investment->value,
+                fn (Builder $query) => $query->where('necessity', Necessity::Investment->value),
+                fn (Builder $query) => $query->whereNull('necessity'),
+            )
+            ->get();
+    }
+
+    /** @return Collection<int, ExpenseSubcategory> */
+    public function getBulkSubcategoriesProperty(): Collection
+    {
+        if ($this->bulkCategoryId === '') {
+            return collect();
+        }
+
+        return ExpenseSubcategory::query()
+            ->where('category_id', $this->bulkCategoryId)
+            ->available()
+            ->get();
+    }
+
+    public function aplicarEdicaoEmMassa(): void
+    {
+        if ($this->selecionadas === []) {
+            return;
+        }
+
+        $data = $this->validate([
+            'bulkNecessity' => ['required', Rule::enum(Necessity::class)],
+            'bulkCategoryId' => ['required'],
+            'bulkSubcategoryId' => ['nullable'],
+            'bulkNewSubcategory' => ['nullable', 'string', 'max:255'],
+        ], attributes: [
+            'bulkNecessity' => 'necessidade',
+            'bulkCategoryId' => 'categoria',
+            'bulkSubcategoryId' => 'subcategoria',
+        ]);
+
+        $this->validarSubcategoriaObrigatoriaBulk();
+
+        $categoria = ExpenseCategory::query()->findOrFail($data['bulkCategoryId']);
+        $subcategoriaId = $this->resolveBulkSubcategoryId($categoria);
+        $atualizadas = 0;
+
+        // Um a um, não whereIn()->update() em massa — mesmo raciocínio de
+        // aplicarCategoriaAosDuplicados(): só o update() por instância
+        // dispara Auditable/InvalidatesDashboard.
+        DB::transaction(function () use ($data, $categoria, $subcategoriaId, &$atualizadas): void {
+            foreach (ExpenseRecord::query()->whereIn('id', $this->selecionadas)->get() as $despesa) {
+                if ($this->isLockedByPaidInvoice($despesa)) {
+                    continue;
+                }
+
+                $despesa->update([
+                    'necessity' => $data['bulkNecessity'],
+                    'category_id' => $categoria->id,
+                    'subcategory_id' => $subcategoriaId,
+                ]);
+                $atualizadas++;
+            }
+        });
+
+        session()->flash('status', "{$atualizadas} despesa(s) atualizada(s).");
+        $this->selecionadas = [];
+        $this->showBulkEditForm = false;
+    }
+
+    private function validarSubcategoriaObrigatoriaBulk(): void
+    {
+        if ($this->bulkNecessity === Necessity::Investment->value) {
+            return;
+        }
+
+        if ($this->bulkSubcategoryId !== '' || trim($this->bulkNewSubcategory) !== '') {
+            return;
+        }
+
+        throw ValidationException::withMessages([
+            'bulkSubcategoryId' => 'Selecione uma subcategoria (ou crie uma nova).',
+        ]);
+    }
+
+    private function resolveBulkSubcategoryId(ExpenseCategory $categoria): ?string
+    {
+        if (trim($this->bulkNewSubcategory) !== '') {
+            return ExpenseSubcategory::createCustom($categoria, $this->bulkNewSubcategory)->id;
+        }
+
+        if ($this->bulkSubcategoryId === '') {
+            return null;
+        }
+
+        return ExpenseSubcategory::query()->findOrFail($this->bulkSubcategoryId)->id;
+    }
+
+    // -----------------------------------------------------------------
     // Formulário — Receita
     // -----------------------------------------------------------------
 
@@ -557,6 +732,7 @@ class CashFlowIndex extends Component
     {
         $this->showIncomeForm = ! $this->showIncomeForm;
         $this->showExpenseForm = false;
+        $this->showBulkEditForm = false;
 
         if ($this->showIncomeForm) {
             $this->resetIncomeForm();
@@ -922,6 +1098,8 @@ class CashFlowIndex extends Component
             'expenseFormCategories' => $this->expenseFormCategories,
             'incomeCategories' => IncomeCategory::available()->get(),
             'expenseSubcategories' => $this->expenseSubcategories,
+            'bulkFormCategories' => $this->bulkFormCategories,
+            'bulkSubcategories' => $this->bulkSubcategories,
             'bankAccounts' => BankAccount::query()->active()->orderBy('bank_name')->get(),
             'creditCards' => CreditCard::query()->active()->orderBy('card_name')->get(),
             'members' => ProfileMember::query()

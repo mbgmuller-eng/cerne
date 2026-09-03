@@ -274,6 +274,66 @@
         </form>
     </x-modal>
 
+    {{-- Editar despesas selecionadas em massa ---------------------------- --}}
+    <x-modal wire-model="showBulkEditForm">
+        <form wire:submit="aplicarEdicaoEmMassa" class="space-y-4">
+            <div class="flex items-baseline justify-between">
+                <h2 class="text-sm font-semibold text-slate-900 dark:text-white">Editar {{ count($selecionadas) }} despesas selecionadas</h2>
+                <button type="button" wire:click="toggleBulkEditForm" class="btn-ghost px-2 py-1 text-xs">Cancelar</button>
+            </div>
+
+            <p class="text-xs text-slate-400">
+                Necessidade, categoria e subcategoria abaixo serão aplicadas a todas as selecionadas — os demais dados (descrição, valor, data...) continuam como estão.
+            </p>
+
+            <div class="grid gap-4 @sm:grid-cols-2 @lg:grid-cols-3">
+                <div>
+                    <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Necessidade</label>
+                    <select wire:model.live="bulkNecessity" class="select mt-1.5 w-full">
+                        <option value="">Selecione</option>
+                        @foreach (Necessity::options() as $valor => $rotulo)
+                            <option value="{{ $valor }}">{{ $rotulo }}</option>
+                        @endforeach
+                    </select>
+                    @error('bulkNecessity') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                </div>
+
+                <div>
+                    <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Categoria</label>
+                    <select wire:model.live="bulkCategoryId" class="select mt-1.5 w-full">
+                        <option value="">Selecione</option>
+                        @foreach ($bulkFormCategories as $categoria)
+                            <option value="{{ $categoria->id }}">{{ $categoria->name }}</option>
+                        @endforeach
+                    </select>
+                    @error('bulkCategoryId') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                </div>
+
+                @unless ($bulkNecessity === Necessity::Investment->value)
+                    <div>
+                        <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Subcategoria</label>
+                        <select wire:model="bulkSubcategoryId" class="select mt-1.5 w-full" @if ($bulkCategoryId === '') disabled @endif>
+                            <option value="">Selecione</option>
+                            @foreach ($bulkSubcategories as $sub)
+                                <option value="{{ $sub->id }}">{{ $sub->name }}</option>
+                            @endforeach
+                        </select>
+                        @error('bulkSubcategoryId') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Ou crie uma subcategoria</label>
+                        <input type="text" wire:model="bulkNewSubcategory" class="input mt-1.5" placeholder="Ex.: Previdência Privada" @if ($bulkCategoryId === '') disabled @endif>
+                    </div>
+                @endunless
+            </div>
+
+            <div class="flex justify-end">
+                <button type="submit" class="btn-primary px-4 py-2" wire:loading.attr="disabled">Aplicar a {{ count($selecionadas) }} despesas</button>
+            </div>
+        </form>
+    </x-modal>
+
     {{-- Totais -------------------------------------------------------- --}}
     <div class="grid gap-4 sm:grid-cols-3">
         <div class="card p-5">
@@ -366,6 +426,18 @@
     <section>
         <h2 class="text-sm font-semibold text-slate-900 dark:text-white">Despesas <span class="font-normal text-slate-400">({{ $expenses->count() }})</span></h2>
 
+        @if (count($selecionadas) > 0)
+            <div class="mt-3 flex items-center justify-between gap-3 rounded-xl bg-brand-50 px-4 py-2.5 ring-1 ring-brand-200 dark:bg-brand-500/10 dark:ring-brand-500/20">
+                <p class="text-sm text-brand-900 dark:text-brand-100">
+                    {{ count($selecionadas) }} {{ count($selecionadas) === 1 ? 'selecionada' : 'selecionadas' }}
+                </p>
+                <div class="flex items-center gap-3">
+                    <button wire:click="limparSelecao" class="text-sm text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200">Cancelar</button>
+                    <button wire:click="toggleBulkEditForm" class="btn-primary px-3 py-1.5">Editar selecionadas</button>
+                </div>
+            </div>
+        @endif
+
         @if ($expenses->isEmpty())
             <div class="mt-3 rounded-2xl border border-dashed border-slate-300 dark:border-slate-600 bg-white/60 dark:bg-slate-800/40 px-5 py-10 text-center">
                 <p class="text-sm text-slate-500 dark:text-slate-400">Nenhuma despesa neste recorte.</p>
@@ -376,6 +448,9 @@
                     @php $faturaPaga = $despesa->isOnCredit() && $despesa->invoice?->status === InvoiceStatus::Paid; @endphp
                     <li class="flex items-center justify-between gap-4 px-5 py-3">
                         <div class="flex min-w-0 items-center gap-3">
+                            @unless ($faturaPaga)
+                                <input type="checkbox" wire:model.live="selecionadas" value="{{ $despesa->id }}" class="shrink-0 rounded border-slate-300 dark:border-slate-600 text-brand-700 dark:text-brand-400 focus:ring-brand-500">
+                            @endunless
                             <span class="h-8 w-1 shrink-0 rounded-full" style="background: {{ $despesa->necessity->color() }}"></span>
                             <div class="min-w-0">
                                 <p class="truncate text-sm text-slate-800 dark:text-slate-200">{{ $despesa->description }}</p>
