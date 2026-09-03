@@ -10,10 +10,13 @@ use App\Livewire\Concerns\RequiresActiveProfile;
 use App\Models\BankAccount;
 use App\Models\DocumentUpload;
 use App\Models\ExpenseCategory;
+use App\Models\ExpenseRecord;
 use App\Models\ExpenseSubcategory;
 use App\Models\IncomeCategory;
+use App\Models\IncomeRecord;
 use App\Services\Extraction\CategorizationRuleMatcher;
 use App\Services\Extraction\DocumentCommitService;
+use App\Support\Money;
 use App\Support\ProfileContext;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
@@ -71,6 +74,14 @@ class DocumentsIndex extends Component
 
     /** Texto explicando o casamento com conta fixa/receita recorrente, quando houver. */
     public array $notaPorItem = [];
+
+    /**
+     * Aviso quando já existe um lançamento com a mesma conta, data e valor
+     * — sinal forte de reimportação do mesmo extrato (ou de um intervalo
+     * de datas sobreposto com outro já confirmado). Indexado igual aos
+     * demais arrays; item com aviso começa desmarcado.
+     */
+    public array $duplicataPorItem = [];
 
     public function mount(): void
     {
@@ -149,6 +160,7 @@ class DocumentsIndex extends Component
         $this->fixedBillPaymentPorItem = [];
         $this->recurringIncomeOccurrencePorItem = [];
         $this->notaPorItem = [];
+        $this->duplicataPorItem = [];
 
         // Casamento com conta fixa (ver Parte B do plano) só faz sentido
         // pra extrato bancário — fatura de cartão não debita conta nenhuma
@@ -166,12 +178,58 @@ class DocumentsIndex extends Component
                 continue;
             }
 
-            if (($item['tipo'] ?? null) === 'receita') {
+            $ehReceita = ($item['tipo'] ?? null) === 'receita';
+
+            if ($ehReceita) {
                 $this->preencherReceita($i, $item, $data, $matcher, $casaContaFixa);
             } else {
                 $this->preencherDespesa($i, $item, $data, $matcher, $casaContaFixa);
             }
+
+            // Independe de ter casado com regra — duplicata é contra
+            // TUDO que já existe na conta, venha de onde vier (extrato
+            // reimportado, intervalo sobreposto, ou lançamento digitado
+            // à mão).
+            $this->checarDuplicata($i, $item, $data, $documento, $ehReceita);
         }
+    }
+
+    /**
+     * Mesma conta + mesma data + mesmo valor já lançado é sinal forte de
+     * reimportação — não é o mesmo caso de "já dado baixa"
+     * (FixedBillPayment/RecurringIncomeOccurrence, que é sobre um
+     * vencimento agendado): aqui é duplicata de LANÇAMENTO. Só roda pra
+     * extrato bancário — fatura de cartão não tem bank_account_id pra
+     * comparar. Desmarca por padrão, igual ao "já dado baixa"; a pessoa
+     * pode forçar marcando de novo se não for duplicata de verdade.
+     */
+    private function checarDuplicata(int $i, array $item, CarbonImmutable $data, DocumentUpload $documento, bool $ehReceita): void
+    {
+        if ($documento->bank_account_id === null) {
+            return;
+        }
+
+        $valor = Money::parse($item['valor'] ?? 0);
+
+        $existente = $ehReceita
+            ? IncomeRecord::query()
+                ->where('bank_account_id', $documento->bank_account_id)
+                ->where('received_date', $data->toDateString())
+                ->where('amount', $valor)
+                ->first()
+            : ExpenseRecord::query()
+                ->where('bank_account_id', $documento->bank_account_id)
+                ->where('expense_date', $data->toDateString())
+                ->where('amount', $valor)
+                ->first();
+
+        if ($existente === null) {
+            return;
+        }
+
+        $this->duplicataPorItem[$i] = 'Possível duplicata — já existe "'.$existente->description.'" de '
+            .Money::format($valor).' em '.$data->format('d/m/Y').' nesta conta.';
+        $this->aceitos = array_values(array_diff($this->aceitos, [$i]));
     }
 
     private function preencherDespesa(int $i, array $item, CarbonImmutable $data, CategorizationRuleMatcher $matcher, bool $casaContaFixa): void
@@ -249,7 +307,7 @@ class DocumentsIndex extends Component
         $this->reset(
             'revisandoId', 'aceitos', 'categoriaPorItem', 'subcategoriaPorItem', 'novaSubcategoriaPorItem',
             'necessidadePorItem', 'regraAplicadaPorItem', 'fixedBillPaymentPorItem',
-            'recurringIncomeOccurrencePorItem', 'notaPorItem',
+            'recurringIncomeOccurrencePorItem', 'notaPorItem', 'duplicataPorItem',
         );
     }
 
@@ -397,6 +455,32 @@ class DocumentsIndex extends Component
         }
 
         session()->flash('status', 'Documento descartado.');
+    }
+
+    /**
+     * Manda pra fila de novo — falha comum é a chave da API ficar sem
+     * crédito no meio de um lote; o arquivo já está salvo, não precisa
+     * reenviar. Só faz sentido pra quem falhou (Pending/Processing já
+     * estão em andamento, Completed/Committed não têm erro pra corrigir).
+     */
+    public function reprocessar(string $id): void
+    {
+        $documento = DocumentUpload::findOrFail($id);
+
+        if ($documento->processing_status !== ProcessingStatus::Failed) {
+            return;
+        }
+
+        $documento->update([
+            'processing_status' => ProcessingStatus::Pending,
+            'error_message' => null,
+        ]);
+
+        if (filled(config('cerne.ai.api_key'))) {
+            ProcessDocumentJob::dispatch($documento->id);
+        }
+
+        session()->flash('status', 'Documento na fila pra nova tentativa.');
     }
 
     /** @return Collection<int, DocumentUpload> */

@@ -61,6 +61,50 @@ class DocumentUploadQueueTest extends TestCase
         Queue::assertPushed(ProcessDocumentJob::class, fn ($job) => $job->documentId === $documento->id);
     }
 
+    public function test_reprocessar_documento_falho_limpa_o_erro_e_despacha_de_novo(): void
+    {
+        config(['cerne.ai.api_key' => 'chave-de-teste']);
+        Queue::fake();
+        [$perfil, $membro] = $this->criarPerfil();
+        $documento = DocumentUpload::withoutProfileScope()->create([
+            'profile_id' => $perfil->id,
+            'uploaded_by_user_id' => $membro->user_id,
+            'document_type' => 'bank_statement',
+            'original_filename' => 'extrato.pdf',
+            'storage_path' => 'documentos/extrato.pdf',
+            'processing_status' => ProcessingStatus::Failed,
+            'error_message' => 'Anthropic Bad Request Exception: credit balance too low',
+        ]);
+
+        Livewire::test(DocumentsIndex::class)
+            ->call('reprocessar', $documento->id);
+
+        $documento->refresh();
+        self::assertSame(ProcessingStatus::Pending, $documento->processing_status);
+        self::assertNull($documento->error_message);
+        Queue::assertPushed(ProcessDocumentJob::class, fn ($job) => $job->documentId === $documento->id);
+    }
+
+    public function test_reprocessar_nao_faz_nada_em_documento_que_nao_falhou(): void
+    {
+        Queue::fake();
+        [$perfil, $membro] = $this->criarPerfil();
+        $documento = DocumentUpload::withoutProfileScope()->create([
+            'profile_id' => $perfil->id,
+            'uploaded_by_user_id' => $membro->user_id,
+            'document_type' => 'bank_statement',
+            'original_filename' => 'extrato.pdf',
+            'storage_path' => 'documentos/extrato.pdf',
+            'processing_status' => ProcessingStatus::Completed,
+        ]);
+
+        Livewire::test(DocumentsIndex::class)
+            ->call('reprocessar', $documento->id);
+
+        self::assertSame(ProcessingStatus::Completed, $documento->fresh()->processing_status);
+        Queue::assertNotPushed(ProcessDocumentJob::class);
+    }
+
     /** @return array{0: FinancialProfile, 1: ProfileMember} */
     private function criarPerfil(): array
     {

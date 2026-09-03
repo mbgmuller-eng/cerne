@@ -17,6 +17,7 @@ use App\Models\ExpenseSubcategory;
 use App\Models\FinancialProfile;
 use App\Models\FixedBill;
 use App\Models\FixedBillPayment;
+use App\Models\IncomeRecord;
 use App\Models\ProfileMember;
 use App\Models\User;
 use App\Services\FixedBillService;
@@ -223,6 +224,105 @@ class DocumentImportCategorizationTest extends TestCase
         $lancamento = ExpenseRecord::where('source_document_id', $documento->id)->sole();
         self::assertNotNull($lancamento->subcategory_id);
         self::assertSame('Subcategoria Nova', $lancamento->subcategory->name);
+    }
+
+    /**
+     * Motivado por um caso real: extrato de agosto reimportado num mês que
+     * já tinha bastante coisa lançada — mesma conta, mesma data, mesmo
+     * valor de um lançamento que já existe é sinal forte de duplicata.
+     * Desmarca por padrão, mas não bloqueia (a pessoa pode ter duas
+     * compras iguais no mesmo dia de verdade).
+     */
+    public function test_item_com_mesma_conta_data_e_valor_de_despesa_existente_mostra_aviso_e_desmarca(): void
+    {
+        [$perfil, $membro] = $this->criarPerfil();
+        $conta = BankAccount::factory()->for($perfil, 'profile')->for($membro, 'member')->create();
+        ExpenseRecord::factory()->for($perfil, 'profile')->create([
+            'description' => 'Supermercado ABC',
+            'bank_account_id' => $conta->id,
+            'expense_date' => '2026-08-20',
+            'amount' => '87.50',
+        ]);
+
+        $documento = $this->criarExtrato($perfil, $membro, $conta, [
+            ['data' => '2026-08-20', 'descricao' => 'Compra no débito autorizada - Supermercado ABC', 'valor' => '87.50', 'tipo' => 'despesa', 'categoria_sugerida' => null],
+        ]);
+
+        $component = Livewire::test(DocumentsIndex::class)
+            ->call('revisar', $documento->id)
+            ->assertSee('Possível duplicata', false)
+            ->assertSee('Supermercado ABC', false);
+
+        self::assertNotContains(0, $component->get('aceitos'));
+    }
+
+    public function test_item_sem_lancamento_parecido_nao_mostra_aviso_de_duplicata(): void
+    {
+        [$perfil, $membro] = $this->criarPerfil();
+        $conta = BankAccount::factory()->for($perfil, 'profile')->for($membro, 'member')->create();
+
+        $documento = $this->criarExtrato($perfil, $membro, $conta, [
+            ['data' => '2026-08-20', 'descricao' => 'Compra inédita', 'valor' => '87.50', 'tipo' => 'despesa', 'categoria_sugerida' => null],
+        ]);
+
+        $component = Livewire::test(DocumentsIndex::class)
+            ->call('revisar', $documento->id)
+            ->assertDontSee('Possível duplicata');
+
+        self::assertContains(0, $component->get('aceitos'));
+    }
+
+    /** Marcar de volta um item apontado como duplicata ainda permite importar — o aviso é uma sugestão, não um bloqueio. */
+    public function test_forcar_a_marcacao_de_um_item_apontado_como_duplicata_ainda_importa(): void
+    {
+        [$perfil, $membro] = $this->criarPerfil();
+        $conta = BankAccount::factory()->for($perfil, 'profile')->for($membro, 'member')->create();
+        $categoria = ExpenseCategory::factory()->create(['necessity' => null]);
+        $subcategoria = ExpenseSubcategory::factory()->create(['category_id' => $categoria->id]);
+        ExpenseRecord::factory()->for($perfil, 'profile')->create([
+            'description' => 'Compra legítima duas vezes no mesmo dia',
+            'bank_account_id' => $conta->id,
+            'expense_date' => '2026-08-20',
+            'amount' => '30.00',
+        ]);
+
+        $documento = $this->criarExtrato($perfil, $membro, $conta, [
+            ['data' => '2026-08-20', 'descricao' => 'Compra legítima duas vezes no mesmo dia', 'valor' => '30.00', 'tipo' => 'despesa', 'categoria_sugerida' => null],
+        ]);
+
+        Livewire::test(DocumentsIndex::class)
+            ->call('revisar', $documento->id)
+            ->set('aceitos', [0])
+            ->set('necessidadePorItem.0', 'essential')
+            ->set('categoriaPorItem.0', $categoria->id)
+            ->set('subcategoriaPorItem.0', $subcategoria->id)
+            ->call('confirmar')
+            ->assertHasNoErrors();
+
+        self::assertSame(2, ExpenseRecord::where('bank_account_id', $conta->id)->count());
+    }
+
+    /** Mesma checagem do lado receita — mesma conta, data e valor de uma receita já lançada. */
+    public function test_item_de_receita_com_mesma_conta_data_e_valor_mostra_aviso_de_duplicata(): void
+    {
+        [$perfil, $membro] = $this->criarPerfil();
+        $conta = BankAccount::factory()->for($perfil, 'profile')->for($membro, 'member')->create();
+        IncomeRecord::factory()->for($perfil, 'profile')->create([
+            'description' => 'Salário',
+            'bank_account_id' => $conta->id,
+            'received_date' => '2026-08-05',
+            'amount' => '5000.00',
+        ]);
+
+        $documento = $this->criarExtrato($perfil, $membro, $conta, [
+            ['data' => '2026-08-05', 'descricao' => 'Crédito PIX Empresa X', 'valor' => '5000.00', 'tipo' => 'receita', 'categoria_sugerida' => null],
+        ]);
+
+        $component = Livewire::test(DocumentsIndex::class)
+            ->call('revisar', $documento->id)
+            ->assertSee('Possível duplicata', false);
+
+        self::assertNotContains(0, $component->get('aceitos'));
     }
 
     /** @param  list<array<string, mixed>>  $itens */

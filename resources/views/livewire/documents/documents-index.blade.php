@@ -1,6 +1,7 @@
 @use('App\Support\Money')
 @use('App\Enums\DocumentType')
 @use('App\Enums\Necessity')
+@use('App\Enums\ProcessingStatus')
 
 <div class="space-y-6">
 
@@ -193,13 +194,16 @@
                                     @endif
                                 </tr>
 
-                                @if ($temCategorizacao && ($faltaCategorizar || ($regraAplicadaPorItem[$i] ?? null) || ($notaPorItem[$i] ?? null)))
+                                @if ($temCategorizacao && ($faltaCategorizar || ($duplicataPorItem[$i] ?? null) || ($regraAplicadaPorItem[$i] ?? null) || ($notaPorItem[$i] ?? null)))
                                     <tr class="{{ in_array($i, $aceitos) ? '' : 'opacity-40' }}">
                                         <td></td>
                                         <td colspan="{{ count($item) + 3 }}" class="px-3 pb-2 text-xs">
                                             <div class="flex flex-wrap gap-x-3 gap-y-1">
                                                 @if ($faltaCategorizar)
                                                     <span class="font-medium text-amber-700 dark:text-amber-400">Falta categorizar</span>
+                                                @endif
+                                                @if ($duplicataPorItem[$i] ?? null)
+                                                    <span class="font-medium text-red-700 dark:text-red-400">{{ $duplicataPorItem[$i] }}</span>
                                                 @endif
                                                 @if ($regraAplicadaPorItem[$i] ?? null)
                                                     <span class="text-slate-500 dark:text-slate-400">Categorizado pela regra "{{ $regraAplicadaPorItem[$i] }}"</span>
@@ -228,6 +232,11 @@
                         @if ($faltandoCount > 0)
                             <p class="text-xs font-medium text-amber-700 dark:text-amber-400">
                                 {{ $faltandoCount }} {{ $faltandoCount === 1 ? 'selecionado está' : 'selecionados estão' }} sem categorização completa — corrija antes de importar.
+                            </p>
+                        @endif
+                        @if (count($duplicataPorItem) > 0)
+                            <p class="text-xs font-medium text-red-700 dark:text-red-400">
+                                {{ count($duplicataPorItem) }} {{ count($duplicataPorItem) === 1 ? 'possível duplicata foi desmarcada' : 'possíveis duplicatas foram desmarcadas' }} automaticamente — confira antes de marcar de volta.
                             </p>
                         @endif
                     </div>
@@ -281,6 +290,13 @@
                             @if ($doc->isAwaitingReview())
                                 <button wire:click="revisar('{{ $doc->id }}')" class="btn-primary px-3 py-1">
                                     Revisar
+                                </button>
+                            @elseif ($doc->processing_status === ProcessingStatus::Failed)
+                                <button wire:click="reprocessar('{{ $doc->id }}')" class="btn-secondary px-3 py-1">
+                                    Reprocessar
+                                </button>
+                                <button wire:click="descartar('{{ $doc->id }}')" class="text-sm text-slate-400 hover:text-red-700 dark:hover:text-red-400">
+                                    Excluir
                                 </button>
                             @else
                                 <button wire:click="descartar('{{ $doc->id }}')" class="text-sm text-slate-400 hover:text-red-700 dark:hover:text-red-400">
