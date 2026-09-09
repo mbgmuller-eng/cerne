@@ -2,7 +2,6 @@
 
 namespace Database\Seeders;
 
-use App\Enums\AllocationAssetClass;
 use App\Enums\AssetClass;
 use App\Enums\Benchmark;
 use App\Enums\EmploymentType;
@@ -81,16 +80,9 @@ class InvestmentsDemoSeeder extends Seeder
             'employment_type' => EmploymentType::PublicServant,
         ]);
 
-        // A alocação recomendada precisa somar 100%.
-        $alocacoes = [
-            [AllocationAssetClass::FixedIncome, '40.00'],
-            [AllocationAssetClass::EquitiesFiis, '30.00'],
-            [AllocationAssetClass::Funds, '15.00'],
-            [AllocationAssetClass::International, '10.00'],
-            [AllocationAssetClass::DigitalAssets, '5.00'],
-        ];
-
-        foreach ($alocacoes as [$classe, $pct]) {
+        // Mesma regra padrão por tipo de investidor que o app usa pra
+        // todo mundo — ver InvestorType::recommendedAllocations().
+        foreach ($perfilAna->investor_type->recommendedAllocations() as $classe => $pct) {
             RecommendedAllocation::create([
                 'investor_profile_id' => $perfilAna->id,
                 'asset_class' => $classe,
@@ -108,17 +100,18 @@ class InvestmentsDemoSeeder extends Seeder
     private function rendaFixa(ProfileMember $ana, ProfileMember $bruno, string $userId): void
     {
         $ativos = [
-            [$ana, AssetClass::ReservaPaz, InvestmentSector::Reserve, 'Reserva de emergência', 'Itaú', '69000.00', 'CDI 102%', ReturnRateType::PostfixedCdi],
-            [$bruno, AssetClass::Cdb, InvestmentSector::FixedIncome, 'CDB Inter 2028', 'Inter', '42500.00', 'CDI 112%', ReturnRateType::PostfixedCdi],
-            [$ana, AssetClass::Tesouro, InvestmentSector::FixedIncome, 'Tesouro IPCA+ 2035', 'Tesouro Direto', '31800.00', 'IPCA + 6,2%', ReturnRateType::PostfixedIpca],
-            [$bruno, AssetClass::Lci, InvestmentSector::FixedIncome, 'LCI Bradesco', 'Bradesco', '25000.00', '96% do CDI', ReturnRateType::PostfixedCdi],
+            [$ana, AssetClass::Cdb, InvestmentSector::FixedIncome, 'Reserva de emergência', 'Itaú', '69000.00', 'CDI 102%', ReturnRateType::PostfixedCdi, ReserveType::Paz],
+            [$bruno, AssetClass::Cdb, InvestmentSector::FixedIncome, 'CDB Inter 2028', 'Inter', '42500.00', 'CDI 112%', ReturnRateType::PostfixedCdi, null],
+            [$ana, AssetClass::Tesouro, InvestmentSector::FixedIncome, 'Tesouro IPCA+ 2035', 'Tesouro Direto', '31800.00', 'IPCA + 6,2%', ReturnRateType::PostfixedIpca, null],
+            [$bruno, AssetClass::Lci, InvestmentSector::FixedIncome, 'LCI Bradesco', 'Bradesco', '25000.00', '96% do CDI', ReturnRateType::PostfixedCdi, null],
         ];
 
-        foreach ($ativos as [$membro, $classe, $setor, $nome, $instituicao, $valor, $taxa, $tipoTaxa]) {
+        foreach ($ativos as [$membro, $classe, $setor, $nome, $instituicao, $valor, $taxa, $tipoTaxa, $reserva]) {
             InvestmentRecord::create([
                 'member_id' => $membro->id,
                 'sector' => $setor,
                 'asset_class' => $classe,
+                'reserve_type' => $reserva,
                 'name' => $nome,
                 'institution' => $instituicao,
                 'current_amount' => $valor,

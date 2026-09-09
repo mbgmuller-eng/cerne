@@ -18,6 +18,7 @@ use App\Models\InvestmentSnapshot;
 use App\Models\InvestmentTransaction;
 use App\Models\InvestorProfile;
 use App\Models\ProfileMember;
+use App\Models\RecommendedAllocation;
 use App\Services\InvestmentTransactionService;
 use App\Support\Money;
 use App\Support\ProfileContext;
@@ -320,10 +321,14 @@ class InvestmentsIndex extends Component
     }
 
     /**
-     * Cria ou atualiza o perfil e garante as duas reservas do membro
-     * (paz e oportunidade) — todo membro com perfil de investidor tem as
-     * duas, mesmo que ainda com saldo zero. `firstOrCreate` é seguro pra
-     * repetir: o índice único evita duplicata.
+     * Cria ou atualiza o perfil, sincroniza a carteira recomendada com a
+     * regra padrão do tipo de investidor (InvestorType::
+     * recommendedAllocations() — mesma regra pra todo cliente, sem ajuste
+     * manual por enquanto) e garante as duas reservas do membro (paz e
+     * oportunidade) — todo membro com perfil de investidor tem as duas,
+     * mesmo que ainda com saldo zero. `updateOrCreate`/`firstOrCreate` são
+     * seguros de repetir: o índice único evita duplicata, e trocar o tipo
+     * de investidor depois atualiza a carteira recomendada pro novo tipo.
      *
      * Se o casal tem gasto essencial oculto entre si E os dois já são
      * provedores (cada um com tipo de atuação definido), garante também
@@ -354,6 +359,13 @@ class InvestmentsIndex extends Component
                 'employment_type' => $data['employmentTypeInput'],
             ],
         );
+
+        foreach ($perfil->investor_type->recommendedAllocations() as $classe => $percentual) {
+            RecommendedAllocation::query()->updateOrCreate(
+                ['investor_profile_id' => $perfil->id, 'asset_class' => $classe],
+                ['target_percentage' => $percentual],
+            );
+        }
 
         foreach (ReserveType::cases() as $tipo) {
             FinancialReserve::query()->firstOrCreate(

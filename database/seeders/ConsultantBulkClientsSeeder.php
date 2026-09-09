@@ -316,7 +316,7 @@ class ConsultantBulkClientsSeeder extends Seeder
         $opcoes = match ($faixa['nome']) {
             'baixa' => [
                 [AssetClass::Poupanca, InvestmentSector::Reserve, null],
-                [AssetClass::ReservaPaz, InvestmentSector::Reserve, 'CDI 100%'],
+                [AssetClass::Cdb, InvestmentSector::FixedIncome, 'CDI 100%'],
                 [AssetClass::Cdb, InvestmentSector::FixedIncome, 'CDI 98%'],
             ],
             'media' => [

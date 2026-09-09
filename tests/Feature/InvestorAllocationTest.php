@@ -139,6 +139,63 @@ class InvestorAllocationTest extends TestCase
         self::assertTrue($item['categorias']->isEmpty());
     }
 
+    public function test_cada_tipo_de_investidor_soma_exatamente_100_por_cento(): void
+    {
+        foreach (InvestorType::cases() as $tipo) {
+            $total = array_reduce($tipo->recommendedAllocations(), fn (string $c, string $v) => bcadd($c, $v, 2), '0.00');
+            self::assertSame('100.00', $total, $tipo->label());
+        }
+    }
+
+    public function test_salvar_perfil_de_investidor_sincroniza_a_carteira_recomendada_padrao(): void
+    {
+        [, $membro] = $this->criarPerfil();
+
+        Livewire::test(InvestmentsIndex::class)
+            ->call('toggleInvestorProfileForm', $membro->id)
+            ->set('investorTypeInput', InvestorType::Moderate->value)
+            ->set('employmentTypeInput', EmploymentType::Clt->value)
+            ->call('saveInvestorProfile')
+            ->assertHasNoErrors();
+
+        $perfil = InvestorProfile::query()->where('member_id', $membro->id)->sole();
+        $percentualDe = fn (AllocationAssetClass $classe) => $perfil->allocations->firstWhere('asset_class', $classe)?->target_percentage;
+
+        self::assertSame('35.00', $percentualDe(AllocationAssetClass::FixedIncome));
+        self::assertSame('20.00', $percentualDe(AllocationAssetClass::Funds));
+        self::assertSame('20.00', $percentualDe(AllocationAssetClass::EquitiesFiis));
+        self::assertSame('7.50', $percentualDe(AllocationAssetClass::DigitalAssets));
+        self::assertSame('7.50', $percentualDe(AllocationAssetClass::FxCurrencies));
+        self::assertSame('10.00', $percentualDe(AllocationAssetClass::Etfs));
+        self::assertCount(6, $perfil->allocations);
+        self::assertTrue($perfil->allocationIsValid());
+    }
+
+    public function test_trocar_tipo_de_investidor_atualiza_a_carteira_recomendada_sem_duplicar(): void
+    {
+        [, $membro] = $this->criarPerfil();
+
+        Livewire::test(InvestmentsIndex::class)
+            ->call('toggleInvestorProfileForm', $membro->id)
+            ->set('investorTypeInput', InvestorType::Conservative->value)
+            ->set('employmentTypeInput', EmploymentType::Clt->value)
+            ->call('saveInvestorProfile');
+
+        Livewire::test(InvestmentsIndex::class)
+            ->call('toggleInvestorProfileForm', $membro->id)
+            ->set('investorTypeInput', InvestorType::Aggressive->value)
+            ->set('employmentTypeInput', EmploymentType::Clt->value)
+            ->call('saveInvestorProfile');
+
+        $perfil = InvestorProfile::query()->where('member_id', $membro->id)->sole();
+
+        self::assertCount(6, $perfil->allocations);
+        self::assertSame(
+            '25.00',
+            $perfil->allocations->firstWhere('asset_class', AllocationAssetClass::FixedIncome)->target_percentage,
+        );
+    }
+
     /** @return array{0: FinancialProfile, 1: ProfileMember} */
     private function criarPerfil(): array
     {
