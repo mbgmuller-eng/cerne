@@ -1,5 +1,5 @@
 @use('App\Support\Money')
-@use('App\Enums\InvestmentSector')
+@use('App\Enums\PortfolioDisplayGroup')
 @use('App\Enums\InvestorType')
 @use('App\Enums\EmploymentType')
 @use('App\Enums\AssetClass')
@@ -320,19 +320,19 @@
             </section>
         @endif
 
-        {{-- Carteira por setor ---------------------------------------- --}}
-        @forelse ($bySector as $setor => $ativos)
+        {{-- Carteira por grupo ------------------------------------------ --}}
+        @forelse ($byGroup as $grupo => $ativos)
             <section>
                 <div class="flex items-baseline justify-between">
                     <h2 class="text-sm font-semibold text-slate-900 dark:text-white">
-                        {{ InvestmentSector::from($setor)->label() }}
+                        {{ PortfolioDisplayGroup::from($grupo)->label() }}
                     </h2>
                     <span class="text-sm tabular-nums text-slate-500 dark:text-slate-400">
                         {{ Money::format(Money::sum($ativos->pluck('current_amount'))) }}
                     </span>
                 </div>
 
-                @if ($setor === 'retirement')
+                @if ($grupo === 'retirement')
                     {{-- Previdência é um contrato que evolui no tempo, não um
                          ativo com cota — o gráfico é mais informativo que a
                          linha de lista usada para os outros setores. --}}

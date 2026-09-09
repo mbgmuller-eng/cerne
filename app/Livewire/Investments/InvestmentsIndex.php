@@ -7,6 +7,7 @@ use App\Enums\AssetClass;
 use App\Enums\EmploymentType;
 use App\Enums\InvestmentSector;
 use App\Enums\InvestorType;
+use App\Enums\PortfolioDisplayGroup;
 use App\Enums\ReserveType;
 use App\Enums\TransactionType;
 use App\Livewire\Concerns\HasPrivacyTabs;
@@ -146,10 +147,24 @@ class InvestmentsIndex extends Component
         return $this->investments->where('member_id', $membroId)->values();
     }
 
-    /** Carteira agrupada por setor, como a tela apresenta. */
-    public function getBySectorProperty(): Collection
+    /**
+     * Carteira agrupada como a tela apresenta — não pelo `sector` bruto
+     * (só 5 valores, empilha quase tudo em renda fixa/variável), pelo
+     * PortfolioDisplayGroup de cada investimento (ver InvestmentRecord::
+     * displayGroup()), na ordem fixa de PortfolioDisplayGroup::cases()
+     * — reserva primeiro, depois as classes com meta recomendada,
+     * previdência e internacional por último. Só entram grupos com pelo
+     * menos um investimento.
+     *
+     * @return Collection<string, Collection<int, InvestmentRecord>>
+     */
+    public function getByGroupProperty(): Collection
     {
-        return $this->sectorInvestments->groupBy(fn (InvestmentRecord $i) => $i->sector->value);
+        $agrupado = $this->sectorInvestments->groupBy(fn (InvestmentRecord $i) => $i->displayGroup()->value);
+
+        return collect(PortfolioDisplayGroup::cases())
+            ->mapWithKeys(fn (PortfolioDisplayGroup $grupo) => [$grupo->value => $agrupado->get($grupo->value, collect())])
+            ->filter(fn (Collection $ativos) => $ativos->isNotEmpty());
     }
 
     public function getTotalProperty(): string
@@ -574,7 +589,7 @@ class InvestmentsIndex extends Component
                 ->get(),
             'showPrivacyTabs' => $this->showPrivacyTabs,
             'privacyMembers' => $this->privacyMembers,
-            'bySector' => $this->bySector,
+            'byGroup' => $this->byGroup,
             'total' => $this->total,
             'totalInvested' => $this->totalInvested,
             'totalGain' => $this->totalGain,

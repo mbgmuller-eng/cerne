@@ -149,7 +149,7 @@ class PrivacyTabsTest extends TestCase
 
         InvestmentRecord::factory()->for($perfil, 'profile')->for($ana->member, 'member')->create(['is_private' => true]);
 
-        $abaCasal = Livewire::test(InvestmentsIndex::class)->set('viewAs', '')->get('bySector');
+        $abaCasal = Livewire::test(InvestmentsIndex::class)->set('viewAs', '')->get('byGroup');
         self::assertTrue($abaCasal->isEmpty());
     }
 

@@ -2,8 +2,10 @@
 
 namespace App\Models;
 
+use App\Enums\AllocationAssetClass;
 use App\Enums\AssetClass;
 use App\Enums\InvestmentSector;
+use App\Enums\PortfolioDisplayGroup;
 use App\Enums\RecordSource;
 use App\Enums\ReserveType;
 use App\Enums\ReturnRateType;
@@ -74,6 +76,42 @@ class InvestmentRecord extends Model
     public function scopeForReserve(Builder $query, ReserveType $type): Builder
     {
         return $query->where('reserve_type', $type);
+    }
+
+    /**
+     * Grupo de exibição na "Carteira por setor" — mais fino que `sector`
+     * (que empilha quase tudo em renda fixa/variável). Reserva vem
+     * antes de tudo (é o que o reserve_type diz, não a classe do
+     * ativo); Previdência tem grupo próprio (é `sector = retirement`,
+     * mas checado pela classe pra não depender de manter os dois
+     * sincronizados); o resto segue AssetClass::allocationClass() — as
+     * mesmas 6 classes com meta recomendada, mais Internacional, que
+     * existe na carteira mas não tem meta.
+     */
+    public function displayGroup(): PortfolioDisplayGroup
+    {
+        if ($this->reserve_type === ReserveType::Paz) {
+            return PortfolioDisplayGroup::ReservaPaz;
+        }
+
+        if ($this->reserve_type === ReserveType::Oportunidade) {
+            return PortfolioDisplayGroup::ReservaOportunidade;
+        }
+
+        if ($this->asset_class === AssetClass::Previdencia) {
+            return PortfolioDisplayGroup::Retirement;
+        }
+
+        return match ($this->asset_class->allocationClass()) {
+            AllocationAssetClass::FixedIncome => PortfolioDisplayGroup::FixedIncome,
+            AllocationAssetClass::Funds => PortfolioDisplayGroup::Funds,
+            AllocationAssetClass::EquitiesFiis => PortfolioDisplayGroup::EquitiesFiis,
+            AllocationAssetClass::DigitalAssets => PortfolioDisplayGroup::DigitalAssets,
+            AllocationAssetClass::FxCurrencies => PortfolioDisplayGroup::FxCurrencies,
+            AllocationAssetClass::Etfs => PortfolioDisplayGroup::Etfs,
+            AllocationAssetClass::International => PortfolioDisplayGroup::International,
+            null => PortfolioDisplayGroup::Other,
+        };
     }
 
     /**
