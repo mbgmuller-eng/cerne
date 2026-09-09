@@ -24,7 +24,7 @@
         </div>
         <div class="card p-5">
             <p class="eyebrow">Ganho não realizado</p>
-            <p class="figure mt-2 text-2xl font-medium {{ (float) $totalGain < 0 ? 'text-red-700 dark:text-red-400' : 'text-brand-800 dark:text-brand-300' }}">
+            <p class="figure mt-2 text-2xl font-medium {{ (float) $totalGain < 0 ? 'text-slate-500 dark:text-slate-400' : 'text-accent-700 dark:text-accent-400' }}">
                 {{ Money::format($totalGain) }}
             </p>
         </div>
@@ -374,8 +374,8 @@
                                         @if ($pct !== null)
                                             <p @class([
                                                 'text-xs font-medium',
-                                                'text-brand-700 dark:text-brand-300' => $pct >= 0,
-                                                'text-red-700 dark:text-red-400' => $pct < 0,
+                                                'text-accent-700 dark:text-accent-400' => $pct >= 0,
+                                                'text-slate-500 dark:text-slate-400' => $pct < 0,
                                             ])>
                                                 {{ $pct >= 0 ? '+' : '' }}{{ number_format($pct, 2, ',', '.') }}%
                                             </p>
@@ -423,7 +423,7 @@
                                     <p class="text-sm tabular-nums text-slate-800 dark:text-slate-200">{{ Money::format($ativo->current_amount) }}</p>
                                     @if ($ativo->invested_amount && (float) $ativo->invested_amount > 0)
                                         @php $ganho = $ativo->unrealizedGain(); $pct = $ativo->gainPercentage(); @endphp
-                                        <p class="text-xs tabular-nums {{ (float) $ganho < 0 ? 'text-red-700 dark:text-red-400' : 'text-brand-700 dark:text-brand-300' }}">
+                                        <p class="text-xs tabular-nums {{ (float) $ganho < 0 ? 'text-slate-500 dark:text-slate-400' : 'text-accent-700 dark:text-accent-400' }}">
                                             {{ (float) $ganho >= 0 ? '+' : '' }}{{ Money::format($ganho) }}
                                             @if ($pct !== null)
                                                 ({{ $pct >= 0 ? '+' : '' }}{{ number_format($pct, 1, ',', '.') }}%)
@@ -455,8 +455,8 @@
                         <p class="figure text-2xl font-medium text-slate-900 dark:text-white">{{ Money::format($portfolioEvolution['valorAtual']) }}</p>
                         <p @class([
                             'text-sm font-medium tabular-nums',
-                            'text-brand-700 dark:text-brand-300' => (float) $portfolioEvolution['crescimentoValor'] >= 0,
-                            'text-red-700 dark:text-red-400' => (float) $portfolioEvolution['crescimentoValor'] < 0,
+                            'text-accent-700 dark:text-accent-400' => (float) $portfolioEvolution['crescimentoValor'] >= 0,
+                            'text-slate-500 dark:text-slate-400' => (float) $portfolioEvolution['crescimentoValor'] < 0,
                         ])>
                             {{ (float) $portfolioEvolution['crescimentoValor'] >= 0 ? '+' : '' }}{{ Money::format($portfolioEvolution['crescimentoValor']) }}
                             @if ($portfolioEvolution['crescimentoPct'] !== null)
@@ -491,7 +491,7 @@
                         </div>
 
                         <div class="shrink-0 text-right">
-                            <p class="text-sm tabular-nums {{ (float) $p->return_percentage < 0 ? 'text-red-700 dark:text-red-400' : 'text-brand-700 dark:text-brand-300' }}">
+                            <p class="text-sm tabular-nums {{ (float) $p->return_percentage < 0 ? 'text-slate-500 dark:text-slate-400' : 'text-accent-700 dark:text-accent-400' }}">
                                 {{ number_format((float) $p->return_percentage, 2, ',', '.') }}%
                             </p>
                             @if ($p->vs_benchmark !== null)
