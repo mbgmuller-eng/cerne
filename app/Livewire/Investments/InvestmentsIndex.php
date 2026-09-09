@@ -262,23 +262,24 @@ class InvestmentsIndex extends Component
     }
 
     /**
-     * Perfil de investidor por membro: tipo, tipo de atuação, reserva de
-     * paz sugerida x atual, e a alocação real da carteira (por
-     * AllocationAssetClass) comparada à recomendada pelo consultor. Todo
-     * membro ativo aparece — quem ainda não tem perfil cadastrado entra
-     * com `perfil: null`, pra a tela oferecer o cadastro em vez de
-     * simplesmente sumir da lista. Só entram na comparação de alocação os
-     * investimentos que mapeiam para uma classe de alocação (ver
-     * AssetClass::allocationClass()) E que não estão marcados como
-     * reserva (reserve_type) — um CDB que é a reserva de paz de alguém
-     * não conta como "renda fixa alocável", mesmo sendo um CDB de
-     * verdade.
+     * Perfil de investidor por membro: tipo, tipo de atuação, e a
+     * alocação real da carteira (por AllocationAssetClass) comparada à
+     * recomendada pelo consultor. Todo membro ativo aparece — quem
+     * ainda não tem perfil cadastrado entra com `perfil: null`, pra a
+     * tela oferecer o cadastro em vez de simplesmente sumir da lista.
+     * Só entram na comparação de alocação os investimentos que mapeiam
+     * para uma classe de alocação (ver AssetClass::allocationClass())
+     * E que não estão marcados como reserva (reserve_type) — um CDB que
+     * é a reserva de paz de alguém não conta como "renda fixa
+     * alocável", mesmo sendo um CDB de verdade.
+     *
+     * Progresso da reserva de paz NÃO entra aqui — já tem card próprio
+     * na seção "Reservas" (ver getReservesProperty()), repetir o mesmo
+     * número aqui era só duplicação.
      *
      * @return Collection<int, array{
      *     membro: ProfileMember,
      *     perfil: ?InvestorProfile,
-     *     reservaSugerida: string,
-     *     reservaAtual: string,
      *     totalAlocavel: string,
      *     categorias: Collection<int, array{classe: AllocationAssetClass, valor: string, atualPct: float, recomendadoPct: float, investimentos: Collection<int, InvestmentRecord>}>,
      * }>
@@ -295,9 +296,8 @@ class InvestmentsIndex extends Component
             ->get();
 
         $investimentosPorMembro = $this->investments->groupBy('member_id');
-        $reservasPorMembro = $this->reserves->groupBy('member_id');
 
-        return $membros->map(function (ProfileMember $membro) use ($investimentosPorMembro, $reservasPorMembro) {
+        return $membros->map(function (ProfileMember $membro) use ($investimentosPorMembro) {
             $perfil = $membro->investorProfile;
 
             $categorias = collect();
@@ -326,14 +326,9 @@ class InvestmentsIndex extends Component
                     ->values();
             }
 
-            $reservaPaz = $reservasPorMembro->get($membro->id, collect())
-                ->first(fn (FinancialReserve $r) => $r->reserve_type === ReserveType::Paz);
-
             return [
                 'membro' => $membro,
                 'perfil' => $perfil,
-                'reservaSugerida' => $perfil?->peaceReserveTarget() ?? '0.00',
-                'reservaAtual' => $reservaPaz?->effectiveAmount() ?? '0.00',
                 'totalAlocavel' => $totalAlocavel,
                 'categorias' => $categorias,
             ];

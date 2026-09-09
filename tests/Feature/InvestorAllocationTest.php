@@ -12,7 +12,6 @@ use App\Enums\ReserveType;
 use App\Livewire\Investments\InvestmentsIndex;
 use App\Models\ExpenseRecord;
 use App\Models\FinancialProfile;
-use App\Models\FinancialReserve;
 use App\Models\InvestmentRecord;
 use App\Models\InvestorProfile;
 use App\Models\ProfileMember;
@@ -98,12 +97,6 @@ class InvestorAllocationTest extends TestCase
             'current_amount' => '3000.00',
             'invested_amount' => '3000.00',
         ]);
-        FinancialReserve::create([
-            'member_id' => $membro->id,
-            'reserve_type' => ReserveType::Paz,
-            'target_amount' => '3000.00',
-            'current_amount' => '0.00',
-        ]);
 
         $alocacoes = Livewire::test(InvestmentsIndex::class)->viewData('investorAllocations');
 
@@ -111,8 +104,6 @@ class InvestorAllocationTest extends TestCase
         $item = $alocacoes->first();
 
         self::assertSame('1000.00', $item['totalAlocavel']); // 600 + 400, sem a reserva
-        self::assertSame('6000.00', $item['reservaSugerida']); // 1.000 de essencial x 6 meses (funcionário público)
-        self::assertSame('3000.00', $item['reservaAtual']);
 
         $porClasse = $item['categorias']->keyBy(fn (array $c) => $c['classe']->value);
         self::assertEqualsWithDelta(60.0, $porClasse['fixed_income']['atualPct'], 0.01);
@@ -135,7 +126,6 @@ class InvestorAllocationTest extends TestCase
         self::assertCount(1, $alocacoes);
         $item = $alocacoes->first();
         self::assertNull($item['perfil']);
-        self::assertSame('0.00', $item['reservaSugerida']);
         self::assertTrue($item['categorias']->isEmpty());
     }
 

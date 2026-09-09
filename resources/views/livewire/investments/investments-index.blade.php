@@ -237,7 +237,6 @@
                             $membro = $item['membro'];
                             $categorias = $item['categorias'];
                             $fatias = $categorias->map(fn ($c) => ['pct' => $c['atualPct'], 'color' => $c['classe']->color()])->all();
-                            $pctReserva = min(100, Money::percentageOf($item['reservaAtual'], $item['reservaSugerida']));
                             $editandoEste = $showInvestorProfileForm && $investorProfileMemberId === $membro->id;
                         @endphp
                         <div class="card p-5">
@@ -289,16 +288,9 @@
                             @elseif ($perfil === null)
                                 <p class="mt-4 text-xs text-slate-400">Sem perfil de investidor cadastrado ainda.</p>
                             @else
-                                <div class="mt-3">
-                                    <div class="flex items-baseline justify-between text-xs text-slate-500 dark:text-slate-400">
-                                        <span>Reserva de paz</span>
-                                        <span>{{ Money::format($item['reservaAtual']) }} de {{ Money::format($item['reservaSugerida']) }}</span>
-                                    </div>
-                                    <div class="mt-1 h-2 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-700">
-                                        <div class="h-full rounded-full bg-brand-700 dark:bg-brand-400" style="width: {{ $pctReserva }}%"></div>
-                                    </div>
-                                    <p class="mt-1 text-xs text-slate-400">{{ $perfil->employment_type->label() }} · {{ $perfil->employment_type->reserveMonths() }} meses de gasto essencial</p>
-                                </div>
+                                {{-- Reserva de paz já aparece com progresso e valor na seção
+                                     "Reservas" acima — repetir aqui só duplicava o mesmo número. --}}
+                                <p class="mt-3 text-xs text-slate-400">{{ $perfil->employment_type->label() }} · {{ $perfil->employment_type->reserveMonths() }} meses de gasto essencial</p>
 
                                 @if ($categorias->isEmpty())
                                     <p class="mt-4 text-xs text-slate-400">Sem investimentos alocáveis cadastrados ainda para comparar com a recomendação.</p>
