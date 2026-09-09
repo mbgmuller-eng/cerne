@@ -31,10 +31,16 @@ class SecurityHeaders
         // navegar para fora.
         $response->headers->set('Referrer-Policy', 'strict-origin-when-cross-origin');
 
-        // Nada aqui precisa de câmera, microfone ou localização.
+        // Microfone liberado só pro próprio domínio: é o que a IA usa pra
+        // transcrever "Falar despesa" no Fluxo de caixa (Web Speech API,
+        // ver resources/js/app.js) — bloqueado feito 'microphone=()' faz o
+        // navegador negar o acesso DIRETO, sem nem chegar a perguntar
+        // permissão pra pessoa (foi isso que quebrou a função em produção:
+        // parecia estar "ouvindo" mas nunca teve acesso de verdade). Nada
+        // aqui usa câmera, localização, pagamento nativo ou USB.
         $response->headers->set(
             'Permissions-Policy',
-            'camera=(), microphone=(), geolocation=(), payment=(), usb=()'
+            'camera=(), microphone=(self), geolocation=(), payment=(), usb=()'
         );
 
         if (app()->environment('production')) {
