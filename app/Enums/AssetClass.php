@@ -14,8 +14,6 @@ enum AssetClass: string
 {
     use HasOptions;
 
-    case ReservaPaz = 'reserva_paz';
-    case ReservaOportunidade = 'reserva_oportunidade';
     case Previdencia = 'previdencia';
     case Cdb = 'cdb';
     case Tesouro = 'tesouro';
@@ -36,8 +34,6 @@ enum AssetClass: string
     public function label(): string
     {
         return match ($this) {
-            self::ReservaPaz => 'Reserva de paz',
-            self::ReservaOportunidade => 'Reserva de oportunidade',
             self::Previdencia => 'Previdência',
             self::Cdb => 'CDB',
             self::Tesouro => 'Tesouro Direto',
@@ -78,7 +74,7 @@ enum AssetClass: string
     public function sector(): InvestmentSector
     {
         return match ($this) {
-            self::ReservaPaz, self::ReservaOportunidade, self::Poupanca => InvestmentSector::Reserve,
+            self::Poupanca => InvestmentSector::Reserve,
             self::Previdencia => InvestmentSector::Retirement,
             self::Cdb, self::Tesouro, self::Lca, self::Lci, self::Consorcio => InvestmentSector::FixedIncome,
             self::Acao, self::Fii, self::Etf, self::FundoInfra, self::Cripto, self::Fundo, self::Outro => InvestmentSector::VariableIncome,
@@ -88,10 +84,13 @@ enum AssetClass: string
 
     /**
      * Classe usada na comparação com a alocação RECOMENDADA
-     * (recommended_allocations, ver AllocationAssetClass). Reserva,
-     * previdência, poupança e "outro" ficam de fora — não fazem parte
-     * da alocação de investimento recomendada pelo consultor, são
-     * tratadas à parte (reserva de emergência tem sua própria meta).
+     * (recommended_allocations, ver AllocationAssetClass). Previdência,
+     * poupança e "outro" ficam de fora — não fazem parte da alocação de
+     * investimento recomendada pelo consultor. Um investimento marcado
+     * como reserva (investment_records.reserve_type) também fica fora
+     * dessa comparação, mas isso é decidido em quem lê `reserve_type`
+     * antes de checar isto — não depende da classe do ativo, ver
+     * InvestmentsIndex::getInvestorAllocationsProperty().
      */
     public function allocationClass(): ?AllocationAssetClass
     {
@@ -102,7 +101,7 @@ enum AssetClass: string
             self::Cripto => AllocationAssetClass::DigitalAssets,
             self::Etf => AllocationAssetClass::Etfs,
             self::EtfInternacional, self::AcaoExterior => AllocationAssetClass::International,
-            self::ReservaPaz, self::ReservaOportunidade, self::Previdencia, self::Poupanca, self::Outro => null,
+            self::Previdencia, self::Poupanca, self::Outro => null,
         };
     }
 }

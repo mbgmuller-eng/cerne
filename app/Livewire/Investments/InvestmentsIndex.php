@@ -72,6 +72,9 @@ class InvestmentsIndex extends Component
 
     public string $investmentAssetClass = '';
 
+    /** '', 'paz' ou 'oportunidade' — vazio é "não conta pra nenhuma reserva". */
+    public string $investmentReserveType = '';
+
     public string $investmentInstitution = '';
 
     public string $investmentMemberId = '';
@@ -174,7 +177,7 @@ class InvestmentsIndex extends Component
     public function getReservesProperty(): Collection
     {
         return FinancialReserve::query()
-            ->with('member', 'linkedInvestment')
+            ->with('member')
             ->get()
             ->sortBy([
                 fn (FinancialReserve $a, FinancialReserve $b) => ($a->member->name ?? '') <=> ($b->member->name ?? ''),
@@ -217,8 +220,11 @@ class InvestmentsIndex extends Component
      * membro ativo aparece — quem ainda não tem perfil cadastrado entra
      * com `perfil: null`, pra a tela oferecer o cadastro em vez de
      * simplesmente sumir da lista. Só entram na comparação de alocação os
-     * investimentos que mapeiam para uma classe de alocação — reserva e
-     * previdência ficam fora (ver AssetClass::allocationClass()).
+     * investimentos que mapeiam para uma classe de alocação (ver
+     * AssetClass::allocationClass()) E que não estão marcados como
+     * reserva (reserve_type) — um CDB que é a reserva de paz de alguém
+     * não conta como "renda fixa alocável", mesmo sendo um CDB de
+     * verdade.
      *
      * @return Collection<int, array{
      *     membro: ProfileMember,
@@ -251,7 +257,7 @@ class InvestmentsIndex extends Component
 
             if ($perfil !== null) {
                 $alocaveis = $investimentosPorMembro->get($membro->id, collect())
-                    ->filter(fn (InvestmentRecord $i) => $i->asset_class->allocationClass() !== null);
+                    ->filter(fn (InvestmentRecord $i) => $i->reserve_type === null && $i->asset_class->allocationClass() !== null);
                 $totalAlocavel = Money::sum($alocaveis->pluck('current_amount'));
                 $porCategoria = $alocaveis->groupBy(fn (InvestmentRecord $i) => $i->asset_class->allocationClass()->value);
 
@@ -405,6 +411,11 @@ class InvestmentsIndex extends Component
         $data = $this->validate([
             'investmentName' => ['required', 'string', 'max:255'],
             'investmentAssetClass' => ['required', Rule::enum(AssetClass::class)],
+            // '' é "não conta pra reserva nenhuma" — Rule::in já cobre os
+            // dois casos sozinho; 'required' rejeitaria '' (não é isso
+            // que "obrigatório" devia significar aqui), e 'nullable' não
+            // trata '' como vazio (só null), então nenhum dos dois serve.
+            'investmentReserveType' => [Rule::in(['', ...array_column(ReserveType::cases(), 'value')])],
             'investmentMemberId' => ['required'],
             'investmentTicker' => ['nullable', 'string', 'max:20'],
             'investmentInstitution' => ['nullable', 'string', 'max:255'],
@@ -433,6 +444,7 @@ class InvestmentsIndex extends Component
             'member_id' => $membroId,
             'sector' => $classe->sector(),
             'asset_class' => $classe,
+            'reserve_type' => $data['investmentReserveType'] !== '' ? $data['investmentReserveType'] : null,
             'ticker' => $data['investmentTicker'] !== '' ? $data['investmentTicker'] : null,
             'name' => $data['investmentName'],
             'institution' => $data['investmentInstitution'] !== '' ? $data['investmentInstitution'] : null,
@@ -474,7 +486,7 @@ class InvestmentsIndex extends Component
     private function resetInvestmentForm(): void
     {
         $this->reset(
-            'investmentName', 'investmentTicker', 'investmentAssetClass', 'investmentInstitution',
+            'investmentName', 'investmentTicker', 'investmentAssetClass', 'investmentReserveType', 'investmentInstitution',
             'investmentMemberId', 'investmentIsPrivate', 'investmentCurrentAmount', 'investmentInvestedAmount',
             'investmentQuantity', 'investmentUnitPrice', 'investmentPurchaseDate', 'investmentReturnRate',
         );

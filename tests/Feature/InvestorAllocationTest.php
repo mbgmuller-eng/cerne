@@ -41,7 +41,6 @@ class InvestorAllocationTest extends TestCase
         self::assertSame(AllocationAssetClass::DigitalAssets, AssetClass::Cripto->allocationClass());
         self::assertSame(AllocationAssetClass::Etfs, AssetClass::Etf->allocationClass());
         self::assertSame(AllocationAssetClass::International, AssetClass::AcaoExterior->allocationClass());
-        self::assertNull(AssetClass::ReservaPaz->allocationClass());
         self::assertNull(AssetClass::Previdencia->allocationClass());
     }
 
@@ -88,10 +87,14 @@ class InvestorAllocationTest extends TestCase
             'invested_amount' => '400.00',
         ]);
 
-        // Reserva não entra na comparação — some fora do total alocável.
-        $reserva = InvestmentRecord::factory()->for($perfil, 'profile')->for($membro, 'member')->create([
-            'sector' => InvestmentSector::Reserve,
-            'asset_class' => AssetClass::ReservaPaz,
+        // Reserva não entra na comparação — some fora do total alocável,
+        // mesmo sendo um CDB de verdade (a flag reserve_type é quem
+        // decide isso, não a classe do ativo — ver AssetClass::
+        // allocationClass()).
+        InvestmentRecord::factory()->for($perfil, 'profile')->for($membro, 'member')->create([
+            'sector' => InvestmentSector::FixedIncome,
+            'asset_class' => AssetClass::Cdb,
+            'reserve_type' => ReserveType::Paz,
             'current_amount' => '3000.00',
             'invested_amount' => '3000.00',
         ]);
@@ -99,8 +102,7 @@ class InvestorAllocationTest extends TestCase
             'member_id' => $membro->id,
             'reserve_type' => ReserveType::Paz,
             'target_amount' => '3000.00',
-            'current_amount' => '3000.00',
-            'linked_investment_id' => $reserva->id,
+            'current_amount' => '0.00',
         ]);
 
         $alocacoes = Livewire::test(InvestmentsIndex::class)->viewData('investorAllocations');

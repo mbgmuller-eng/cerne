@@ -14,8 +14,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 #[Fillable([
-    'profile_id', 'member_id', 'reserve_type', 'target_amount',
-    'current_amount', 'linked_investment_id',
+    'profile_id', 'member_id', 'reserve_type', 'target_amount', 'current_amount',
 ])]
 class FinancialReserve extends Model
 {
@@ -56,11 +55,6 @@ class FinancialReserve extends Model
         return $this->belongsTo(ProfileMember::class, 'member_id');
     }
 
-    public function linkedInvestment(): BelongsTo
-    {
-        return $this->belongsTo(InvestmentRecord::class, 'linked_investment_id');
-    }
-
     /** Reserva da família, não de uma pessoa — visível aos dois do casal. */
     public function isShared(): bool
     {
@@ -68,12 +62,35 @@ class FinancialReserve extends Model
     }
 
     /**
-     * Valor efetivo: quando há investimento vinculado, ele é a fonte da
-     * verdade — manter dois números manualmente é garantia de divergirem.
+     * Valor efetivo: soma de TODOS os investimentos ativos marcados com
+     * este tipo de reserva (investment_records.reserve_type) — nunca um
+     * FK só, uma reserva de verdade raramente cabe num investimento
+     * único (ex.: reserva de paz espalhada em vários certificados de
+     * CDB). Reserva do casal (member_id nulo) soma dos dois membros;
+     * reserva individual, só do dono. Soma em SQL, não em coleção (ver
+     * CLAUDE.md regra 3).
+     *
+     * Sem NENHUM investimento marcado ainda, cai pro `current_amount`
+     * manual — mesmo raciocínio de fallback do targetAmount() abaixo,
+     * pra quem ainda não migrou a reserva pra um investimento de
+     * verdade continuar com o número que já tinha digitado.
      */
     public function effectiveAmount(): string
     {
-        return $this->linkedInvestment?->current_amount ?? $this->current_amount;
+        $query = InvestmentRecord::withoutProfileScope()
+            ->where('profile_id', $this->profile_id)
+            ->forReserve($this->reserve_type)
+            ->active();
+
+        if (! $this->isShared()) {
+            $query->where('member_id', $this->member_id);
+        }
+
+        if (! $query->exists()) {
+            return $this->current_amount;
+        }
+
+        return Money::parse($query->sum('current_amount'));
     }
 
     /**

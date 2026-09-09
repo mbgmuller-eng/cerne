@@ -3,6 +3,7 @@
 @use('App\Enums\InvestorType')
 @use('App\Enums\EmploymentType')
 @use('App\Enums\AssetClass')
+@use('App\Enums\ReserveType')
 
 <div class="space-y-6">
 
@@ -96,6 +97,17 @@
                             <label for="investmentIsPrivate" class="text-sm text-slate-600 dark:text-slate-400">Ocultar do meu cônjuge</label>
                         </div>
                     @endif
+
+                    <div>
+                        <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Conta pra reserva</label>
+                        <select wire:model="investmentReserveType" class="select mt-1.5 w-full">
+                            <option value="">Nenhuma</option>
+                            @foreach (ReserveType::options() as $valor => $rotulo)
+                                <option value="{{ $valor }}">{{ $rotulo }}</option>
+                            @endforeach
+                        </select>
+                        @error('investmentReserveType') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                    </div>
 
                     <div>
                         <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Instituição</label>

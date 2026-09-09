@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Enums\AssetClass;
 use App\Enums\EmploymentType;
 use App\Enums\InvestorType;
 use App\Enums\Necessity;
@@ -10,6 +11,7 @@ use App\Livewire\Investments\InvestmentsIndex;
 use App\Models\ExpenseRecord;
 use App\Models\FinancialProfile;
 use App\Models\FinancialReserve;
+use App\Models\InvestmentRecord;
 use App\Models\InvestorProfile;
 use App\Models\ProfileMember;
 use App\Models\User;
@@ -336,6 +338,84 @@ class InvestorProfileReserveTest extends TestCase
 
             $reserva->delete();
         }
+    }
+
+    public function test_investimentos_marcados_somam_no_valor_efetivo_da_reserva(): void
+    {
+        [$perfil, $membro] = $this->criarPerfil();
+
+        $reserva = FinancialReserve::create([
+            'member_id' => $membro->id,
+            'reserve_type' => ReserveType::Paz,
+            'target_amount' => '0.00',
+            'current_amount' => '999.00', // não deve aparecer: existe investimento marcado
+        ]);
+
+        InvestmentRecord::factory()->for($perfil, 'profile')->for($membro, 'member')->create([
+            'asset_class' => AssetClass::Cdb,
+            'reserve_type' => ReserveType::Paz,
+            'current_amount' => '4000.00',
+        ]);
+        InvestmentRecord::factory()->for($perfil, 'profile')->for($membro, 'member')->create([
+            'asset_class' => AssetClass::Tesouro,
+            'reserve_type' => ReserveType::Paz,
+            'current_amount' => '1500.00',
+        ]);
+        // Não conta: outro tipo de reserva.
+        InvestmentRecord::factory()->for($perfil, 'profile')->for($membro, 'member')->create([
+            'asset_class' => AssetClass::Cdb,
+            'reserve_type' => ReserveType::Oportunidade,
+            'current_amount' => '800.00',
+        ]);
+        // Não conta: inativo.
+        InvestmentRecord::factory()->for($perfil, 'profile')->for($membro, 'member')->create([
+            'asset_class' => AssetClass::Cdb,
+            'reserve_type' => ReserveType::Paz,
+            'current_amount' => '2000.00',
+            'is_active' => false,
+        ]);
+
+        self::assertSame('5500.00', $reserva->effectiveAmount());
+    }
+
+    public function test_sem_nenhum_investimento_marcado_usa_o_valor_manual(): void
+    {
+        [, $membro] = $this->criarPerfil();
+
+        $reserva = FinancialReserve::create([
+            'member_id' => $membro->id,
+            'reserve_type' => ReserveType::Paz,
+            'target_amount' => '0.00',
+            'current_amount' => '999.00',
+        ]);
+
+        self::assertSame('999.00', $reserva->effectiveAmount());
+    }
+
+    public function test_reserva_do_casal_soma_investimentos_marcados_dos_dois_membros(): void
+    {
+        [$perfil, $titular] = $this->criarPerfil();
+        $conjuge = ProfileMember::factory()->create(['profile_id' => $perfil->id]);
+
+        $reserva = FinancialReserve::create([
+            'member_id' => null,
+            'reserve_type' => ReserveType::Paz,
+            'target_amount' => '0.00',
+            'current_amount' => '0.00',
+        ]);
+
+        InvestmentRecord::factory()->for($perfil, 'profile')->for($titular, 'member')->create([
+            'asset_class' => AssetClass::Cdb,
+            'reserve_type' => ReserveType::Paz,
+            'current_amount' => '3000.00',
+        ]);
+        InvestmentRecord::factory()->for($perfil, 'profile')->for($conjuge, 'member')->create([
+            'asset_class' => AssetClass::Fundo,
+            'reserve_type' => ReserveType::Paz,
+            'current_amount' => '1200.00',
+        ]);
+
+        self::assertSame('4200.00', $reserva->effectiveAmount());
     }
 
     /** @return array{0: FinancialProfile, 1: ProfileMember} */

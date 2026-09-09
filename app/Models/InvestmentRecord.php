@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Enums\AssetClass;
 use App\Enums\InvestmentSector;
 use App\Enums\RecordSource;
+use App\Enums\ReserveType;
 use App\Enums\ReturnRateType;
 use App\Models\Concerns\Auditable;
 use App\Models\Concerns\BelongsToProfile;
@@ -20,7 +21,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 #[Fillable([
-    'profile_id', 'member_id', 'sector', 'asset_class', 'ticker', 'name', 'institution',
+    'profile_id', 'member_id', 'sector', 'asset_class', 'reserve_type', 'ticker', 'name', 'institution',
     'current_amount', 'invested_amount', 'average_price', 'quantity', 'purchase_date',
     'maturity_date', 'return_rate', 'return_rate_type', 'broker_account_id', 'source',
     'external_asset_id', 'is_locked_by_sync', 'is_active', 'notes', 'source_document_id',
@@ -35,6 +36,7 @@ class InvestmentRecord extends Model
         return [
             'sector' => InvestmentSector::class,
             'asset_class' => AssetClass::class,
+            'reserve_type' => ReserveType::class,
             'return_rate_type' => ReturnRateType::class,
             'source' => RecordSource::class,
             'current_amount' => 'decimal:2',
@@ -67,6 +69,11 @@ class InvestmentRecord extends Model
     public function scopeActive(Builder $query): Builder
     {
         return $query->where('is_active', true);
+    }
+
+    public function scopeForReserve(Builder $query, ReserveType $type): Builder
+    {
+        return $query->where('reserve_type', $type);
     }
 
     /**
