@@ -51,6 +51,21 @@ class InvestmentsIndex extends Component
     public string $tab = 'portfolio';
 
     // -----------------------------------------------------------------
+    // Evolução do patrimônio (aba Performance) — lente do gráfico
+    // -----------------------------------------------------------------
+
+    /** 'total', 'group' ou 'asset' — o que as colunas da Evolução mostram. */
+    public string $evolutionLens = 'total';
+
+    /** Ativo escolhido quando $evolutionLens === 'asset'. */
+    public string $evolutionAssetId = '';
+
+    public function updatedEvolutionLens(): void
+    {
+        $this->evolutionAssetId = '';
+    }
+
+    // -----------------------------------------------------------------
     // Formulário — Perfil do investidor
     // -----------------------------------------------------------------
 
@@ -584,22 +599,23 @@ class InvestmentsIndex extends Component
     }
 
     /**
-     * Evolução mensal do patrimônio investido, mês a mês desde a primeira
-     * foto disponível (foto = InvestmentSnapshot) até a mais recente —
-     * respeita a mesma aba de privacidade da lista (Casal não existe pra
-     * investimento, mas um membro específico soma só os dele). Sem pelo
-     * menos 2 meses de foto no total não há curva pra desenhar (cliente
-     * novo, sem histórico importado nem um mês fechado ainda) — nesse
-     * caso, null.
+     * Base compartilhada pelo resumo (Total) e pelo gráfico de colunas
+     * (Total/Grupo/Ativo) da Evolução do patrimônio: o intervalo de
+     * meses comum a toda a carteira filtrada (do primeiro ao último mês
+     * com QUALQUER foto — foto = InvestmentSnapshot) e, dentro dele, o
+     * valor de CADA ativo mês a mês.
      *
      * O carry-forward é por ATIVO, não pela soma do mês — um mês em que
      * só parte da carteira tirou foto não pode fazer o total do mês
      * cair (ver teste de regressão: um CDB parado num mês, ao lado de um
-     * Tesouro que fotografou todo mês, não pode "sumir" da soma).
+     * Tesouro que fotografou todo mês, não pode "sumir" da soma). Sem
+     * pelo menos 2 meses de foto no total não há curva pra desenhar
+     * (cliente novo, sem histórico importado nem um mês fechado ainda)
+     * — nesse caso, null.
      *
-     * @return ?array{pontos: list<float>, desde: string, valorAtual: string, crescimentoValor: string, crescimentoPct: ?float}
+     * @return ?array{meses: list<CarbonImmutable>, porAtivo: array<string, list<float>>}
      */
-    public function getPortfolioEvolutionProperty(): ?array
+    private function evolutionSeries(): ?array
     {
         $ids = $this->sectorInvestments->pluck('id');
 
@@ -607,22 +623,22 @@ class InvestmentsIndex extends Component
             return null;
         }
 
-        $porAtivo = InvestmentSnapshot::query()
+        $porAtivoBruto = InvestmentSnapshot::query()
             ->whereIn('investment_id', $ids)
             ->orderBy('year')->orderBy('month')
             ->get(['investment_id', 'year', 'month', 'amount'])
             ->groupBy('investment_id');
 
-        if ($porAtivo->count() < 1 || $porAtivo->sum(fn (Collection $linhas) => $linhas->count()) < 2) {
+        if ($porAtivoBruto->sum(fn (Collection $linhas) => $linhas->count()) < 2) {
             return null;
         }
 
         $primeiroMes = null;
         $ultimoMes = null;
-        $seriesPorAtivo = [];
+        $seriesBrutas = [];
 
-        foreach ($porAtivo as $investmentId => $linhas) {
-            $seriesPorAtivo[$investmentId] = $linhas->mapWithKeys(fn ($l) => [$l->year.'-'.$l->month => (float) $l->amount]);
+        foreach ($porAtivoBruto as $investmentId => $linhas) {
+            $seriesBrutas[$investmentId] = $linhas->mapWithKeys(fn ($l) => [$l->year.'-'.$l->month => (float) $l->amount]);
 
             $primeira = CarbonImmutable::create($linhas->first()->year, $linhas->first()->month, 1);
             $ultima = CarbonImmutable::create($linhas->last()->year, $linhas->last()->month, 1);
@@ -634,32 +650,146 @@ class InvestmentsIndex extends Component
             return null; // um único mês de história no total — sem curva.
         }
 
-        $pontos = [];
-        $ultimoValorPorAtivo = [];
+        $meses = [];
         for ($mes = $primeiroMes; $mes->lte($ultimoMes); $mes = $mes->addMonth()) {
-            $chave = $mes->year.'-'.$mes->month;
-            $totalMes = 0.0;
-
-            foreach ($seriesPorAtivo as $investmentId => $porMes) {
-                $valor = $porMes[$chave] ?? ($ultimoValorPorAtivo[$investmentId] ?? 0.0);
-                $ultimoValorPorAtivo[$investmentId] = $valor;
-                $totalMes += $valor;
-            }
-
-            $pontos[] = $totalMes;
+            $meses[] = $mes;
         }
 
-        $primeiroValor = $pontos[0];
-        $ultimoValor = end($pontos);
+        $porAtivo = [];
+        foreach ($seriesBrutas as $investmentId => $porMes) {
+            $pontos = [];
+            $anterior = 0.0;
+            foreach ($meses as $mes) {
+                $anterior = $porMes[$mes->year.'-'.$mes->month] ?? $anterior;
+                $pontos[] = $anterior;
+            }
+            $porAtivo[$investmentId] = $pontos;
+        }
+
+        return ['meses' => $meses, 'porAtivo' => $porAtivo];
+    }
+
+    /** Soma, índice a índice, as séries mensais dos ativos informados. */
+    private function somarSeries(array $porAtivo, array $ids): array
+    {
+        $n = $porAtivo === [] ? 0 : count(reset($porAtivo));
+        $totais = array_fill(0, $n, 0.0);
+
+        foreach ($ids as $id) {
+            foreach ($porAtivo[$id] ?? [] as $i => $valor) {
+                $totais[$i] += $valor;
+            }
+        }
+
+        return $totais;
+    }
+
+    /**
+     * Resumo da Evolução do patrimônio (card de cima, sempre o TOTAL da
+     * carteira filtrada, independente da lente escolhida pro gráfico
+     * abaixo) — desde quando há histórico, valor atual e crescimento em
+     * R$ e % desde o primeiro mês.
+     *
+     * @return ?array{desde: string, valorAtual: string, crescimentoValor: string, crescimentoPct: ?float}
+     */
+    public function getPortfolioEvolutionProperty(): ?array
+    {
+        $series = $this->evolutionSeries();
+
+        if ($series === null) {
+            return null;
+        }
+
+        $total = $this->somarSeries($series['porAtivo'], array_keys($series['porAtivo']));
+        $primeiroValor = $total[0];
+        $ultimoValor = end($total);
         $crescimentoValor = $ultimoValor - $primeiroValor;
 
         return [
-            'pontos' => $pontos,
-            'desde' => $primeiroMes->translatedFormat('M/Y'),
+            'desde' => $series['meses'][0]->translatedFormat('M/Y'),
             'valorAtual' => Money::parse($ultimoValor),
             'crescimentoValor' => Money::parse($crescimentoValor),
             'crescimentoPct' => $primeiroValor > 0 ? ($crescimentoValor / $primeiroValor) * 100 : null,
         ];
+    }
+
+    /**
+     * Dado pro gráfico de colunas da Evolução — conforme $evolutionLens:
+     * 'total' (uma série só, a carteira inteira), 'group' (uma série
+     * empilhada por PortfolioDisplayGroup, cor fixa por grupo) ou
+     * 'asset' (uma série só, o ativo escolhido em $evolutionAssetId).
+     * `maximo` já vem calculado pra escala do eixo Y bater com o que
+     * está sendo mostrado (soma empilhada do mês, não o maior grupo
+     * isolado).
+     *
+     * @return ?array{
+     *     meses: list<string>,
+     *     total: ?list<float>,
+     *     porGrupo: ?list<array{grupo: PortfolioDisplayGroup, cor: string, valores: list<float>}>,
+     *     ativo: ?array{nome: string, valores: list<float>},
+     *     ativosDisponiveis: list<array{id: string, nome: string}>,
+     *     maximo: float,
+     * }
+     */
+    public function getEvolutionChartProperty(): ?array
+    {
+        $series = $this->evolutionSeries();
+
+        if ($series === null) {
+            return null;
+        }
+
+        $porAtivo = $series['porAtivo'];
+        $investimentosPorId = $this->sectorInvestments->keyBy('id');
+
+        $ativosDisponiveis = collect($porAtivo)->keys()
+            ->map(fn ($id) => $investimentosPorId->get($id))
+            ->filter()
+            ->sortBy(fn (InvestmentRecord $i) => $i->displayName())
+            ->map(fn (InvestmentRecord $i) => ['id' => $i->id, 'nome' => $i->displayName()])
+            ->values()->all();
+
+        $resultado = [
+            'meses' => collect($series['meses'])->map(fn (CarbonImmutable $m) => $m->translatedFormat('M/y'))->all(),
+            'total' => null,
+            'porGrupo' => null,
+            'ativo' => null,
+            'ativosDisponiveis' => $ativosDisponiveis,
+        ];
+
+        $seriesParaEscala = [];
+
+        if ($this->evolutionLens === 'group') {
+            $idsPorGrupo = collect(array_keys($porAtivo))
+                ->groupBy(fn ($id) => $investimentosPorId->get($id)?->displayGroup()->value ?? PortfolioDisplayGroup::Other->value);
+
+            $resultado['porGrupo'] = collect(PortfolioDisplayGroup::cases())
+                ->filter(fn (PortfolioDisplayGroup $grupo) => $idsPorGrupo->has($grupo->value))
+                ->map(fn (PortfolioDisplayGroup $grupo) => [
+                    'grupo' => $grupo,
+                    'cor' => $grupo->color(),
+                    'valores' => $this->somarSeries($porAtivo, $idsPorGrupo[$grupo->value]->all()),
+                ])
+                ->values()->all();
+
+            $seriesParaEscala = array_column($resultado['porGrupo'], 'valores');
+        } elseif ($this->evolutionLens === 'asset' && isset($porAtivo[$this->evolutionAssetId])) {
+            $investimento = $investimentosPorId->get($this->evolutionAssetId);
+            $resultado['ativo'] = [
+                'nome' => $investimento?->displayName() ?? '',
+                'valores' => $porAtivo[$this->evolutionAssetId],
+            ];
+
+            $seriesParaEscala = [$resultado['ativo']['valores']];
+        } else {
+            $resultado['total'] = $this->somarSeries($porAtivo, array_keys($porAtivo));
+            $seriesParaEscala = [$resultado['total']];
+        }
+
+        $somasPorMes = $this->somarSeries($seriesParaEscala, array_keys($seriesParaEscala));
+        $resultado['maximo'] = $somasPorMes === [] ? 1.0 : max(max($somasPorMes), 1.0);
+
+        return $resultado;
     }
 
     /** @return Collection<int, InvestmentPerformance> */
@@ -719,6 +849,7 @@ class InvestmentsIndex extends Component
             'reserves' => $this->reserves,
             'performance' => $this->performance,
             'portfolioEvolution' => $this->portfolioEvolution,
+            'evolutionChart' => $this->evolutionChart,
             'transactions' => $this->transactions,
             'snapshotHistory' => $this->snapshotHistory,
             'investorAllocations' => $this->investorAllocations,

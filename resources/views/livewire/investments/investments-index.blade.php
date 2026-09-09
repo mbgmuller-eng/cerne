@@ -465,8 +465,71 @@
                         </p>
                     </div>
                 </div>
-                <div class="mt-4">
-                    <x-sparkline :values="$portfolioEvolution['pontos']" :height="80" :width="640" />
+                <div class="mt-4 flex flex-wrap items-center justify-between gap-3">
+                    <div class="flex gap-1 rounded-lg bg-slate-100 p-1 dark:bg-white/5">
+                        @foreach (['total' => 'Total', 'group' => 'Grupo', 'asset' => 'Ativo'] as $lente => $rotuloLente)
+                            <button
+                                type="button"
+                                wire:click="$set('evolutionLens', '{{ $lente }}')"
+                                @class([
+                                    'rounded-md px-3 py-1 text-xs font-medium transition',
+                                    'bg-white text-slate-900 shadow-sm dark:bg-slate-700 dark:text-white' => $evolutionLens === $lente,
+                                    'text-slate-500 dark:text-slate-400' => $evolutionLens !== $lente,
+                                ])
+                            >{{ $rotuloLente }}</button>
+                        @endforeach
+                    </div>
+
+                    @if ($evolutionLens === 'asset')
+                        <select wire:model.live="evolutionAssetId" class="select w-auto text-xs">
+                            <option value="">Selecione um ativo</option>
+                            @foreach ($evolutionChart['ativosDisponiveis'] as $opcaoAtivo)
+                                <option value="{{ $opcaoAtivo['id'] }}">{{ $opcaoAtivo['nome'] }}</option>
+                            @endforeach
+                        </select>
+                    @endif
+                </div>
+
+                <div class="mt-3">
+                    @if ($evolutionLens === 'group' && $evolutionChart['porGrupo'] !== null)
+                        <x-bar-chart
+                            :meses="$evolutionChart['meses']"
+                            :series="collect($evolutionChart['porGrupo'])->map(fn ($g) => ['cor' => $g['cor'], 'valores' => $g['valores'], 'rotulo' => $g['grupo']->label()])->all()"
+                            :maximo="$evolutionChart['maximo']"
+                            :height="180"
+                            :width="640"
+                        />
+                        <div class="mt-3 flex flex-wrap gap-x-4 gap-y-1.5">
+                            @foreach ($evolutionChart['porGrupo'] as $grupoEvolucao)
+                                <span class="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
+                                    <span class="h-2.5 w-2.5 shrink-0 rounded-full" style="background-color: {{ $grupoEvolucao['cor'] }}"></span>
+                                    {{ $grupoEvolucao['grupo']->label() }}
+                                </span>
+                            @endforeach
+                        </div>
+                    @elseif ($evolutionLens === 'asset')
+                        @if ($evolutionChart['ativo'] !== null)
+                            <x-bar-chart
+                                :meses="$evolutionChart['meses']"
+                                :series="[['cor' => 'currentColor', 'valores' => $evolutionChart['ativo']['valores'], 'rotulo' => $evolutionChart['ativo']['nome']]]"
+                                :maximo="$evolutionChart['maximo']"
+                                :height="180"
+                                :width="640"
+                                class="text-brand-700 dark:text-brand-300"
+                            />
+                        @else
+                            <p class="py-8 text-center text-xs text-slate-400">Selecione um ativo pra ver a evolução dele.</p>
+                        @endif
+                    @else
+                        <x-bar-chart
+                            :meses="$evolutionChart['meses']"
+                            :series="[['cor' => 'currentColor', 'valores' => $evolutionChart['total'], 'rotulo' => 'Total']]"
+                            :maximo="$evolutionChart['maximo']"
+                            :height="180"
+                            :width="640"
+                            class="text-brand-700 dark:text-brand-300"
+                        />
+                    @endif
                 </div>
             </div>
         @endif

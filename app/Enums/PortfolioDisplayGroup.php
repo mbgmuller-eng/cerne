@@ -49,4 +49,29 @@ enum PortfolioDisplayGroup: string
             self::Other => 'Outros',
         };
     }
+
+    /**
+     * Cor fixa por grupo (mesma em claro/escuro, igual ao padrão já usado
+     * em AllocationAssetClass::color() pros pontinhos da carteira
+     * recomendada) — aqui alimenta as colunas empilhadas da "Evolução do
+     * patrimônio" por grupo. As 6 classes com meta recomendada reusam
+     * exatamente o hex de AllocationAssetClass, pra a mesma classe ter a
+     * mesma cor em qualquer gráfico da tela.
+     */
+    public function color(): string
+    {
+        return match ($this) {
+            self::ReservaPaz => '#2563eb',
+            self::ReservaOportunidade => '#ea580c',
+            self::FixedIncome => '#0f766e',
+            self::Funds => '#6366f1',
+            self::EquitiesFiis => '#d97706',
+            self::DigitalAssets => '#9333ea',
+            self::FxCurrencies => '#0891b2',
+            self::Etfs => '#e11d48',
+            self::Retirement => '#1e3a8a',
+            self::International => '#475569',
+            self::Other => '#94a3b8',
+        };
+    }
 }
