@@ -14,6 +14,7 @@ use App\Models\ExpenseSubcategory;
 use App\Models\IncomeCategory;
 use App\Models\IncomeRecord;
 use App\Models\ProfileMember;
+use App\Services\Extraction\VoiceExpenseExtractionService;
 use App\Services\InstallmentService;
 use App\Services\InvoiceService;
 use App\Support\Money;
@@ -228,6 +229,81 @@ class CashFlowIndex extends Component
         if ($this->showExpenseForm) {
             $this->resetExpenseForm();
         }
+    }
+
+    /**
+     * "Falar despesa" — o navegador transcreve a fala (Web Speech API,
+     * ver o x-data em cash-flow-index.blade.php) e manda o texto aqui.
+     * A IA só SUGERE valores pro formulário de sempre; nada é gravado
+     * até a pessoa revisar e clicar em salvar (regra 5 do CLAUDE.md —
+     * mesmo princípio da importação de PDF, só que com uma IA bem mais
+     * simples porque é sempre uma frase, um gasto só).
+     */
+    /**
+     * Devolve bool (não void) de propósito: quem chama é o Alpine em
+     * cash-flow-index.blade.php, via `$wire.call(...)` — o valor de
+     * retorno vira o resultado da Promise no JS. session()->flash('status')
+     * não serve aqui porque o banner de status mora no layout (fora da
+     * árvore que o Livewire re-renderiza numa chamada de ação), então
+     * ficaria escondido até a próxima navegação de página inteira — o
+     * Alpine usa este retorno pra mostrar o erro na hora, ao lado do
+     * próprio botão.
+     */
+    public function processVoiceExpense(string $transcricao, VoiceExpenseExtractionService $service): bool
+    {
+        $transcricao = trim($transcricao);
+
+        if ($transcricao === '') {
+            return false;
+        }
+
+        $categorias = ExpenseCategory::available()->pluck('name')->all();
+
+        try {
+            $dados = $service->extract($transcricao, $categorias);
+        } catch (\Throwable $e) {
+            report($e);
+
+            return false;
+        }
+
+        $necessidade = Necessity::tryFrom($dados['necessidade_sugerida'] ?? '') ?? Necessity::Discretionary;
+
+        // Mesmo filtro de getExpenseFormCategoriesProperty(): categoria de
+        // Investimento só é válida se a necessidade sugerida também for —
+        // senão a categoria escolhida pela IA nem apareceria no select.
+        $categoriaSugerida = $dados['categoria_sugerida'] ?? null;
+        $categoria = $categoriaSugerida !== null
+            ? ExpenseCategory::available()
+                ->when(
+                    $necessidade === Necessity::Investment,
+                    fn (Builder $q) => $q->where('necessity', Necessity::Investment->value),
+                    fn (Builder $q) => $q->whereNull('necessity'),
+                )
+                ->whereRaw('LOWER(name) = ?', [mb_strtolower(trim($categoriaSugerida))])
+                ->first()
+            : null;
+
+        $data = null;
+        if (filled($dados['data'] ?? null)) {
+            try {
+                $data = CarbonImmutable::parse($dados['data']);
+            } catch (\Throwable) {
+                $data = null;
+            }
+        }
+
+        $this->resetExpenseForm();
+        $this->expenseDescription = $dados['descricao'] ?? '';
+        $this->expenseAmount = $dados['valor'] !== null ? (string) $dados['valor'] : '';
+        $this->expenseDate = ($data ?? CarbonImmutable::now())->toDateString();
+        $this->expenseNecessity = $necessidade->value;
+        $this->expenseCategoryId = $categoria?->id ?? '';
+        $this->showIncomeForm = false;
+        $this->showBulkEditForm = false;
+        $this->showExpenseForm = true;
+
+        return true;
     }
 
     /**

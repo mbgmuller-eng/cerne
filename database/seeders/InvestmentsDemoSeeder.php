@@ -242,14 +242,15 @@ class InvestmentsDemoSeeder extends Seeder
      */
     private function reservas(ProfileMember $ana, ProfileMember $bruno): void
     {
-        $reservaPaz = InvestmentRecord::where('name', 'Reserva de emergência')->first();
-
+        // "Reserva de emergência" (criada acima) já nasce com reserve_type
+        // Paz — effectiveAmount() soma os investimentos marcados com essa
+        // reserva; current_amount aqui é só o valor de partida (fallback
+        // caso nenhum investimento esteja marcado).
         FinancialReserve::create([
             'member_id' => $ana->id,
             'reserve_type' => ReserveType::Paz,
             'target_amount' => '0.00',
             'current_amount' => '69000.00',
-            'linked_investment_id' => $reservaPaz?->id,
         ]);
 
         FinancialReserve::create([

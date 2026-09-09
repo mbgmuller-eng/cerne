@@ -14,6 +14,21 @@
         <div class="flex flex-wrap items-center gap-2">
             <button wire:click="toggleIncomeForm" class="btn-secondary px-3 py-1.5">+ Receita</button>
             <button wire:click="toggleExpenseForm" class="btn-primary px-3 py-1.5">+ Despesa</button>
+
+            <div x-data="voiceExpense()" class="contents">
+                <button
+                    type="button"
+                    x-show="suportado"
+                    x-cloak
+                    @click="alternar()"
+                    :disabled="processando"
+                    :class="gravando ? 'btn-primary' : 'btn-secondary'"
+                    class="px-3 py-1.5 disabled:opacity-60"
+                    x-text="rotulo()"
+                ></button>
+                <p x-show="erro" x-text="erro" x-cloak class="w-full text-xs text-red-700 dark:text-red-400"></p>
+            </div>
+
             <span class="mx-1 h-5 w-px bg-slate-200 dark:bg-white/10"></span>
             <button wire:click="previousMonth" class="btn-secondary px-3 py-1.5">←</button>
             <button wire:click="nextMonth" class="btn-secondary px-3 py-1.5">→</button>
