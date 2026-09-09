@@ -114,6 +114,9 @@ class InvestmentsIndex extends Component
 
     public string $investmentCurrentAmount = '';
 
+    /** Só usado ao editar — o dia em que o valor atual informado foi conferido (atualiza a foto do mês). */
+    public string $investmentValueDate = '';
+
     public string $investmentInvestedAmount = '';
 
     public string $investmentQuantity = '';
@@ -472,6 +475,7 @@ class InvestmentsIndex extends Component
         $this->investmentMemberId = $investimento->member_id;
         $this->investmentIsPrivate = $investimento->is_private;
         $this->investmentCurrentAmount = $investimento->current_amount;
+        $this->investmentValueDate = CarbonImmutable::now()->toDateString();
         $this->investmentInvestedAmount = (string) $investimento->invested_amount;
         $this->investmentPurchaseDate = $investimento->purchase_date?->toDateString() ?? '';
         $this->investmentReturnRate = (string) $investimento->return_rate;
@@ -512,6 +516,7 @@ class InvestmentsIndex extends Component
             'investmentQuantity' => [$comCotas ? 'required' : 'nullable', 'numeric', 'gt:0'],
             'investmentUnitPrice' => [$comCotas ? 'required' : 'nullable', 'numeric', 'gt:0'],
             'investmentCurrentAmount' => [$comCotas ? 'nullable' : 'required', 'numeric', 'gte:0'],
+            'investmentValueDate' => [$editando ? 'required' : 'nullable', 'date', 'before_or_equal:today'],
             'investmentInvestedAmount' => ['nullable', 'numeric', 'gte:0'],
             'investmentPurchaseDate' => ['nullable', 'date'],
             'investmentReturnRate' => ['nullable', 'string', 'max:50'],
@@ -522,6 +527,7 @@ class InvestmentsIndex extends Component
             'investmentQuantity' => 'quantidade',
             'investmentUnitPrice' => 'preço unitário',
             'investmentCurrentAmount' => 'valor atual',
+            'investmentValueDate' => 'data deste valor',
         ]);
 
         $membroId = $this->resolveMembro($this->investmentMemberId);
@@ -544,12 +550,26 @@ class InvestmentsIndex extends Component
         ];
 
         if ($editando) {
+            $valorAtual = Money::parse($data['investmentCurrentAmount']);
+
             InvestmentRecord::findOrFail($this->editingInvestmentId)->update($base + [
-                'current_amount' => Money::parse($data['investmentCurrentAmount']),
+                'current_amount' => $valorAtual,
                 'invested_amount' => $data['investmentInvestedAmount'] !== null && $data['investmentInvestedAmount'] !== ''
                     ? Money::parse($data['investmentInvestedAmount'])
-                    : Money::parse($data['investmentCurrentAmount']),
+                    : $valorAtual,
             ]);
+
+            // Mesma "foto mensal" que InvestmentSnapshotService::captureMonth()
+            // grava sozinho todo dia 1 — atualizar o valor à mão precisa
+            // manter o histórico coerente com o que a tela de Evolução do
+            // patrimônio mostra, senão a curva só refletiria a mudança no
+            // próximo mês. Uma foto por mês: editar de novo no mesmo mês
+            // corrige a mesma foto, não cria outra.
+            $dataValor = CarbonImmutable::parse($data['investmentValueDate']);
+            InvestmentSnapshot::updateOrCreate(
+                ['investment_id' => $this->editingInvestmentId, 'year' => $dataValor->year, 'month' => $dataValor->month],
+                ['amount' => $valorAtual],
+            );
         } elseif ($comCotas) {
             $custoTotal = bcmul((string) $data['investmentQuantity'], (string) $data['investmentUnitPrice'], 2);
             $valorAtual = $data['investmentCurrentAmount'] !== null && $data['investmentCurrentAmount'] !== ''
@@ -584,7 +604,7 @@ class InvestmentsIndex extends Component
     {
         $this->reset(
             'editingInvestmentId', 'investmentName', 'investmentTicker', 'investmentAssetClass', 'investmentReserveType', 'investmentInstitution',
-            'investmentMemberId', 'investmentIsPrivate', 'investmentCurrentAmount', 'investmentInvestedAmount',
+            'investmentMemberId', 'investmentIsPrivate', 'investmentCurrentAmount', 'investmentValueDate', 'investmentInvestedAmount',
             'investmentQuantity', 'investmentUnitPrice', 'investmentPurchaseDate', 'investmentReturnRate',
         );
         $this->resetErrorBag();

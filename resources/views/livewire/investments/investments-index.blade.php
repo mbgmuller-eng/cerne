@@ -157,6 +157,15 @@
                             @error('investmentCurrentAmount') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
                         </div>
 
+                        @if ($editingInvestmentId)
+                            <div wire:key="investment-field-value-date">
+                                <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Data deste valor</label>
+                                <input type="date" wire:model="investmentValueDate" class="input mt-1.5" max="{{ now()->toDateString() }}">
+                                <p class="mt-1 text-xs text-slate-400">O dia em que você conferiu esse valor — atualiza o histórico do mês.</p>
+                                @error('investmentValueDate') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                            </div>
+                        @endif
+
                         <div wire:key="investment-field-invested-amount">
                             <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Valor investido (aporte)</label>
                             <input type="number" step="0.01" min="0" wire:model="investmentInvestedAmount" class="input mt-1.5" placeholder="Se vazio, usa o valor atual">

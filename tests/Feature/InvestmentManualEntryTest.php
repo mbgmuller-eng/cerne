@@ -7,6 +7,7 @@ use App\Enums\InvestmentSector;
 use App\Livewire\Investments\InvestmentsIndex;
 use App\Models\FinancialProfile;
 use App\Models\InvestmentRecord;
+use App\Models\InvestmentSnapshot;
 use App\Models\InvestmentTransaction;
 use App\Models\ProfileMember;
 use App\Models\User;
@@ -190,6 +191,7 @@ class InvestmentManualEntryTest extends TestCase
             ->assertSet('investmentName', 'CDB Original')
             ->assertSet('investmentAssetClass', AssetClass::Cdb->value)
             ->assertSet('investmentCurrentAmount', '8000.00')
+            ->assertSet('investmentValueDate', now()->toDateString())
             ->assertSet('investmentInvestedAmount', '7500.00')
             ->assertSet('showInvestmentForm', true);
     }
@@ -243,6 +245,69 @@ class InvestmentManualEntryTest extends TestCase
         self::assertSame('100.000000', $investimento->quantity);
         self::assertSame('32.500000', $investimento->average_price);
         self::assertSame('4000.00', $investimento->current_amount);
+    }
+
+    /**
+     * A tela de Evolução do patrimônio (aba Performance) é construída em
+     * cima de InvestmentSnapshot — sem gravar uma foto aqui, atualizar o
+     * valor à mão só apareceria no gráfico na próxima captura automática
+     * do dia 1 (InvestmentSnapshotService::captureMonth()), o que deixaria
+     * a curva desatualizada por semanas.
+     */
+    public function test_editar_valor_atual_grava_a_foto_do_mes_pro_grafico_de_evolucao(): void
+    {
+        [$perfil, $membro] = $this->criarPerfil();
+        $investimento = InvestmentRecord::factory()->for($perfil, 'profile')->for($membro, 'member')->create([
+            'current_amount' => '8000.00',
+        ]);
+
+        Livewire::test(InvestmentsIndex::class)
+            ->call('editInvestment', $investimento->id)
+            ->set('investmentCurrentAmount', '8500.00')
+            ->set('investmentValueDate', '2026-03-15')
+            ->call('saveInvestment')
+            ->assertHasNoErrors();
+
+        $foto = InvestmentSnapshot::query()->where('investment_id', $investimento->id)->where('year', 2026)->where('month', 3)->first();
+        self::assertNotNull($foto);
+        self::assertSame('8500.00', $foto->amount);
+    }
+
+    public function test_editar_duas_vezes_no_mesmo_mes_atualiza_a_mesma_foto_sem_duplicar(): void
+    {
+        [$perfil, $membro] = $this->criarPerfil();
+        $investimento = InvestmentRecord::factory()->for($perfil, 'profile')->for($membro, 'member')->create([
+            'current_amount' => '8000.00',
+        ]);
+
+        Livewire::test(InvestmentsIndex::class)
+            ->call('editInvestment', $investimento->id)
+            ->set('investmentCurrentAmount', '8300.00')
+            ->set('investmentValueDate', '2026-03-05')
+            ->call('saveInvestment');
+
+        Livewire::test(InvestmentsIndex::class)
+            ->call('editInvestment', $investimento->id)
+            ->set('investmentCurrentAmount', '8600.00')
+            ->set('investmentValueDate', '2026-03-20')
+            ->call('saveInvestment');
+
+        self::assertSame(1, InvestmentSnapshot::query()->where('investment_id', $investimento->id)->where('year', 2026)->where('month', 3)->count());
+        $foto = InvestmentSnapshot::query()->where('investment_id', $investimento->id)->where('year', 2026)->where('month', 3)->first();
+        self::assertSame('8600.00', $foto->amount); // a edição mais recente vence, mesma foto do mês.
+    }
+
+    public function test_data_deste_valor_nao_pode_ser_no_futuro(): void
+    {
+        [, $membro] = $this->criarPerfil();
+        $investimento = InvestmentRecord::factory()->for($membro->profile, 'profile')->for($membro, 'member')->create();
+
+        Livewire::test(InvestmentsIndex::class)
+            ->call('editInvestment', $investimento->id)
+            ->set('investmentCurrentAmount', '1000.00')
+            ->set('investmentValueDate', now()->addDay()->toDateString())
+            ->call('saveInvestment')
+            ->assertHasErrors(['investmentValueDate']);
     }
 
     public function test_nao_consegue_editar_investimento_de_outro_perfil(): void
