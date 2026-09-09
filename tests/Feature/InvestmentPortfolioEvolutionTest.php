@@ -91,6 +91,30 @@ class InvestmentPortfolioEvolutionTest extends TestCase
     }
 
     /**
+     * Regressão: getPortfolioEvolutionProperty() é uma computed property,
+     * mas render() passa os dados pra view por uma lista explícita (não
+     * pela resolução mágica do Livewire) — esquecer de acrescentar
+     * 'portfolioEvolution' ali não quebra Livewire::test()->get(), que
+     * chama a property direto, só quebra o HTML de verdade ("Undefined
+     * variable $portfolioEvolution"). Só um teste que troca de aba de
+     * fato pega isso — foi exatamente o que aconteceu em produção.
+     */
+    public function test_as_tres_abas_renderizam_sem_erro(): void
+    {
+        [$perfil, $membro] = $this->criarPerfil();
+        $this->actingAs($membro->user);
+        app(ProfileContext::class)->set($perfil, $membro);
+
+        $ativo = InvestmentRecord::factory()->for($perfil, 'profile')->for($membro, 'member')->create(['current_amount' => '1000.00']);
+        InvestmentSnapshot::create(['investment_id' => $ativo->id, 'year' => 2026, 'month' => 6, 'amount' => '800.00']);
+        InvestmentSnapshot::create(['investment_id' => $ativo->id, 'year' => 2026, 'month' => 8, 'amount' => '1000.00']);
+
+        foreach (['portfolio', 'performance', 'transactions'] as $aba) {
+            Livewire::test(InvestmentsIndex::class)->call('setTab', $aba)->assertOk();
+        }
+    }
+
+    /**
      * @return array{0: FinancialProfile, 1: ProfileMember}
      */
     private function criarPerfil(): array

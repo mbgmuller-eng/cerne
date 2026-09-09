@@ -718,6 +718,7 @@ class InvestmentsIndex extends Component
             'totalGain' => $this->totalGain,
             'reserves' => $this->reserves,
             'performance' => $this->performance,
+            'portfolioEvolution' => $this->portfolioEvolution,
             'transactions' => $this->transactions,
             'snapshotHistory' => $this->snapshotHistory,
             'investorAllocations' => $this->investorAllocations,
