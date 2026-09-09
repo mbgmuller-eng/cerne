@@ -127,8 +127,41 @@ class InvestmentPortfolioEvolutionTest extends TestCase
         self::assertSame(PortfolioDisplayGroup::FixedIncome->color(), $grafico['porGrupo'][0]['cor']);
         self::assertSame([1000.0, 1000.0], $grafico['porGrupo'][0]['valores']);
         self::assertSame([2000.0, 3000.0], $grafico['porGrupo'][1]['valores']);
+        self::assertTrue($grafico['porGrupo'][0]['visivel']);
+        self::assertTrue($grafico['porGrupo'][1]['visivel']);
         // escala do eixo Y é a SOMA empilhada do mês (não o maior grupo isolado): ago = 1000+3000.
         self::assertSame(4000.0, $grafico['maximo']);
+    }
+
+    public function test_clicar_na_legenda_esconde_o_grupo_e_reescala_o_eixo_pros_que_sobraram(): void
+    {
+        [$perfil, $membro] = $this->criarPerfil();
+        $this->actingAs($membro->user);
+        app(ProfileContext::class)->set($perfil, $membro);
+
+        $etf = InvestmentRecord::factory()->for($perfil, 'profile')->for($membro, 'member')->create(['asset_class' => AssetClass::Etf, 'current_amount' => '3000.00']);
+        InvestmentSnapshot::create(['investment_id' => $etf->id, 'year' => 2026, 'month' => 7, 'amount' => '2000.00']);
+        InvestmentSnapshot::create(['investment_id' => $etf->id, 'year' => 2026, 'month' => 8, 'amount' => '3000.00']);
+
+        $cdb = InvestmentRecord::factory()->for($perfil, 'profile')->for($membro, 'member')->create(['asset_class' => AssetClass::Cdb, 'current_amount' => '1000.00']);
+        InvestmentSnapshot::create(['investment_id' => $cdb->id, 'year' => 2026, 'month' => 7, 'amount' => '1000.00']);
+        InvestmentSnapshot::create(['investment_id' => $cdb->id, 'year' => 2026, 'month' => 8, 'amount' => '1000.00']);
+
+        $componente = Livewire::test(InvestmentsIndex::class)
+            ->set('evolutionLens', 'group')
+            ->call('toggleEvolutionGroup', PortfolioDisplayGroup::Etfs->value);
+
+        $grafico = $componente->get('evolutionChart');
+
+        // continua listado (pra dar pra religar), só marcado como escondido — e não entra mais na escala.
+        self::assertCount(2, $grafico['porGrupo']);
+        self::assertFalse($grafico['porGrupo'][1]['visivel']);
+        self::assertTrue($grafico['porGrupo'][0]['visivel']);
+        self::assertSame(1000.0, $grafico['maximo']); // sem o Etfs (2000/3000), só sobra o Cdb (1000/1000).
+
+        $componente->call('toggleEvolutionGroup', PortfolioDisplayGroup::Etfs->value);
+        self::assertTrue($componente->get('evolutionChart')['porGrupo'][1]['visivel']);
+        self::assertSame(4000.0, $componente->get('evolutionChart')['maximo']);
     }
 
     public function test_lente_ativo_mostra_so_a_serie_do_ativo_escolhido_e_trocar_de_lente_limpa_a_escolha(): void
@@ -188,6 +221,13 @@ class InvestmentPortfolioEvolutionTest extends TestCase
                 ->set('evolutionAssetId', $lente === 'asset' ? $ativo->id : '')
                 ->assertOk();
         }
+
+        // lente Grupo com TODOS os grupos escondidos — o "sem grupo selecionado" também precisa renderizar.
+        Livewire::test(InvestmentsIndex::class)
+            ->call('setTab', 'performance')
+            ->set('evolutionLens', 'group')
+            ->call('toggleEvolutionGroup', $ativo->displayGroup()->value)
+            ->assertOk();
     }
 
     /**

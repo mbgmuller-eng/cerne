@@ -60,9 +60,20 @@ class InvestmentsIndex extends Component
     /** Ativo escolhido quando $evolutionLens === 'asset'. */
     public string $evolutionAssetId = '';
 
+    /** Grupos que o clique na legenda tirou do gráfico empilhado (lente 'group') — value do PortfolioDisplayGroup. */
+    public array $evolutionHiddenGroups = [];
+
     public function updatedEvolutionLens(): void
     {
         $this->evolutionAssetId = '';
+    }
+
+    /** Clique na legenda liga/desliga um grupo no gráfico empilhado — não mexe na escala dos outros. */
+    public function toggleEvolutionGroup(string $grupo): void
+    {
+        $this->evolutionHiddenGroups = in_array($grupo, $this->evolutionHiddenGroups, true)
+            ? array_values(array_diff($this->evolutionHiddenGroups, [$grupo]))
+            : [...$this->evolutionHiddenGroups, $grupo];
     }
 
     // -----------------------------------------------------------------
@@ -722,10 +733,17 @@ class InvestmentsIndex extends Component
      * está sendo mostrado (soma empilhada do mês, não o maior grupo
      * isolado).
      *
+     * `porGrupo` sempre traz TODOS os grupos com dado (mesmo os escondidos
+     * pela legenda, marcados `visivel: false`) — é o que alimenta os
+     * botões de filtro, que precisam continuar clicáveis pra religar um
+     * grupo. Só os `visivel: true` entram no empilhado de verdade e na
+     * escala do eixo Y (esconder um grupo reaproveita a régua pros que
+     * sobraram, não deixa um espaço vazio no topo do gráfico).
+     *
      * @return ?array{
      *     meses: list<string>,
      *     total: ?list<float>,
-     *     porGrupo: ?list<array{grupo: PortfolioDisplayGroup, cor: string, valores: list<float>}>,
+     *     porGrupo: ?list<array{grupo: PortfolioDisplayGroup, cor: string, valores: list<float>, visivel: bool}>,
      *     ativo: ?array{nome: string, valores: list<float>},
      *     ativosDisponiveis: list<array{id: string, nome: string}>,
      *     maximo: float,
@@ -769,10 +787,13 @@ class InvestmentsIndex extends Component
                     'grupo' => $grupo,
                     'cor' => $grupo->color(),
                     'valores' => $this->somarSeries($porAtivo, $idsPorGrupo[$grupo->value]->all()),
+                    'visivel' => ! in_array($grupo->value, $this->evolutionHiddenGroups, true),
                 ])
                 ->values()->all();
 
-            $seriesParaEscala = array_column($resultado['porGrupo'], 'valores');
+            $seriesParaEscala = collect($resultado['porGrupo'])
+                ->filter(fn (array $g) => $g['visivel'])
+                ->pluck('valores')->all();
         } elseif ($this->evolutionLens === 'asset' && isset($porAtivo[$this->evolutionAssetId])) {
             $investimento = $investimentosPorId->get($this->evolutionAssetId);
             $resultado['ativo'] = [

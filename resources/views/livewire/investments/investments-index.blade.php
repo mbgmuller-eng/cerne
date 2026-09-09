@@ -492,19 +492,35 @@
 
                 <div class="mt-3">
                     @if ($evolutionLens === 'group' && $evolutionChart['porGrupo'] !== null)
-                        <x-bar-chart
-                            :meses="$evolutionChart['meses']"
-                            :series="collect($evolutionChart['porGrupo'])->map(fn ($g) => ['cor' => $g['cor'], 'valores' => $g['valores'], 'rotulo' => $g['grupo']->label()])->all()"
-                            :maximo="$evolutionChart['maximo']"
-                            :height="180"
-                            :width="640"
-                        />
-                        <div class="mt-3 flex flex-wrap gap-x-4 gap-y-1.5">
+                        @if (collect($evolutionChart['porGrupo'])->contains('visivel', true))
+                            <x-bar-chart
+                                :meses="$evolutionChart['meses']"
+                                :series="collect($evolutionChart['porGrupo'])->where('visivel', true)->map(fn ($g) => ['cor' => $g['cor'], 'valores' => $g['valores'], 'rotulo' => $g['grupo']->label()])->all()"
+                                :maximo="$evolutionChart['maximo']"
+                                :height="180"
+                                :width="640"
+                            />
+                        @else
+                            <p class="py-8 text-center text-xs text-slate-400">Nenhum grupo selecionado — clique num grupo abaixo pra mostrar de novo.</p>
+                        @endif
+                        <div class="mt-3 flex flex-wrap gap-x-4 gap-y-2">
                             @foreach ($evolutionChart['porGrupo'] as $grupoEvolucao)
-                                <span class="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
-                                    <span class="h-2.5 w-2.5 shrink-0 rounded-full" style="background-color: {{ $grupoEvolucao['cor'] }}"></span>
+                                <button
+                                    type="button"
+                                    wire:click="toggleEvolutionGroup('{{ $grupoEvolucao['grupo']->value }}')"
+                                    @class([
+                                        'flex items-center gap-1.5 text-xs transition',
+                                        'text-slate-500 dark:text-slate-400' => $grupoEvolucao['visivel'],
+                                        'text-slate-300 line-through dark:text-slate-600' => ! $grupoEvolucao['visivel'],
+                                    ])
+                                    title="{{ $grupoEvolucao['visivel'] ? 'Clique pra esconder' : 'Clique pra mostrar' }}"
+                                >
+                                    <span
+                                        class="h-2.5 w-2.5 shrink-0 rounded-full"
+                                        style="background-color: {{ $grupoEvolucao['visivel'] ? $grupoEvolucao['cor'] : 'transparent' }}; border: 1.5px solid {{ $grupoEvolucao['cor'] }}"
+                                    ></span>
                                     {{ $grupoEvolucao['grupo']->label() }}
-                                </span>
+                                </button>
                             @endforeach
                         </div>
                     @elseif ($evolutionLens === 'asset')
