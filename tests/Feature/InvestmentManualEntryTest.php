@@ -174,6 +174,90 @@ class InvestmentManualEntryTest extends TestCase
         self::assertSame(0, InvestmentRecord::query()->where('name', 'Ação sem dados')->count());
     }
 
+    public function test_editar_carrega_os_dados_no_formulario(): void
+    {
+        [$perfil, $membro] = $this->criarPerfil();
+        $investimento = InvestmentRecord::factory()->for($perfil, 'profile')->for($membro, 'member')->create([
+            'name' => 'CDB Original',
+            'asset_class' => AssetClass::Cdb,
+            'current_amount' => '8000.00',
+            'invested_amount' => '7500.00',
+        ]);
+
+        Livewire::test(InvestmentsIndex::class)
+            ->call('editInvestment', $investimento->id)
+            ->assertSet('editingInvestmentId', $investimento->id)
+            ->assertSet('investmentName', 'CDB Original')
+            ->assertSet('investmentAssetClass', AssetClass::Cdb->value)
+            ->assertSet('investmentCurrentAmount', '8000.00')
+            ->assertSet('investmentInvestedAmount', '7500.00')
+            ->assertSet('showInvestmentForm', true);
+    }
+
+    public function test_editar_atualiza_um_ativo_sem_cota_sem_criar_linha_nova(): void
+    {
+        [$perfil, $membro] = $this->criarPerfil();
+        $investimento = InvestmentRecord::factory()->for($perfil, 'profile')->for($membro, 'member')->create([
+            'name' => 'CDB Original',
+            'asset_class' => AssetClass::Cdb,
+            'institution' => 'Banco Antigo',
+            'current_amount' => '8000.00',
+            'invested_amount' => '7500.00',
+        ]);
+
+        Livewire::test(InvestmentsIndex::class)
+            ->call('editInvestment', $investimento->id)
+            ->set('investmentInstitution', 'Banco Novo')
+            ->set('investmentCurrentAmount', '8500.00')
+            ->call('saveInvestment')
+            ->assertHasNoErrors();
+
+        self::assertSame(1, InvestmentRecord::query()->count());
+        $investimento->refresh();
+        self::assertSame('Banco Novo', $investimento->institution);
+        self::assertSame('8500.00', $investimento->current_amount);
+        self::assertSame('7500.00', $investimento->invested_amount); // não mexeu
+    }
+
+    public function test_editar_ativo_com_cota_nao_mexe_em_quantidade_nem_preco_medio(): void
+    {
+        [$perfil, $membro] = $this->criarPerfil();
+        $investimento = InvestmentRecord::factory()->for($perfil, 'profile')->for($membro, 'member')->create([
+            'name' => 'Petrobras PN',
+            'ticker' => 'PETR4',
+            'asset_class' => AssetClass::Acao,
+            'quantity' => '100.000000',
+            'average_price' => '32.500000',
+            'current_amount' => '3250.00',
+            'invested_amount' => '3250.00',
+        ]);
+
+        Livewire::test(InvestmentsIndex::class)
+            ->call('editInvestment', $investimento->id)
+            ->set('investmentCurrentAmount', '4000.00') // valorizou
+            ->call('saveInvestment')
+            ->assertHasNoErrors();
+
+        self::assertSame(0, InvestmentTransaction::query()->count()); // não criou transação nova
+        $investimento->refresh();
+        self::assertSame('100.000000', $investimento->quantity);
+        self::assertSame('32.500000', $investimento->average_price);
+        self::assertSame('4000.00', $investimento->current_amount);
+    }
+
+    public function test_nao_consegue_editar_investimento_de_outro_perfil(): void
+    {
+        $this->criarPerfil();
+
+        $outroPerfil = FinancialProfile::factory()->create();
+        $outroMembro = ProfileMember::factory()->create(['profile_id' => $outroPerfil->id]);
+        $investimentoAlheio = InvestmentRecord::factory()->for($outroPerfil, 'profile')->for($outroMembro, 'member')->create();
+
+        $this->expectException(\Illuminate\Database\Eloquent\ModelNotFoundException::class);
+
+        Livewire::test(InvestmentsIndex::class)->call('editInvestment', $investimentoAlheio->id);
+    }
+
     public function test_membro_de_outro_perfil_nao_e_aceito(): void
     {
         $this->criarPerfil();

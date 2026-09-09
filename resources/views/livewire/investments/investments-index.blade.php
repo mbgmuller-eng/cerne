@@ -58,9 +58,15 @@
         </div>
 
         @if ($showInvestmentForm)
-            @php $comCotas = $investmentAssetClass !== '' && AssetClass::tryFrom($investmentAssetClass)?->hasQuantity(); @endphp
+            @php
+                // Editar nunca mostra os campos de cota, mesmo pra um ativo
+                // que nasceu com elas — ver InvestmentsIndex::saveInvestment().
+                $comCotas = ! $editingInvestmentId && $investmentAssetClass !== '' && AssetClass::tryFrom($investmentAssetClass)?->hasQuantity();
+            @endphp
             <div class="card space-y-4 p-5">
-                <p class="text-sm font-semibold text-slate-900 dark:text-white">Novo investimento</p>
+                <p class="text-sm font-semibold text-slate-900 dark:text-white">
+                    {{ $editingInvestmentId ? 'Editar investimento' : 'Novo investimento' }}
+                </p>
 
                 <div class="grid gap-4 sm:grid-cols-2">
                     <div>
@@ -160,7 +166,9 @@
                     @endif
                 </div>
 
-                <button type="button" wire:click="saveInvestment" class="btn-primary w-full sm:w-auto">Salvar investimento</button>
+                <button type="button" wire:click="saveInvestment" class="btn-primary w-full sm:w-auto">
+                    {{ $editingInvestmentId ? 'Salvar alterações' : 'Salvar investimento' }}
+                </button>
             </div>
         @endif
 
@@ -367,6 +375,7 @@
                                                 {{ $pct >= 0 ? '+' : '' }}{{ number_format($pct, 2, ',', '.') }}%
                                             </p>
                                         @endif
+                                        <button type="button" wire:click="editInvestment('{{ $ativo->id }}')" class="mt-0.5 text-xs text-slate-500 hover:underline dark:text-slate-400">Editar</button>
                                     </div>
                                 </div>
 
@@ -413,6 +422,7 @@
                                             {{ (float) $ganho >= 0 ? '+' : '' }}{{ Money::format($ganho) }}
                                         </p>
                                     @endif
+                                    <button type="button" wire:click="editInvestment('{{ $ativo->id }}')" class="text-xs text-slate-500 hover:underline dark:text-slate-400">Editar</button>
                                 </div>
                             </li>
                         @endforeach

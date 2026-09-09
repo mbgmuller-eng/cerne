@@ -68,6 +68,9 @@ class InvestmentsIndex extends Component
 
     public bool $showInvestmentForm = false;
 
+    /** id do investimento em edição, ou nulo quando o formulário é de cadastro novo. */
+    public ?string $editingInvestmentId = null;
+
     public string $investmentName = '';
 
     public string $investmentTicker = '';
@@ -423,6 +426,34 @@ class InvestmentsIndex extends Component
     }
 
     /**
+     * Carrega um investimento já cadastrado pro formulário — mesmo
+     * formulário do cadastro novo, só que salvar atualiza em vez de
+     * criar (ver saveInvestment()). Quantidade/preço médio nunca entram
+     * aqui: pertencem à transação de compra que originou o ativo, editar
+     * não pode corrigir isso por fora dela (senão o preço médio
+     * dessincroniza da transação que devia explicá-lo).
+     */
+    public function editInvestment(string $investmentId): void
+    {
+        $investimento = InvestmentRecord::findOrFail($investmentId);
+
+        $this->editingInvestmentId = $investimento->id;
+        $this->investmentName = $investimento->name;
+        $this->investmentTicker = (string) $investimento->ticker;
+        $this->investmentAssetClass = $investimento->asset_class->value;
+        $this->investmentReserveType = $investimento->reserve_type?->value ?? '';
+        $this->investmentInstitution = (string) $investimento->institution;
+        $this->investmentMemberId = $investimento->member_id;
+        $this->investmentIsPrivate = $investimento->is_private;
+        $this->investmentCurrentAmount = $investimento->current_amount;
+        $this->investmentInvestedAmount = (string) $investimento->invested_amount;
+        $this->investmentPurchaseDate = $investimento->purchase_date?->toDateString() ?? '';
+        $this->investmentReturnRate = (string) $investimento->return_rate;
+        $this->showInvestmentForm = true;
+        $this->resetErrorBag();
+    }
+
+    /**
      * Ativo com cota (ação, FII, ETF, cripto...) nasce de uma
      * transação de compra de verdade, passando pelo mesmo
      * InvestmentTransactionService que recalcula preço médio — não é
@@ -430,10 +461,16 @@ class InvestmentsIndex extends Component
      * do InvestmentsDemoSeeder). Ativo sem cota (CDB, Tesouro,
      * Previdência...) não tem preço médio pra calcular: entra direto
      * com o valor atual e o investido informados.
+     *
+     * Editar nunca passa pelo caminho de cotas, mesmo pra um ativo que
+     * nasceu com elas — o formulário de edição não mexe em
+     * quantidade/preço médio (ver editInvestment()), só corrige os
+     * outros campos e o valor atual de mercado.
      */
     public function saveInvestment(InvestmentTransactionService $service): void
     {
-        $comCotas = $this->investmentAssetClass !== '' && (AssetClass::tryFrom($this->investmentAssetClass)?->hasQuantity() ?? false);
+        $editando = $this->editingInvestmentId !== null;
+        $comCotas = ! $editando && $this->investmentAssetClass !== '' && (AssetClass::tryFrom($this->investmentAssetClass)?->hasQuantity() ?? false);
 
         $data = $this->validate([
             'investmentName' => ['required', 'string', 'max:255'],
@@ -477,17 +514,23 @@ class InvestmentsIndex extends Component
             'institution' => $data['investmentInstitution'] !== '' ? $data['investmentInstitution'] : null,
             'purchase_date' => $dataCompra,
             'return_rate' => $data['investmentReturnRate'] !== '' ? $data['investmentReturnRate'] : null,
-            'created_by_user_id' => auth()->id(),
             'is_private' => $this->investmentIsPrivate,
         ];
 
-        if ($comCotas) {
+        if ($editando) {
+            InvestmentRecord::findOrFail($this->editingInvestmentId)->update($base + [
+                'current_amount' => Money::parse($data['investmentCurrentAmount']),
+                'invested_amount' => $data['investmentInvestedAmount'] !== null && $data['investmentInvestedAmount'] !== ''
+                    ? Money::parse($data['investmentInvestedAmount'])
+                    : Money::parse($data['investmentCurrentAmount']),
+            ]);
+        } elseif ($comCotas) {
             $custoTotal = bcmul((string) $data['investmentQuantity'], (string) $data['investmentUnitPrice'], 2);
             $valorAtual = $data['investmentCurrentAmount'] !== null && $data['investmentCurrentAmount'] !== ''
                 ? Money::parse($data['investmentCurrentAmount'])
                 : $custoTotal;
 
-            $investimento = InvestmentRecord::create($base + ['current_amount' => $valorAtual]);
+            $investimento = InvestmentRecord::create($base + ['current_amount' => $valorAtual, 'created_by_user_id' => auth()->id()]);
 
             $service->record($investimento, [
                 'type' => TransactionType::Buy,
@@ -502,10 +545,11 @@ class InvestmentsIndex extends Component
                 'invested_amount' => $data['investmentInvestedAmount'] !== null && $data['investmentInvestedAmount'] !== ''
                     ? Money::parse($data['investmentInvestedAmount'])
                     : Money::parse($data['investmentCurrentAmount']),
+                'created_by_user_id' => auth()->id(),
             ]);
         }
 
-        session()->flash('status', 'Investimento cadastrado.');
+        session()->flash('status', $editando ? 'Investimento atualizado.' : 'Investimento cadastrado.');
         $this->showInvestmentForm = false;
         $this->resetInvestmentForm();
     }
@@ -513,7 +557,7 @@ class InvestmentsIndex extends Component
     private function resetInvestmentForm(): void
     {
         $this->reset(
-            'investmentName', 'investmentTicker', 'investmentAssetClass', 'investmentReserveType', 'investmentInstitution',
+            'editingInvestmentId', 'investmentName', 'investmentTicker', 'investmentAssetClass', 'investmentReserveType', 'investmentInstitution',
             'investmentMemberId', 'investmentIsPrivate', 'investmentCurrentAmount', 'investmentInvestedAmount',
             'investmentQuantity', 'investmentUnitPrice', 'investmentPurchaseDate', 'investmentReturnRate',
         );
