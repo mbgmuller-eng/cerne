@@ -57,18 +57,21 @@
             </button>
         </div>
 
-        @if ($showInvestmentForm)
-            @php
-                // Editar nunca mostra os campos de cota, mesmo pra um ativo
-                // que nasceu com elas — ver InvestmentsIndex::saveInvestment().
-                $comCotas = ! $editingInvestmentId && $investmentAssetClass !== '' && AssetClass::tryFrom($investmentAssetClass)?->hasQuantity();
-            @endphp
-            <div class="card space-y-4 p-5">
-                <p class="text-sm font-semibold text-slate-900 dark:text-white">
-                    {{ $editingInvestmentId ? 'Editar investimento' : 'Novo investimento' }}
-                </p>
+        @php
+            // Editar nunca mostra os campos de cota, mesmo pra um ativo
+            // que nasceu com elas — ver InvestmentsIndex::saveInvestment().
+            $comCotas = ! $editingInvestmentId && $investmentAssetClass !== '' && AssetClass::tryFrom($investmentAssetClass)?->hasQuantity();
+        @endphp
+        <x-modal wire-model="showInvestmentForm">
+            <form wire:submit="saveInvestment" class="space-y-4">
+                <div class="flex items-baseline justify-between">
+                    <h2 class="text-sm font-semibold text-slate-900 dark:text-white">
+                        {{ $editingInvestmentId ? 'Editar investimento' : 'Novo investimento' }}
+                    </h2>
+                    <button type="button" wire:click="toggleInvestmentForm" class="btn-ghost px-2 py-1 text-xs">Cancelar</button>
+                </div>
 
-                <div class="grid gap-4 sm:grid-cols-2">
+                <div class="grid gap-4 @sm:grid-cols-2">
                     <div>
                         <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Nome</label>
                         <input type="text" wire:model="investmentName" class="input mt-1.5" placeholder="Ex.: Tesouro IPCA+ 2035">
@@ -166,11 +169,13 @@
                     @endif
                 </div>
 
-                <button type="button" wire:click="saveInvestment" class="btn-primary w-full sm:w-auto">
-                    {{ $editingInvestmentId ? 'Salvar alterações' : 'Salvar investimento' }}
-                </button>
-            </div>
-        @endif
+                <div class="flex justify-end">
+                    <button type="submit" class="btn-primary px-4 py-2" wire:loading.attr="disabled">
+                        {{ $editingInvestmentId ? 'Salvar alterações' : 'Salvar investimento' }}
+                    </button>
+                </div>
+            </form>
+        </x-modal>
 
         {{-- Reservas -------------------------------------------------- --}}
         @if ($reserves->isNotEmpty())
