@@ -583,6 +583,85 @@ class InvestmentsIndex extends Component
         return $membro->id;
     }
 
+    /**
+     * Evolução mensal do patrimônio investido, mês a mês desde a primeira
+     * foto disponível (foto = InvestmentSnapshot) até a mais recente —
+     * respeita a mesma aba de privacidade da lista (Casal não existe pra
+     * investimento, mas um membro específico soma só os dele). Sem pelo
+     * menos 2 meses de foto no total não há curva pra desenhar (cliente
+     * novo, sem histórico importado nem um mês fechado ainda) — nesse
+     * caso, null.
+     *
+     * O carry-forward é por ATIVO, não pela soma do mês — um mês em que
+     * só parte da carteira tirou foto não pode fazer o total do mês
+     * cair (ver teste de regressão: um CDB parado num mês, ao lado de um
+     * Tesouro que fotografou todo mês, não pode "sumir" da soma).
+     *
+     * @return ?array{pontos: list<float>, desde: string, valorAtual: string, crescimentoValor: string, crescimentoPct: ?float}
+     */
+    public function getPortfolioEvolutionProperty(): ?array
+    {
+        $ids = $this->sectorInvestments->pluck('id');
+
+        if ($ids->isEmpty()) {
+            return null;
+        }
+
+        $porAtivo = InvestmentSnapshot::query()
+            ->whereIn('investment_id', $ids)
+            ->orderBy('year')->orderBy('month')
+            ->get(['investment_id', 'year', 'month', 'amount'])
+            ->groupBy('investment_id');
+
+        if ($porAtivo->count() < 1 || $porAtivo->sum(fn (Collection $linhas) => $linhas->count()) < 2) {
+            return null;
+        }
+
+        $primeiroMes = null;
+        $ultimoMes = null;
+        $seriesPorAtivo = [];
+
+        foreach ($porAtivo as $investmentId => $linhas) {
+            $seriesPorAtivo[$investmentId] = $linhas->mapWithKeys(fn ($l) => [$l->year.'-'.$l->month => (float) $l->amount]);
+
+            $primeira = CarbonImmutable::create($linhas->first()->year, $linhas->first()->month, 1);
+            $ultima = CarbonImmutable::create($linhas->last()->year, $linhas->last()->month, 1);
+            $primeiroMes = $primeiroMes === null ? $primeira : $primeiroMes->min($primeira);
+            $ultimoMes = $ultimoMes === null ? $ultima : $ultimoMes->max($ultima);
+        }
+
+        if ($primeiroMes->equalTo($ultimoMes)) {
+            return null; // um único mês de história no total — sem curva.
+        }
+
+        $pontos = [];
+        $ultimoValorPorAtivo = [];
+        for ($mes = $primeiroMes; $mes->lte($ultimoMes); $mes = $mes->addMonth()) {
+            $chave = $mes->year.'-'.$mes->month;
+            $totalMes = 0.0;
+
+            foreach ($seriesPorAtivo as $investmentId => $porMes) {
+                $valor = $porMes[$chave] ?? ($ultimoValorPorAtivo[$investmentId] ?? 0.0);
+                $ultimoValorPorAtivo[$investmentId] = $valor;
+                $totalMes += $valor;
+            }
+
+            $pontos[] = $totalMes;
+        }
+
+        $primeiroValor = $pontos[0];
+        $ultimoValor = end($pontos);
+        $crescimentoValor = $ultimoValor - $primeiroValor;
+
+        return [
+            'pontos' => $pontos,
+            'desde' => $primeiroMes->translatedFormat('M/Y'),
+            'valorAtual' => Money::parse($ultimoValor),
+            'crescimentoValor' => Money::parse($crescimentoValor),
+            'crescimentoPct' => $primeiroValor > 0 ? ($crescimentoValor / $primeiroValor) * 100 : null,
+        ];
+    }
+
     /** @return Collection<int, InvestmentPerformance> */
     public function getPerformanceProperty(): Collection
     {

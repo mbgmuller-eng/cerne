@@ -422,9 +422,12 @@
                                 <div class="shrink-0 text-right">
                                     <p class="text-sm tabular-nums text-slate-800 dark:text-slate-200">{{ Money::format($ativo->current_amount) }}</p>
                                     @if ($ativo->invested_amount && (float) $ativo->invested_amount > 0)
-                                        @php $ganho = $ativo->unrealizedGain(); @endphp
+                                        @php $ganho = $ativo->unrealizedGain(); $pct = $ativo->gainPercentage(); @endphp
                                         <p class="text-xs tabular-nums {{ (float) $ganho < 0 ? 'text-red-700 dark:text-red-400' : 'text-brand-700 dark:text-brand-300' }}">
                                             {{ (float) $ganho >= 0 ? '+' : '' }}{{ Money::format($ganho) }}
+                                            @if ($pct !== null)
+                                                ({{ $pct >= 0 ? '+' : '' }}{{ number_format($pct, 1, ',', '.') }}%)
+                                            @endif
                                         </p>
                                     @endif
                                     <button type="button" wire:click="editInvestment('{{ $ativo->id }}')" class="text-xs text-slate-500 hover:underline dark:text-slate-400">Editar</button>
@@ -441,6 +444,33 @@
         @endforelse
 
     @elseif ($tab === 'performance')
+        @if ($portfolioEvolution !== null)
+            <div class="card p-5">
+                <div class="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                        <p class="eyebrow">Evolução do patrimônio</p>
+                        <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Desde {{ $portfolioEvolution['desde'] }}</p>
+                    </div>
+                    <div class="text-right">
+                        <p class="figure text-2xl font-medium text-slate-900 dark:text-white">{{ Money::format($portfolioEvolution['valorAtual']) }}</p>
+                        <p @class([
+                            'text-sm font-medium tabular-nums',
+                            'text-brand-700 dark:text-brand-300' => (float) $portfolioEvolution['crescimentoValor'] >= 0,
+                            'text-red-700 dark:text-red-400' => (float) $portfolioEvolution['crescimentoValor'] < 0,
+                        ])>
+                            {{ (float) $portfolioEvolution['crescimentoValor'] >= 0 ? '+' : '' }}{{ Money::format($portfolioEvolution['crescimentoValor']) }}
+                            @if ($portfolioEvolution['crescimentoPct'] !== null)
+                                ({{ $portfolioEvolution['crescimentoPct'] >= 0 ? '+' : '' }}{{ number_format($portfolioEvolution['crescimentoPct'], 1, ',', '.') }}%)
+                            @endif
+                        </p>
+                    </div>
+                </div>
+                <div class="mt-4">
+                    <x-sparkline :values="$portfolioEvolution['pontos']" :height="80" :width="640" />
+                </div>
+            </div>
+        @endif
+
         @if ($performance->isEmpty())
             <div class="rounded-2xl border border-dashed border-slate-300 dark:border-slate-600 bg-white/60 dark:bg-slate-800/40 px-5 py-12 text-center">
                 <p class="text-sm text-slate-600 dark:text-slate-300">Nenhuma rentabilidade registrada.</p>
