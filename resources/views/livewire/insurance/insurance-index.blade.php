@@ -80,12 +80,18 @@
                 <div>
                     <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Membro</label>
                     <select wire:model="policyMemberId" class="select mt-1.5 w-full">
-                        <option value="">Seguro familiar (sem dono único)</option>
+                        <option value="">Seguro familiar / outra pessoa</option>
                         @foreach ($members as $membro)
                             <option value="{{ $membro->id }}">{{ $membro->name }}</option>
                         @endforeach
                     </select>
                     @error('policyMemberId') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                </div>
+
+                <div>
+                    <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Outra pessoa (opcional)</label>
+                    <input type="text" wire:model="policyInsuredPersonName" class="input mt-1.5" placeholder="Ex.: Filha, Maria (dependente)">
+                    <p class="mt-1 text-xs text-slate-400">Só quando não é o titular nem o cônjuge cadastrado. Com "Membro" preenchido, este campo é ignorado.</p>
                 </div>
 
                 <div>

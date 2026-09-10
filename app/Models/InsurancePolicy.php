@@ -18,7 +18,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 #[Fillable([
-    'profile_id', 'member_id', 'insurance_type', 'insurer_name', 'policy_number', 'insured_item',
+    'profile_id', 'member_id', 'insured_person_name', 'insurance_type', 'insurer_name', 'policy_number', 'insured_item',
     'coverage_amount', 'coverages', 'monthly_premium', 'annual_premium', 'payment_frequency',
     'bank_account_id', 'start_date', 'expiry_date', 'is_active', 'beneficiaries',
     'notes', 'source_document_id', 'created_by_user_id', 'is_private',
@@ -49,6 +49,31 @@ class InsurancePolicy extends Model
     public function member(): BelongsTo
     {
         return $this->belongsTo(ProfileMember::class, 'member_id');
+    }
+
+    /**
+     * Nome de quem é a apólice, pra tela — titular/cônjuge cadastrado
+     * (member) quando existe, senão o nome livre (insured_person_name,
+     * ex.: filha), senão null (apólice sem dono específico, "seguro
+     * familiar"). O app não tem papel de dependente em ProfileMember,
+     * então essa é a única forma de separar "apólice da filha" da
+     * apólice do titular sem inventar um cônjuge falso.
+     */
+    public function personLabel(): ?string
+    {
+        return $this->member?->name ?? $this->insured_person_name;
+    }
+
+    /**
+     * Chave estável pra agrupar apólices "da mesma pessoa" nas telas
+     * (InsuranceIndex, PortfolioInsurance) — usa o id do membro quando
+     * tem; senão o nome livre digitado; senão um balde comum, porque
+     * duas apólices sem member_id E sem insured_person_name são
+     * ambas "seguro familiar" genérico, a mesma coisa.
+     */
+    public function personGroupKey(): string
+    {
+        return $this->member_id ?? ('pessoa:'.($this->insured_person_name ?? '__familiar__'));
     }
 
     public function bankAccount(): BelongsTo

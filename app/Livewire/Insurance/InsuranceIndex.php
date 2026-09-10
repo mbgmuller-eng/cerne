@@ -36,6 +36,8 @@ class InsuranceIndex extends Component
 
     public string $policyMemberId = '';
 
+    public string $policyInsuredPersonName = '';
+
     public string $policyInsuranceType = 'vida';
 
     public string $policyInsurerName = '';
@@ -92,6 +94,7 @@ class InsuranceIndex extends Component
 
         $this->editingPolicyId = $apolice->id;
         $this->policyMemberId = (string) $apolice->member_id;
+        $this->policyInsuredPersonName = (string) $apolice->insured_person_name;
         $this->policyInsuranceType = $apolice->insurance_type->value;
         $this->policyInsurerName = $apolice->insurer_name;
         $this->policyNumber = (string) $apolice->policy_number;
@@ -111,6 +114,7 @@ class InsuranceIndex extends Component
     {
         $data = $this->validate([
             'policyMemberId' => ['nullable'],
+            'policyInsuredPersonName' => ['nullable', 'string', 'max:255'],
             'policyInsuranceType' => ['required', Rule::enum(InsuranceType::class)],
             'policyInsurerName' => ['required', 'string', 'max:255'],
             'policyNumber' => ['nullable', 'string', 'max:100'],
@@ -135,6 +139,13 @@ class InsuranceIndex extends Component
 
         $payload = [
             'member_id' => $memberId,
+            // Só faz sentido quando não há membro cadastrado — com
+            // member_id preenchido, o nome livre é descartado de
+            // propósito (evita os dois campos divergirem sobre "de quem"
+            // é a apólice).
+            'insured_person_name' => $memberId === null && $data['policyInsuredPersonName'] !== ''
+                ? $data['policyInsuredPersonName']
+                : null,
             'insurance_type' => $data['policyInsuranceType'],
             'insurer_name' => $data['policyInsurerName'],
             'policy_number' => $data['policyNumber'] !== '' ? $data['policyNumber'] : null,
@@ -181,8 +192,9 @@ class InsuranceIndex extends Component
     private function resetPolicyForm(): void
     {
         $this->reset(
-            'editingPolicyId', 'policyMemberId', 'policyInsurerName', 'policyNumber', 'policyInsuredItem',
-            'policyCoverageAmount', 'policyAnnualPremium', 'policyExpiryDate', 'policyNotes', 'policyIsPrivate',
+            'editingPolicyId', 'policyMemberId', 'policyInsuredPersonName', 'policyInsurerName', 'policyNumber',
+            'policyInsuredItem', 'policyCoverageAmount', 'policyAnnualPremium', 'policyExpiryDate', 'policyNotes',
+            'policyIsPrivate',
         );
         $this->policyInsuranceType = 'vida';
         $this->policyMonthlyPremium = '0';
@@ -250,12 +262,15 @@ class InsuranceIndex extends Component
     }
 
     /**
-     * Apólices agrupadas para a lista "Suas apólices": tipo → (membro,
-     * quando há mais de um dono naquele tipo, ou sempre em Saúde, que é
+     * Apólices agrupadas para a lista "Suas apólices": tipo → (pessoa,
+     * quando há mais de uma dona naquele tipo, ou sempre em Saúde, que é
      * sempre pessoal mesmo perfil individual) → seguradora → apólices.
-     * Casal com dois seguros de vida (um por cônjuge) separa por membro
+     * Casal com dois seguros de vida (um por cônjuge) separa por pessoa
      * antes da seguradora; perfil individual com só um seguro de carro
-     * vai direto pra seguradora, sem cabeçalho de membro redundante.
+     * vai direto pra seguradora, sem cabeçalho redundante. "Pessoa" usa
+     * InsurancePolicy::personGroupKey() — cobre tanto titular/cônjuge
+     * cadastrado quanto alguém sem ProfileMember (ex.: filha), ver
+     * insured_person_name.
      *
      * @return Collection<int, array{tipo: InsuranceType, separarPorMembro: bool, membros: Collection}>
      */
@@ -265,17 +280,18 @@ class InsuranceIndex extends Component
             ->groupBy(fn (InsurancePolicy $p) => $p->insurance_type->value)
             ->map(function (Collection $doTipo, string $tipoValue) {
                 $tipo = InsuranceType::from($tipoValue);
-                $separarPorMembro = $tipo === InsuranceType::Saude || $doTipo->pluck('member_id')->unique()->count() > 1;
+                $separarPorMembro = $tipo === InsuranceType::Saude
+                    || $doTipo->map(fn (InsurancePolicy $p) => $p->personGroupKey())->unique()->count() > 1;
 
                 $porMembro = $separarPorMembro
-                    ? $doTipo->groupBy('member_id')
+                    ? $doTipo->groupBy(fn (InsurancePolicy $p) => $p->personGroupKey())
                     : collect(['todos' => $doTipo]);
 
                 return [
                     'tipo' => $tipo,
                     'separarPorMembro' => $separarPorMembro,
                     'membros' => $porMembro->map(fn (Collection $doMembro) => [
-                        'nome' => $doMembro->first()->member?->name,
+                        'nome' => $doMembro->first()->personLabel(),
                         'seguradoras' => $doMembro->groupBy('insurer_name'),
                     ])->values(),
                 ];

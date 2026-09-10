@@ -82,6 +82,45 @@ class InsuranceCrudTest extends TestCase
         self::assertSame('Honda Civic 2022', $apolice->insured_item);
     }
 
+    public function test_pessoa_sem_membro_cadastrado_usa_o_nome_livre(): void
+    {
+        $this->criarPerfil();
+
+        Livewire::test(InsuranceIndex::class)
+            ->set('policyMemberId', '')
+            ->set('policyInsuredPersonName', 'Filha')
+            ->set('policyInsuranceType', 'saude')
+            ->set('policyInsurerName', 'Amil')
+            ->set('policyMonthlyPremium', '350.00')
+            ->set('policyStartDate', '2026-01-01')
+            ->call('savePolicy')
+            ->assertHasNoErrors();
+
+        $apolice = InsurancePolicy::withoutProfileScope()->where('insurer_name', 'Amil')->sole();
+        self::assertNull($apolice->member_id);
+        self::assertSame('Filha', $apolice->insured_person_name);
+        self::assertSame('Filha', $apolice->personLabel());
+    }
+
+    public function test_nome_livre_e_descartado_quando_ha_membro_selecionado(): void
+    {
+        [, $membro] = $this->criarPerfil();
+
+        Livewire::test(InsuranceIndex::class)
+            ->set('policyMemberId', $membro->id)
+            ->set('policyInsuredPersonName', 'Nome que não deveria ser salvo')
+            ->set('policyInsuranceType', 'vida')
+            ->set('policyInsurerName', 'Icatu')
+            ->set('policyMonthlyPremium', '100.00')
+            ->set('policyStartDate', '2026-01-01')
+            ->call('savePolicy')
+            ->assertHasNoErrors();
+
+        $apolice = InsurancePolicy::withoutProfileScope()->where('insurer_name', 'Icatu')->sole();
+        self::assertSame($membro->id, $apolice->member_id);
+        self::assertNull($apolice->insured_person_name);
+    }
+
     public function test_membro_de_outro_perfil_nao_e_aceito(): void
     {
         $this->criarPerfil();

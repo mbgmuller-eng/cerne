@@ -66,6 +66,32 @@ class InsuranceGroupingTest extends TestCase
         self::assertTrue($grouped->first()['separarPorMembro']);
     }
 
+    /**
+     * O app não tem papel de dependente — pai e filha compartilham o
+     * mesmo perfil individual, só o pai é ProfileMember. A apólice da
+     * filha usa insured_person_name (sem member_id), e ainda assim tem
+     * que separar dela do pai na tela — ver InsurancePolicy::
+     * personGroupKey()/personLabel().
+     */
+    public function test_saude_separa_titular_de_dependente_sem_membro_cadastrado(): void
+    {
+        [$perfil, $membro] = $this->criarPerfil();
+        InsurancePolicy::factory()->for($perfil, 'profile')->for($membro, 'member')
+            ->create(['insurance_type' => 'saude', 'insurer_name' => 'Amil']);
+        InsurancePolicy::factory()->for($perfil, 'profile')
+            ->create(['insurance_type' => 'saude', 'insurer_name' => 'Amil', 'member_id' => null, 'insured_person_name' => 'Filha']);
+
+        $grouped = Livewire::test(InsuranceIndex::class)->get('grouped');
+
+        $saude = $grouped->first();
+        self::assertTrue($saude['separarPorMembro']);
+        self::assertCount(2, $saude['membros']);
+
+        $nomes = $saude['membros']->pluck('nome')->all();
+        self::assertContains('Filha', $nomes);
+        self::assertContains($membro->name, $nomes);
+    }
+
     public function test_carro_com_um_membro_so_nao_separa_por_pessoa(): void
     {
         [$perfil, $membro] = $this->criarPerfil();

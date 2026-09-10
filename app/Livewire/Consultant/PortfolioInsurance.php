@@ -69,10 +69,10 @@ class PortfolioInsurance extends Component
                         ->groupBy('client_name')
                         ->map(function (Collection $doCliente) use ($tipo) {
                             $separarPorMembro = $tipo === InsuranceType::Saude
-                                || $doCliente->pluck('policy.member_id')->unique()->count() > 1;
+                                || $doCliente->map(fn (array $l) => $l['policy']->personGroupKey())->unique()->count() > 1;
 
                             $porMembro = $separarPorMembro
-                                ? $doCliente->groupBy(fn (array $l) => $l['policy']->member_id ?? 'familiar')
+                                ? $doCliente->groupBy(fn (array $l) => $l['policy']->personGroupKey())
                                 : collect(['todos' => $doCliente]);
 
                             return [
