@@ -18,7 +18,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 #[Fillable([
-    'profile_id', 'member_id', 'insurance_type', 'insurer_name', 'policy_number',
+    'profile_id', 'member_id', 'insurance_type', 'insurer_name', 'policy_number', 'insured_item',
     'coverage_amount', 'coverages', 'monthly_premium', 'annual_premium', 'payment_frequency',
     'bank_account_id', 'start_date', 'expiry_date', 'is_active', 'beneficiaries',
     'notes', 'source_document_id', 'created_by_user_id', 'is_private',

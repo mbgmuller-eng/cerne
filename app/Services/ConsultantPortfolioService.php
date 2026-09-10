@@ -87,7 +87,15 @@ class ConsultantPortfolioService
      * nome de quem é o cliente já anexado — para a tela "Seguros da
      * carteira" (uma linha por apólice, não por cliente).
      *
-     * @return Collection<int, array{policy: InsurancePolicy, client_name: string}>
+     * `client_name` é sempre o dono do perfil (o "cliente" no vocabulário
+     * do consultor); `member_name` é quem especificamente é o dono da
+     * apólice dentro daquele perfil — pode ser o cônjuge, não o titular.
+     * Um perfil de casal com apólices de vida dos dois cônjuges devolve
+     * duas linhas com o MESMO client_name e member_name diferentes — a
+     * tela agrupa por isso pra não parecer duplicata (ver
+     * PortfolioInsurance).
+     *
+     * @return Collection<int, array{policy: InsurancePolicy, client_name: string, member_name: ?string}>
      */
     public function allActivePolicies(User $consultant): Collection
     {
@@ -108,6 +116,7 @@ class ConsultantPortfolioService
             ->map(fn (InsurancePolicy $p): array => [
                 'policy' => $p,
                 'client_name' => $nomes[$p->profile_id] ?? '—',
+                'member_name' => $p->member?->name,
             ]);
     }
 
