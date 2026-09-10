@@ -35,8 +35,12 @@ class ConsultantPortfolioServiceTest extends TestCase
     {
         $consultor = User::factory()->consultant()->create();
 
-        [$perfilA] = $this->criarClienteVinculado($consultor, saldoConta: '10000.00');
-        [$perfilB] = $this->criarClienteVinculado($consultor, saldoConta: '5000.00');
+        // saldoConta entra em 'contas' (informativo) mas NÃO em 'liquido' —
+        // patrimônio investido é só investimento (ver netWorth()).
+        [$perfilA, , $membroA] = $this->criarClienteVinculado($consultor, saldoConta: '10000.00');
+        [$perfilB, , $membroB] = $this->criarClienteVinculado($consultor, saldoConta: '5000.00');
+        InvestmentRecord::factory()->for($perfilA, 'profile')->for($membroA, 'member')->create(['current_amount' => '2000.00']);
+        InvestmentRecord::factory()->for($perfilB, 'profile')->for($membroB, 'member')->create(['current_amount' => '1000.00']);
 
         // Vínculo pendente: ainda não é cliente de fato, não deve entrar na soma.
         $pendente = User::factory()->create();
@@ -48,17 +52,19 @@ class ConsultantPortfolioServiceTest extends TestCase
         $membroPendente = ProfileMember::factory()->create(['profile_id' => $perfilPendente->id]);
         BankAccount::factory()->for($perfilPendente, 'profile')->for($membroPendente, 'member')
             ->create(['current_balance' => '99999.00']);
+        InvestmentRecord::factory()->for($perfilPendente, 'profile')->for($membroPendente, 'member')->create(['current_amount' => '88888.00']);
 
         // Perfil de um cliente de OUTRO consultor: nunca pode entrar na soma.
         $outroConsultor = User::factory()->consultant()->create();
-        $this->criarClienteVinculado($outroConsultor, saldoConta: '77777.00');
+        [$perfilOutro, , $membroOutro] = $this->criarClienteVinculado($outroConsultor, saldoConta: '77777.00');
+        InvestmentRecord::factory()->for($perfilOutro, 'profile')->for($membroOutro, 'member')->create(['current_amount' => '66666.00']);
 
         $dados = app(ConsultantPortfolioService::class)->overview($consultor);
 
         self::assertSame(2, $dados['clientes']['ativos']);
         self::assertSame(3, $dados['clientes']['total']);
         self::assertSame('15000.00', $dados['patrimonio']['contas']);
-        self::assertSame('15000.00', $dados['patrimonio']['liquido']);
+        self::assertSame('3000.00', $dados['patrimonio']['liquido']);
 
         // O vínculo pendente aparece na tabela (é o pipeline do consultor),
         // mas sem nenhum dado financeiro — a política só autoriza acesso
@@ -413,7 +419,7 @@ class ConsultantPortfolioServiceTest extends TestCase
         return [$perfil, $titular];
     }
 
-    /** @return array{0: FinancialProfile, 1: User} */
+    /** @return array{0: FinancialProfile, 1: User, 2: ProfileMember} */
     private function criarClienteVinculado(User $consultor, string $saldoConta = '0.00'): array
     {
         $cliente = User::factory()->create();
@@ -428,6 +434,6 @@ class ConsultantPortfolioServiceTest extends TestCase
         BankAccount::factory()->for($perfil, 'profile')->for($membro, 'member')
             ->create(['current_balance' => $saldoConta]);
 
-        return [$perfil, $cliente];
+        return [$perfil, $cliente, $membro];
     }
 }

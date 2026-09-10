@@ -33,7 +33,7 @@
         <div class="pointer-events-none absolute -bottom-32 -left-16 h-64 w-64 rounded-full bg-brand-950/70 blur-3xl"></div>
 
         <div class="relative">
-            <p class="eyebrow text-brand-200">Patrimônio líquido</p>
+            <p class="eyebrow text-brand-200">Patrimônio investido</p>
             <p class="figure mt-2 text-4xl font-medium sm:text-5xl {{ (float) $p['liquido'] < 0 ? 'text-red-200' : '' }}">
                 {{ Money::format($p['liquido']) }}
             </p>

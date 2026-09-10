@@ -68,7 +68,7 @@
     <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <div class="card relative overflow-hidden bg-brand-800 p-6 text-white">
             <div class="pointer-events-none absolute -top-16 -right-16 h-40 w-40 rounded-full bg-brand-600/50 dark:bg-brand-400/20 blur-3xl"></div>
-            <p class="relative eyebrow text-brand-200">Patrimônio total</p>
+            <p class="relative eyebrow text-brand-200">Patrimônio investido</p>
             <p class="relative figure mt-2 text-3xl font-medium">{{ Money::compact($dados['patrimonio']['liquido']) }}</p>
             <p class="relative mt-1 text-xs text-brand-200">{{ Money::format($dados['patrimonio']['liquido']) }}</p>
         </div>

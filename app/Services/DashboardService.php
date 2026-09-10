@@ -67,9 +67,14 @@ class DashboardService
     // -----------------------------------------------------------------
 
     /**
-     * Patrimônio líquido: investimentos + saldos em conta − faturas em
-     * aberto. As faturas entram como dívida porque já foram gastas, ainda
-     * que não pagas — ignorá-las mostraria o cliente mais rico do que é.
+     * Patrimônio investido: só investimento, líquido de fatura em
+     * aberto. Saldo de conta bancária NÃO entra — é dinheiro parado,
+     * não patrimônio investido, e somar os dois iludia a pessoa sobre
+     * quanto de fato está investido. `contas` continua devolvido — a
+     * tela mostra o saldo em conta como informação à parte, só não soma
+     * no total. Faturas entram como dívida porque já foram gastas,
+     * ainda que não pagas — ignorá-las mostraria a pessoa mais rica do
+     * que é.
      */
     public function netWorth(): array
     {
@@ -85,13 +90,11 @@ class DashboardService
             CreditCardInvoice::query()->outstanding()->sum('total_amount')
         );
 
-        $bruto = bcadd($investimentos, $contas, 2);
-
         return [
             'investimentos' => $investimentos,
             'contas' => $contas,
             'faturas' => $faturas,
-            'liquido' => bcsub($bruto, $faturas, 2),
+            'liquido' => bcsub($investimentos, $faturas, 2),
         ];
     }
 

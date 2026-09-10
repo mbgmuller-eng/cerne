@@ -182,7 +182,17 @@ class ConsultantPortfolioService
             ->get();
     }
 
-    /** @param Collection<int, string> $profileIds */
+    /**
+     * "Patrimônio" aqui é só investimento (líquido de fatura em aberto) —
+     * saldo de conta bancária NÃO entra na soma. É dinheiro parado, não
+     * patrimônio investido, e somar os dois iludia o consultor sobre
+     * quanto da carteira do cliente está de fato trabalhando (mesmo
+     * raciocínio de investedEvolution(), que só existe pra investimento
+     * de qualquer forma). `contas` continua devolvido — a tela mostra
+     * o saldo em conta como informação à parte, só não soma no total.
+     *
+     * @param Collection<int, string> $profileIds
+     */
     private function netWorth(Collection $profileIds): array
     {
         if ($profileIds->isEmpty()) {
@@ -201,13 +211,11 @@ class ConsultantPortfolioService
             CreditCardInvoice::withoutProfileScope()->whereIn('profile_id', $profileIds)->outstanding()->sum('total_amount')
         );
 
-        $bruto = bcadd($investimentos, $contas, 2);
-
         return [
             'investimentos' => $investimentos,
             'contas' => $contas,
             'faturas' => $faturas,
-            'liquido' => bcsub($bruto, $faturas, 2),
+            'liquido' => bcsub($investimentos, $faturas, 2),
         ];
     }
 
@@ -341,8 +349,14 @@ class ConsultantPortfolioService
     }
 
     /**
+     * Mesmo raciocínio de netWorth(): só investimento (líquido de fatura
+     * em aberto) — saldo de conta bancária não entra. É o número usado
+     * pra ordenar/listar cliente por "patrimônio" na Carteira, então
+     * precisa ser coerente com o "Patrimônio investido" do topo — os
+     * dois têm que somar pra bater um com o outro.
+     *
      * @param  Collection<int, string>  $profileIds
-     * @return array<string, string> profile_id => patrimônio líquido
+     * @return array<string, string> profile_id => patrimônio investido
      */
     private function netWorthByProfile(Collection $profileIds): array
     {
@@ -355,11 +369,6 @@ class ConsultantPortfolioService
             ->selectRaw('profile_id, SUM(current_amount) as total')
             ->groupBy('profile_id')->pluck('total', 'profile_id');
 
-        $contas = BankAccount::withoutProfileScope()
-            ->whereIn('profile_id', $profileIds)->active()->consolidated()
-            ->selectRaw('profile_id, SUM(current_balance) as total')
-            ->groupBy('profile_id')->pluck('total', 'profile_id');
-
         $faturas = CreditCardInvoice::withoutProfileScope()
             ->whereIn('profile_id', $profileIds)->outstanding()
             ->selectRaw('profile_id, SUM(total_amount) as total')
@@ -367,8 +376,7 @@ class ConsultantPortfolioService
 
         $resultado = [];
         foreach ($profileIds as $id) {
-            $bruto = bcadd((string) ($investimentos[$id] ?? '0'), (string) ($contas[$id] ?? '0'), 2);
-            $resultado[$id] = bcsub($bruto, (string) ($faturas[$id] ?? '0'), 2);
+            $resultado[$id] = bcsub((string) ($investimentos[$id] ?? '0'), (string) ($faturas[$id] ?? '0'), 2);
         }
 
         return $resultado;
