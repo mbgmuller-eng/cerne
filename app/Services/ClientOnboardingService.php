@@ -91,6 +91,15 @@ class ClientOnboardingService
      * Casal ganha privacidade granular (`is_private` por lançamento) quando
      * cada membro loga — mas login não é obrigatório: ver
      * addPartnerWithoutLogin() pra quem não quer conta nenhuma.
+     *
+     * Se já existe um cônjuge SEM login (cadastrado antes via
+     * addPartnerWithoutLogin(), ou importado de planilha — ver o card
+     * "convite pendente" na Carteira do consultor), o login novo entra
+     * NESSE `ProfileMember` já existente em vez de criar outro — senão a
+     * pessoa vira dois membros diferentes do mesmo casal, e tudo que já
+     * tem o `member_id` antigo (conta, gasto, investimento) fica órfão do
+     * login novo. Ver PartnerInviteService::send(), que permite reenviar
+     * convite exatamente nesse caso.
      */
     public function addPartner(FinancialProfile $profile, string $name, string $email, string $password): User
     {
@@ -107,13 +116,23 @@ class ClientOnboardingService
 
             $profile->update(['profile_type' => ProfileType::Couple]);
 
-            ProfileMember::create([
-                'profile_id' => $profile->id,
-                'user_id' => $partner->id,
-                'name' => $name,
-                'role' => MemberRole::Secondary,
-                'is_active' => true,
-            ]);
+            $membroSemLogin = ProfileMember::query()
+                ->where('profile_id', $profile->id)
+                ->where('role', MemberRole::Secondary)
+                ->whereNull('user_id')
+                ->first();
+
+            if ($membroSemLogin !== null) {
+                $membroSemLogin->update(['user_id' => $partner->id, 'name' => $name]);
+            } else {
+                ProfileMember::create([
+                    'profile_id' => $profile->id,
+                    'user_id' => $partner->id,
+                    'name' => $name,
+                    'role' => MemberRole::Secondary,
+                    'is_active' => true,
+                ]);
+            }
 
             return $partner;
         });

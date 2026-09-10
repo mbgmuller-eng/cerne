@@ -61,6 +61,12 @@
                     </dd>
                 </div>
             </dl>
+
+            @if ($partner->user === null && $canInvitePartner)
+                <button type="button" wire:click="toggleInviteForm" class="btn-ghost mt-3 px-2 py-1 text-xs">
+                    {{ $showInviteForm ? 'Cancelar' : 'Convidar por e-mail' }}
+                </button>
+            @endif
         @elseif ($pendingInvite)
             <p class="mt-2 text-sm text-slate-600 dark:text-slate-300">
                 Convite enviado pra <strong>{{ $pendingInvite->partner_name }}</strong>

@@ -26,7 +26,7 @@ class PartnerInviteService
      */
     public function send(FinancialProfile $profile, User $issuer, string $name, string $email): string
     {
-        if ($this->alreadyHasPartner($profile)) {
+        if ($this->alreadyHasPartnerComLogin($profile)) {
             throw new RuntimeException('Este perfil já tem um cônjuge cadastrado.');
         }
 
@@ -46,11 +46,20 @@ class PartnerInviteService
         return $link;
     }
 
-    private function alreadyHasPartner(FinancialProfile $profile): bool
+    /**
+     * Só bloqueia quando o cônjuge JÁ TEM login — um cônjuge cadastrado
+     * sem login (addPartnerWithoutLogin(), ou vindo de importação) pode
+     * receber convite depois: é exatamente o caminho pra dar acesso a
+     * alguém que a gente cadastrou sem login no começo. Ver
+     * ClientOnboardingService::addPartner(), que reaproveita esse
+     * ProfileMember em vez de criar outro quando o convite é aceito.
+     */
+    private function alreadyHasPartnerComLogin(FinancialProfile $profile): bool
     {
         return ProfileMember::query()
             ->where('profile_id', $profile->id)
             ->where('role', MemberRole::Secondary)
+            ->whereNotNull('user_id')
             ->exists();
     }
 }

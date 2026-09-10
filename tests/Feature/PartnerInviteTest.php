@@ -9,9 +9,11 @@ use App\Enums\ProfileType;
 use App\Mail\PartnerInviteMail;
 use App\Models\ConsultantClient;
 use App\Models\FinancialProfile;
+use App\Models\InvestmentRecord;
 use App\Models\PartnerInvite;
 use App\Models\ProfileMember;
 use App\Models\User;
+use App\Services\ClientOnboardingService;
 use App\Services\PartnerInviteService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Mail;
@@ -44,15 +46,42 @@ class PartnerInviteTest extends TestCase
         Mail::assertQueued(PartnerInviteMail::class);
     }
 
-    public function test_nao_convida_de_novo_se_ja_tem_conjuge(): void
+    public function test_nao_convida_de_novo_se_ja_tem_conjuge_com_login(): void
     {
         [$profile, $titular] = $this->criarPerfilIndividual();
         $profile->update(['profile_type' => ProfileType::Couple]);
-        ProfileMember::factory()->secondary()->create(['profile_id' => $profile->id]);
+        ProfileMember::factory()->secondary()->create(['profile_id' => $profile->id, 'user_id' => User::factory()]);
 
         $this->expectException(RuntimeException::class);
 
         app(PartnerInviteService::class)->send($profile, $titular, 'Helen Müller', 'helen@exemplo.com');
+    }
+
+    /**
+     * Cônjuge cadastrado sem login (ver ClientOnboardingService::
+     * addPartnerWithoutLogin(), ou membro importado de planilha — como o
+     * caso real que motivou este teste: Manu, cônjuge do Hugo, veio de
+     * uma importação e a tela não oferecia jeito nenhum de convidá-la
+     * depois) PODE receber convite — é o caminho pra dar acesso a
+     * alguém que entrou sem login no começo.
+     */
+    public function test_convida_conjuge_que_ja_existe_mas_ainda_nao_tem_login(): void
+    {
+        Mail::fake();
+        [$profile, $titular] = $this->criarPerfilIndividual();
+        $profile->update(['profile_type' => ProfileType::Couple]);
+        $semLogin = ProfileMember::factory()->secondary()->create(['profile_id' => $profile->id, 'name' => 'Manu']);
+
+        $link = app(PartnerInviteService::class)->send($profile, $titular, 'Manu', 'manu@exemplo.com');
+
+        self::assertNotEmpty($link);
+        Mail::assertQueued(PartnerInviteMail::class);
+
+        // Nenhum ProfileMember novo foi criado — só o convite, o membro
+        // sem login continua o mesmo até o convite ser aceito (ver
+        // ClientOnboardingService::addPartner()).
+        self::assertSame(1, ProfileMember::query()->where('profile_id', $profile->id)->where('role', MemberRole::Secondary)->count());
+        self::assertNull($semLogin->fresh()->user_id);
     }
 
     public function test_convidar_de_novo_expira_o_convite_anterior_em_vez_de_empilhar(): void
@@ -93,6 +122,42 @@ class PartnerInviteTest extends TestCase
 
         $invite = PartnerInvite::query()->where('partner_email', 'helen@exemplo.com')->sole();
         self::assertSame(InviteStatus::Accepted, $invite->status);
+    }
+
+    /**
+     * O caso real que motivou este teste: Manu (cônjuge do Hugo) foi
+     * cadastrada sem login por uma importação, com investimentos e
+     * contas já vinculados ao `member_id` dela. Aceitar o convite não
+     * pode criar um SEGUNDO ProfileMember — isso deixaria tudo que já
+     * existe (o InvestmentRecord daqui, por exemplo) órfão do login
+     * novo, como se o histórico dela tivesse sumido.
+     */
+    public function test_aceitar_convite_de_conjuge_que_ja_existia_sem_login_reaproveita_o_mesmo_membro(): void
+    {
+        [$profile, $titular] = $this->criarPerfilIndividual();
+        $profile->update(['profile_type' => ProfileType::Couple]);
+        $semLogin = app(ClientOnboardingService::class)->addPartnerWithoutLogin($profile, 'Manu');
+
+        $investimento = InvestmentRecord::factory()->for($profile, 'profile')->for($semLogin, 'member')->create([
+            'current_amount' => '5000.00',
+        ]);
+
+        ['token' => $token] = PartnerInvite::issue($profile, $titular, 'Manu', 'manu@exemplo.com');
+
+        $this->post(route('partner-invite.store', ['token' => $token]), [
+            'password' => 'Senha123',
+            'password_confirmation' => 'Senha123',
+        ])->assertRedirect(route('dashboard'));
+
+        $parceira = User::query()->where('email', 'manu@exemplo.com')->sole();
+
+        // Continua sendo o MESMO id de membro — não um segundo.
+        self::assertSame(1, ProfileMember::query()->where('profile_id', $profile->id)->where('role', MemberRole::Secondary)->count());
+        $semLogin->refresh();
+        self::assertSame($parceira->id, $semLogin->user_id);
+
+        // O investimento cadastrado antes do login continua vinculado a ela.
+        self::assertSame($semLogin->id, $investimento->fresh()->member_id);
     }
 
     public function test_convite_expirado_nao_cria_conta(): void

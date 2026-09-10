@@ -79,6 +79,19 @@ class MyAccount extends Component
         if ($this->showInviteForm) {
             $this->reset('partnerName', 'partnerEmail', 'lastInviteLink');
             $this->resetErrorBag();
+
+            // Cônjuge sem login já cadastrado (ver addPartnerWithoutLogin())
+            // — pré-preenche o nome que já demos, a pessoa só digita o e-mail.
+            $profile = app(ProfileContext::class)->profile();
+            $semLogin = ProfileMember::query()
+                ->where('profile_id', $profile->id)
+                ->where('role', MemberRole::Secondary)
+                ->whereNull('user_id')
+                ->first();
+
+            if ($semLogin !== null) {
+                $this->partnerName = $semLogin->name;
+            }
         }
     }
 
@@ -192,7 +205,11 @@ class MyAccount extends Component
             'consultant' => $consultantLink?->consultant,
             'partner' => $partnerMember,
             'pendingInvite' => $pendingInvite,
-            'canInvitePartner' => $partnerMember === null && auth()->user()->can('manageMembers', $profile),
+            // Sem cônjuge ainda, OU cônjuge cadastrado sem login (ver
+            // addPartnerWithoutLogin()) — os dois casos podem receber
+            // convite por e-mail (ver PartnerInviteService::send()).
+            'canInvitePartner' => ($partnerMember === null || $partnerMember->user === null)
+                && auth()->user()->can('manageMembers', $profile),
         ]);
     }
 }

@@ -16,7 +16,6 @@ use App\Services\PartnerInviteService;
 use App\Support\ProfileContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
-use RuntimeException;
 use Tests\TestCase;
 
 /**
@@ -46,6 +45,12 @@ class PartnerWithoutLoginTest extends TestCase
      * `view(...)->with([...])` de render()), não propriedade pública do
      * componente — `Testable::get()` não os enxerga. A forma certa de
      * conferir aqui é pelo HTML renderizado, não por `->get(...)`.
+     *
+     * "Convidar por e-mail" PRECISA aparecer aqui: é o caminho pra dar
+     * login depois a um cônjuge cadastrado sem login no começo — sem
+     * isso a tela não oferecia jeito nenhum de convidar alguém como a
+     * Mariana (caso real: Manu, cônjuge do Hugo, veio de uma importação
+     * e ficou sem forma de receber acesso).
      */
     public function test_myaccount_encontra_o_conjuge_sem_login_como_partner(): void
     {
@@ -55,17 +60,18 @@ class PartnerWithoutLoginTest extends TestCase
         Livewire::test(MyAccount::class)
             ->assertSee('Mariana')
             ->assertSee('Cadastrado sem login')
-            ->assertDontSee('Convidar por e-mail');
+            ->assertSee('Convidar por e-mail');
     }
 
-    public function test_convidar_por_email_depois_e_bloqueado(): void
+    public function test_convidar_por_email_depois_funciona_e_nao_cria_membro_duplicado(): void
     {
         [$owner, $perfil, $membro] = $this->criarTitular();
-        app(ClientOnboardingService::class)->addPartnerWithoutLogin($perfil, 'Mariana');
-
-        $this->expectException(RuntimeException::class);
+        $semLogin = app(ClientOnboardingService::class)->addPartnerWithoutLogin($perfil, 'Mariana');
 
         app(PartnerInviteService::class)->send($perfil, $owner, 'Mariana', 'mariana@example.com');
+
+        self::assertSame(1, ProfileMember::query()->where('profile_id', $perfil->id)->where('role', MemberRole::Secondary)->count());
+        self::assertNull($semLogin->fresh()->user_id); // só depois do convite ACEITO é que ganha login — ver PartnerInviteTest.
     }
 
     public function test_lancamento_privado_do_conjuge_sem_login_fica_invisivel_pro_titular(): void
