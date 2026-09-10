@@ -208,14 +208,25 @@
                 <p class="text-sm text-slate-600 dark:text-slate-300">Nenhuma apólice cadastrada.</p>
             </div>
         @else
-            <div class="mt-3 space-y-8">
+            <div class="mt-3 space-y-3">
                 @foreach ($grouped as $grupoTipo)
-                    <div>
-                        <h3 class="text-xs font-semibold tracking-wide text-slate-500 uppercase dark:text-slate-400">
-                            {{ $grupoTipo['tipo']->label() }}
-                        </h3>
+                    <div x-data="{ open: false }" class="card overflow-hidden">
+                        <button
+                            type="button"
+                            @click="open = ! open"
+                            class="flex w-full items-center justify-between gap-3 px-5 py-4 text-left"
+                        >
+                            <h3 class="font-display text-lg font-semibold text-slate-900 dark:text-white sm:text-xl">
+                                {{ $grupoTipo['tipo']->label() }}
+                            </h3>
+                            <x-nav-icon
+                                name="chevron"
+                                class="h-5 w-5 shrink-0 text-slate-400 transition-transform duration-200"
+                                x-bind:class="{ 'rotate-180': open }"
+                            />
+                        </button>
 
-                        <div class="mt-3 space-y-6">
+                        <div x-show="open" x-cloak x-transition class="space-y-6 border-t border-slate-100 px-5 py-5 dark:border-white/10">
                             @foreach ($grupoTipo['membros'] as $porMembro)
                                 <div>
                                     @if ($grupoTipo['separarPorMembro'])
@@ -226,8 +237,8 @@
 
                                     <div @class(['space-y-4', 'mt-2' => $grupoTipo['separarPorMembro']])>
                                         @foreach ($porMembro['seguradoras'] as $seguradoraNome => $apolicesDaSeguradora)
-                                            <div class="card overflow-hidden">
-                                                <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-5 py-3 dark:border-white/10">
+                                            <div class="overflow-hidden rounded-xl border border-slate-100 dark:border-white/10">
+                                                <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 bg-slate-50/60 px-4 py-2.5 dark:border-white/10 dark:bg-white/5">
                                                     <div class="flex items-center gap-3">
                                                         <div @class([
                                                             'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg font-display text-xs font-semibold text-white',

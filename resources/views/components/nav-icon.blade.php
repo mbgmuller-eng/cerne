@@ -55,6 +55,9 @@
         @case('bell')
             <path d="M6 8a6 6 0 1 1 12 0c0 4 1.5 5.5 1.5 5.5H4.5S6 12 6 8Z"/><path d="M9.5 17a2.5 2.5 0 0 0 5 0"/>
             @break
+        @case('chevron')
+            <path d="m6 9 6 6 6-6"/>
+            @break
         @case('dots')
             <circle cx="12" cy="5" r="1.25" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.25" fill="currentColor" stroke="none"/><circle cx="12" cy="19" r="1.25" fill="currentColor" stroke="none"/>
             @break
