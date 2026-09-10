@@ -148,23 +148,21 @@
     {{-- Evolução do patrimônio investido ----------------------------------- --}}
     @php
         $evolucao = collect($dados['evolucao_investido']);
-        $maximo = max($evolucao->max(fn ($m) => (float) $m['valor']), 1);
+        $maximo = (float) max($evolucao->max(fn ($m) => (float) $m['valor']), 1);
     @endphp
     <div class="card p-6">
         <p class="eyebrow">Patrimônio investido · últimos {{ $evolucao->count() }} meses</p>
         <p class="mt-0.5 text-xs text-slate-400">soma dos investimentos ativos da carteira — contas e faturas não têm histórico mensal</p>
 
-        <div class="mt-6 flex items-end gap-2 sm:gap-4" style="height: 140px">
-            @foreach ($evolucao as $mes)
-                <div class="group flex h-full min-w-0 flex-1 flex-col items-center justify-end gap-1.5">
-                    <div
-                        class="w-full max-w-8 rounded-t-md bg-brand-600 transition-colors group-hover:bg-brand-500 dark:bg-brand-400 dark:group-hover:bg-brand-300"
-                        style="height: {{ max(2, ((float) $mes['valor'] / $maximo) * 100) }}%"
-                        title="{{ Money::format($mes['valor']) }}"
-                    ></div>
-                    <span class="w-full truncate text-center text-[10px] text-slate-400">{{ $mes['rotulo'] }}</span>
-                </div>
-            @endforeach
+        <div class="mt-6">
+            <x-bar-chart
+                :meses="$evolucao->pluck('rotulo')->all()"
+                :series="[['cor' => 'currentColor', 'valores' => $evolucao->map(fn ($m) => (float) $m['valor'])->all(), 'rotulo' => 'Patrimônio investido']]"
+                :maximo="$maximo"
+                :height="160"
+                :width="720"
+                class="text-brand-700 dark:text-brand-300"
+            />
         </div>
     </div>
 

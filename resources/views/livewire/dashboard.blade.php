@@ -9,7 +9,7 @@
     $evolucao = collect($dados['evolucao']);
     $alertas = $dados['alertas'];
     $alertas['itens'] = collect($alertas['itens']);
-    $maximo = max($evolucao->max('receitas'), $evolucao->max('despesas'), 1);
+    $maximo = (float) max($evolucao->max('receitas'), $evolucao->max('despesas'), 1);
 @endphp
 
 <div class="space-y-8">
@@ -87,24 +87,18 @@
             </div>
         </div>
 
-        <div class="mt-6 flex items-end gap-1.5 sm:gap-3" style="height: 160px">
-            @foreach ($evolucao as $mes)
-                <div class="group flex h-full min-w-0 flex-1 flex-col items-center justify-end gap-1.5">
-                    <div class="flex h-full w-full items-end justify-center gap-0.5">
-                        <div
-                            class="w-1/2 max-w-3 rounded-t-md bg-brand-600 dark:bg-brand-400 transition-colors group-hover:bg-brand-500 dark:group-hover:bg-brand-300"
-                            style="height: {{ max(2, ((float) $mes['receitas'] / $maximo) * 100) }}%"
-                            title="Receitas: {{ Money::format($mes['receitas']) }}"
-                        ></div>
-                        <div
-                            class="w-1/2 max-w-3 rounded-t-md bg-amber-500 transition-colors group-hover:bg-amber-400"
-                            style="height: {{ max(2, ((float) $mes['despesas'] / $maximo) * 100) }}%"
-                            title="Despesas: {{ Money::format($mes['despesas']) }}"
-                        ></div>
-                    </div>
-                    <span class="text-[10px] whitespace-nowrap text-slate-400">{{ $mes['rotulo'] }}</span>
-                </div>
-            @endforeach
+        <div class="mt-6">
+            <x-bar-chart
+                :meses="$evolucao->pluck('rotulo')->all()"
+                :series="[
+                    ['cor' => 'currentColor', 'classe' => 'text-brand-600 dark:text-brand-400', 'valores' => $evolucao->pluck('receitas')->map(fn ($v) => (float) $v)->all(), 'rotulo' => 'Receitas'],
+                    ['cor' => 'currentColor', 'classe' => 'text-amber-500', 'valores' => $evolucao->pluck('despesas')->map(fn ($v) => (float) $v)->all(), 'rotulo' => 'Despesas'],
+                ]"
+                :maximo="$maximo"
+                :height="180"
+                :width="720"
+                modo="agrupado"
+            />
         </div>
     </div>
 
