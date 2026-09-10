@@ -258,6 +258,32 @@ class ConsultantPortfolioServiceTest extends TestCase
         self::assertSame('15000.00', $mesAtual['valor']);
     }
 
+    /**
+     * "Patrimônio investido" (o gráfico da Carteira) precisa ser só
+     * investimento — saldo de conta bancária não tem foto mensal
+     * (InvestmentSnapshot) nem entra nessa soma de jeito nenhum, mesmo
+     * que o saldo seja gigante comparado ao investimento de verdade.
+     */
+    public function test_evolucao_investido_nunca_soma_saldo_de_conta_bancaria(): void
+    {
+        $consultor = User::factory()->consultant()->create();
+
+        [$perfil] = $this->criarClienteVinculado($consultor, saldoConta: '500000.00');
+        $investimento = InvestmentRecord::factory()->create(['profile_id' => $perfil->id]);
+        InvestmentSnapshot::create([
+            'profile_id' => $perfil->id,
+            'investment_id' => $investimento->id,
+            'year' => now()->year,
+            'month' => now()->month,
+            'amount' => '10000.00',
+        ]);
+
+        $dados = app(ConsultantPortfolioService::class)->overview($consultor);
+
+        $mesAtual = collect($dados['evolucao_investido'])->last();
+        self::assertSame('10000.00', $mesAtual['valor']);
+    }
+
     public function test_acoes_pendentes_lista_vinculos_ordenados_e_faturas_vencendo(): void
     {
         // Congela o relógio no segundo exato: "dias pendente" soma
