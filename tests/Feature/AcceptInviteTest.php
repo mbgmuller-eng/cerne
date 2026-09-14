@@ -10,6 +10,7 @@ use App\Models\FinancialProfile;
 use App\Models\ProfileMember;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Hash;
 use Tests\TestCase;
 
 /**
@@ -65,6 +66,58 @@ class AcceptInviteTest extends TestCase
         $perfil = FinancialProfile::query()->where('owner_user_id', User::where('email', 'ana.teste@exemplo.com')->value('id'))->sole();
 
         self::assertSame('Ana Ribeiro', $perfil->profile_name);
+    }
+
+    /**
+     * Caso real: cliente importado em lote (planilha) já tem User com
+     * senha aleatória desconhecida, sem convite nenhum. O convite emitido
+     * DEPOIS só serve pra ela definir a senha de verdade — não pode
+     * tentar criar outro usuário com o mesmo e-mail (bateria no índice
+     * único e voltaria erro 500 pra quem só quer entrar na própria conta).
+     */
+    public function test_convite_para_email_que_ja_tem_conta_so_define_a_senha(): void
+    {
+        $consultor = User::factory()->consultant()->create();
+        $existente = User::factory()->create(['name' => 'Mariana Marino', 'email' => 'mariana@exemplo.com']);
+        $perfil = FinancialProfile::factory()->create(['owner_user_id' => $existente->id]);
+        ConsultantClient::factory()->create([
+            'consultant_id' => $consultor->id,
+            'client_id' => $existente->id,
+            'status' => ConsultantClientStatus::Active,
+        ]);
+
+        ['invite' => $invite, 'token' => $token] = ConsultantInvite::issue($consultor, 'Mariana Marino', 'mariana@exemplo.com');
+
+        $this->post(route('invite.store', ['token' => $token]), [
+            'password' => 'Senha123',
+            'password_confirmation' => 'Senha123',
+        ])->assertRedirect(route('dashboard'));
+
+        self::assertSame(1, User::query()->where('email', 'mariana@exemplo.com')->count());
+        self::assertTrue(Hash::check('Senha123', $existente->fresh()->password));
+        self::assertTrue(auth()->check());
+        self::assertSame($existente->id, auth()->id());
+
+        // Perfil e vínculo que já existiam não duplicaram.
+        self::assertSame(1, FinancialProfile::query()->where('owner_user_id', $existente->id)->count());
+        self::assertSame(1, ConsultantClient::query()->where('client_id', $existente->id)->count());
+
+        self::assertSame(InviteStatus::Accepted, $invite->fresh()->status);
+    }
+
+    public function test_convite_para_email_de_conta_que_nao_e_cliente_e_rejeitado(): void
+    {
+        $consultor = User::factory()->consultant()->create();
+        $outroConsultor = User::factory()->consultant()->create(['email' => 'outro.consultor@exemplo.com']);
+
+        ['token' => $token] = ConsultantInvite::issue($consultor, 'Outro Consultor', 'outro.consultor@exemplo.com');
+
+        $this->post(route('invite.store', ['token' => $token]), [
+            'password' => 'Senha123',
+            'password_confirmation' => 'Senha123',
+        ])->assertSessionHasErrors('password');
+
+        self::assertFalse(auth()->check());
     }
 
     public function test_convite_expirado_nao_cria_conta(): void

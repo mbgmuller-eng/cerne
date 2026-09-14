@@ -14,6 +14,7 @@ use App\Models\PartnerInvite;
 use App\Models\ProfileMember;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Transforma um convite aceito em cliente operante.
@@ -28,10 +29,40 @@ class ClientOnboardingService
 {
     /**
      * @param  string  $password  Senha em claro; o cast `hashed` do model cuida do resto.
+     *
+     * @throws ValidationException  quando o e-mail já pertence a uma conta que não é de cliente.
      */
     public function acceptInvite(ConsultantInvite $invite, string $password): User
     {
         return DB::transaction(function () use ($invite, $password): User {
+            // A conta pode já existir sem ter passado por convite nenhum —
+            // ex.: importação em lote (planilha de seguros), que cria
+            // usuário direto com senha aleatória desconhecida, sem enviar
+            // e-mail, pra vincular a apólice logo. O convite aqui é só o
+            // jeito de finalmente dar acesso: define a senha de verdade
+            // na conta que já existe, sem duplicar usuário/perfil/vínculo
+            // (que já existem certos). Sem este desvio, User::create()
+            // abaixo bateria no e-mail único e devolveria erro 500 pra
+            // quem só está tentando ativar a própria conta.
+            $existente = User::where('email', $invite->client_email)->first();
+
+            if ($existente !== null) {
+                if (! $existente->isClient()) {
+                    throw ValidationException::withMessages([
+                        'password' => 'Esse e-mail já pertence a uma conta que não é de cliente — fale com o consultor.',
+                    ]);
+                }
+
+                $existente->forceFill(['password' => $password])->save();
+
+                $invite->update([
+                    'status' => InviteStatus::Accepted,
+                    'accepted_at' => now(),
+                ]);
+
+                return $existente;
+            }
+
             $user = User::create([
                 'name' => $invite->client_name,
                 'email' => $invite->client_email,
