@@ -1,4 +1,9 @@
 @use('App\Support\Money')
+@use('App\Models\InvestmentRecord')
+
+@php
+    $badgeColors = ['bg-brand-700', 'bg-accent-700', 'bg-brand-500', 'bg-accent-600', 'bg-brand-900'];
+@endphp
 
 <div class="space-y-6">
 
@@ -72,7 +77,15 @@
                                 <div @class(['space-y-3', 'mt-2' => $porCliente['separarPorMembro']])>
                                     @foreach ($porMembro['instituicoes'] as $instituicaoNome => $linhasDaInstituicao)
                                         <div>
-                                            <p class="text-sm font-medium text-slate-700 dark:text-slate-300">{{ $instituicaoNome }}</p>
+                                            <div class="flex items-center gap-2">
+                                                <span @class([
+                                                    'flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-[10px] font-semibold text-white',
+                                                    $badgeColors[InvestmentRecord::colorIndexFor($instituicaoNome, count($badgeColors))],
+                                                ])>
+                                                    {{ InvestmentRecord::initialsFor($instituicaoNome) }}
+                                                </span>
+                                                <span class="text-sm font-medium text-slate-700 dark:text-slate-300">{{ $instituicaoNome }}</span>
+                                            </div>
 
                                             <div class="mt-2 overflow-x-auto">
                                                 <table class="w-full min-w-[560px] text-sm">

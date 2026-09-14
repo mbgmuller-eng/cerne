@@ -11,6 +11,7 @@ use App\Enums\ReserveType;
 use App\Enums\ReturnRateType;
 use App\Models\Concerns\Auditable;
 use App\Models\Concerns\BelongsToProfile;
+use App\Models\Concerns\HasBadgeInitials;
 use App\Models\Concerns\InvalidatesDashboard;
 use App\Models\Concerns\RespectsMemberPrivacy;
 use App\Support\Money;
@@ -31,7 +32,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 ])]
 class InvestmentRecord extends Model
 {
-    use Auditable, BelongsToProfile, InvalidatesDashboard, HasFactory, HasUuids, RespectsMemberPrivacy;
+    use Auditable, BelongsToProfile, HasBadgeInitials, InvalidatesDashboard, HasFactory, HasUuids, RespectsMemberPrivacy;
 
     protected function casts(): array
     {
@@ -137,6 +138,17 @@ class InvestmentRecord extends Model
     public function displayName(): string
     {
         return $this->ticker ? $this->ticker.' · '.$this->name : $this->name;
+    }
+
+    /**
+     * Cor do selo da instituição, estável por nome — mesma ideia de
+     * InsurancePolicy::colorIndexFor(), pra telas que agrupam por
+     * instituição (ex.: Investimentos da carteira) sem precisar
+     * cadastrar uma paleta por corretora.
+     */
+    public static function colorIndexFor(string $institutionName, int $paletteSize): int
+    {
+        return crc32($institutionName) % $paletteSize;
     }
 
     /** Percentual de ganho sobre o investido — não confundir com return_rate (a taxa contratada). */
