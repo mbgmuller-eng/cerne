@@ -56,7 +56,7 @@ class PortfolioInvestments extends Component
      * acordeão (ver getGroupedProperty() equivalente em InsuranceIndex).
      *
      * @param  Collection<int, array{investment: InvestmentRecord, client_name: string, member_name: ?string}>  $linhas
-     * @return Collection<string, array{separarPorMembro: bool, quantidade: int, total: string, membros: Collection}>
+     * @return Collection<string, array{separarPorMembro: bool, quantidade: int, total: string, profile_id: string, membros: Collection}>
      */
     private function group(Collection $linhas): Collection
     {
@@ -74,6 +74,11 @@ class PortfolioInvestments extends Component
                     'separarPorMembro' => $separarPorMembro,
                     'quantidade' => $doCliente->count(),
                     'total' => Money::sum($doCliente->map(fn (array $l) => $l['investment']->current_amount)),
+                    // Mesmo perfil pra qualquer ativo deste cliente — dá pra
+                    // pegar de qualquer linha. Usado pro botão único "Abrir
+                    // perfil" no cabeçalho do card, em vez de repetir um
+                    // por ativo (era sempre o mesmo destino).
+                    'profile_id' => $doCliente->first()['investment']->profile_id,
                     'membros' => $porMembro->map(fn (Collection $doMembro) => [
                         'nome' => $doMembro->first()['member_name'],
                         'instituicoes' => $doMembro->groupBy(fn (array $l) => $l['investment']->institution ?? 'Sem instituição'),

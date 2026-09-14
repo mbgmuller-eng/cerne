@@ -41,14 +41,12 @@
         <div class="space-y-3">
             @foreach ($grouped as $clienteNome => $porCliente)
                 <div x-data="{ open: false }" class="card overflow-hidden">
-                    <button
-                        type="button"
-                        @click="open = ! open"
-                        class="flex w-full flex-wrap items-center justify-between gap-3 px-5 py-4 text-left"
-                    >
-                        <p class="font-display text-lg font-semibold text-slate-900 dark:text-white sm:text-xl">
-                            {{ $clienteNome }}
-                        </p>
+                    <div class="flex w-full flex-wrap items-center justify-between gap-3 px-5 py-4">
+                        <button type="button" @click="open = ! open" class="flex flex-1 items-center gap-3 text-left">
+                            <p class="font-display text-lg font-semibold text-slate-900 dark:text-white sm:text-xl">
+                                {{ $clienteNome }}
+                            </p>
+                        </button>
 
                         <div class="flex items-center gap-4">
                             <div class="text-right">
@@ -57,13 +55,24 @@
                                     {{ $porCliente['quantidade'] }} {{ $porCliente['quantidade'] === 1 ? 'ativo' : 'ativos' }}
                                 </p>
                             </div>
-                            <x-nav-icon
-                                name="chevron"
-                                class="h-5 w-5 shrink-0 text-slate-400 transition-transform duration-200"
-                                x-bind:class="{ 'rotate-180': open }"
-                            />
+
+                            {{-- Um botão só pro cliente inteiro — era o mesmo
+                                 perfil se repetindo em cada linha de ativo,
+                                 sempre o mesmo destino. --}}
+                            <form method="POST" action="{{ route('profile.switch', $porCliente['profile_id']) }}">
+                                @csrf
+                                <button type="submit" class="btn-secondary px-3 py-1.5 whitespace-nowrap">Abrir perfil</button>
+                            </form>
+
+                            <button type="button" @click="open = ! open">
+                                <x-nav-icon
+                                    name="chevron"
+                                    class="h-5 w-5 shrink-0 text-slate-400 transition-transform duration-200"
+                                    x-bind:class="{ 'rotate-180': open }"
+                                />
+                            </button>
                         </div>
-                    </button>
+                    </div>
 
                     <div x-show="open" x-cloak x-transition class="divide-y divide-slate-100 border-t border-slate-100 px-5 dark:divide-white/10 dark:border-white/10">
                         @foreach ($porCliente['membros'] as $porMembro)
@@ -88,7 +97,18 @@
                                             </div>
 
                                             <div class="mt-2 overflow-x-auto">
-                                                <table class="w-full min-w-[560px] text-sm">
+                                                {{-- table-fixed + colgroup idênticos em toda tabela desta
+                                                     página: cada instituição é uma <table> separada, e sem
+                                                     largura fixa cada uma calculava as colunas sozinha a
+                                                     partir do próprio conteúdo — o "Ganho"/"Valor atual" de
+                                                     uma instituição não alinhava com o de outra. --}}
+                                                <table class="w-full min-w-[480px] table-fixed text-sm">
+                                                    <colgroup>
+                                                        <col class="w-[42%]">
+                                                        <col class="w-[22%]">
+                                                        <col class="w-[18%]">
+                                                        <col class="w-[18%]">
+                                                    </colgroup>
                                                     <tbody class="divide-y divide-slate-100 dark:divide-white/10">
                                                         @foreach ($linhasDaInstituicao as $linha)
                                                             @php
@@ -96,31 +116,25 @@
                                                                 $pct = $ativo->gainPercentage();
                                                             @endphp
                                                             <tr>
-                                                                <td class="max-w-56 py-2 pr-3">
+                                                                <td class="py-2 pr-3">
                                                                     <p class="truncate text-slate-800 dark:text-slate-200">{{ $ativo->displayName() }}</p>
                                                                 </td>
-                                                                <td class="py-2 pr-3 text-slate-600 dark:text-slate-400">{{ $ativo->asset_class->label() }}</td>
+                                                                <td class="truncate py-2 pr-3 text-slate-600 dark:text-slate-400">{{ $ativo->asset_class->label() }}</td>
                                                                 <td class="py-2 pr-3 text-right tabular-nums text-slate-800 dark:text-slate-200">
                                                                     {{ Money::compact($ativo->current_amount) }}
                                                                 </td>
-                                                                <td class="py-2 pr-3 text-right tabular-nums">
+                                                                <td class="py-2 text-right tabular-nums">
                                                                     @if ($pct !== null)
                                                                         <span @class([
                                                                             'font-medium',
-                                                                            'text-brand-700 dark:text-brand-300' => $pct >= 0,
-                                                                            'text-red-700 dark:text-red-400' => $pct < 0,
+                                                                            'text-accent-700 dark:text-accent-400' => $pct >= 0,
+                                                                            'text-slate-500 dark:text-slate-400' => $pct < 0,
                                                                         ])>
                                                                             {{ $pct >= 0 ? '+' : '' }}{{ number_format($pct, 2, ',', '.') }}%
                                                                         </span>
                                                                     @else
                                                                         <span class="text-slate-400">—</span>
                                                                     @endif
-                                                                </td>
-                                                                <td class="py-2 text-right">
-                                                                    <form method="POST" action="{{ route('profile.switch', $ativo->profile_id) }}">
-                                                                        @csrf
-                                                                        <button type="submit" class="btn-secondary px-3 py-1.5 whitespace-nowrap">Abrir perfil</button>
-                                                                    </form>
                                                                 </td>
                                                             </tr>
                                                         @endforeach
