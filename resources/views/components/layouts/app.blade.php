@@ -316,12 +316,18 @@
             'lg:hidden' => $mostraAsideDesktop,
         ])>
             <div class="mx-auto flex h-14 max-w-6xl items-center justify-between gap-3 px-4">
-                <a href="{{ route('dashboard') }}" class="flex items-center gap-2 font-display text-xl font-semibold tracking-tight text-brand-800 dark:text-white">
+                <a href="{{ route('dashboard') }}" class="flex shrink-0 items-center gap-2 font-display text-xl font-semibold tracking-tight text-brand-800 dark:text-white">
                     <x-brand-mark class="h-6 w-6" />
                     Cerne
                 </a>
 
-                <div class="flex items-center gap-2">
+                {{-- min-w-0 é o que permite este grupo encolher menos que
+                     seu conteúdo e rolar por dentro (overflow-x-auto) em
+                     vez de estourar a largura da tela — consultor/admin
+                     têm bem mais botões aqui do que o cliente comum, e
+                     sem isto eles simplesmente somiam pra fora da tela no
+                     celular. --}}
+                <div class="flex min-w-0 items-center gap-2 overflow-x-auto">
                     @if ($context->isConsultant())
                         <span class="badge bg-amber-50 text-amber-900 ring-1 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-300 dark:ring-amber-500/20">consultor</span>
                     @endif
@@ -442,7 +448,7 @@
 @elseif ($areaConsultor)
     {{-- Poucas telas nesta área — cabem direto, sem gaveta "Mais". --}}
     <nav
-        class="fixed inset-x-0 bottom-0 z-30 flex border-t border-brand-950/5 bg-white/95 backdrop-blur transform-gpu will-change-transform lg:hidden dark:border-white/10 dark:bg-slate-900/95"
+        class="fixed inset-x-0 bottom-0 z-30 flex overflow-x-auto border-t border-brand-950/5 bg-white/95 backdrop-blur transform-gpu will-change-transform lg:hidden dark:border-white/10 dark:bg-slate-900/95"
         style="padding-bottom: env(safe-area-inset-bottom)"
     >
         @foreach ($navConsultor as [$route, $label, $curto, $icone])
@@ -454,7 +460,7 @@
     </nav>
 @elseif ($areaAdmin)
     <nav
-        class="fixed inset-x-0 bottom-0 z-30 flex border-t border-brand-950/5 bg-white/95 backdrop-blur transform-gpu will-change-transform lg:hidden dark:border-white/10 dark:bg-slate-900/95"
+        class="fixed inset-x-0 bottom-0 z-30 flex overflow-x-auto border-t border-brand-950/5 bg-white/95 backdrop-blur transform-gpu will-change-transform lg:hidden dark:border-white/10 dark:bg-slate-900/95"
         style="padding-bottom: env(safe-area-inset-bottom)"
     >
         @foreach ($navAdmin as [$route, $label, $curto, $icone])
