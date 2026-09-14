@@ -154,11 +154,26 @@ class InvestmentRecord extends Model
     /** Percentual de ganho sobre o investido — não confundir com return_rate (a taxa contratada). */
     public function gainPercentage(): ?float
     {
-        if ($this->invested_amount === null || bccomp($this->invested_amount, '0', 2) <= 0) {
+        return self::percentageChange($this->invested_amount, $this->current_amount);
+    }
+
+    /**
+     * Variação percentual entre dois valores quaisquer — a mesma conta
+     * de gainPercentage(), só que generalizada pra comparar dois pontos
+     * no tempo em vez de sempre "investido vs atual" (ver
+     * FiltersInvestmentGrowth, que usa isto pra "este ano"/"este
+     * mês"/"comparar dois meses" a partir de InvestmentSnapshot).
+     *
+     * null de propósito quando não dá pra calcular (base ausente ou
+     * zero/negativa) — a tela mostra "—", nunca um número inventado.
+     */
+    public static function percentageChange(?string $de, ?string $para): ?float
+    {
+        if ($de === null || $para === null || bccomp($de, '0', 2) <= 0) {
             return null;
         }
 
-        return (float) Money::percentageOf($this->unrealizedGain(), $this->invested_amount);
+        return (float) Money::percentageOf(bcsub($para, $de, 2), $de);
     }
 
     /** Dias desde a compra — null se a data não foi informada. */

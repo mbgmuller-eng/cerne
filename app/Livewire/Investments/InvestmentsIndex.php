@@ -10,6 +10,7 @@ use App\Enums\InvestorType;
 use App\Enums\PortfolioDisplayGroup;
 use App\Enums\ReserveType;
 use App\Enums\TransactionType;
+use App\Livewire\Concerns\FiltersInvestmentGrowth;
 use App\Livewire\Concerns\HasPrivacyTabs;
 use App\Livewire\Concerns\RequiresActiveProfile;
 use App\Models\FinancialReserve;
@@ -41,6 +42,7 @@ class InvestmentsIndex extends Component
 {
     use RequiresActiveProfile;
     use HasPrivacyTabs;
+    use FiltersInvestmentGrowth;
 
     protected function privacyModels(): array
     {
@@ -212,6 +214,19 @@ class InvestmentsIndex extends Component
     public function getTotalGainProperty(): string
     {
         return bcsub($this->total, $this->totalInvested, 2);
+    }
+
+    /**
+     * "Ganho" (%) de cada ativo conforme o período escolhido no filtro
+     * (ver FiltersInvestmentGrowth) — substitui a chamada direta a
+     * InvestmentRecord::gainPercentage() na view quando o período não é
+     * "desde o início".
+     *
+     * @return array<string, ?float> investment_id => percentual
+     */
+    public function getGrowthPercentagesProperty(): array
+    {
+        return $this->computeGrowthPercentages($this->investments);
     }
 
     /**
@@ -889,6 +904,9 @@ class InvestmentsIndex extends Component
             'transactions' => $this->transactions,
             'snapshotHistory' => $this->snapshotHistory,
             'investorAllocations' => $this->investorAllocations,
+            'growthPercentages' => $this->growthPercentages,
+            'growthPeriod' => $this->growthPeriod,
+            'growthPeriodOptions' => $this->growthPeriodOptions(),
         ]);
     }
 }

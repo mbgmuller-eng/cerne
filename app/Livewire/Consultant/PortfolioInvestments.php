@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Consultant;
 
+use App\Livewire\Concerns\FiltersInvestmentGrowth;
 use App\Models\InvestmentRecord;
 use App\Services\ConsultantPortfolioService;
 use App\Support\Money;
@@ -20,6 +21,8 @@ use Livewire\Component;
 #[Layout('components.layouts.app')]
 class PortfolioInvestments extends Component
 {
+    use FiltersInvestmentGrowth;
+
     #[Url]
     public string $instituicao = '';
 
@@ -43,10 +46,15 @@ class PortfolioInvestments extends Component
             ? $todos
             : $todos->filter(fn (array $linha): bool => $linha['investment']->institution === $this->instituicao);
 
+        $crescimento = $this->computeGrowthPercentages($linhas->pluck('investment'));
+        $linhas = $linhas->map(fn (array $l): array => $l + ['pct' => $crescimento[$l['investment']->id]['pct'] ?? null]);
+
         return view('livewire.consultant.portfolio-investments', [
             'grouped' => $this->group($linhas),
             'instituicoes' => $instituicoes,
             'totalGeral' => $todos->count(),
+            'growthPeriod' => $this->growthPeriod,
+            'growthPeriodOptions' => $this->growthPeriodOptions(),
         ]);
     }
 
@@ -55,7 +63,7 @@ class PortfolioInvestments extends Component
      * tamanho da carteira daquele cliente sem precisar abrir o
      * acordeão (ver getGroupedProperty() equivalente em InsuranceIndex).
      *
-     * @param  Collection<int, array{investment: InvestmentRecord, client_name: string, member_name: ?string}>  $linhas
+     * @param  Collection<int, array{investment: InvestmentRecord, client_name: string, member_name: ?string, pct: ?float}>  $linhas
      * @return Collection<string, array{separarPorMembro: bool, quantidade: int, total: string, profile_id: string, membros: Collection}>
      */
     private function group(Collection $linhas): Collection

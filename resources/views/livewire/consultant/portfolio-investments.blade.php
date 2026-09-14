@@ -16,14 +16,18 @@
             </p>
         </div>
 
-        <div>
-            <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Corretora / instituição</label>
-            <select wire:model.live="instituicao" class="select mt-1.5">
-                <option value="">Todas as instituições</option>
-                @foreach ($instituicoes as $nome)
-                    <option value="{{ $nome }}">{{ $nome }}</option>
-                @endforeach
-            </select>
+        <div class="flex flex-wrap items-end gap-3">
+            <div>
+                <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Corretora / instituição</label>
+                <select wire:model.live="instituicao" class="select mt-1.5">
+                    <option value="">Todas as instituições</option>
+                    @foreach ($instituicoes as $nome)
+                        <option value="{{ $nome }}">{{ $nome }}</option>
+                    @endforeach
+                </select>
+            </div>
+
+            <x-investment-growth-filter :period="$growthPeriod" :options="$growthPeriodOptions" />
         </div>
     </div>
 
@@ -113,7 +117,7 @@
                                                         @foreach ($linhasDaInstituicao as $linha)
                                                             @php
                                                                 $ativo = $linha['investment'];
-                                                                $pct = $ativo->gainPercentage();
+                                                                $pct = $linha['pct'];
                                                             @endphp
                                                             <tr>
                                                                 <td class="py-2 pr-3">

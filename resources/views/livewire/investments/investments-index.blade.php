@@ -51,10 +51,12 @@
 
     @if ($tab === 'portfolio')
         {{-- Novo investimento ------------------------------------------ --}}
-        <div>
+        <div class="flex flex-wrap items-end justify-between gap-3">
             <button type="button" wire:click="toggleInvestmentForm" class="btn-secondary">
                 {{ $showInvestmentForm ? 'Cancelar' : '+ Investimento' }}
             </button>
+
+            <x-investment-growth-filter :period="$growthPeriod" :options="$growthPeriodOptions" />
         </div>
 
         @php
@@ -353,7 +355,7 @@
                     <div class="mt-2 space-y-4">
                         @foreach ($ativos as $ativo)
                             @php
-                                $pct = $ativo->gainPercentage();
+                                $pct = $growthPercentages[$ativo->id]['pct'] ?? null;
                                 $anualizado = $ativo->annualizedReturnPercentage();
                                 $dias = $ativo->daysHeld();
                             @endphp
@@ -422,12 +424,12 @@
 
                                 <div class="shrink-0 text-right">
                                     <p class="text-sm tabular-nums text-slate-800 dark:text-slate-200">{{ Money::format($ativo->current_amount) }}</p>
-                                    @if ($ativo->invested_amount && (float) $ativo->invested_amount > 0)
-                                        @php $ganho = $ativo->unrealizedGain(); $pct = $ativo->gainPercentage(); @endphp
-                                        <p class="text-xs tabular-nums {{ (float) $ganho < 0 ? 'text-slate-500 dark:text-slate-400' : 'text-accent-700 dark:text-accent-400' }}">
-                                            {{ (float) $ganho >= 0 ? '+' : '' }}{{ Money::format($ganho) }}
-                                            @if ($pct !== null)
-                                                ({{ $pct >= 0 ? '+' : '' }}{{ number_format($pct, 1, ',', '.') }}%)
+                                    @php $crescimento = $growthPercentages[$ativo->id] ?? ['pct' => null, 'ganho' => null]; @endphp
+                                    @if ($crescimento['ganho'] !== null)
+                                        <p class="text-xs tabular-nums {{ (float) $crescimento['ganho'] < 0 ? 'text-slate-500 dark:text-slate-400' : 'text-accent-700 dark:text-accent-400' }}">
+                                            {{ (float) $crescimento['ganho'] >= 0 ? '+' : '' }}{{ Money::format($crescimento['ganho']) }}
+                                            @if ($crescimento['pct'] !== null)
+                                                ({{ $crescimento['pct'] >= 0 ? '+' : '' }}{{ number_format($crescimento['pct'], 1, ',', '.') }}%)
                                             @endif
                                         </p>
                                     @endif
