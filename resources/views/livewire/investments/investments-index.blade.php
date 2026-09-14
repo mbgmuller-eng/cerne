@@ -27,6 +27,20 @@
             <p class="figure mt-2 text-2xl font-medium {{ (float) $totalGain < 0 ? 'text-slate-500 dark:text-slate-400' : 'text-accent-700 dark:text-accent-400' }}">
                 {{ Money::format($totalGain) }}
             </p>
+            {{-- "Ganho não realizado" acima é sempre desde o início (custo
+                 de aquisição) — este percentual é o complemento, só
+                 aparece quando o filtro de Crescimento está num período
+                 diferente, pra não duplicar o mesmo número duas vezes. --}}
+            @if ($growthPeriod !== 'inicio' && $growthTotal['pct'] !== null)
+                <p @class([
+                    'mt-1 text-xs font-medium',
+                    'text-accent-700 dark:text-accent-400' => $growthTotal['pct'] >= 0,
+                    'text-slate-500 dark:text-slate-400' => $growthTotal['pct'] < 0,
+                ])>
+                    {{ $growthTotal['pct'] >= 0 ? '+' : '' }}{{ number_format($growthTotal['pct'], 2, ',', '.') }}%
+                    · {{ $growthPeriodOptions[$growthPeriod] }}
+                </p>
+            @endif
         </div>
     </div>
 

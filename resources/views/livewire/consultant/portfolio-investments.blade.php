@@ -57,6 +57,15 @@
                                 <p class="figure text-sm font-semibold text-slate-800 dark:text-slate-200">{{ Money::compact($porCliente['total']) }}</p>
                                 <p class="text-xs text-slate-400">
                                     {{ $porCliente['quantidade'] }} {{ $porCliente['quantidade'] === 1 ? 'ativo' : 'ativos' }}
+                                    @if ($porCliente['crescimento']['pct'] !== null)
+                                        · <span @class([
+                                            'font-medium',
+                                            'text-accent-700 dark:text-accent-400' => $porCliente['crescimento']['pct'] >= 0,
+                                            'text-slate-500 dark:text-slate-400' => $porCliente['crescimento']['pct'] < 0,
+                                        ])>
+                                            {{ $porCliente['crescimento']['pct'] >= 0 ? '+' : '' }}{{ number_format($porCliente['crescimento']['pct'], 2, ',', '.') }}%
+                                        </span>
+                                    @endif
                                 </p>
                             </div>
 

@@ -71,9 +71,68 @@ trait FiltersInvestmentGrowth
      */
     protected function computeGrowthPercentages(Collection $investimentos): array
     {
+        return collect($this->growthPoints($investimentos))
+            ->map(fn (array $p) => [
+                'pct' => InvestmentRecord::percentageChange($p['de'], $p['para']),
+                'ganho' => $p['de'] !== null && $p['para'] !== null ? bcsub($p['para'], $p['de'], 2) : null,
+            ])
+            ->all();
+    }
+
+    /**
+     * Crescimento da CARTEIRA inteira informada (soma, não média das
+     * percentuais individuais — %s não se somam nem se tiram média
+     * direto, cada ativo tem uma base diferente). Só entram na soma os
+     * ativos com os dois pontos disponíveis (mesma regra de "sem foto,
+     * sem número" da versão por ativo); um ativo sem base nenhuma não
+     * conta nem a favor nem contra.
+     *
+     * @param  Collection<int, InvestmentRecord>  $investimentos
+     * @return array{pct: ?float, ganho: ?string}
+     */
+    protected function computeGrowthTotal(Collection $investimentos): array
+    {
+        $somaDe = '0.00';
+        $somaPara = '0.00';
+        $contribuiu = false;
+
+        foreach ($this->growthPoints($investimentos) as $p) {
+            if ($p['de'] === null || $p['para'] === null) {
+                continue;
+            }
+
+            $somaDe = bcadd($somaDe, $p['de'], 2);
+            $somaPara = bcadd($somaPara, $p['para'], 2);
+            $contribuiu = true;
+        }
+
+        if (! $contribuiu) {
+            return ['pct' => null, 'ganho' => null];
+        }
+
+        return [
+            'pct' => InvestmentRecord::percentageChange($somaDe, $somaPara),
+            'ganho' => bcsub($somaPara, $somaDe, 2),
+        ];
+    }
+
+    /**
+     * Os dois pontos de comparação de cada ativo, conforme o período —
+     * base compartilhada por computeGrowthPercentages() (por ativo) e
+     * computeGrowthTotal() (soma da carteira), pra não buscar a mesma
+     * foto duas vezes nem duplicar a regra de qual foto usar.
+     *
+     * @param  Collection<int, InvestmentRecord>  $investimentos
+     * @return array<string, array{de: ?string, para: ?string}>
+     */
+    private function growthPoints(Collection $investimentos): array
+    {
         if ($this->growthPeriod === 'inicio') {
             return $investimentos->mapWithKeys(fn (InvestmentRecord $i) => [
-                $i->id => ['pct' => $i->gainPercentage(), 'ganho' => $i->unrealizedGain()],
+                $i->id => [
+                    'de' => $i->invested_amount !== null && bccomp($i->invested_amount, '0', 2) > 0 ? $i->invested_amount : null,
+                    'para' => $i->current_amount,
+                ],
             ])->all();
         }
 
@@ -83,15 +142,12 @@ trait FiltersInvestmentGrowth
             ? $this->growthSnapshotAmounts($ids, $this->growthMonthPoint($this->growthMonthB))
             : null;
 
-        return $investimentos->mapWithKeys(function (InvestmentRecord $i) use ($inicio, $fim) {
-            $de = $inicio[$i->id] ?? null;
-            $para = $fim === null ? $i->current_amount : ($fim[$i->id] ?? null);
-
-            return [$i->id => [
-                'pct' => InvestmentRecord::percentageChange($de, $para),
-                'ganho' => $de !== null && $para !== null ? bcsub($para, $de, 2) : null,
-            ]];
-        })->all();
+        return $investimentos->mapWithKeys(fn (InvestmentRecord $i) => [
+            $i->id => [
+                'de' => $inicio[$i->id] ?? null,
+                'para' => $fim === null ? $i->current_amount : ($fim[$i->id] ?? null),
+            ],
+        ])->all();
     }
 
     /** @return ?array{year: int, month: int} */

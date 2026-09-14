@@ -230,6 +230,20 @@ class InvestmentsIndex extends Component
     }
 
     /**
+     * Crescimento da carteira INTEIRA no período escolhido — o card
+     * "Ganho não realizado" continua mostrando o valor de sempre (custo
+     * de aquisição vs. atual, sem depender do filtro); isto é só o
+     * percentual complementar, mostrado do lado quando o período
+     * escolhido não é "desde o início" (ver computeGrowthTotal()).
+     *
+     * @return array{pct: ?float, ganho: ?string}
+     */
+    public function getGrowthTotalProperty(): array
+    {
+        return $this->computeGrowthTotal($this->investments);
+    }
+
+    /**
      * A do casal (member_id nulo — visível aos dois, ver
      * InvestorProfile::sharedPeaceReserveTarget()) vem primeiro; depois,
      * agrupada por membro e, dentro do membro, paz antes de oportunidade
@@ -905,6 +919,7 @@ class InvestmentsIndex extends Component
             'snapshotHistory' => $this->snapshotHistory,
             'investorAllocations' => $this->investorAllocations,
             'growthPercentages' => $this->growthPercentages,
+            'growthTotal' => $this->growthTotal,
             'growthPeriod' => $this->growthPeriod,
             'growthPeriodOptions' => $this->growthPeriodOptions(),
         ]);
