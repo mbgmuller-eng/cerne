@@ -165,7 +165,7 @@
             <p class="text-xs text-slate-500 dark:text-slate-400">Sem perfil próprio — cônjuge com login vinculado a um perfil de outra pessoa, ou conta sem papel de consultor.</p>
 
             <div class="card overflow-x-auto p-0">
-                <table class="w-full text-left text-sm">
+                <table class="w-full min-w-[640px] text-left text-sm">
                     <thead class="text-xs text-slate-500 dark:text-slate-400">
                         <tr>
                             <th class="px-5 py-2 font-medium">Nome</th>
