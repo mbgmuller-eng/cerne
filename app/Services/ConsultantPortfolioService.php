@@ -126,7 +126,12 @@ class ConsultantPortfolioService
      * Todos os investimentos ativos dos clientes ativos deste consultor,
      * com o nome do cliente anexado — para "Investimentos da carteira".
      *
-     * @return Collection<int, array{investment: InvestmentRecord, client_name: string}>
+     * `member_name` é quem é o dono do ativo dentro daquele perfil — pode
+     * ser o cônjuge, não o titular. Diferente de seguro, InvestmentRecord.
+     * member_id nunca é nulo (todo ativo tem um dono), então não existe
+     * caso "família" aqui.
+     *
+     * @return Collection<int, array{investment: InvestmentRecord, client_name: string, member_name: ?string}>
      */
     public function allActiveInvestments(User $consultant): Collection
     {
@@ -147,6 +152,7 @@ class ConsultantPortfolioService
             ->map(fn (InvestmentRecord $i): array => [
                 'investment' => $i,
                 'client_name' => $nomes[$i->profile_id] ?? '—',
+                'member_name' => $i->member?->name,
             ]);
     }
 
