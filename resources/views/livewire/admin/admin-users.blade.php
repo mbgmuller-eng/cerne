@@ -67,7 +67,18 @@
     @endif
 
     @if ($this->exclusaoInfo)
-        <div class="card space-y-4 border border-red-200 p-5 dark:border-red-500/30">
+        {{-- O clique em "Excluir" pode vir de uma linha lá embaixo na
+             lista — sem isto, o painel muda lá em cima e ninguém percebe
+             (parece que o clique não fez nada). x-init roda de novo toda
+             vez que este bloco reaparece no DOM (Livewire recria o
+             elemento a cada clique em "Excluir", mesmo trocando de
+             pessoa), então funciona pra qualquer conta escolhida, não só
+             a primeira. --}}
+        <div
+            x-data
+            x-init="$nextTick(() => $el.scrollIntoView({ behavior: 'smooth', block: 'start' }))"
+            class="card space-y-4 border border-red-200 p-5 dark:border-red-500/30"
+        >
             <div>
                 <p class="text-sm font-semibold text-red-700 dark:text-red-400">Excluir conta de {{ $this->exclusaoInfo['nome'] }}</p>
 
