@@ -33,14 +33,34 @@
             </p>
         </div>
     @else
-        <div class="space-y-6">
+        <div class="space-y-3">
             @foreach ($grouped as $clienteNome => $porCliente)
-                <div class="card overflow-hidden">
-                    <div class="border-b border-slate-100 bg-slate-50/60 px-5 py-2.5 dark:border-white/10 dark:bg-white/5">
-                        <p class="text-sm font-semibold text-slate-800 dark:text-slate-200">{{ $clienteNome }}</p>
-                    </div>
+                <div x-data="{ open: false }" class="card overflow-hidden">
+                    <button
+                        type="button"
+                        @click="open = ! open"
+                        class="flex w-full flex-wrap items-center justify-between gap-3 px-5 py-4 text-left"
+                    >
+                        <p class="font-display text-lg font-semibold text-slate-900 dark:text-white sm:text-xl">
+                            {{ $clienteNome }}
+                        </p>
 
-                    <div class="divide-y divide-slate-100 px-5 dark:divide-white/10">
+                        <div class="flex items-center gap-4">
+                            <div class="text-right">
+                                <p class="figure text-sm font-semibold text-slate-800 dark:text-slate-200">{{ Money::compact($porCliente['total']) }}</p>
+                                <p class="text-xs text-slate-400">
+                                    {{ $porCliente['quantidade'] }} {{ $porCliente['quantidade'] === 1 ? 'ativo' : 'ativos' }}
+                                </p>
+                            </div>
+                            <x-nav-icon
+                                name="chevron"
+                                class="h-5 w-5 shrink-0 text-slate-400 transition-transform duration-200"
+                                x-bind:class="{ 'rotate-180': open }"
+                            />
+                        </div>
+                    </button>
+
+                    <div x-show="open" x-cloak x-transition class="divide-y divide-slate-100 border-t border-slate-100 px-5 dark:divide-white/10 dark:border-white/10">
                         @foreach ($porCliente['membros'] as $porMembro)
                             <div class="py-3">
                                 @if ($porCliente['separarPorMembro'])

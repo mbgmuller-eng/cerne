@@ -4,6 +4,7 @@ namespace App\Livewire\Consultant;
 
 use App\Models\InvestmentRecord;
 use App\Services\ConsultantPortfolioService;
+use App\Support\Money;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Url;
@@ -50,8 +51,12 @@ class PortfolioInvestments extends Component
     }
 
     /**
+     * `quantidade`/`total` ficam no resumo do card — dá pra saber o
+     * tamanho da carteira daquele cliente sem precisar abrir o
+     * acordeão (ver getGroupedProperty() equivalente em InsuranceIndex).
+     *
      * @param  Collection<int, array{investment: InvestmentRecord, client_name: string, member_name: ?string}>  $linhas
-     * @return Collection<string, array{separarPorMembro: bool, membros: Collection}>
+     * @return Collection<string, array{separarPorMembro: bool, quantidade: int, total: string, membros: Collection}>
      */
     private function group(Collection $linhas): Collection
     {
@@ -67,6 +72,8 @@ class PortfolioInvestments extends Component
 
                 return [
                     'separarPorMembro' => $separarPorMembro,
+                    'quantidade' => $doCliente->count(),
+                    'total' => Money::sum($doCliente->map(fn (array $l) => $l['investment']->current_amount)),
                     'membros' => $porMembro->map(fn (Collection $doMembro) => [
                         'nome' => $doMembro->first()['member_name'],
                         'instituicoes' => $doMembro->groupBy(fn (array $l) => $l['investment']->institution ?? 'Sem instituição'),
