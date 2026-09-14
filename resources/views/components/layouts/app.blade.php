@@ -31,6 +31,27 @@
     $dentroDoPerfil = $profile && ! $areaConsultor && ! $areaAdmin;
     $mostraAsideDesktop = $dentroDoPerfil || $areaConsultor || $areaAdmin;
 
+    // Nav da barra inferior nas áreas de consultor/admin — cabe tudo
+    // direto, sem gaveta "Mais" (são poucas telas, ao contrário do menu
+    // de dentro do perfil). Mesmos itens da <aside> de desktop de cada
+    // área, só que achatados pra caber embaixo.
+    $navConsultor = [
+        ['consultant.portfolio', 'Painel da carteira', 'Carteira', 'invest'],
+        ['consultant.portfolio.insurance', 'Seguros da carteira', 'Seguros', 'shield'],
+        ['consultant.portfolio.investments', 'Investimentos da carteira', 'Invest.', 'flow'],
+    ];
+    if ($user?->isPlatformAdmin()) {
+        $navConsultor[] = ['admin.users', 'Painel admin', 'Admin', 'admin'];
+    }
+
+    $navAdmin = [
+        ['admin.users', 'Contas e perfis', 'Contas', 'admin'],
+        ['admin.banks', 'Bancos', 'Bancos', 'cards'],
+    ];
+    if ($user?->isConsultant()) {
+        $navAdmin[] = ['consultant.portfolio', 'Painel da carteira', 'Carteira', 'invest'];
+    }
+
     // Só conta se for mesmo relevante — poupa uma query em toda página
     // pra quem não é admin.
     $bancosPendentes = $user?->isPlatformAdmin() ? \App\Models\Bank::withoutTaxonomyScope()->pending()->count() : 0;
@@ -346,7 +367,7 @@
 
         <main @class([
             'mx-auto w-full max-w-6xl flex-1 px-4 py-6 sm:px-6 sm:py-8 lg:px-10 lg:py-10',
-            'pb-24 lg:pb-10' => $dentroDoPerfil,  // espaço para a barra inferior no celular
+            'pb-24 lg:pb-10' => $mostraAsideDesktop,  // espaço para a barra inferior no celular
         ])>
             @if (session('status'))
                 <div class="mb-6 rounded-xl bg-brand-50 px-4 py-3 text-sm text-brand-900 ring-1 ring-brand-200 dark:bg-brand-500/10 dark:text-brand-200 dark:ring-brand-500/20">
@@ -418,6 +439,31 @@
             </button>
         </nav>
     </div>
+@elseif ($areaConsultor)
+    {{-- Poucas telas nesta área — cabem direto, sem gaveta "Mais". --}}
+    <nav
+        class="fixed inset-x-0 bottom-0 z-30 flex border-t border-brand-950/5 bg-white/95 backdrop-blur transform-gpu will-change-transform lg:hidden dark:border-white/10 dark:bg-slate-900/95"
+        style="padding-bottom: env(safe-area-inset-bottom)"
+    >
+        @foreach ($navConsultor as [$route, $label, $curto, $icone])
+            <a href="{{ route($route) }}" @class(['tab-item', 'tab-item-active' => request()->routeIs($route)])>
+                <x-nav-icon :name="$icone" class="h-6 w-6" />
+                <span>{{ $curto }}</span>
+            </a>
+        @endforeach
+    </nav>
+@elseif ($areaAdmin)
+    <nav
+        class="fixed inset-x-0 bottom-0 z-30 flex border-t border-brand-950/5 bg-white/95 backdrop-blur transform-gpu will-change-transform lg:hidden dark:border-white/10 dark:bg-slate-900/95"
+        style="padding-bottom: env(safe-area-inset-bottom)"
+    >
+        @foreach ($navAdmin as [$route, $label, $curto, $icone])
+            <a href="{{ route($route) }}" @class(['tab-item', 'tab-item-active' => request()->routeIs($route)])>
+                <x-nav-icon :name="$icone" class="h-6 w-6" />
+                <span>{{ $curto }}</span>
+            </a>
+        @endforeach
+    </nav>
 @endif
 
 <script>
