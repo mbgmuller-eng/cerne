@@ -8,6 +8,7 @@ use App\Enums\MemberRole;
 use App\Enums\ProfileType;
 use App\Models\BankAccount;
 use App\Models\ConsultantClient;
+use App\Models\ConsultantInvite;
 use App\Models\CreditCard;
 use App\Models\CreditCardInvoice;
 use App\Models\FinancialProfile;
@@ -259,7 +260,7 @@ class ConsultantPortfolioService
      *     name: string, email: string, status: ConsultantClientStatus, since: ?\Illuminate\Support\Carbon,
      *     profile_id: ?string, patrimonio: ?string, seguro_vida: bool, insurers: list<string>,
      *     insurance_types: list<string>, tipo_perfil: ?ProfileType, parceiro: ?string,
-     *     acessos: ?int, vida_financeira: ?string, premio_mensal: ?string,
+     *     acessos: ?int, vida_financeira: ?string, premio_mensal: ?string, sem_convite_enviado: bool,
      * }>
      */
     private function perClientBreakdown(User $consultant, Collection $profileIds, Collection $apolicesPorPerfil): array
@@ -272,7 +273,19 @@ class ConsultantPortfolioService
 
         $patrimonioPorPerfil = $this->netWorthByProfile($profileIds);
 
-        return $links->map(function (ConsultantClient $link) use ($patrimonioPorPerfil, $apolicesPorPerfil): array {
+        // Cliente importado em lote (ex.: planilha de seguros) nasce com
+        // usuário, perfil e vínculo já prontos, mas sem NENHUM
+        // ConsultantInvite emitido — a senha que ele tem é aleatória e
+        // desconhecida, então nunca conseguiu logar. "Reenviar" (no painel
+        // de convites) não serve pra esse caso porque não existe convite
+        // nenhum pra reenviar; precisa de um primeiro envio mesmo.
+        $emailsComConvite = ConsultantInvite::query()
+            ->where('consultant_id', $consultant->id)
+            ->pluck('client_email')
+            ->map(fn (string $email) => mb_strtolower($email))
+            ->flip();
+
+        return $links->map(function (ConsultantClient $link) use ($patrimonioPorPerfil, $apolicesPorPerfil, $emailsComConvite): array {
             $profile = $link->client->ownedProfiles->first();
             $ativo = $link->status === ConsultantClientStatus::Active;
             $profileId = $ativo ? $profile?->id : null;
@@ -301,6 +314,7 @@ class ConsultantPortfolioService
                 'premio_mensal' => $profileId
                     ? Money::sum($apolicesDoCliente->map(fn (InsurancePolicy $p) => $p->normalizedMonthlyCost()))
                     : null,
+                'sem_convite_enviado' => $ativo && ! isset($emailsComConvite[mb_strtolower($link->client->email)]),
             ];
         })->all();
     }

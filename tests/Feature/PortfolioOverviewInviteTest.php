@@ -2,10 +2,13 @@
 
 namespace Tests\Feature;
 
+use App\Enums\ConsultantClientStatus;
 use App\Enums\InviteStatus;
 use App\Livewire\Consultant\PortfolioOverview;
 use App\Mail\ClientInviteMail;
+use App\Models\ConsultantClient;
 use App\Models\ConsultantInvite;
+use App\Models\FinancialProfile;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Mail;
@@ -121,6 +124,55 @@ class PortfolioOverviewInviteTest extends TestCase
         $this->expectException(\Illuminate\Database\Eloquent\ModelNotFoundException::class);
 
         Livewire::test(PortfolioOverview::class)->call('reenviarConvite', $convite->id);
+    }
+
+    /**
+     * Caso do cliente importado em lote (planilha de seguros, ex.): já tem
+     * usuário, perfil e vínculo ativo, mas nunca recebeu convite nenhum —
+     * a senha que ele tem é aleatória e desconhecida. Este é o primeiro
+     * convite de verdade, não um reenvio.
+     */
+    public function test_enviar_convite_de_acesso_pra_cliente_ja_existente_sem_convite_nenhum(): void
+    {
+        Mail::fake();
+        $consultor = User::factory()->consultant()->create();
+        $rubens = User::factory()->create(['name' => 'Rubens Anjos', 'email' => 'rubens@exemplo.com']);
+        ConsultantClient::factory()->create([
+            'consultant_id' => $consultor->id,
+            'client_id' => $rubens->id,
+            'status' => ConsultantClientStatus::Active,
+        ]);
+        $perfil = FinancialProfile::factory()->create(['owner_user_id' => $rubens->id]);
+
+        $this->actingAs($consultor);
+
+        Livewire::test(PortfolioOverview::class)
+            ->call('enviarConviteDeAcesso', $perfil->id)
+            ->assertHasNoErrors();
+
+        $convite = ConsultantInvite::query()->where('client_email', 'rubens@exemplo.com')->sole();
+        self::assertSame($consultor->id, $convite->consultant_id);
+        self::assertSame(InviteStatus::Pending, $convite->status);
+        Mail::assertQueued(ClientInviteMail::class);
+    }
+
+    public function test_enviar_convite_de_acesso_pra_cliente_de_outro_consultor_falha(): void
+    {
+        $consultor = User::factory()->consultant()->create();
+        $outroConsultor = User::factory()->consultant()->create();
+        $cliente = User::factory()->create();
+        ConsultantClient::factory()->create([
+            'consultant_id' => $outroConsultor->id,
+            'client_id' => $cliente->id,
+            'status' => ConsultantClientStatus::Active,
+        ]);
+        $perfil = FinancialProfile::factory()->create(['owner_user_id' => $cliente->id]);
+
+        $this->actingAs($consultor);
+
+        $this->expectException(\Illuminate\Database\Eloquent\ModelNotFoundException::class);
+
+        Livewire::test(PortfolioOverview::class)->call('enviarConviteDeAcesso', $perfil->id);
     }
 
     public function test_quem_nao_e_consultor_recebe_403(): void

@@ -47,6 +47,11 @@ class PortfolioOverview extends Component
 
     public ?string $lastPartnerInviteLink = null;
 
+    /** profile_id do último "Enviar convite de acesso" bem-sucedido — mostra o link ali na hora, mesma linha (session flash não aparece sem navegação de página inteira: o banner mora no layout, fora da árvore que uma chamada Livewire re-renderiza). */
+    public ?string $lastAccessInviteProfileId = null;
+
+    public ?string $lastAccessInviteLink = null;
+
 
     /** @var array<string, string> chave usada na URL/dropdown => rótulo, na ordem de exibição */
     private const ORDENS_CLIENTES = [
@@ -204,6 +209,34 @@ class PortfolioOverview extends Component
 
         $this->lastInviteLink = $invites->resend($convite);
         session()->flash('status', 'Convite reenviado.');
+    }
+
+    /**
+     * Primeiro convite de acesso pra um cliente que já existe na
+     * plataforma (perfil, vínculo ativo) mas nunca recebeu nenhum — caso
+     * típico de importação em lote, que cria a conta com senha aleatória
+     * desconhecida sem avisar ninguém (ver ClientOnboardingService::
+     * acceptInvite()). Diferente de reenviarConvite(): ali já existe um
+     * ConsultantInvite; aqui não existe nenhum ainda.
+     */
+    public function enviarConviteDeAcesso(string $profileId, ClientInviteService $invites): void
+    {
+        $profile = FinancialProfile::with('owner')->findOrFail($profileId);
+
+        // Só o dono do vínculo ativo pode receber — mesma checagem de
+        // togglePartnerInviteForm()/sendPartnerInvite() pro mesmo motivo:
+        // um id de perfil adulterado não pode disparar convite pra
+        // ninguém fora da carteira deste consultor.
+        ConsultantClient::query()
+            ->where('consultant_id', auth()->id())
+            ->where('client_id', $profile->owner_user_id)
+            ->where('status', ConsultantClientStatus::Active)
+            ->firstOrFail();
+
+        $this->lastAccessInviteProfileId = $profileId;
+        $this->lastAccessInviteLink = $invites->send(auth()->user(), $profile->owner->name, $profile->owner->email);
+
+        session()->flash('status', "Convite de acesso enviado pra {$profile->owner->email}.");
     }
 
     /** @return Collection<int, ConsultantInvite> */

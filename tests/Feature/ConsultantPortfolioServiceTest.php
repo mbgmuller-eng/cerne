@@ -76,6 +76,27 @@ class ConsultantPortfolioServiceTest extends TestCase
         self::assertNull($linhaPendente['premio_mensal']);
     }
 
+    /**
+     * Cliente importado em lote (planilha de seguros, ex.) nasce com
+     * usuário/perfil/vínculo prontos mas sem NENHUM ConsultantInvite
+     * emitido — precisa de um jeito de mandar o primeiro convite mesmo
+     * já sendo "cliente" (ver PortfolioOverview::enviarConviteDeAcesso()).
+     */
+    public function test_sinaliza_cliente_ativo_sem_nenhum_convite_emitido(): void
+    {
+        $consultor = User::factory()->consultant()->create();
+        [, $semConvite] = $this->criarClienteVinculado($consultor);
+        [, $comConvite] = $this->criarClienteVinculado($consultor);
+
+        \App\Models\ConsultantInvite::issue($consultor, $comConvite->name, $comConvite->email);
+
+        $dados = app(ConsultantPortfolioService::class)->overview($consultor);
+        $porEmail = collect($dados['por_cliente'])->keyBy('email');
+
+        self::assertTrue($porEmail[$semConvite->email]['sem_convite_enviado']);
+        self::assertFalse($porEmail[$comConvite->email]['sem_convite_enviado']);
+    }
+
     public function test_conta_clientes_com_e_sem_seguro_de_vida(): void
     {
         $consultor = User::factory()->consultant()->create();

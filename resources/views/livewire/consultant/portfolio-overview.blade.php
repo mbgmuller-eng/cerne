@@ -378,6 +378,13 @@
                                 </td>
                                 <td class="px-5 py-3 text-right">
                                     <div class="flex justify-end gap-2">
+                                        @if ($linha['profile_id'] && ($linha['sem_convite_enviado'] ?? false))
+                                            {{-- Cliente já existe (importado em lote, por ex.) mas nunca recebeu
+                                                 convite nenhum — sem isso ele não tem como logar de jeito nenhum. --}}
+                                            <button type="button" wire:click="enviarConviteDeAcesso('{{ $linha['profile_id'] }}')" wire:loading.attr="disabled" class="btn-ghost px-2 py-1.5 text-xs whitespace-nowrap text-emerald-700 dark:text-emerald-400">
+                                                Enviar convite de acesso
+                                            </button>
+                                        @endif
                                         @if ($linha['profile_id'] && $linha['tipo_perfil'] === ProfileType::Single && $linha['status'] === ConsultantClientStatus::Active)
                                             <button type="button" wire:click="togglePartnerInviteForm('{{ $linha['profile_id'] }}')" class="btn-ghost px-2 py-1.5 text-xs whitespace-nowrap">
                                                 {{ $invitingPartnerProfileId === $linha['profile_id'] ? 'Cancelar' : 'Convidar cônjuge' }}
@@ -393,6 +400,14 @@
                                     </div>
                                 </td>
                             </tr>
+                            @if ($lastAccessInviteProfileId === $linha['profile_id'] && $lastAccessInviteLink)
+                                <tr>
+                                    <td colspan="7" class="bg-emerald-50 px-5 py-3 text-xs dark:bg-emerald-500/10">
+                                        <p class="font-medium text-emerald-800 dark:text-emerald-300">Convite de acesso enviado.</p>
+                                        <p class="mt-1 font-mono break-all text-emerald-700 dark:text-emerald-400">{{ $lastAccessInviteLink }}</p>
+                                    </td>
+                                </tr>
+                            @endif
                             @if ($invitingPartnerProfileId === $linha['profile_id'])
                                 <tr>
                                     <td colspan="7" class="bg-slate-50 px-5 py-4 dark:bg-slate-800/60">
