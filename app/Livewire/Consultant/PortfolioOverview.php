@@ -189,6 +189,23 @@ class PortfolioOverview extends Component
         session()->flash('status', 'Convite enviado.');
     }
 
+    /**
+     * Reenviar convite de cliente titular ainda não cadastrado — pode ter
+     * se perdido no e-mail, ou o prazo expirou. Escopado por
+     * consultant_id igual a getPendingInvitesProperty(): sem isso, um
+     * convite de outro consultor poderia ser reenviado só adivinhando o id.
+     */
+    public function reenviarConvite(string $id, ClientInviteService $invites): void
+    {
+        $convite = ConsultantInvite::query()
+            ->where('consultant_id', auth()->id())
+            ->where('status', InviteStatus::Pending)
+            ->findOrFail($id);
+
+        $this->lastInviteLink = $invites->resend($convite);
+        session()->flash('status', 'Convite reenviado.');
+    }
+
     /** @return Collection<int, ConsultantInvite> */
     public function getPendingInvitesProperty(): Collection
     {

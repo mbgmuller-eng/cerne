@@ -53,9 +53,14 @@
                     <p class="text-xs font-medium text-slate-500 dark:text-slate-400">Convites enviados, aguardando cadastro</p>
                     <ul class="mt-2 divide-y divide-slate-100 dark:divide-white/10">
                         @foreach ($this->pendingInvites as $convite)
-                            <li class="flex items-baseline justify-between py-1.5 text-sm">
-                                <span class="text-slate-700 dark:text-slate-300">{{ $convite->client_name }}</span>
-                                <span class="text-xs text-slate-400">{{ $convite->client_email }} · expira {{ $convite->expires_at->diffForHumans() }}</span>
+                            <li class="flex items-center justify-between gap-3 py-1.5 text-sm">
+                                <div class="min-w-0">
+                                    <span class="text-slate-700 dark:text-slate-300">{{ $convite->client_name }}</span>
+                                    <span class="text-xs text-slate-400">{{ $convite->client_email }} · expira {{ $convite->expires_at->diffForHumans() }}</span>
+                                </div>
+                                <button type="button" wire:click="reenviarConvite('{{ $convite->id }}')" wire:loading.attr="disabled" class="btn-ghost shrink-0 px-2 py-1 text-xs whitespace-nowrap">
+                                    Reenviar
+                                </button>
                             </li>
                         @endforeach
                     </ul>

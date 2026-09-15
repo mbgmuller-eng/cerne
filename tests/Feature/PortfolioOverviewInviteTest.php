@@ -74,6 +74,55 @@ class PortfolioOverviewInviteTest extends TestCase
         self::assertSame('meu@exemplo.com', $pendentes->first()->client_email);
     }
 
+    public function test_reenviar_convite_expira_o_antigo_e_emite_um_token_novo(): void
+    {
+        Mail::fake();
+        $consultor = User::factory()->consultant()->create();
+        ['invite' => $original] = ConsultantInvite::issue($consultor, 'Fernanda Lima', 'fernanda@exemplo.com');
+        $this->actingAs($consultor);
+
+        Livewire::test(PortfolioOverview::class)
+            ->call('reenviarConvite', $original->id)
+            ->assertHasNoErrors();
+
+        self::assertSame(InviteStatus::Expired, $original->fresh()->status);
+
+        $novo = ConsultantInvite::query()->where('client_email', 'fernanda@exemplo.com')
+            ->where('status', InviteStatus::Pending)->sole();
+        self::assertNotSame($original->id, $novo->id);
+        self::assertNotSame($original->token, $novo->token);
+
+        // ConsultantInvite::issue() só grava a linha (sem enviar) — quem
+        // enfileira o e-mail é o service, então só o reenvio conta aqui.
+        Mail::assertQueued(ClientInviteMail::class, 1);
+    }
+
+    public function test_reenviar_convite_de_outro_consultor_falha(): void
+    {
+        $consultor = User::factory()->consultant()->create();
+        $outroConsultor = User::factory()->consultant()->create();
+        ['invite' => $convite] = ConsultantInvite::issue($outroConsultor, 'Não é meu cliente', 'outro@exemplo.com');
+
+        $this->actingAs($consultor);
+
+        $this->expectException(\Illuminate\Database\Eloquent\ModelNotFoundException::class);
+
+        Livewire::test(PortfolioOverview::class)->call('reenviarConvite', $convite->id);
+    }
+
+    public function test_reenviar_convite_ja_aceito_falha(): void
+    {
+        $consultor = User::factory()->consultant()->create();
+        ['invite' => $convite] = ConsultantInvite::issue($consultor, 'Fernanda Lima', 'fernanda@exemplo.com');
+        $convite->update(['status' => InviteStatus::Accepted]);
+
+        $this->actingAs($consultor);
+
+        $this->expectException(\Illuminate\Database\Eloquent\ModelNotFoundException::class);
+
+        Livewire::test(PortfolioOverview::class)->call('reenviarConvite', $convite->id);
+    }
+
     public function test_quem_nao_e_consultor_recebe_403(): void
     {
         $cliente = User::factory()->create();

@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\InviteStatus;
 use App\Mail\ClientInviteMail;
 use App\Models\ConsultantInvite;
 use App\Models\User;
@@ -42,5 +43,21 @@ class ClientInviteService
         Mail::to($email)->queue(new ClientInviteMail($invite, $link));
 
         return $link;
+    }
+
+    /**
+     * Reenvia um convite de cliente titular já emitido — a pessoa pode ter
+     * perdido o e-mail original ou o link ter expirado. Substitui o
+     * convite anterior em vez de empilhar (mesmo raciocínio de
+     * PartnerInviteService::send()): expira o antigo e emite um token novo,
+     * senão o link velho continuaria valendo em paralelo com o novo.
+     */
+    public function resend(ConsultantInvite $invite): string
+    {
+        $invite->update(['status' => InviteStatus::Expired]);
+
+        return $invite->consultant_id !== null
+            ? $this->send($invite->consultant, $invite->client_name, $invite->client_email)
+            : $this->sendStandalone($invite->client_name, $invite->client_email);
     }
 }
