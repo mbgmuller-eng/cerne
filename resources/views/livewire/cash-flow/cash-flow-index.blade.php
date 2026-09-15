@@ -81,44 +81,53 @@
                     @error('expenseDate') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
                 </div>
 
-                <div>
-                    <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Necessidade</label>
-                    <select wire:model.live="expenseNecessity" class="select mt-1.5 w-full">
-                        <option value="">Selecione</option>
-                        @foreach (Necessity::options() as $valor => $rotulo)
-                            <option value="{{ $valor }}">{{ $rotulo }}</option>
-                        @endforeach
-                    </select>
-                    @error('expenseNecessity') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                <div class="@sm:col-span-2 @lg:col-span-3 flex items-center gap-2 rounded-lg bg-emerald-50 px-3 py-2 dark:bg-emerald-500/10">
+                    <input type="checkbox" wire:model.live="expenseIsRefund" id="expenseIsRefund" class="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500">
+                    <label for="expenseIsRefund" class="text-sm text-emerald-900 dark:text-emerald-200">
+                        Estorno / cashback — dinheiro de volta, sem necessidade de categorizar
+                    </label>
                 </div>
 
-                <div>
-                    <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Categoria</label>
-                    <select wire:model.live="expenseCategoryId" class="select mt-1.5 w-full">
-                        <option value="">Selecione</option>
-                        @foreach ($expenseFormCategories as $categoria)
-                            <option value="{{ $categoria->id }}">{{ $categoria->name }}</option>
-                        @endforeach
-                    </select>
-                    @error('expenseCategoryId') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
-                </div>
-
-                @unless ($expenseNecessity === Necessity::Investment->value)
+                @unless ($expenseIsRefund)
                     <div>
-                        <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Subcategoria</label>
-                        <select wire:model="expenseSubcategoryId" class="select mt-1.5 w-full" @if ($expenseCategoryId === '') disabled @endif>
+                        <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Necessidade</label>
+                        <select wire:model.live="expenseNecessity" class="select mt-1.5 w-full">
                             <option value="">Selecione</option>
-                            @foreach ($expenseSubcategories as $sub)
-                                <option value="{{ $sub->id }}">{{ $sub->name }}</option>
+                            @foreach (Necessity::options() as $valor => $rotulo)
+                                <option value="{{ $valor }}">{{ $rotulo }}</option>
                             @endforeach
                         </select>
-                        @error('expenseSubcategoryId') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                        @error('expenseNecessity') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
                     </div>
 
                     <div>
-                        <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Ou crie uma subcategoria</label>
-                        <input type="text" wire:model="expenseNewSubcategory" class="input mt-1.5" placeholder="Ex.: Terapia">
+                        <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Categoria</label>
+                        <select wire:model.live="expenseCategoryId" class="select mt-1.5 w-full">
+                            <option value="">Selecione</option>
+                            @foreach ($expenseFormCategories as $categoria)
+                                <option value="{{ $categoria->id }}">{{ $categoria->name }}</option>
+                            @endforeach
+                        </select>
+                        @error('expenseCategoryId') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
                     </div>
+
+                    @unless ($expenseNecessity === Necessity::Investment->value)
+                        <div>
+                            <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Subcategoria</label>
+                            <select wire:model="expenseSubcategoryId" class="select mt-1.5 w-full" @if ($expenseCategoryId === '') disabled @endif>
+                                <option value="">Selecione</option>
+                                @foreach ($expenseSubcategories as $sub)
+                                    <option value="{{ $sub->id }}">{{ $sub->name }}</option>
+                                @endforeach
+                            </select>
+                            @error('expenseSubcategoryId') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Ou crie uma subcategoria</label>
+                            <input type="text" wire:model="expenseNewSubcategory" class="input mt-1.5" placeholder="Ex.: Terapia">
+                        </div>
+                    @endunless
                 @endunless
 
                 <div>
@@ -177,12 +186,14 @@
                             @error('expenseCreditCardId') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
                         </div>
 
-                        <div>
-                            <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Parcelas</label>
-                            <input type="number" min="1" max="{{ $maxInstallments }}" wire:model="expenseInstallments" class="input mt-1.5">
-                            @error('expenseInstallments') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
-                            <p class="mt-1 text-xs text-slate-400">1x = à vista no cartão.</p>
-                        </div>
+                        @unless ($expenseIsRefund)
+                            <div>
+                                <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Parcelas</label>
+                                <input type="number" min="1" max="{{ $maxInstallments }}" wire:model="expenseInstallments" class="input mt-1.5">
+                                @error('expenseInstallments') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                                <p class="mt-1 text-xs text-slate-400">1x = à vista no cartão.</p>
+                            </div>
+                        @endunless
                     @else
                         <div>
                             <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Conta (opcional)</label>
@@ -466,13 +477,21 @@
                             @unless ($faturaPaga)
                                 <input type="checkbox" wire:model.live="selecionadas" value="{{ $despesa->id }}" class="shrink-0 rounded border-slate-300 dark:border-slate-600 text-brand-700 dark:text-brand-400 focus:ring-brand-500">
                             @endunless
-                            <span class="h-8 w-1 shrink-0 rounded-full" style="background: {{ $despesa->necessity->color() }}"></span>
+                            @if ($despesa->is_refund)
+                                <span class="h-8 w-1 shrink-0 rounded-full bg-emerald-500"></span>
+                            @else
+                                <span class="h-8 w-1 shrink-0 rounded-full" style="background: {{ $despesa->necessity->color() }}"></span>
+                            @endif
                             <div class="min-w-0">
                                 <p class="truncate text-sm text-slate-800 dark:text-slate-200">{{ $despesa->description }}</p>
                                 <p class="truncate text-xs text-slate-500 dark:text-slate-400">
                                     {{ $despesa->expense_date->format('d/m') }}
-                                    · {{ $despesa->category->name }}
-                                    @if ($despesa->subcategory) › {{ $despesa->subcategory->name }} @endif
+                                    @if ($despesa->is_refund)
+                                        · <span class="text-emerald-700 dark:text-emerald-400">Estorno</span>
+                                    @else
+                                        · {{ $despesa->category->name }}
+                                        @if ($despesa->subcategory) › {{ $despesa->subcategory->name }} @endif
+                                    @endif
                                     @if ($despesa->member) · {{ $despesa->member->name }} @endif
                                     @if ($despesa->isOnCredit()) · {{ $despesa->creditCard->card_name }} @endif
                                 </p>
@@ -481,7 +500,9 @@
 
                         <div class="flex shrink-0 items-center gap-3">
                             <div class="text-right">
-                                <p class="text-sm tabular-nums text-slate-800 dark:text-slate-200">{{ Money::format($despesa->amount) }}</p>
+                                <p class="text-sm tabular-nums {{ $despesa->is_refund ? 'text-emerald-700 dark:text-emerald-400' : 'text-slate-800 dark:text-slate-200' }}">
+                                    {{ $despesa->is_refund ? '-'.Money::format(ltrim($despesa->amount, '-')) : Money::format($despesa->amount) }}
+                                </p>
                                 @if ($despesa->isInstallment())
                                     <p class="text-xs text-slate-400">parcela {{ $despesa->installmentLabel() }}</p>
                                 @endif

@@ -8,6 +8,7 @@ use App\Enums\ProcessingStatus;
 use App\Jobs\ProcessDocumentJob;
 use App\Livewire\Concerns\RequiresActiveProfile;
 use App\Models\BankAccount;
+use App\Models\CreditCard;
 use App\Models\DocumentUpload;
 use App\Models\ExpenseCategorizationRule;
 use App\Models\ExpenseCategory;
@@ -46,6 +47,8 @@ class DocumentsIndex extends Component
 
     public string $uploadBankAccountId = '';
 
+    public string $uploadCreditCardId = '';
+
     /** Documento aberto para revisão. */
     public ?string $revisandoId = null;
 
@@ -65,6 +68,15 @@ class DocumentsIndex extends Component
     public array $novaSubcategoriaPorItem = [];
 
     public array $necessidadePorItem = [];
+
+    /**
+     * Estorno/cashback: não entra como receita, mas também não é despesa
+     * comum — sem necessidade/categoria (ver getItensFaltandoCategoriaProperty()),
+     * e o valor vai negativo pro total da fatura/conta abater sozinho
+     * (ver DocumentCommitService). Pré-marcado quando a IA já lê o valor
+     * negativo (ex.: contestação de compra), a pessoa pode corrigir.
+     */
+    public array $estornoPorItem = [];
 
     /** Padrão da regra que pré-preencheu o item (null = ninguém casou, categorização é manual). */
     public array $regraAplicadaPorItem = [];
@@ -122,6 +134,10 @@ class DocumentsIndex extends Component
             // o saldo certo — extrato sem conta é exatamente o bug que
             // deixava o saldo do BTG parado depois de importar.
             'uploadBankAccountId' => ['required_if:documentType,bank_statement'],
+            // Sem isto, uma fatura importada não tinha como saber qual
+            // cartão vincular — o total da fatura de verdade nunca batia
+            // com o que acabou de ser importado.
+            'uploadCreditCardId' => ['required_if:documentType,credit_card_invoice'],
         ];
     }
 
@@ -141,10 +157,15 @@ class DocumentsIndex extends Component
             ? BankAccount::query()->findOrFail($data['uploadBankAccountId'])
             : null;
 
+        $cartao = $data['uploadCreditCardId'] !== ''
+            ? CreditCard::query()->findOrFail($data['uploadCreditCardId'])
+            : null;
+
         $documento = DocumentUpload::create([
             'uploaded_by_user_id' => auth()->id(),
             'member_id' => $context->memberId(),
             'bank_account_id' => $conta?->id,
+            'credit_card_id' => $cartao?->id,
             'document_type' => $this->documentType,
             'original_filename' => $this->arquivo->getClientOriginalName(),
             'storage_path' => $caminho,
@@ -159,7 +180,7 @@ class DocumentsIndex extends Component
             ProcessDocumentJob::dispatch($documento->id);
         }
 
-        $this->reset('arquivo', 'uploadBankAccountId');
+        $this->reset('arquivo', 'uploadBankAccountId', 'uploadCreditCardId');
         session()->flash('status', 'Documento enviado. A leitura acontece em segundo plano.');
     }
 
@@ -179,6 +200,7 @@ class DocumentsIndex extends Component
         $this->subcategoriaPorItem = [];
         $this->novaSubcategoriaPorItem = [];
         $this->necessidadePorItem = [];
+        $this->estornoPorItem = [];
         $this->regraAplicadaPorItem = [];
         $this->fixedBillPaymentPorItem = [];
         $this->recurringIncomeOccurrencePorItem = [];
@@ -211,6 +233,12 @@ class DocumentsIndex extends Component
                 $this->preencherReceita($i, $item, $data, $matcher, $casaContaFixa);
             } else {
                 $this->preencherDespesa($i, $item, $data, $matcher, $casaContaFixa);
+
+                // A IA já lê o valor negativo numa linha de estorno/contestação
+                // (ex.: "-209,90") — pré-marca, a pessoa confirma ou desmarca.
+                if ((float) Money::parse($item['valor'] ?? 0) < 0) {
+                    $this->estornoPorItem[$i] = true;
+                }
             }
 
             // Independe de ter casado com regra — duplicata é contra
@@ -333,7 +361,7 @@ class DocumentsIndex extends Component
     {
         $this->reset(
             'revisandoId', 'aceitos', 'categoriaPorItem', 'subcategoriaPorItem', 'novaSubcategoriaPorItem',
-            'necessidadePorItem', 'regraAplicadaPorItem', 'fixedBillPaymentPorItem',
+            'necessidadePorItem', 'estornoPorItem', 'regraAplicadaPorItem', 'fixedBillPaymentPorItem',
             'recurringIncomeOccurrencePorItem', 'notaPorItem', 'duplicataPorItem',
             'criarRegraPorItem', 'regraPatternPorItem', 'regraValorExatoPorItem',
             'confirmandoExclusaoItem',
@@ -350,6 +378,17 @@ class DocumentsIndex extends Component
     {
         if (str_starts_with($name, 'criarRegraPorItem.')) {
             $this->prefillRegraPattern((int) substr($name, strlen('criarRegraPorItem.')));
+
+            return;
+        }
+
+        if (str_starts_with($name, 'estornoPorItem.')) {
+            $i = (int) substr($name, strlen('estornoPorItem.'));
+
+            if ($this->estornoPorItem[$i] ?? false) {
+                unset($this->necessidadePorItem[$i], $this->categoriaPorItem[$i], $this->subcategoriaPorItem[$i], $this->novaSubcategoriaPorItem[$i]);
+                $this->criarRegraPorItem[$i] = false;
+            }
 
             return;
         }
@@ -419,6 +458,12 @@ class DocumentsIndex extends Component
                 continue;
             }
 
+            if ($this->estornoPorItem[$i] ?? false) {
+                $faltando[$i] = false;
+
+                continue;
+            }
+
             $necessidade = $this->necessidadePorItem[$i] ?? '';
             $categoria = $this->categoriaPorItem[$i] ?? '';
             $subcategoria = $this->subcategoriaPorItem[$i] ?? '';
@@ -480,6 +525,7 @@ class DocumentsIndex extends Component
                 'categoria' => $this->categoriaPorItem,
                 'subcategoria' => $this->subcategoriaPorItem,
                 'necessidade' => $this->necessidadePorItem,
+                'estorno' => $this->estornoPorItem,
                 'fixedBillPayment' => $this->fixedBillPaymentPorItem,
                 'recurringIncomeOccurrence' => $this->recurringIncomeOccurrencePorItem,
             ]);
@@ -586,6 +632,11 @@ class DocumentsIndex extends Component
 
         foreach ($indices as $i) {
             if (($this->criarRegraPorItem[$i] ?? false) !== true) {
+                continue;
+            }
+
+            // Regra de categorização não existe sem categoria — estorno não tem uma.
+            if ($this->estornoPorItem[$i] ?? false) {
                 continue;
             }
 
@@ -744,6 +795,7 @@ class DocumentsIndex extends Component
             'tipos' => DocumentType::options(),
             'iaConfigurada' => filled(config('cerne.ai.api_key')),
             'bankAccounts' => BankAccount::query()->active()->orderBy('bank_name')->get(),
+            'creditCards' => CreditCard::query()->active()->orderBy('card_name')->get(),
             'expenseCategories' => ExpenseCategory::query()->available()->get(),
             'expenseSubcategories' => ExpenseSubcategory::query()->available()->get(),
             'incomeCategories' => IncomeCategory::query()->available()->get(),

@@ -63,6 +63,19 @@
                         <p class="mt-1 text-sm text-red-700 dark:text-red-400">{{ $message }}</p>
                     @enderror
                 </div>
+            @elseif ($documentType === 'credit_card_invoice')
+                <div>
+                    <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Cartão da fatura</label>
+                    <select wire:model="uploadCreditCardId" class="select mt-1.5">
+                        <option value="">Selecione o cartão</option>
+                        @foreach ($creditCards as $cartao)
+                            <option value="{{ $cartao->id }}">{{ $cartao->displayName() }}</option>
+                        @endforeach
+                    </select>
+                    @error('uploadCreditCardId')
+                        <p class="mt-1 text-sm text-red-700 dark:text-red-400">{{ $message }}</p>
+                    @enderror
+                </div>
             @endif
 
             <button
@@ -138,6 +151,7 @@
                                     $jaExcluido = in_array($i, $revisando->excluded_item_indices ?? [], true);
                                     $resolvido = $jaImportado || $jaExcluido;
                                     $ehReceita = ($item['tipo'] ?? null) === 'receita';
+                                    $ehEstorno = $estornoPorItem[$i] ?? false;
                                     $necessidadeItem = $necessidadePorItem[$i] ?? '';
                                     $faltaCategorizar = ! $ehReceita && ($itensFaltandoCategoria[$i] ?? false);
                                     $categoriasDoItem = $necessidadeItem === Necessity::Investment->value
@@ -189,25 +203,29 @@
 
                                     @if ($temCategorizacao)
                                         <td class="px-3 py-2">
-                                            @unless ($ehReceita)
+                                            @if ($ehEstorno)
+                                                <span class="text-xs font-medium text-emerald-700 dark:text-emerald-400">Estorno</span>
+                                            @elseif (! $ehReceita)
                                                 <select wire:model.live="necessidadePorItem.{{ $i }}" @class(['select w-full text-xs', 'ring-2 ring-amber-400 dark:ring-amber-500' => $faltaCategorizar && $necessidadeItem === ''])>
                                                     <option value="">Selecione</option>
                                                     @foreach (Necessity::options() as $valorNecessidade => $rotulo)
                                                         <option value="{{ $valorNecessidade }}">{{ $rotulo }}</option>
                                                     @endforeach
                                                 </select>
+                                            @endif
+                                        </td>
+                                        <td class="px-3 py-2">
+                                            @unless ($ehEstorno)
+                                                <select wire:model.live="categoriaPorItem.{{ $i }}" @class(['select w-full text-xs', 'ring-2 ring-amber-400 dark:ring-amber-500' => $faltaCategorizar && ($categoriaPorItem[$i] ?? '') === '']) @if (! $ehReceita && $necessidadeItem === '') disabled @endif>
+                                                    <option value="">—</option>
+                                                    @foreach (($ehReceita ? $incomeCategories : $categoriasDoItem) as $categoria)
+                                                        <option value="{{ $categoria->id }}">{{ $categoria->name }}</option>
+                                                    @endforeach
+                                                </select>
                                             @endunless
                                         </td>
                                         <td class="px-3 py-2">
-                                            <select wire:model.live="categoriaPorItem.{{ $i }}" @class(['select w-full text-xs', 'ring-2 ring-amber-400 dark:ring-amber-500' => $faltaCategorizar && ($categoriaPorItem[$i] ?? '') === '']) @if (! $ehReceita && $necessidadeItem === '') disabled @endif>
-                                                <option value="">—</option>
-                                                @foreach (($ehReceita ? $incomeCategories : $categoriasDoItem) as $categoria)
-                                                    <option value="{{ $categoria->id }}">{{ $categoria->name }}</option>
-                                                @endforeach
-                                            </select>
-                                        </td>
-                                        <td class="px-3 py-2">
-                                            @unless ($ehReceita || $necessidadeItem === Necessity::Investment->value)
+                                            @unless ($ehReceita || $ehEstorno || $necessidadeItem === Necessity::Investment->value)
                                                 <select wire:model="subcategoriaPorItem.{{ $i }}" @class(['select w-full text-xs', 'ring-2 ring-amber-400 dark:ring-amber-500' => $faltaCategorizar]) @if (($categoriaPorItem[$i] ?? '') === '') disabled @endif>
                                                     <option value="">—</option>
                                                     @foreach ($expenseSubcategories->where('category_id', $categoriaPorItem[$i] ?? null) as $subcategoria)
@@ -250,10 +268,20 @@
                                             @endif
 
                                             <div class="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
-                                                <label class="inline-flex items-center gap-1.5 text-slate-500 dark:text-slate-400">
-                                                    <input type="checkbox" wire:model.live="criarRegraPorItem.{{ $i }}" class="rounded border-slate-300 dark:border-slate-600 text-brand-700 dark:text-brand-400 focus:ring-brand-500">
-                                                    Criar regra de categorização também
-                                                </label>
+                                                @unless ($ehReceita)
+                                                    <label class="inline-flex items-center gap-1.5 text-emerald-700 dark:text-emerald-400">
+                                                        <input type="checkbox" wire:model.live="estornoPorItem.{{ $i }}" class="rounded border-slate-300 dark:border-slate-600 text-emerald-600 focus:ring-emerald-500">
+                                                        Estorno / cashback
+                                                    </label>
+                                                    <span class="text-slate-300 dark:text-slate-600">·</span>
+                                                @endunless
+
+                                                @unless ($ehEstorno)
+                                                    <label class="inline-flex items-center gap-1.5 text-slate-500 dark:text-slate-400">
+                                                        <input type="checkbox" wire:model.live="criarRegraPorItem.{{ $i }}" class="rounded border-slate-300 dark:border-slate-600 text-brand-700 dark:text-brand-400 focus:ring-brand-500">
+                                                        Criar regra de categorização também
+                                                    </label>
+                                                @endunless
                                                 @if ($criarRegraPorItem[$i] ?? false)
                                                     <input
                                                         type="text"

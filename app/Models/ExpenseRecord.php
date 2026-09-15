@@ -17,7 +17,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use LogicException;
 
 #[Fillable([
-    'profile_id', 'member_id', 'description', 'necessity', 'category_id', 'subcategory_id',
+    'profile_id', 'member_id', 'description', 'necessity', 'is_refund', 'category_id', 'subcategory_id',
     'amount', 'expense_date', 'bank_account_id', 'credit_card_id', 'credit_card_invoice_id',
     'installment_group_id', 'installment_number', 'notes', 'source_document_id',
     'created_by_user_id', 'is_private',
@@ -32,6 +32,7 @@ class ExpenseRecord extends Model
     {
         return [
             'necessity' => Necessity::class,
+            'is_refund' => 'boolean',
             'amount' => 'decimal:2',
             'expense_date' => 'date',
             'year' => 'integer',
@@ -55,6 +56,15 @@ class ExpenseRecord extends Model
             if ($record->credit_card_invoice_id !== null && $record->credit_card_id === null) {
                 throw new LogicException(
                     'Lançamento vinculado a uma fatura precisa informar o cartão.'
+                );
+            }
+
+            // Estorno é a única exceção a ter necessidade/categoria: quem
+            // não é estorno sempre passa pela revisão humana (regra 5 do
+            // CLAUDE.md) ou pelo formulário, que já exigem os dois.
+            if (! $record->is_refund && ($record->necessity === null || $record->category_id === null)) {
+                throw new LogicException(
+                    'Toda despesa (exceto estorno) precisa de necessidade e categoria.'
                 );
             }
         };

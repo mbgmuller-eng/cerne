@@ -234,6 +234,73 @@ class CashFlowManualEntryTest extends TestCase
         self::assertSame($perfil->id, $lancamento->profile_id);
     }
 
+    public function test_estorno_em_conta_bancaria_credita_o_saldo_e_nao_pede_categoria(): void
+    {
+        [$perfil, $membro] = $this->criarPerfil();
+        $conta = BankAccount::factory()->for($perfil, 'profile')->for($membro, 'member')
+            ->create(['current_balance' => '1000.00']);
+
+        Livewire::test(CashFlowIndex::class)
+            ->set('expenseDescription', 'Cashback compra')
+            ->set('expenseAmount', '50.00')
+            ->set('expenseDate', '2026-08-10')
+            ->set('expenseIsRefund', true)
+            ->set('expenseBankAccountId', $conta->id)
+            ->call('saveExpense')
+            ->assertHasNoErrors();
+
+        $conta->refresh();
+        // Estorno credita de volta em vez de debitar — 1000 + 50, não - 50.
+        self::assertSame('1050.00', $conta->current_balance);
+
+        $lancamento = ExpenseRecord::withoutProfileScope()->where('description', 'Cashback compra')->firstOrFail();
+        self::assertSame('-50.00', $lancamento->amount);
+        self::assertTrue($lancamento->is_refund);
+        self::assertNull($lancamento->necessity);
+        self::assertNull($lancamento->category_id);
+    }
+
+    public function test_estorno_no_cartao_e_lancamento_unico_vinculado_a_fatura_e_abate_o_total(): void
+    {
+        [$perfil, $membro] = $this->criarPerfil();
+        $cartao = CreditCard::factory()->for($perfil, 'profile')->for($membro, 'member')->create();
+        $categoria = ExpenseCategory::factory()->create();
+        $subcategoria = ExpenseSubcategory::factory()->create(['category_id' => $categoria->id]);
+
+        // Uma compra normal primeiro, pra ter algo no total pro estorno abater.
+        Livewire::test(CashFlowIndex::class)
+            ->set('expenseDescription', 'Compra normal')
+            ->set('expenseAmount', '300.00')
+            ->set('expenseDate', '2026-08-15')
+            ->set('expenseNecessity', 'essential')
+            ->set('expenseCategoryId', $categoria->id)
+            ->set('expenseSubcategoryId', $subcategoria->id)
+            ->set('expensePaymentMethod', 'cartao')
+            ->set('expenseCreditCardId', $cartao->id)
+            ->call('saveExpense')
+            ->assertHasNoErrors();
+
+        Livewire::test(CashFlowIndex::class)
+            ->set('expenseDescription', 'Estorno de contestação')
+            ->set('expenseAmount', '80.00')
+            ->set('expenseDate', '2026-08-16')
+            ->set('expenseIsRefund', true)
+            ->set('expensePaymentMethod', 'cartao')
+            ->set('expenseCreditCardId', $cartao->id)
+            ->call('saveExpense')
+            ->assertHasNoErrors();
+
+        $estorno = ExpenseRecord::withoutProfileScope()->where('description', 'Estorno de contestação')->firstOrFail();
+        self::assertSame('-80.00', $estorno->amount);
+        self::assertTrue($estorno->is_refund);
+        self::assertNull($estorno->installment_group_id);
+        self::assertSame($cartao->id, $estorno->credit_card_id);
+        self::assertNotNull($estorno->credit_card_invoice_id);
+
+        // 300 (compra) - 80 (estorno) = 220 no total da fatura, sem lógica extra em InvoiceService.
+        self::assertSame('220.00', $estorno->invoice->total_amount);
+    }
+
     public function test_categoria_de_outro_perfil_nao_permite_salvar(): void
     {
         $outroPerfil = FinancialProfile::factory()->create();

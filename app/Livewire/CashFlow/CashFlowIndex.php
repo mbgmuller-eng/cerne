@@ -78,7 +78,7 @@ class CashFlowIndex extends Component
      * que ainda não têm a mesma categorização — oferta de aplicar em bloco.
      * Nulo = nada pendente.
      *
-     * @var array{tipo: 'despesa'|'receita', ids: list<string>, quantidade: int, categoria_id: string, subcategoria_id: ?string, necessidade: ?string}|null
+     * @var array{tipo: 'despesa'|'receita', ids: list<string>, quantidade: int, categoria_id: ?string, subcategoria_id: ?string, necessidade: ?string, estorno: bool}|null
      */
     public ?array $duplicatas = null;
 
@@ -100,6 +100,13 @@ class CashFlowIndex extends Component
     public ?string $expenseDate = null;
 
     public string $expenseNecessity = '';
+
+    /**
+     * Estorno/cashback: entra negativo pra abater o total (fatura ou mês)
+     * em vez de somar. Sem necessidade/categoria — às vezes é cashback,
+     * às vezes a pessoa nem lembra do que se tratava a compra original.
+     */
+    public bool $expenseIsRefund = false;
 
     public string $expenseCategoryId = '';
 
@@ -328,6 +335,20 @@ class CashFlowIndex extends Component
         $this->expenseSubcategoryId = '';
     }
 
+    /** Marcar estorno esvazia necessidade/categoria/parcelas — não se aplica a um crédito de volta. */
+    public function updatedExpenseIsRefund(): void
+    {
+        if (! $this->expenseIsRefund) {
+            return;
+        }
+
+        $this->expenseNecessity = '';
+        $this->expenseCategoryId = '';
+        $this->expenseSubcategoryId = '';
+        $this->expenseNewSubcategory = '';
+        $this->expenseInstallments = 1;
+    }
+
     /**
      * Categoria sem necessidade fixa (a maioria) aparece pra Essencial e
      * Supérfluo; categorias de Investimento (Aporte, Previdência etc.) são
@@ -373,10 +394,13 @@ class CashFlowIndex extends Component
 
         $this->editingExpenseId = $despesa->id;
         $this->expenseDescription = $despesa->description;
-        $this->expenseAmount = $despesa->amount;
+        $this->expenseIsRefund = $despesa->is_refund;
+        // O formulário sempre trabalha com valor positivo — o sinal
+        // negativo do estorno é implementação interna (ver saveExpense()).
+        $this->expenseAmount = $despesa->is_refund ? ltrim($despesa->amount, '-') : $despesa->amount;
         $this->expenseDate = $despesa->expense_date->toDateString();
-        $this->expenseNecessity = $despesa->necessity->value;
-        $this->expenseCategoryId = $despesa->category_id;
+        $this->expenseNecessity = $despesa->necessity?->value ?? '';
+        $this->expenseCategoryId = $despesa->category_id ?? '';
         $this->expenseSubcategoryId = $despesa->subcategory_id ?? '';
         $this->expenseMemberId = $despesa->member_id ?? '';
         $this->expenseIsPrivate = $despesa->is_private;
@@ -439,12 +463,12 @@ class CashFlowIndex extends Component
             return;
         }
 
-        $data = $this->validate([
+        $rules = [
             'expenseDescription' => ['required', 'string', 'max:255'],
             'expenseAmount' => ['required', 'numeric', 'gt:0'],
             'expenseDate' => ['required', 'date'],
-            'expenseNecessity' => ['required', Rule::enum(Necessity::class)],
-            'expenseCategoryId' => ['required'],
+            'expenseNecessity' => $this->expenseIsRefund ? ['nullable'] : ['required', Rule::enum(Necessity::class)],
+            'expenseCategoryId' => $this->expenseIsRefund ? ['nullable'] : ['required'],
             'expenseSubcategoryId' => ['nullable'],
             'expenseNewSubcategory' => ['nullable', 'string', 'max:255'],
             'expenseMemberId' => ['nullable'],
@@ -453,7 +477,9 @@ class CashFlowIndex extends Component
             'expenseCreditCardId' => ['required_if:expensePaymentMethod,cartao'],
             'expenseInstallments' => ['required_if:expensePaymentMethod,cartao', 'integer', 'min:1', 'max:'.config('cerne.installments.max')],
             'expenseNotes' => ['nullable', 'string'],
-        ], attributes: [
+        ];
+
+        $data = $this->validate($rules, attributes: [
             'expenseDescription' => 'descrição',
             'expenseAmount' => 'valor',
             'expenseDate' => 'data',
@@ -463,32 +489,63 @@ class CashFlowIndex extends Component
             'expenseInstallments' => 'parcelas',
         ]);
 
-        $this->validarSubcategoriaObrigatoria();
+        if (! $this->expenseIsRefund) {
+            $this->validarSubcategoriaObrigatoria();
+        }
 
         // find() dentro do escopo do perfil ativo: se o category_id veio
         // adulterado (outro perfil), simplesmente não existe aqui — falha
         // fechado por conta do BelongsToProfileOrShared, não por checagem
         // manual.
-        $categoria = ExpenseCategory::query()->findOrFail($data['expenseCategoryId']);
-        $subcategoriaId = $this->resolveSubcategoryId($categoria);
+        $categoria = $this->expenseIsRefund ? null : ExpenseCategory::query()->findOrFail($data['expenseCategoryId']);
+        $subcategoriaId = $categoria !== null ? $this->resolveSubcategoryId($categoria) : null;
         $memberId = $this->validarMembro($this->expenseMemberId);
         $data_compra = CarbonImmutable::parse($data['expenseDate']);
+        $necessidade = $this->expenseIsRefund ? null : $data['expenseNecessity'];
+
+        // O formulário só aceita valor positivo — o sinal negativo do
+        // estorno é o que faz InvoiceService::recalculateTotal() e os
+        // totais do mês abaterem o valor sozinhos, via SUM(amount).
+        $valorComSinal = $this->expenseIsRefund ? '-'.$data['expenseAmount'] : $data['expenseAmount'];
 
         if ($data['expensePaymentMethod'] === 'cartao') {
             $cartao = CreditCard::query()->findOrFail($data['expenseCreditCardId']);
 
-            $installments->create($cartao, [
-                'description' => $data['expenseDescription'],
-                'total_amount' => $data['expenseAmount'],
-                'installments' => (int) $data['expenseInstallments'],
-                'purchase_date' => $data_compra,
-                'necessity' => Necessity::from($data['expenseNecessity']),
-                'category_id' => $categoria->id,
-                'subcategory_id' => $subcategoriaId,
-                'member_id' => $memberId,
-                'notes' => $this->expenseNotes !== '' ? $this->expenseNotes : null,
-                'is_private' => $memberId !== null && $this->expenseIsPrivate,
-            ], auth()->id());
+            if ($this->expenseIsRefund) {
+                // Estorno é sempre lançamento único — parcelar um crédito de volta não faz sentido.
+                $fatura = app(InvoiceService::class)->invoiceForPurchase($cartao, $data_compra);
+
+                ExpenseRecord::create([
+                    'member_id' => $memberId,
+                    'description' => $data['expenseDescription'],
+                    'necessity' => null,
+                    'is_refund' => true,
+                    'category_id' => null,
+                    'subcategory_id' => null,
+                    'amount' => $valorComSinal,
+                    'expense_date' => $data_compra,
+                    'credit_card_id' => $cartao->id,
+                    'credit_card_invoice_id' => $fatura->id,
+                    'notes' => $this->expenseNotes !== '' ? $this->expenseNotes : null,
+                    'created_by_user_id' => auth()->id(),
+                    'is_private' => $memberId !== null && $this->expenseIsPrivate,
+                ]);
+
+                app(InvoiceService::class)->recalculateTotal($fatura);
+            } else {
+                $installments->create($cartao, [
+                    'description' => $data['expenseDescription'],
+                    'total_amount' => $data['expenseAmount'],
+                    'installments' => (int) $data['expenseInstallments'],
+                    'purchase_date' => $data_compra,
+                    'necessity' => Necessity::from($necessidade),
+                    'category_id' => $categoria->id,
+                    'subcategory_id' => $subcategoriaId,
+                    'member_id' => $memberId,
+                    'notes' => $this->expenseNotes !== '' ? $this->expenseNotes : null,
+                    'is_private' => $memberId !== null && $this->expenseIsPrivate,
+                ], auth()->id());
+            }
         } else {
             $conta = $this->expenseBankAccountId !== ''
                 ? BankAccount::query()->findOrFail($this->expenseBankAccountId)
@@ -497,10 +554,11 @@ class CashFlowIndex extends Component
             ExpenseRecord::create([
                 'member_id' => $memberId,
                 'description' => $data['expenseDescription'],
-                'necessity' => $data['expenseNecessity'],
-                'category_id' => $categoria->id,
+                'necessity' => $necessidade,
+                'is_refund' => $this->expenseIsRefund,
+                'category_id' => $categoria?->id,
                 'subcategory_id' => $subcategoriaId,
-                'amount' => $data['expenseAmount'],
+                'amount' => $valorComSinal,
                 'expense_date' => $data_compra,
                 'bank_account_id' => $conta?->id,
                 'notes' => $this->expenseNotes !== '' ? $this->expenseNotes : null,
@@ -508,10 +566,13 @@ class CashFlowIndex extends Component
                 'is_private' => $memberId !== null && $this->expenseIsPrivate,
             ]);
 
-            $conta?->applyToBalance('-'.$data['expenseAmount']);
+            // Delta de saldo: despesa debita, estorno credita de volta —
+            // por isso a negação numérica de $valorComSinal (que já vem
+            // negativo pro estorno) em vez do "-" fixo de antes.
+            $conta?->applyToBalance(bcmul($valorComSinal, '-1', 2));
         }
 
-        session()->flash('status', 'Despesa adicionada.');
+        session()->flash('status', $this->expenseIsRefund ? 'Estorno adicionado.' : 'Despesa adicionada.');
         $this->resetExpenseForm();
         $this->showExpenseForm = false;
     }
@@ -532,18 +593,20 @@ class CashFlowIndex extends Component
             return;
         }
 
-        $data = $this->validate([
+        $rules = [
             'expenseDescription' => ['required', 'string', 'max:255'],
             'expenseAmount' => ['required', 'numeric', 'gt:0'],
             'expenseDate' => ['required', 'date'],
-            'expenseNecessity' => ['required', Rule::enum(Necessity::class)],
-            'expenseCategoryId' => ['required'],
+            'expenseNecessity' => $this->expenseIsRefund ? ['nullable'] : ['required', Rule::enum(Necessity::class)],
+            'expenseCategoryId' => $this->expenseIsRefund ? ['nullable'] : ['required'],
             'expenseSubcategoryId' => ['nullable'],
             'expenseNewSubcategory' => ['nullable', 'string', 'max:255'],
             'expenseMemberId' => ['nullable'],
             'expenseBankAccountId' => ['nullable'],
             'expenseNotes' => ['nullable', 'string'],
-        ], attributes: [
+        ];
+
+        $data = $this->validate($rules, attributes: [
             'expenseDescription' => 'descrição',
             'expenseAmount' => 'valor',
             'expenseDate' => 'data',
@@ -551,20 +614,25 @@ class CashFlowIndex extends Component
             'expenseCategoryId' => 'categoria',
         ]);
 
-        $this->validarSubcategoriaObrigatoria();
+        if (! $this->expenseIsRefund) {
+            $this->validarSubcategoriaObrigatoria();
+        }
 
-        $categoria = ExpenseCategory::query()->findOrFail($data['expenseCategoryId']);
-        $subcategoriaId = $this->resolveSubcategoryId($categoria);
+        $categoria = $this->expenseIsRefund ? null : ExpenseCategory::query()->findOrFail($data['expenseCategoryId']);
+        $subcategoriaId = $categoria !== null ? $this->resolveSubcategoryId($categoria) : null;
         $memberId = $this->validarMembro($this->expenseMemberId);
         $data_compra = CarbonImmutable::parse($data['expenseDate']);
+        $necessidade = $this->expenseIsRefund ? null : $data['expenseNecessity'];
+        $valorComSinal = $this->expenseIsRefund ? '-'.$data['expenseAmount'] : $data['expenseAmount'];
 
-        DB::transaction(function () use ($despesa, $data, $categoria, $subcategoriaId, $memberId, $data_compra): void {
+        DB::transaction(function () use ($despesa, $data, $categoria, $subcategoriaId, $memberId, $data_compra, $necessidade, $valorComSinal): void {
             $camposComuns = [
                 'description' => $data['expenseDescription'],
-                'necessity' => $data['expenseNecessity'],
-                'category_id' => $categoria->id,
+                'necessity' => $necessidade,
+                'is_refund' => $this->expenseIsRefund,
+                'category_id' => $categoria?->id,
                 'subcategory_id' => $subcategoriaId,
-                'amount' => $data['expenseAmount'],
+                'amount' => $valorComSinal,
                 'expense_date' => $data_compra,
                 'member_id' => $memberId,
                 'notes' => $this->expenseNotes !== '' ? $this->expenseNotes : null,
@@ -581,9 +649,10 @@ class CashFlowIndex extends Component
                 return;
             }
 
-            // Desfaz o débito antigo ANTES de gravar o novo valor/conta —
-            // se as duas coisas fossem a mesma conta, a ordem errada
-            // aplicaria o delta sobre um saldo que já mudou.
+            // Desfaz o efeito de saldo antigo ANTES de gravar o novo valor —
+            // o valor antigo já carrega o sinal certo pra desfazer (débito
+            // positivo, estorno negativo), então somar ele de volta reverte
+            // os dois casos sem precisar saber qual era antes.
             if ($despesa->bank_account_id !== null) {
                 BankAccount::withoutProfileScope()->find($despesa->bank_account_id)?->applyToBalance($despesa->amount);
             }
@@ -594,12 +663,12 @@ class CashFlowIndex extends Component
 
             $despesa->update($camposComuns + ['bank_account_id' => $contaNova?->id]);
 
-            $contaNova?->applyToBalance('-'.$data['expenseAmount']);
+            $contaNova?->applyToBalance(bcmul($valorComSinal, '-1', 2));
         });
 
         $this->detectarDuplicatas('despesa', $despesa);
 
-        session()->flash('status', 'Despesa atualizada.');
+        session()->flash('status', $this->expenseIsRefund ? 'Estorno atualizado.' : 'Despesa atualizada.');
         $this->resetExpenseForm();
         $this->showExpenseForm = false;
     }
@@ -643,7 +712,7 @@ class CashFlowIndex extends Component
     private function resetExpenseForm(): void
     {
         $this->reset(
-            'expenseDescription', 'expenseAmount', 'expenseNecessity', 'expenseCategoryId',
+            'expenseDescription', 'expenseAmount', 'expenseNecessity', 'expenseIsRefund', 'expenseCategoryId',
             'expenseSubcategoryId', 'expenseNewSubcategory', 'expenseMemberId', 'expenseIsPrivate',
             'expensePaymentMethod', 'expenseBankAccountId', 'expenseCreditCardId', 'expenseInstallments',
             'expenseNotes', 'editingExpenseId',
@@ -1006,7 +1075,8 @@ class CashFlowIndex extends Component
             'quantidade' => count($ids),
             'categoria_id' => $registro->category_id,
             'subcategoria_id' => $tipo === 'despesa' ? $registro->subcategory_id : null,
-            'necessidade' => $tipo === 'despesa' ? $registro->necessity->value : null,
+            'necessidade' => $tipo === 'despesa' ? $registro->necessity?->value : null,
+            'estorno' => $tipo === 'despesa' && $registro instanceof ExpenseRecord ? $registro->is_refund : false,
         ];
     }
 
@@ -1024,6 +1094,7 @@ class CashFlowIndex extends Component
         if ($d['tipo'] === 'despesa') {
             $payload['subcategory_id'] = $d['subcategoria_id'];
             $payload['necessity'] = $d['necessidade'];
+            $payload['is_refund'] = $d['estorno'];
         }
 
         // Um a um, não whereIn()->update() em massa: é o update() por
