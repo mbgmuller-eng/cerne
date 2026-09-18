@@ -44,6 +44,46 @@ class FixedBillService
     }
 
     /**
+     * Edita uma conta fixa existente.
+     *
+     * Não mexe em vencimento já gerado: `amount`/`category_id`/etc. são
+     * lidos ao vivo da conta na hora de pay() (ver ali), então a edição já
+     * vale pro próximo pagamento sem nada extra aqui. `due_day`/
+     * `recurrence` só valem pra vencimentos futuros ainda não gerados —
+     * mudar o dia não reagenda o vencimento deste mês que já existe.
+     *
+     * @param  array<string, mixed>  $dados
+     */
+    public function update(FixedBill $bill, array $dados): FixedBill
+    {
+        $bill->update($dados);
+
+        return $bill;
+    }
+
+    /**
+     * "Exclui" a conta fixa — nunca um DELETE de verdade: fixed_bill_payments
+     * tem cascadeOnDelete, apagar a conta apagaria o histórico de
+     * pagamentos junto, inclusive o que já foi pago de verdade. Marca
+     * is_active=false (some da geração futura, ver generateForMonth) e
+     * pula quem ainda está em aberto (Pending/Overdue) — não faz sentido
+     * continuar cobrando por uma conta que a pessoa acabou de excluir. O
+     * que já foi PAGO fica intocado: é fluxo de caixa real que já aconteceu.
+     */
+    public function deactivate(FixedBill $bill): void
+    {
+        DB::transaction(function () use ($bill): void {
+            $bill->update(['is_active' => false]);
+
+            FixedBillPayment::withoutProfileScope()
+                ->where('fixed_bill_id', $bill->id)
+                ->whereIn('status', [FixedBillPaymentStatus::Pending, FixedBillPaymentStatus::Overdue])
+                ->get()
+                ->each(fn (FixedBillPayment $p) => $this->skip($p, 'Conta fixa excluída'));
+        });
+    }
+
+    /**
      * Gera os vencimentos do mês para todas as contas ativas.
      *
      * Roda sem escopo de perfil de propósito: é uma rotina do sistema que

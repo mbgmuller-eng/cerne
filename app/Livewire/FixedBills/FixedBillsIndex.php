@@ -69,6 +69,11 @@ class FixedBillsIndex extends Component
 
     public bool $showBillForm = false;
 
+    /** Nulo = criando; preenchido = editando esta conta fixa. */
+    public ?string $editingBillId = null;
+
+    public ?string $confirmingDeleteBillId = null;
+
     public string $billName = '';
 
     public string $billAmount = '';
@@ -104,6 +109,11 @@ class FixedBillsIndex extends Component
     // -----------------------------------------------------------------
 
     public bool $showIncomeForm = false;
+
+    /** Nulo = criando; preenchido = editando esta receita recorrente. */
+    public ?string $editingIncomeId = null;
+
+    public ?string $confirmingDeleteIncomeId = null;
 
     public string $incomeName = '';
 
@@ -252,6 +262,52 @@ class FixedBillsIndex extends Component
             ->get();
     }
 
+    public function editBill(string $id): void
+    {
+        $conta = FixedBill::query()->findOrFail($id);
+
+        $this->editingBillId = $conta->id;
+        $this->billName = $conta->name;
+        $this->billAmount = $conta->amount;
+        $this->billRecurrence = $conta->recurrence->value;
+        $this->billDueDay = (string) ($conta->due_day ?? '');
+        $this->billDueWeekday = (string) ($conta->due_weekday ?? '');
+        $this->billDueMonth = (string) ($conta->due_month ?? '');
+        $this->billNecessity = $conta->necessity?->value ?? '';
+        $this->billCategoryId = $conta->category_id ?? '';
+        $this->billSubcategoryId = $conta->subcategory_id ?? '';
+        $this->billMemberId = $conta->member_id ?? '';
+        $this->billIsPrivate = $conta->is_private;
+        $this->billBankAccountId = $conta->bank_account_id ?? '';
+        $this->billIsVariable = $conta->is_variable;
+        $this->billNotes = $conta->notes ?? '';
+        $this->showBillForm = true;
+        $this->showIncomeForm = false;
+    }
+
+    public function confirmDeleteBill(string $id): void
+    {
+        $this->confirmingDeleteBillId = $id;
+    }
+
+    public function cancelDeleteBill(): void
+    {
+        $this->confirmingDeleteBillId = null;
+    }
+
+    public function deleteBill(string $id, FixedBillService $service): void
+    {
+        $service->deactivate(FixedBill::query()->findOrFail($id));
+
+        if ($this->editingBillId === $id) {
+            $this->showBillForm = false;
+            $this->resetBillForm();
+        }
+
+        $this->confirmingDeleteBillId = null;
+        session()->flash('status', 'Conta fixa excluída.');
+    }
+
     public function saveBill(FixedBillService $service): void
     {
         $data = $this->validate([
@@ -289,7 +345,7 @@ class FixedBillsIndex extends Component
             ? BankAccount::query()->findOrFail($this->billBankAccountId)
             : null;
 
-        $service->create([
+        $dados = [
             'name' => $data['billName'],
             'amount' => $data['billAmount'],
             'recurrence' => RecurrenceType::from($data['billRecurrence']),
@@ -304,9 +360,16 @@ class FixedBillsIndex extends Component
             'is_variable' => $this->billIsVariable,
             'notes' => $this->billNotes !== '' ? $this->billNotes : null,
             'is_private' => $memberId !== null && $this->billIsPrivate,
-        ]);
+        ];
 
-        session()->flash('status', 'Conta fixa cadastrada.');
+        if ($this->editingBillId !== null) {
+            $service->update(FixedBill::query()->findOrFail($this->editingBillId), $dados);
+            session()->flash('status', 'Conta fixa atualizada.');
+        } else {
+            $service->create($dados);
+            session()->flash('status', 'Conta fixa cadastrada.');
+        }
+
         $this->resetBillForm();
         $this->showBillForm = false;
     }
@@ -349,7 +412,7 @@ class FixedBillsIndex extends Component
         $this->reset(
             'billName', 'billAmount', 'billDueDay', 'billDueWeekday', 'billDueMonth', 'billNecessity',
             'billCategoryId', 'billSubcategoryId', 'billNewSubcategory',
-            'billMemberId', 'billIsPrivate', 'billBankAccountId', 'billIsVariable', 'billNotes',
+            'billMemberId', 'billIsPrivate', 'billBankAccountId', 'billIsVariable', 'billNotes', 'editingBillId',
         );
         $this->billRecurrence = 'monthly';
         $this->resetErrorBag();
@@ -427,6 +490,50 @@ class FixedBillsIndex extends Component
         }
     }
 
+    public function editIncome(string $id): void
+    {
+        $receita = RecurringIncome::query()->findOrFail($id);
+
+        $this->editingIncomeId = $receita->id;
+        $this->incomeName = $receita->name;
+        $this->incomeAmount = $receita->amount;
+        $this->incomeRecurrence = $receita->recurrence->value;
+        $this->incomeDueDay = (string) ($receita->due_day ?? '');
+        $this->incomeDueWeekday = (string) ($receita->due_weekday ?? '');
+        $this->incomeDueMonth = (string) ($receita->due_month ?? '');
+        $this->incomeCategoryId = $receita->category_id ?? '';
+        $this->incomeMemberId = $receita->member_id ?? '';
+        $this->incomeIsPrivate = $receita->is_private;
+        $this->incomeBankAccountId = $receita->bank_account_id ?? '';
+        $this->incomeIsVariable = $receita->is_variable;
+        $this->incomeNotes = $receita->notes ?? '';
+        $this->showIncomeForm = true;
+        $this->showBillForm = false;
+    }
+
+    public function confirmDeleteIncome(string $id): void
+    {
+        $this->confirmingDeleteIncomeId = $id;
+    }
+
+    public function cancelDeleteIncome(): void
+    {
+        $this->confirmingDeleteIncomeId = null;
+    }
+
+    public function deleteIncome(string $id, RecurringIncomeService $service): void
+    {
+        $service->deactivate(RecurringIncome::query()->findOrFail($id));
+
+        if ($this->editingIncomeId === $id) {
+            $this->showIncomeForm = false;
+            $this->resetIncomeForm();
+        }
+
+        $this->confirmingDeleteIncomeId = null;
+        session()->flash('status', 'Receita recorrente excluída.');
+    }
+
     public function saveIncome(RecurringIncomeService $service): void
     {
         $data = $this->validate([
@@ -456,7 +563,7 @@ class FixedBillsIndex extends Component
             ? BankAccount::query()->findOrFail($this->incomeBankAccountId)
             : null;
 
-        $service->create([
+        $dados = [
             'name' => $data['incomeName'],
             'amount' => $data['incomeAmount'],
             'recurrence' => RecurrenceType::from($data['incomeRecurrence']),
@@ -469,9 +576,16 @@ class FixedBillsIndex extends Component
             'is_variable' => $this->incomeIsVariable,
             'notes' => $this->incomeNotes !== '' ? $this->incomeNotes : null,
             'is_private' => $memberId !== null && $this->incomeIsPrivate,
-        ]);
+        ];
 
-        session()->flash('status', 'Receita recorrente cadastrada.');
+        if ($this->editingIncomeId !== null) {
+            $service->update(RecurringIncome::query()->findOrFail($this->editingIncomeId), $dados);
+            session()->flash('status', 'Receita recorrente atualizada.');
+        } else {
+            $service->create($dados);
+            session()->flash('status', 'Receita recorrente cadastrada.');
+        }
+
         $this->resetIncomeForm();
         $this->showIncomeForm = false;
     }
@@ -481,7 +595,7 @@ class FixedBillsIndex extends Component
         $this->reset(
             'incomeName', 'incomeAmount', 'incomeDueDay', 'incomeDueWeekday', 'incomeDueMonth',
             'incomeCategoryId', 'incomeMemberId', 'incomeIsPrivate', 'incomeBankAccountId',
-            'incomeIsVariable', 'incomeNotes',
+            'incomeIsVariable', 'incomeNotes', 'editingIncomeId',
         );
         $this->incomeRecurrence = 'monthly';
         $this->resetErrorBag();

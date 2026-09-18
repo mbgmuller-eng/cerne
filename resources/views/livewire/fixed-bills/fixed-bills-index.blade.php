@@ -48,7 +48,7 @@
         <x-modal wire-model="showBillForm">
             <form wire:submit="saveBill" class="space-y-4">
                 <div class="flex items-baseline justify-between">
-                    <h2 class="text-sm font-semibold text-slate-900 dark:text-white">Nova conta fixa</h2>
+                    <h2 class="text-sm font-semibold text-slate-900 dark:text-white">{{ $editingBillId ? 'Editar conta fixa' : 'Nova conta fixa' }}</h2>
                     <button type="button" wire:click="toggleBillForm" class="btn-ghost px-2 py-1 text-xs">Cancelar</button>
                 </div>
 
@@ -188,7 +188,7 @@
                 </div>
 
                 <div class="flex justify-end">
-                    <button type="submit" class="btn-primary px-4 py-2" wire:loading.attr="disabled">Salvar conta fixa</button>
+                    <button type="submit" class="btn-primary px-4 py-2" wire:loading.attr="disabled">{{ $editingBillId ? 'Salvar alterações' : 'Salvar conta fixa' }}</button>
                 </div>
             </form>
         </x-modal>
@@ -267,6 +267,22 @@
                                     <span class="text-xs text-slate-400">em {{ $pagamento->paid_at->format('d/m') }}</span>
                                 @endif
                             @endif
+
+                            @if ($confirmingDeleteBillId === $conta->id)
+                                <span class="text-xs text-slate-500 dark:text-slate-400">Confirma?</span>
+                                <button wire:click="deleteBill('{{ $conta->id }}')" class="text-sm font-medium text-red-700 hover:underline dark:text-red-400">Sim</button>
+                                <button wire:click="cancelDeleteBill" class="text-sm text-slate-400 hover:text-slate-700 dark:hover:text-slate-300">Não</button>
+                            @else
+                                <div class="relative" x-data="{ open: false }" @click.outside="open = false">
+                                    <button type="button" @click="open = !open" class="btn-ghost px-2 py-1.5" aria-label="Mais ações">
+                                        <x-nav-icon name="dots" class="h-4 w-4" />
+                                    </button>
+                                    <div x-show="open" x-transition x-cloak @click="open = false" class="absolute right-0 z-10 mt-1 w-32 overflow-hidden rounded-xl bg-white py-1 shadow-card ring-1 ring-brand-950/5 dark:bg-slate-800 dark:ring-white/10">
+                                        <button wire:click="editBill('{{ $conta->id }}')" type="button" class="block w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-700">Editar</button>
+                                        <button wire:click="confirmDeleteBill('{{ $conta->id }}')" type="button" class="block w-full px-3 py-2 text-left text-sm text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-500/10">Excluir</button>
+                                    </div>
+                                </div>
+                            @endif
                         </div>
                     </li>
                 @endforeach
@@ -283,7 +299,7 @@
         <x-modal wire-model="showIncomeForm">
             <form wire:submit="saveIncome" class="space-y-4">
                 <div class="flex items-baseline justify-between">
-                    <h2 class="text-sm font-semibold text-slate-900 dark:text-white">Nova receita recorrente</h2>
+                    <h2 class="text-sm font-semibold text-slate-900 dark:text-white">{{ $editingIncomeId ? 'Editar receita recorrente' : 'Nova receita recorrente' }}</h2>
                     <button type="button" wire:click="toggleIncomeForm" class="btn-ghost px-2 py-1 text-xs">Cancelar</button>
                 </div>
 
@@ -394,7 +410,7 @@
                 </div>
 
                 <div class="flex justify-end">
-                    <button type="submit" class="btn-primary px-4 py-2" wire:loading.attr="disabled">Salvar receita recorrente</button>
+                    <button type="submit" class="btn-primary px-4 py-2" wire:loading.attr="disabled">{{ $editingIncomeId ? 'Salvar alterações' : 'Salvar receita recorrente' }}</button>
                 </div>
             </form>
         </x-modal>
@@ -472,6 +488,22 @@
                                 @if ($ocorrencia->received_at)
                                     <span class="text-xs text-slate-400">em {{ $ocorrencia->received_at->format('d/m') }}</span>
                                 @endif
+                            @endif
+
+                            @if ($confirmingDeleteIncomeId === $receita->id)
+                                <span class="text-xs text-slate-500 dark:text-slate-400">Confirma?</span>
+                                <button wire:click="deleteIncome('{{ $receita->id }}')" class="text-sm font-medium text-red-700 hover:underline dark:text-red-400">Sim</button>
+                                <button wire:click="cancelDeleteIncome" class="text-sm text-slate-400 hover:text-slate-700 dark:hover:text-slate-300">Não</button>
+                            @else
+                                <div class="relative" x-data="{ open: false }" @click.outside="open = false">
+                                    <button type="button" @click="open = !open" class="btn-ghost px-2 py-1.5" aria-label="Mais ações">
+                                        <x-nav-icon name="dots" class="h-4 w-4" />
+                                    </button>
+                                    <div x-show="open" x-transition x-cloak @click="open = false" class="absolute right-0 z-10 mt-1 w-32 overflow-hidden rounded-xl bg-white py-1 shadow-card ring-1 ring-brand-950/5 dark:bg-slate-800 dark:ring-white/10">
+                                        <button wire:click="editIncome('{{ $receita->id }}')" type="button" class="block w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-700">Editar</button>
+                                        <button wire:click="confirmDeleteIncome('{{ $receita->id }}')" type="button" class="block w-full px-3 py-2 text-left text-sm text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-500/10">Excluir</button>
+                                    </div>
+                                </div>
                             @endif
                         </div>
                     </li>

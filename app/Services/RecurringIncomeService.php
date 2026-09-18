@@ -39,6 +39,39 @@ class RecurringIncomeService
     }
 
     /**
+     * Edita uma receita recorrente existente — mesmo raciocínio de
+     * FixedBillService::update(): valores lidos ao vivo em receive(), e
+     * due_day/recurrence só valem pra ocorrências futuras ainda não geradas.
+     *
+     * @param  array<string, mixed>  $dados
+     */
+    public function update(RecurringIncome $receita, array $dados): RecurringIncome
+    {
+        $receita->update($dados);
+
+        return $receita;
+    }
+
+    /**
+     * "Exclui" a receita recorrente — is_active=false, nunca DELETE de
+     * verdade (mesmo raciocínio de FixedBillService::deactivate(): evita
+     * apagar histórico de recebimento junto). Pula quem ainda está em
+     * aberto; o que já foi recebido fica intocado.
+     */
+    public function deactivate(RecurringIncome $receita): void
+    {
+        DB::transaction(function () use ($receita): void {
+            $receita->update(['is_active' => false]);
+
+            RecurringIncomeOccurrence::withoutProfileScope()
+                ->where('recurring_income_id', $receita->id)
+                ->whereIn('status', [RecurringIncomeStatus::Pending, RecurringIncomeStatus::Overdue])
+                ->get()
+                ->each(fn (RecurringIncomeOccurrence $o) => $this->skip($o, 'Receita recorrente excluída'));
+        });
+    }
+
+    /**
      * Gera os recebimentos do mês para todas as receitas recorrentes
      * ativas. Roda sem escopo de perfil de propósito — rotina de sistema.
      *
