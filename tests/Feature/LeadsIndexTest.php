@@ -48,7 +48,7 @@ class LeadsIndexTest extends TestCase
         Livewire::test(LeadsIndex::class)->call('editLead', $leadDeOutro->id);
     }
 
-    public function test_filtra_por_estagio(): void
+    public function test_quadro_separa_pipeline_aberto_de_convertidos_e_perdidos(): void
     {
         $consultor = User::factory()->consultant()->create();
         Lead::factory()->create(['consultant_id' => $consultor->id, 'name' => 'Em aberto', 'stage' => LeadStage::NewContact]);
@@ -56,10 +56,15 @@ class LeadsIndexTest extends TestCase
 
         $this->actingAs($consultor);
 
-        $component = Livewire::test(LeadsIndex::class)->set('stage', LeadStage::Lost->value);
+        $component = Livewire::test(LeadsIndex::class)->set('showClosed', true);
 
-        self::assertCount(1, $component->get('leads'));
-        self::assertSame('Ja perdido', $component->get('leads')->first()->name);
+        $porEstagio = $component->get('leadsByStage');
+        self::assertCount(1, $porEstagio->get(LeadStage::NewContact->value));
+        self::assertNull($porEstagio->get(LeadStage::Lost->value));
+
+        $fechados = $component->get('closedLeads');
+        self::assertCount(1, $fechados);
+        self::assertSame('Ja perdido', $fechados->first()->name);
     }
 
     public function test_busca_por_nome_ou_email(): void
@@ -72,7 +77,32 @@ class LeadsIndexTest extends TestCase
 
         $component = Livewire::test(LeadsIndex::class)->set('search', 'fernanda');
 
-        self::assertCount(1, $component->get('leads'));
+        $todos = $component->get('leadsByStage')->flatten(1);
+        self::assertCount(1, $todos);
+    }
+
+    public function test_avancar_e_voltar_estagio(): void
+    {
+        $consultor = User::factory()->consultant()->create();
+        $lead = Lead::factory()->create(['consultant_id' => $consultor->id, 'stage' => LeadStage::NewContact]);
+        $this->actingAs($consultor);
+
+        Livewire::test(LeadsIndex::class)->call('advanceStage', $lead->id);
+        self::assertSame(LeadStage::MeetingScheduled, $lead->fresh()->stage);
+
+        Livewire::test(LeadsIndex::class)->call('regressStage', $lead->id);
+        self::assertSame(LeadStage::NewContact, $lead->fresh()->stage);
+    }
+
+    public function test_avancar_no_ultimo_estagio_aberto_nao_faz_nada(): void
+    {
+        $consultor = User::factory()->consultant()->create();
+        $lead = Lead::factory()->create(['consultant_id' => $consultor->id, 'stage' => LeadStage::ProposalSent]);
+        $this->actingAs($consultor);
+
+        Livewire::test(LeadsIndex::class)->call('advanceStage', $lead->id);
+
+        self::assertSame(LeadStage::ProposalSent, $lead->fresh()->stage);
     }
 
     public function test_registra_atividade_pelo_componente(): void

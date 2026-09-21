@@ -8,6 +8,7 @@ use App\Models\Lead;
 use App\Models\LeadActivity;
 use App\Services\LeadService;
 use Carbon\CarbonImmutable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Layout;
@@ -23,11 +24,24 @@ use Livewire\Component;
 #[Layout('components.layouts.app')]
 class LeadsIndex extends Component
 {
-    #[Url]
-    public string $stage = '';
+    /**
+     * Ordem das colunas do quadro — Convertido/Perdido ficam de fora (são
+     * "caso encerrado", não pipeline ativo) e viram uma lista à parte, ver
+     * $showClosed.
+     *
+     * @var list<LeadStage>
+     */
+    private const OPEN_STAGES = [
+        LeadStage::NewContact,
+        LeadStage::MeetingScheduled,
+        LeadStage::ProposalSent,
+    ];
 
     #[Url]
     public string $search = '';
+
+    #[Url]
+    public bool $showClosed = false;
 
     // -----------------------------------------------------------------
     // Formulário — Lead
@@ -257,21 +271,43 @@ class LeadsIndex extends Component
     }
 
     // -----------------------------------------------------------------
+    // Mover de coluna
+    // -----------------------------------------------------------------
+
+    /** Sem arrastar-e-soltar de propósito — funciona igual no celular. */
+    public function advanceStage(string $id, LeadService $service): void
+    {
+        $lead = Lead::query()->where('consultant_id', auth()->id())->findOrFail($id);
+        $indice = array_search($lead->stage, self::OPEN_STAGES, true);
+
+        if ($indice === false || $indice >= count(self::OPEN_STAGES) - 1) {
+            return;
+        }
+
+        $service->update($lead, ['stage' => self::OPEN_STAGES[$indice + 1]->value]);
+    }
+
+    public function regressStage(string $id, LeadService $service): void
+    {
+        $lead = Lead::query()->where('consultant_id', auth()->id())->findOrFail($id);
+        $indice = array_search($lead->stage, self::OPEN_STAGES, true);
+
+        if ($indice === false || $indice <= 0) {
+            return;
+        }
+
+        $service->update($lead, ['stage' => self::OPEN_STAGES[$indice - 1]->value]);
+    }
+
+    // -----------------------------------------------------------------
     // Dados
     // -----------------------------------------------------------------
 
-    /** @return Collection<int, Lead> */
-    public function getLeadsProperty(): Collection
+    private function baseQuery(): Builder
     {
         $query = Lead::query()
             ->where('consultant_id', auth()->id())
-            ->with(['activities' => fn ($q) => $q->latest('occurred_at')->limit(3)])
-            ->orderByRaw('next_action_at IS NULL, next_action_at')
-            ->latest();
-
-        if ($this->stage !== '') {
-            $query->where('stage', $this->stage);
-        }
+            ->with(['activities' => fn ($q) => $q->latest('occurred_at')->limit(3)]);
 
         if (trim($this->search) !== '') {
             $busca = mb_strtolower(trim($this->search));
@@ -280,14 +316,39 @@ class LeadsIndex extends Component
                 ->orWhereRaw('LOWER(email) LIKE ?', ["%{$busca}%"]));
         }
 
-        return $query->get();
+        return $query;
+    }
+
+    /** @return Collection<string, Collection<int, Lead>> estágio (value) => leads, só o pipeline aberto */
+    public function getLeadsByStageProperty(): Collection
+    {
+        $leads = $this->baseQuery()
+            ->whereIn('stage', array_map(fn (LeadStage $s) => $s->value, self::OPEN_STAGES))
+            ->orderByRaw('next_action_at IS NULL, next_action_at')
+            ->get();
+
+        return $leads->groupBy(fn (Lead $lead) => $lead->stage->value);
+    }
+
+    /** @return Collection<int, Lead> */
+    public function getClosedLeadsProperty(): Collection
+    {
+        if (! $this->showClosed) {
+            return collect();
+        }
+
+        return $this->baseQuery()
+            ->whereIn('stage', [LeadStage::Converted->value, LeadStage::Lost->value])
+            ->latest('updated_at')
+            ->get();
     }
 
     public function render()
     {
         return view('livewire.consultant.leads-index', [
-            'leads' => $this->leads,
-            'stages' => LeadStage::options(),
+            'openStages' => self::OPEN_STAGES,
+            'leadsByStage' => $this->leadsByStage,
+            'closedLeads' => $this->closedLeads,
             'activityTypes' => LeadActivityType::options(),
         ]);
     }
