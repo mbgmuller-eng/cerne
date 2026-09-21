@@ -15,6 +15,7 @@ use App\Livewire\Admin\AdminUsers;
 use App\Livewire\Accounts\InvoiceShow;
 use App\Livewire\CashFlow\CashFlowIndex;
 use App\Livewire\CategorizationRules\CategorizationRulesIndex;
+use App\Livewire\Consultant\LeadsIndex;
 use App\Livewire\Consultant\PortfolioInsurance;
 use App\Livewire\Consultant\PortfolioInvestments;
 use App\Livewire\Consultant\PortfolioOverview;
@@ -72,6 +73,7 @@ Route::middleware('auth')->group(function (): void {
     Route::get('/carteira', PortfolioOverview::class)->name('consultant.portfolio');
     Route::get('/carteira/seguros', PortfolioInsurance::class)->name('consultant.portfolio.insurance');
     Route::get('/carteira/investimentos', PortfolioInvestments::class)->name('consultant.portfolio.investments');
+    Route::get('/leads', LeadsIndex::class)->name('consultant.leads');
     Route::post('/clientes/{profile}/abrir', [ProfileSwitchController::class, 'store'])->name('profile.switch');
 
     // Gestão de toda a plataforma — gate é isPlatformAdmin() dentro do

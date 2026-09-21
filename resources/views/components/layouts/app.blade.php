@@ -39,6 +39,7 @@
         ['consultant.portfolio', 'Painel da carteira', 'Carteira', 'invest'],
         ['consultant.portfolio.insurance', 'Seguros da carteira', 'Seguros', 'shield'],
         ['consultant.portfolio.investments', 'Investimentos da carteira', 'Invest.', 'flow'],
+        ['consultant.leads', 'Leads', 'Leads', 'contact'],
     ];
     if ($user?->isPlatformAdmin()) {
         $navConsultor[] = ['admin.users', 'Painel admin', 'Admin', 'admin'];
@@ -167,6 +168,10 @@
                         <x-nav-icon name="flow" />
                         <span>Investimentos da carteira</span>
                     </a>
+                    <a href="{{ route('consultant.leads') }}" class="nav-item">
+                        <x-nav-icon name="contact" />
+                        <span>Leads</span>
+                    </a>
                 @endif
 
                 @if ($user->isPlatformAdmin())
@@ -204,6 +209,10 @@
                 <a href="{{ route('consultant.portfolio.investments') }}" @class(['nav-item', 'nav-item-active' => request()->routeIs('consultant.portfolio.investments')])>
                     <x-nav-icon name="flow" />
                     <span>Investimentos da carteira</span>
+                </a>
+                <a href="{{ route('consultant.leads') }}" @class(['nav-item', 'nav-item-active' => request()->routeIs('consultant.leads')])>
+                    <x-nav-icon name="contact" />
+                    <span>Leads</span>
                 </a>
 
                 @if ($user->isPlatformAdmin())
@@ -344,6 +353,10 @@
                         <a href="{{ route('consultant.portfolio.investments') }}" class="btn-ghost" title="Investimentos da carteira">
                             <x-nav-icon name="flow" class="h-4 w-4" />
                             <span class="ml-1.5 hidden sm:inline">Invest.</span>
+                        </a>
+                        <a href="{{ route('consultant.leads') }}" class="btn-ghost" title="Leads">
+                            <x-nav-icon name="contact" class="h-4 w-4" />
+                            <span class="ml-1.5 hidden sm:inline">Leads</span>
                         </a>
                     @endif
 

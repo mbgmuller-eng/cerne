@@ -7,6 +7,8 @@ use App\Models\Concerns\BelongsToProfileOrShared;
 use App\Models\ConsultantClient;
 use App\Models\ConsultantInvite;
 use App\Models\FinancialProfile;
+use App\Models\Lead;
+use App\Models\LeadActivity;
 use App\Models\PartnerInvite;
 use App\Models\ProfileMember;
 use App\Models\Subscription;
@@ -38,6 +40,8 @@ class TenancyCoverageTest extends TestCase
         // Vínculos consultor-cliente: ligam dois usuários, sem profile_id.
         ConsultantClient::class => 'liga consultor e cliente por user_id — não tem profile_id',
         ConsultantInvite::class => 'o convite existe antes de qualquer perfil ser criado',
+        Lead::class => 'contato que ainda não é cliente — existe antes de qualquer perfil, mesmo raciocínio de ConsultantInvite; pertence ao consultor (consultant_id)',
+        LeadActivity::class => 'segue o Lead — nunca consultada fora do escopo de um lead_id já resolvido',
         PartnerInvite::class => 'consultado pelo consultor sobre um perfil que não é o contexto ativo dele — filtra profile_id explicitamente, mesmo raciocínio de ConsultantInvite',
 
         // Resolvidos ANTES de existir um ProfileContext ativo — ver
