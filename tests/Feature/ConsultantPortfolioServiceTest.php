@@ -196,6 +196,29 @@ class ConsultantPortfolioServiceTest extends TestCase
         self::assertFalse($linhas->contains(fn (array $l) => $l['policy']->insurer_name === 'Bradesco Seguros'));
     }
 
+    /**
+     * Diferente do consultor financeiro (sempre vê tudo), o corretor só
+     * enxerga, no painel agregado, apólices com o próprio broker_id —
+     * mesmo através de vários clientes de uma vez. Essa consulta atravessa
+     * perfis de propósito (ConsultantPortfolioService::allActivePolicies()),
+     * então o filtro entra na mão, não pelo escopo automático.
+     */
+    public function test_corretor_so_ve_as_proprias_apolices_no_painel_agregado(): void
+    {
+        $corretor = User::factory()->broker()->create();
+        $outroCorretor = User::factory()->broker()->create();
+
+        [$perfilA] = $this->criarClienteVinculado($corretor);
+        InsurancePolicy::factory()->create(['profile_id' => $perfilA->id, 'insurer_name' => 'Do corretor', 'broker_id' => $corretor->id]);
+        InsurancePolicy::factory()->create(['profile_id' => $perfilA->id, 'insurer_name' => 'De outro corretor', 'broker_id' => $outroCorretor->id]);
+        InsurancePolicy::factory()->create(['profile_id' => $perfilA->id, 'insurer_name' => 'Sem corretor', 'broker_id' => null]);
+
+        $linhas = app(ConsultantPortfolioService::class)->allActivePolicies($corretor);
+
+        self::assertCount(1, $linhas);
+        self::assertSame('Do corretor', $linhas->first()['policy']->insurer_name);
+    }
+
     public function test_lista_todos_investimentos_dos_clientes_ativos_com_nome_do_cliente(): void
     {
         $consultor = User::factory()->consultant()->create();

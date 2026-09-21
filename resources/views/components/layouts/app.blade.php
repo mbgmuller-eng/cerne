@@ -5,7 +5,13 @@
     $user = auth()->user();
 
     // [rota, rótulo completo, rótulo curto para a barra inferior, ícone]
-    $nav = [
+    // Corretor dentro do perfil de um cliente só vê Seguros — o resto é
+    // tela financeira, travada no mount() de cada uma (ver
+    // RequiresActiveProfile e os guards em cada tela). O menu já não
+    // oferece o que ele não pode abrir.
+    $nav = $user?->isBroker() ? [
+        ['insurance.index', 'Seguros', 'Seguros', 'shield'],
+    ] : [
         ['dashboard', 'Visão geral', 'Início', 'home'],
         ['cashflow.index', 'Fluxo de caixa', 'Fluxo', 'flow'],
         ['fixedbills.index', 'Contas fixas', 'Fixas', 'bills'],
@@ -35,7 +41,12 @@
     // direto, sem gaveta "Mais" (são poucas telas, ao contrário do menu
     // de dentro do perfil). Mesmos itens da <aside> de desktop de cada
     // área, só que achatados pra caber embaixo.
-    $navConsultor = [
+    // Corretor não tem Painel da carteira nem Investimentos — são telas
+    // financeiras. A dele é só Seguros da carteira + Leads.
+    $navConsultor = $user?->isBroker() ? [
+        ['consultant.portfolio.insurance', 'Seguros da carteira', 'Seguros', 'shield'],
+        ['consultant.leads', 'Leads', 'Leads', 'contact'],
+    ] : [
         ['consultant.portfolio', 'Painel da carteira', 'Carteira', 'invest'],
         ['consultant.portfolio.insurance', 'Seguros da carteira', 'Seguros', 'shield'],
         ['consultant.portfolio.investments', 'Investimentos da carteira', 'Invest.', 'flow'],
@@ -49,9 +60,15 @@
         ['admin.users', 'Contas e perfis', 'Contas', 'admin'],
         ['admin.banks', 'Bancos', 'Bancos', 'cards'],
     ];
-    if ($user?->isConsultant()) {
-        $navAdmin[] = ['consultant.portfolio', 'Painel da carteira', 'Carteira', 'invest'];
+    if ($user?->isLinkedProfessional()) {
+        $navAdmin[] = $user->isBroker()
+            ? ['consultant.portfolio.insurance', 'Seguros da carteira', 'Seguros', 'shield']
+            : ['consultant.portfolio', 'Painel da carteira', 'Carteira', 'invest'];
     }
+
+    // "Página inicial" de cada profissional — corretor não tem Painel da
+    // carteira (é tela financeira), a dele é Seguros da carteira.
+    $homeRouteProfissional = $user?->isBroker() ? 'consultant.portfolio.insurance' : 'consultant.portfolio';
 
     // Só conta se for mesmo relevante — poupa uma query em toda página
     // pra quem não é admin.
@@ -129,7 +146,7 @@
             <div class="border-t border-brand-950/5 p-3 dark:border-white/10">
                 @if ($context->isConsultant())
                     <div class="mb-2 rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-900 ring-1 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-300 dark:ring-amber-500/20">
-                        Você está vendo este perfil <span class="font-medium">como consultor</span>.
+                        Você está vendo este perfil <span class="font-medium">como {{ $user?->isBroker() ? 'corretor' : 'consultor' }}</span>.
                     </div>
                 @endif
 
@@ -155,23 +172,15 @@
                     <livewire:notifications.notification-center direction="up" />
                 </div>
 
-                @if ($user->isConsultant())
-                    <a href="{{ route('consultant.portfolio') }}" class="nav-item mt-1">
-                        <x-nav-icon name="invest" />
-                        <span>Painel da carteira</span>
-                    </a>
-                    <a href="{{ route('consultant.portfolio.insurance') }}" class="nav-item">
-                        <x-nav-icon name="shield" />
-                        <span>Seguros da carteira</span>
-                    </a>
-                    <a href="{{ route('consultant.portfolio.investments') }}" class="nav-item">
-                        <x-nav-icon name="flow" />
-                        <span>Investimentos da carteira</span>
-                    </a>
-                    <a href="{{ route('consultant.leads') }}" class="nav-item">
-                        <x-nav-icon name="contact" />
-                        <span>Leads</span>
-                    </a>
+                @if ($user->isLinkedProfessional())
+                    @foreach ($navConsultor as [$route, $label, $curto, $icone])
+                        @if ($route !== 'admin.users')
+                            <a href="{{ route($route) }}" @class(['nav-item', 'mt-1' => $loop->first])>
+                                <x-nav-icon :name="$icone" />
+                                <span>{{ $label }}</span>
+                            </a>
+                        @endif
+                    @endforeach
                 @endif
 
                 @if ($user->isPlatformAdmin())
@@ -190,30 +199,22 @@
         {{-- Área de gestão do consultor: carteira e clientes, não um perfil. --}}
         <aside class="sticky top-0 hidden h-screen w-64 shrink-0 flex-col border-r border-brand-950/5 bg-white lg:flex dark:border-white/10 dark:bg-slate-900">
             <div class="px-6 pt-6 pb-4">
-                <a href="{{ route('consultant.portfolio') }}" class="flex items-center gap-2">
+                <a href="{{ route($homeRouteProfissional) }}" class="flex items-center gap-2">
                     <x-brand-mark class="h-7 w-7" />
                     <span class="font-display text-2xl font-semibold tracking-tight text-brand-800 dark:text-white">Cerne</span>
                 </a>
-                <p class="mt-1 truncate text-xs text-slate-500 dark:text-slate-400">Painel do consultor</p>
+                <p class="mt-1 truncate text-xs text-slate-500 dark:text-slate-400">{{ $user?->isBroker() ? 'Painel do corretor' : 'Painel do consultor' }}</p>
             </div>
 
             <nav class="flex-1 space-y-0.5 overflow-y-auto px-3">
-                <a href="{{ route('consultant.portfolio') }}" @class(['nav-item', 'nav-item-active' => request()->routeIs('consultant.portfolio')])>
-                    <x-nav-icon name="invest" />
-                    <span>Painel da carteira</span>
-                </a>
-                <a href="{{ route('consultant.portfolio.insurance') }}" @class(['nav-item', 'nav-item-active' => request()->routeIs('consultant.portfolio.insurance')])>
-                    <x-nav-icon name="shield" />
-                    <span>Seguros da carteira</span>
-                </a>
-                <a href="{{ route('consultant.portfolio.investments') }}" @class(['nav-item', 'nav-item-active' => request()->routeIs('consultant.portfolio.investments')])>
-                    <x-nav-icon name="flow" />
-                    <span>Investimentos da carteira</span>
-                </a>
-                <a href="{{ route('consultant.leads') }}" @class(['nav-item', 'nav-item-active' => request()->routeIs('consultant.leads')])>
-                    <x-nav-icon name="contact" />
-                    <span>Leads</span>
-                </a>
+                @foreach ($navConsultor as [$route, $label, $curto, $icone])
+                    @if ($route !== 'admin.users')
+                        <a href="{{ route($route) }}" @class(['nav-item', 'nav-item-active' => request()->routeIs($route)])>
+                            <x-nav-icon :name="$icone" />
+                            <span>{{ $label }}</span>
+                        </a>
+                    @endif
+                @endforeach
 
                 @if ($user->isPlatformAdmin())
                     <a href="{{ route('admin.users') }}" class="nav-item mt-1">
@@ -270,10 +271,10 @@
                     @endif
                 </a>
 
-                @if ($user->isConsultant())
-                    <a href="{{ route('consultant.portfolio') }}" class="nav-item mt-1">
+                @if ($user->isLinkedProfessional())
+                    <a href="{{ route($homeRouteProfissional) }}" class="nav-item mt-1">
                         <x-nav-icon name="invest" />
-                        <span>Painel da carteira</span>
+                        <span>{{ $user->isBroker() ? 'Seguros da carteira' : 'Painel da carteira' }}</span>
                     </a>
                 @endif
             </nav>
@@ -338,26 +339,18 @@
                      celular. --}}
                 <div class="flex min-w-0 items-center gap-2 overflow-x-auto">
                     @if ($context->isConsultant())
-                        <span class="badge bg-amber-50 text-amber-900 ring-1 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-300 dark:ring-amber-500/20">consultor</span>
+                        <span class="badge bg-amber-50 text-amber-900 ring-1 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-300 dark:ring-amber-500/20">{{ $user?->isBroker() ? 'corretor' : 'consultor' }}</span>
                     @endif
 
-                    @if ($user?->isConsultant())
-                        <a href="{{ route('consultant.portfolio') }}" class="btn-ghost" title="Painel da carteira">
-                            <x-nav-icon name="invest" class="h-4 w-4" />
-                            <span class="ml-1.5 hidden sm:inline">Carteira</span>
-                        </a>
-                        <a href="{{ route('consultant.portfolio.insurance') }}" class="btn-ghost" title="Seguros da carteira">
-                            <x-nav-icon name="shield" class="h-4 w-4" />
-                            <span class="ml-1.5 hidden sm:inline">Seguros</span>
-                        </a>
-                        <a href="{{ route('consultant.portfolio.investments') }}" class="btn-ghost" title="Investimentos da carteira">
-                            <x-nav-icon name="flow" class="h-4 w-4" />
-                            <span class="ml-1.5 hidden sm:inline">Invest.</span>
-                        </a>
-                        <a href="{{ route('consultant.leads') }}" class="btn-ghost" title="Leads">
-                            <x-nav-icon name="contact" class="h-4 w-4" />
-                            <span class="ml-1.5 hidden sm:inline">Leads</span>
-                        </a>
+                    @if ($user?->isLinkedProfessional())
+                        @foreach ($navConsultor as [$route, $label, $curto, $icone])
+                            @if ($route !== 'admin.users')
+                                <a href="{{ route($route) }}" class="btn-ghost" title="{{ $label }}">
+                                    <x-nav-icon :name="$icone" class="h-4 w-4" />
+                                    <span class="ml-1.5 hidden sm:inline">{{ $curto }}</span>
+                                </a>
+                            @endif
+                        @endforeach
                     @endif
 
                     @if ($user?->isPlatformAdmin())

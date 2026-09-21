@@ -52,11 +52,19 @@ class FinancialProfilePolicy
 
     // ---------------------------------------------------------------------
 
+    /**
+     * "Consegue abrir esse perfil" — não confundir com "vê tudo dentro
+     * dele". Um corretor vinculado passa aqui (senão nem trocaria de
+     * perfil pra chegar em Seguros), mas cada tela financeira barra ele
+     * no próprio mount() (ver App\Livewire\Concerns — telas fora de
+     * Seguros exigem isLinkedConsultant explicitamente, não só hasAccess).
+     */
     public function hasAccess(User $user, FinancialProfile $profile): bool
     {
         return $this->isOwner($user, $profile)
             || $this->isMember($user, $profile)
-            || $this->isLinkedConsultant($user, $profile);
+            || $this->isLinkedConsultant($user, $profile)
+            || $this->isLinkedBroker($user, $profile);
     }
 
     private function isOwner(User $user, FinancialProfile $profile): bool
@@ -80,6 +88,27 @@ class FinancialProfilePolicy
     private function isLinkedConsultant(User $user, FinancialProfile $profile): bool
     {
         if (! $user->isConsultant()) {
+            return false;
+        }
+
+        return ConsultantClient::query()
+            ->active()
+            ->where('consultant_id', $user->id)
+            ->where('client_id', $profile->owner_user_id)
+            ->exists();
+    }
+
+    /**
+     * Corretor vinculado ao dono do perfil, com vínculo ativo. Mesma
+     * checagem de isLinkedConsultant(), papel diferente — um corretor
+     * NUNCA entra em update()/manageMembers()/viewAuditLog() acima, só em
+     * hasAccess(): ele abre o perfil, mas não administra nada nele, e
+     * dentro de Seguros só vê as apólices que têm seu próprio broker_id
+     * (ver InsurancePolicyBrokerScope).
+     */
+    private function isLinkedBroker(User $user, FinancialProfile $profile): bool
+    {
+        if (! $user->isBroker()) {
             return false;
         }
 

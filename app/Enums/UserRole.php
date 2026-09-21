@@ -10,6 +10,7 @@ enum UserRole: string
 
     case Admin = 'admin';
     case Consultant = 'consultant';
+    case Broker = 'broker';
     case Client = 'client';
 
     public function label(): string
@@ -17,6 +18,7 @@ enum UserRole: string
         return match ($this) {
             self::Admin => 'Administrador',
             self::Consultant => 'Consultor',
+            self::Broker => 'Corretor',
             self::Client => 'Cliente',
         };
     }

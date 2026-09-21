@@ -26,6 +26,8 @@ class ProfileSwitchController extends Controller
 
         $request->session()->put(SetProfileContext::SESSION_KEY, $profile->id);
 
-        return redirect()->route('dashboard');
+        // Corretor não tem Visão geral (é tela financeira, ver Dashboard::
+        // mount()) — cai direto em Seguros, a única tela dele dentro do perfil.
+        return redirect()->route($request->user()->isBroker() ? 'insurance.index' : 'dashboard');
     }
 }

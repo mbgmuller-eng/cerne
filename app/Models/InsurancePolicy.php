@@ -8,6 +8,7 @@ use App\Models\Concerns\Auditable;
 use App\Models\Concerns\BelongsToProfile;
 use App\Models\Concerns\HasBadgeInitials;
 use App\Models\Concerns\InvalidatesDashboard;
+use App\Models\Concerns\RespectsBrokerVisibility;
 use App\Models\Concerns\RespectsMemberPrivacy;
 use App\Support\Money;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -18,14 +19,14 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 #[Fillable([
-    'profile_id', 'member_id', 'insured_person_name', 'insurance_type', 'insurer_name', 'policy_number', 'insured_item',
+    'profile_id', 'member_id', 'broker_id', 'insured_person_name', 'insurance_type', 'insurer_name', 'policy_number', 'insured_item',
     'coverage_amount', 'coverages', 'monthly_premium', 'annual_premium', 'payment_frequency',
     'bank_account_id', 'start_date', 'expiry_date', 'is_active', 'beneficiaries',
     'notes', 'source_document_id', 'created_by_user_id', 'is_private',
 ])]
 class InsurancePolicy extends Model
 {
-    use Auditable, BelongsToProfile, HasBadgeInitials, InvalidatesDashboard, HasFactory, HasUuids, RespectsMemberPrivacy;
+    use Auditable, BelongsToProfile, HasBadgeInitials, InvalidatesDashboard, HasFactory, HasUuids, RespectsBrokerVisibility, RespectsMemberPrivacy;
 
     protected function casts(): array
     {
@@ -49,6 +50,12 @@ class InsurancePolicy extends Model
     public function member(): BelongsTo
     {
         return $this->belongsTo(ProfileMember::class, 'member_id');
+    }
+
+    /** Nulo = nenhum corretor vê esta apólice — só dono/cônjuge/consultor. */
+    public function broker(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'broker_id');
     }
 
     /**

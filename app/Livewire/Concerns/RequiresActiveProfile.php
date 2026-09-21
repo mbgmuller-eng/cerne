@@ -28,6 +28,14 @@ trait RequiresActiveProfile
             return;
         }
 
+        // Corretor não tem "Painel da carteira" (é tela financeira) — a
+        // casa dele é Seguros da carteira.
+        if (auth()->user()?->isBroker()) {
+            $this->redirect(route('consultant.portfolio.insurance'));
+
+            return;
+        }
+
         abort(404);
     }
 }

@@ -94,6 +94,20 @@
                     <p class="mt-1 text-xs text-slate-400">Só quando não é o titular nem o cônjuge cadastrado. Com "Membro" preenchido, este campo é ignorado.</p>
                 </div>
 
+                @if ($availableBrokers->isNotEmpty())
+                    <div>
+                        <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Compartilhar com corretor</label>
+                        <select wire:model="policyBrokerId" class="select mt-1.5 w-full">
+                            <option value="">Nenhum</option>
+                            @foreach ($availableBrokers as $corretor)
+                                <option value="{{ $corretor->id }}">{{ $corretor->name }}</option>
+                            @endforeach
+                        </select>
+                        @error('policyBrokerId') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                        <p class="mt-1 text-xs text-slate-400">Só esse corretor enxerga esta apólice — o consultor sempre vê tudo.</p>
+                    </div>
+                @endif
+
                 <div>
                     <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Item segurado (opcional)</label>
                     <input type="text" wire:model="policyInsuredItem" class="input mt-1.5" placeholder="Ex.: Honda Civic 2022, iPhone 15">
@@ -260,6 +274,9 @@
                                                                     @endif
                                                                     @if ($apolice->policy_number)
                                                                         <p class="text-xs text-slate-500 dark:text-slate-400">Apólice {{ $apolice->policy_number }}</p>
+                                                                    @endif
+                                                                    @if ($apolice->broker)
+                                                                        <p class="text-xs text-brand-700 dark:text-brand-300">Compartilhado com {{ $apolice->broker->name }}</p>
                                                                     @endif
                                                                 </div>
 

@@ -2,12 +2,16 @@
 
 namespace App\Livewire\Insurance;
 
+use App\Enums\ConsultantClientStatus;
 use App\Enums\InsuranceType;
 use App\Enums\PaymentFrequency;
+use App\Enums\UserRole;
 use App\Livewire\Concerns\HasPrivacyTabs;
 use App\Livewire\Concerns\RequiresActiveProfile;
+use App\Models\ConsultantClient;
 use App\Models\InsurancePolicy;
 use App\Models\ProfileMember;
+use App\Models\User;
 use App\Support\Money;
 use App\Support\ProfileContext;
 use Illuminate\Support\Collection;
@@ -35,6 +39,9 @@ class InsuranceIndex extends Component
     public ?string $editingPolicyId = null;
 
     public string $policyMemberId = '';
+
+    /** Vazio = nenhum corretor vê esta apólice. */
+    public string $policyBrokerId = '';
 
     public string $policyInsuredPersonName = '';
 
@@ -94,6 +101,7 @@ class InsuranceIndex extends Component
 
         $this->editingPolicyId = $apolice->id;
         $this->policyMemberId = (string) $apolice->member_id;
+        $this->policyBrokerId = (string) $apolice->broker_id;
         $this->policyInsuredPersonName = (string) $apolice->insured_person_name;
         $this->policyInsuranceType = $apolice->insurance_type->value;
         $this->policyInsurerName = $apolice->insurer_name;
@@ -114,6 +122,7 @@ class InsuranceIndex extends Component
     {
         $data = $this->validate([
             'policyMemberId' => ['nullable'],
+            'policyBrokerId' => ['nullable'],
             'policyInsuredPersonName' => ['nullable', 'string', 'max:255'],
             'policyInsuranceType' => ['required', Rule::enum(InsuranceType::class)],
             'policyInsurerName' => ['required', 'string', 'max:255'],
@@ -136,9 +145,11 @@ class InsuranceIndex extends Component
         ]);
 
         $memberId = $this->resolveMembro($this->policyMemberId);
+        $brokerId = $this->resolveBroker($this->policyBrokerId);
 
         $payload = [
             'member_id' => $memberId,
+            'broker_id' => $brokerId,
             // Só faz sentido quando não há membro cadastrado — com
             // member_id preenchido, o nome livre é descartado de
             // propósito (evita os dois campos divergirem sobre "de quem"
@@ -192,7 +203,7 @@ class InsuranceIndex extends Component
     private function resetPolicyForm(): void
     {
         $this->reset(
-            'editingPolicyId', 'policyMemberId', 'policyInsuredPersonName', 'policyInsurerName', 'policyNumber',
+            'editingPolicyId', 'policyMemberId', 'policyBrokerId', 'policyInsuredPersonName', 'policyInsurerName', 'policyNumber',
             'policyInsuredItem', 'policyCoverageAmount', 'policyAnnualPremium', 'policyExpiryDate', 'policyNotes',
             'policyIsPrivate',
         );
@@ -229,14 +240,66 @@ class InsuranceIndex extends Component
         return $membro->id;
     }
 
+    /**
+     * A última palavra sobre "esse corretor vê essa apólice" é de quem
+     * cadastra — mas só pode escolher entre corretores com vínculo ATIVO
+     * neste perfil (a lista vem de getAvailableBrokersProperty(), a mesma
+     * que popula o <select>). Um id fora dessa lista falha fechado, mesmo
+     * raciocínio de resolveMembro().
+     */
+    private function resolveBroker(string $brokerId): ?string
+    {
+        if ($brokerId === '') {
+            return null;
+        }
+
+        $corretor = $this->availableBrokers->firstWhere('id', $brokerId);
+
+        if ($corretor === null) {
+            throw ValidationException::withMessages([
+                'policyBrokerId' => 'Selecione um corretor válido.',
+            ]);
+        }
+
+        return $corretor->id;
+    }
+
     // -----------------------------------------------------------------
     // Leitura
     // -----------------------------------------------------------------
 
+    /**
+     * Corretores com vínculo ativo neste perfil — só entre eles dá pra
+     * escolher no formulário (ver resolveBroker()). Vazio na maioria dos
+     * perfis, que não têm corretor nenhum vinculado ainda.
+     *
+     * @return Collection<int, User>
+     */
+    public function getAvailableBrokersProperty(): Collection
+    {
+        $profileId = app(ProfileContext::class)->profileId();
+        $ownerUserId = app(ProfileContext::class)->profile()?->owner_user_id;
+
+        if ($profileId === null || $ownerUserId === null) {
+            return collect();
+        }
+
+        $corretorIds = ConsultantClient::query()
+            ->where('client_id', $ownerUserId)
+            ->where('status', ConsultantClientStatus::Active)
+            ->pluck('consultant_id');
+
+        return User::query()
+            ->whereIn('id', $corretorIds)
+            ->where('role', UserRole::Broker)
+            ->orderBy('name')
+            ->get();
+    }
+
     /** @return Collection<int, InsurancePolicy> */
     public function getPoliciesProperty(): Collection
     {
-        $query = InsurancePolicy::query()->active()->with('member')->orderBy('insurance_type');
+        $query = InsurancePolicy::query()->active()->with('member', 'broker')->orderBy('insurance_type');
 
         if ($this->showPrivacyTabs) {
             $query->where('member_id', $this->viewAs === '' ? null : $this->viewAs);
@@ -342,6 +405,7 @@ class InsuranceIndex extends Component
             'totalMonthly' => $this->totalMonthly,
             'expiring' => $this->expiring,
             'insurersCount' => $this->insurersCount,
+            'availableBrokers' => $this->availableBrokers,
             'members' => ProfileMember::query()
                 ->where('profile_id', $profileId)
                 ->where('is_active', true)

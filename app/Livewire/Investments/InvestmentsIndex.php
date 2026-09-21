@@ -132,6 +132,8 @@ class InvestmentsIndex extends Component
     public function mount(): void
     {
         $this->redirectOrAbortWithoutProfile();
+        // Corretor só entra em Seguros — nenhuma outra tela financeira.
+        abort_if(auth()->user()?->isBroker(), 403);
     }
 
     public function setTab(string $tab): void

@@ -142,6 +142,8 @@ class FixedBillsIndex extends Component
     public function mount(): void
     {
         $this->redirectOrAbortWithoutProfile();
+        // Corretor só entra em Seguros — nenhuma outra tela financeira.
+        abort_if(auth()->user()?->isBroker(), 403);
 
         $hoje = CarbonImmutable::now();
         $this->year ??= $hoje->year;

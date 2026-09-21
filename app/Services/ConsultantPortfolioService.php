@@ -113,6 +113,12 @@ class ConsultantPortfolioService
         return InsurancePolicy::withoutProfileScope()
             ->whereIn('profile_id', $profiles->pluck('id'))
             ->active()
+            // Esta consulta atravessa vários perfis de propósito — não tem
+            // um ProfileContext ativo pra InsurancePolicyBrokerScope filtrar
+            // sozinho (ver a trait), então o filtro entra na mão aqui: um
+            // corretor só vê o que tem o próprio broker_id; consultor
+            // financeiro nunca é restrito.
+            ->when($consultant->isBroker(), fn ($q) => $q->where('broker_id', $consultant->id))
             ->with('member')
             ->orderBy('insurer_name')
             ->get()

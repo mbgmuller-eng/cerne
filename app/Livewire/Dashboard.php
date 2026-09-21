@@ -24,9 +24,25 @@ class Dashboard extends Component
      */
     public function mount(): void
     {
-        if (app(ProfileContext::class)->profile() === null && auth()->user()?->isConsultant()) {
-            $this->redirect(route('consultant.portfolio'));
+        if (app(ProfileContext::class)->profile() === null) {
+            if (auth()->user()?->isConsultant()) {
+                $this->redirect(route('consultant.portfolio'));
+
+                return;
+            }
+
+            // Corretor não tem "Visão geral" — é tela financeira. A casa
+            // dele é Seguros da carteira.
+            if (auth()->user()?->isBroker()) {
+                $this->redirect(route('consultant.portfolio.insurance'));
+
+                return;
+            }
         }
+
+        // Com perfil ativo, Visão geral mostra dado financeiro — corretor
+        // fica de fora, mesma trava das outras telas fora de Seguros.
+        abort_if(auth()->user()?->isBroker(), 403);
     }
 
     public function render(DashboardService $dashboard)

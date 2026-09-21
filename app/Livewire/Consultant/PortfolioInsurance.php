@@ -28,7 +28,7 @@ class PortfolioInsurance extends Component
 
     public function mount(): void
     {
-        abort_unless(auth()->user()?->isConsultant(), 403);
+        abort_unless(auth()->user()?->isLinkedProfessional(), 403);
     }
 
     public function render(ConsultantPortfolioService $portfolio)

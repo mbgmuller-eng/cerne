@@ -52,7 +52,12 @@ class SetProfileContext
         $context->set(
             profile: $profile,
             member: $profile->memberFor($user),
-            asConsultant: $user->isConsultant() && $profile->owner_user_id !== $user->id,
+            // isLinkedProfessional() (consultor OU corretor) — não só
+            // isConsultant(): sem isso, um corretor vendo o perfil de um
+            // cliente seria tratado como se fosse o cônjuge dele pela
+            // privacidade do casal (MemberPrivacyScope), em vez de alguém
+            // de fora com acesso restrito por tipo de seguro.
+            asConsultant: $user->isLinkedProfessional() && $profile->owner_user_id !== $user->id,
         );
 
         $request->session()->put(self::SESSION_KEY, $profile->id);

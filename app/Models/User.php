@@ -56,6 +56,24 @@ class User extends Authenticatable
         return $this->role === UserRole::Consultant;
     }
 
+    public function isBroker(): bool
+    {
+        return $this->role === UserRole::Broker;
+    }
+
+    /**
+     * Consultor financeiro OU corretor de seguros — qualquer profissional
+     * vinculado a clientes, por oposição a um membro da família (dono ou
+     * cônjuge). Existe porque várias regras (privacidade do casal, redirect
+     * sem perfil ativo) precisam tratar os dois papéis do mesmo jeito: "é
+     * alguém de fora olhando", sem se importar com QUAL módulo cada um pode
+     * ver — isso quem decide é FinancialProfilePolicy.
+     */
+    public function isLinkedProfessional(): bool
+    {
+        return $this->isConsultant() || $this->isBroker();
+    }
+
     public function isClient(): bool
     {
         return $this->role === UserRole::Client;
@@ -124,7 +142,7 @@ class User extends Authenticatable
 
         $profiles = $owned->union($memberOf);
 
-        if ($this->isConsultant()) {
+        if ($this->isLinkedProfessional()) {
             $clientIds = ConsultantClient::query()
                 ->where('consultant_id', $this->id)
                 ->where('status', \App\Enums\ConsultantClientStatus::Active)
