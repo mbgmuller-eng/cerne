@@ -10,10 +10,82 @@
                 {{ $totalUsuarios }} {{ $totalUsuarios === 1 ? 'conta' : 'contas' }} · {{ $totalPerfis }} {{ $totalPerfis === 1 ? 'perfil' : 'perfis' }} na plataforma
             </p>
         </div>
-        <button type="button" wire:click="toggleInviteForm" class="btn-secondary">
-            {{ $showInviteForm ? 'Cancelar' : '+ Criar conta sem consultor' }}
-        </button>
+        <div class="flex flex-wrap gap-2">
+            <button type="button" wire:click="toggleProfessionalInviteForm" class="btn-secondary">
+                {{ $showProfessionalInviteForm ? 'Cancelar' : '+ Criar conta de consultor/corretor' }}
+            </button>
+            <button type="button" wire:click="toggleInviteForm" class="btn-secondary">
+                {{ $showInviteForm ? 'Cancelar' : '+ Criar conta sem consultor' }}
+            </button>
+        </div>
     </div>
+
+    @if ($showProfessionalInviteForm)
+        <div class="card space-y-4 p-5">
+            <div>
+                <p class="text-sm font-semibold text-slate-900 dark:text-white">Criar conta de consultor ou corretor</p>
+                <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                    Gera um link de convite — quem abrir define a própria senha. A conta nasce sem nenhum perfil
+                    financeiro e sem nenhum cliente vinculado; os vínculos, o próprio profissional cria depois
+                    (Consultor em "Carteira", Corretor em "Seguros da carteira").
+                </p>
+            </div>
+
+            <form wire:submit="inviteProfessional" class="grid gap-4 sm:grid-cols-2">
+                <div>
+                    <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Nome</label>
+                    <input type="text" wire:model="professionalName" class="input mt-1.5" placeholder="Nome da pessoa">
+                    @error('professionalName') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                </div>
+
+                <div>
+                    <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">E-mail</label>
+                    <input type="email" wire:model="professionalEmail" class="input mt-1.5" placeholder="email@exemplo.com">
+                    @error('professionalEmail') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                </div>
+
+                <div>
+                    <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Papel</label>
+                    <select wire:model="professionalRole" class="select mt-1.5 w-full">
+                        <option value="consultant">Consultor financeiro</option>
+                        <option value="broker">Corretor de seguros</option>
+                    </select>
+                    @error('professionalRole') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                </div>
+
+                <div class="sm:col-span-2">
+                    <button type="submit" class="btn-primary" wire:loading.attr="disabled">Gerar convite</button>
+                </div>
+            </form>
+
+            @if ($lastProfessionalInviteLink)
+                <div class="rounded-lg bg-slate-50 p-3 dark:bg-slate-700">
+                    <p class="text-xs font-medium text-slate-600 dark:text-slate-400">Link do convite — copie e envie por onde preferir</p>
+                    <p class="mt-1 font-mono text-xs break-all text-slate-700 dark:text-slate-300">{{ $lastProfessionalInviteLink }}</p>
+                </div>
+            @endif
+
+            @if ($this->pendingProfessionalInvites->isNotEmpty())
+                <div class="border-t border-slate-100 pt-4 dark:border-white/10">
+                    <p class="text-xs font-medium text-slate-500 dark:text-slate-400">Convites profissionais aguardando cadastro</p>
+                    <ul class="mt-2 divide-y divide-slate-100 dark:divide-white/10">
+                        @foreach ($this->pendingProfessionalInvites as $convite)
+                            <li class="flex items-center justify-between gap-3 py-1.5 text-sm">
+                                <div class="min-w-0">
+                                    <span class="text-slate-700 dark:text-slate-300">{{ $convite->name }}</span>
+                                    <span class="badge bg-brand-50 text-brand-800 ring-1 ring-brand-200 dark:bg-brand-500/10 dark:text-brand-300 dark:ring-brand-500/20 ml-1">{{ $convite->role->label() }}</span>
+                                    <span class="text-xs text-slate-400">{{ $convite->email }} · expira {{ $convite->expires_at->diffForHumans() }}</span>
+                                </div>
+                                <button type="button" wire:click="reenviarConviteProfissional('{{ $convite->id }}')" wire:loading.attr="disabled" class="btn-ghost shrink-0 px-2 py-1 text-xs whitespace-nowrap">
+                                    Reenviar
+                                </button>
+                            </li>
+                        @endforeach
+                    </ul>
+                </div>
+            @endif
+        </div>
+    @endif
 
     @if ($showInviteForm)
         <div class="card space-y-4 p-5">

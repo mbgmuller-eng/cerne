@@ -16,16 +16,82 @@
             </p>
         </div>
 
-        <div>
-            <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Seguradora</label>
-            <select wire:model.live="seguradora" class="select mt-1.5">
-                <option value="">Todas as seguradoras</option>
-                @foreach ($seguradoras as $nome)
-                    <option value="{{ $nome }}">{{ $nome }}</option>
-                @endforeach
-            </select>
+        <div class="flex flex-wrap items-end gap-3">
+            @if (auth()->user()->isBroker())
+                <button type="button" wire:click="toggleInviteForm" class="btn-secondary">
+                    {{ $showInviteForm ? 'Cancelar' : '+ Vincular cliente' }}
+                </button>
+            @endif
+
+            <div>
+                <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Seguradora</label>
+                <select wire:model.live="seguradora" class="select mt-1.5">
+                    <option value="">Todas as seguradoras</option>
+                    @foreach ($seguradoras as $nome)
+                        <option value="{{ $nome }}">{{ $nome }}</option>
+                    @endforeach
+                </select>
+            </div>
         </div>
     </div>
+
+    {{-- Vínculo com cliente novo — só o corretor vê este bloco; o
+         consultor já tem o formulário equivalente em PortfolioOverview. --}}
+    @if (auth()->user()->isBroker() && $showInviteForm)
+        <div class="card space-y-4 p-5">
+            <div>
+                <p class="text-sm font-semibold text-slate-900 dark:text-white">Vincular um cliente</p>
+                <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                    E-mail sem conta vira convite de cadastro; e-mail que já tem conta no Cerne vira um pedido —
+                    o cliente decide, na hora de autorizar, quais apólices já cadastradas liberar pra você.
+                </p>
+            </div>
+
+            <form wire:submit="invite" class="grid gap-4 sm:grid-cols-2">
+                <div>
+                    <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Nome</label>
+                    <input type="text" wire:model="inviteName" class="input mt-1.5" placeholder="Nome do cliente">
+                    @error('inviteName') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                </div>
+
+                <div>
+                    <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">E-mail</label>
+                    <input type="email" wire:model="inviteEmail" class="input mt-1.5" placeholder="email@exemplo.com">
+                    @error('inviteEmail') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                </div>
+
+                <div class="sm:col-span-2">
+                    <button type="submit" class="btn-primary" wire:loading.attr="disabled">Vincular</button>
+                </div>
+            </form>
+
+            @if ($lastInviteLink)
+                <div class="rounded-lg bg-slate-50 p-3 dark:bg-slate-700">
+                    <p class="text-xs font-medium text-slate-600 dark:text-slate-400">Link — copie e envie por outro canal se o e-mail não chegar</p>
+                    <p class="mt-1 font-mono text-xs break-all text-slate-700 dark:text-slate-300">{{ $lastInviteLink }}</p>
+                </div>
+            @endif
+
+            @if ($this->pendingInvites->isNotEmpty())
+                <div class="border-t border-slate-100 pt-4 dark:border-white/10">
+                    <p class="text-xs font-medium text-slate-500 dark:text-slate-400">Convites enviados, aguardando cadastro</p>
+                    <ul class="mt-2 divide-y divide-slate-100 dark:divide-white/10">
+                        @foreach ($this->pendingInvites as $convite)
+                            <li class="flex items-center justify-between gap-3 py-1.5 text-sm">
+                                <div class="min-w-0">
+                                    <span class="text-slate-700 dark:text-slate-300">{{ $convite->client_name }}</span>
+                                    <span class="text-xs text-slate-400">{{ $convite->client_email }} · expira {{ $convite->expires_at->diffForHumans() }}</span>
+                                </div>
+                                <button type="button" wire:click="reenviarConvite('{{ $convite->id }}')" wire:loading.attr="disabled" class="btn-ghost shrink-0 px-2 py-1 text-xs whitespace-nowrap">
+                                    Reenviar
+                                </button>
+                            </li>
+                        @endforeach
+                    </ul>
+                </div>
+            @endif
+        </div>
+    @endif
 
     @if ($grouped->isEmpty())
         <div class="rounded-2xl border border-dashed border-slate-300 bg-white/60 px-5 py-12 text-center dark:border-slate-600 dark:bg-slate-800/40">

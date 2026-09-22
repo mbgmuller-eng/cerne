@@ -94,7 +94,7 @@
                     <p class="mt-1 text-xs text-slate-400">Só quando não é o titular nem o cônjuge cadastrado. Com "Membro" preenchido, este campo é ignorado.</p>
                 </div>
 
-                @if ($availableBrokers->isNotEmpty())
+                @if (! auth()->user()->isBroker() && $availableBrokers->isNotEmpty())
                     <div>
                         <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Compartilhar com corretor</label>
                         <select wire:model="policyBrokerId" class="select mt-1.5 w-full">

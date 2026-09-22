@@ -3,6 +3,7 @@
 use App\Http\Controllers\Admin\ImpersonationController;
 use App\Http\Controllers\Auth\AcceptInviteController;
 use App\Http\Controllers\Auth\AcceptPartnerInviteController;
+use App\Http\Controllers\Auth\AcceptProfessionalInviteController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\ConsultantLinkController;
 use App\Http\Controllers\ProfileSwitchController;
@@ -49,6 +50,9 @@ Route::middleware('guest')->group(function (): void {
 
     Route::get('/convite-conjuge/{token}', [AcceptPartnerInviteController::class, 'show'])->name('partner-invite.accept');
     Route::post('/convite-conjuge/{token}', [AcceptPartnerInviteController::class, 'store'])->name('partner-invite.store');
+
+    Route::get('/convite-profissional/{token}', [AcceptProfessionalInviteController::class, 'show'])->name('professional-invite.accept');
+    Route::post('/convite-profissional/{token}', [AcceptProfessionalInviteController::class, 'store'])->name('professional-invite.store');
 });
 
 /*

@@ -3,7 +3,11 @@
 namespace App\Livewire\Consultant;
 
 use App\Enums\InsuranceType;
+use App\Enums\InviteStatus;
+use App\Models\ConsultantInvite;
 use App\Models\InsurancePolicy;
+use App\Services\ClientInviteService;
+use App\Services\ConsultantLinkService;
 use App\Services\ConsultantPortfolioService;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Layout;
@@ -19,6 +23,13 @@ use Livewire\Component;
  *
  * O corte por seguradora (filtro `seguradora`) continua existindo —
  * útil pra falar com a seguradora sobre a carteira inteira.
+ *
+ * Também é aqui que o CORRETOR vincula um cliente novo — ele não tem a
+ * tela de carteira do consultor (PortfolioOverview), então o formulário de
+ * convite/pedido de vínculo mora nesta, a única tela que os dois dividem
+ * (ver ConsultantLinkService::inviteOrRequest()). Pro consultor o botão
+ * fica escondido: ele já tem esse formulário em PortfolioOverview, duas
+ * portas pra mesma coisa só confundiriam.
  */
 #[Layout('components.layouts.app')]
 class PortfolioInsurance extends Component
@@ -26,9 +37,65 @@ class PortfolioInsurance extends Component
     #[Url]
     public string $seguradora = '';
 
+    public string $inviteName = '';
+
+    public string $inviteEmail = '';
+
+    public ?string $lastInviteLink = null;
+
+    public bool $showInviteForm = false;
+
     public function mount(): void
     {
         abort_unless(auth()->user()?->isLinkedProfessional(), 403);
+    }
+
+    public function toggleInviteForm(): void
+    {
+        $this->showInviteForm = ! $this->showInviteForm;
+
+        if ($this->showInviteForm) {
+            $this->reset('inviteName', 'inviteEmail', 'lastInviteLink');
+            $this->resetErrorBag();
+        }
+    }
+
+    public function invite(ClientInviteService $invites, ConsultantLinkService $links): void
+    {
+        $this->validate([
+            'inviteName' => ['required', 'string', 'max:255'],
+            'inviteEmail' => ['required', 'email', 'max:255'],
+        ], attributes: [
+            'inviteName' => 'nome',
+            'inviteEmail' => 'e-mail',
+        ]);
+
+        $this->lastInviteLink = $links->inviteOrRequest(auth()->user(), $this->inviteName, $this->inviteEmail, $invites);
+        $this->reset('inviteName', 'inviteEmail');
+        session()->flash('status', 'Convite enviado.');
+    }
+
+    public function reenviarConvite(string $id, ClientInviteService $invites): void
+    {
+        $convite = ConsultantInvite::query()
+            ->where('consultant_id', auth()->id())
+            ->where('status', InviteStatus::Pending)
+            ->findOrFail($id);
+
+        $this->lastInviteLink = $invites->resend($convite);
+        session()->flash('status', 'Convite reenviado.');
+    }
+
+    /** @return Collection<int, ConsultantInvite> */
+    public function getPendingInvitesProperty(): Collection
+    {
+        return ConsultantInvite::query()
+            ->where('consultant_id', auth()->id())
+            ->where('status', InviteStatus::Pending)
+            ->latest()
+            ->get()
+            ->reject(fn (ConsultantInvite $invite) => $invite->isExpired())
+            ->values();
     }
 
     public function render(ConsultantPortfolioService $portfolio)

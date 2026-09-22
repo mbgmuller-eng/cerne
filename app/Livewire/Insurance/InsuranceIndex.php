@@ -145,7 +145,11 @@ class InsuranceIndex extends Component
         ]);
 
         $memberId = $this->resolveMembro($this->policyMemberId);
-        $brokerId = $this->resolveBroker($this->policyBrokerId);
+        // Corretor cadastrando apólice pro próprio cliente vinculado: já
+        // nasce compartilhada com ele mesmo, sem escolher na lista (nem
+        // aparece pra ele — ver blade). Cliente/consultor continuam
+        // escolhendo livremente entre os corretores vinculados.
+        $brokerId = auth()->user()->isBroker() ? auth()->id() : $this->resolveBroker($this->policyBrokerId);
 
         $payload = [
             'member_id' => $memberId,

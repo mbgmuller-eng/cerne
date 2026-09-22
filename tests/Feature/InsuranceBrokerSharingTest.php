@@ -145,6 +145,43 @@ class InsuranceBrokerSharingTest extends TestCase
         self::assertSame('Compartilhada', $policies->first()->insurer_name);
     }
 
+    public function test_corretor_cadastrando_apolice_nova_ja_fica_compartilhada_com_ele_mesmo(): void
+    {
+        [$perfil, , $titular] = $this->criarPerfil();
+        $corretor = User::factory()->broker()->create();
+        ConsultantClient::factory()->create([
+            'consultant_id' => $corretor->id, 'client_id' => $titular->id, 'status' => ConsultantClientStatus::Active,
+        ]);
+
+        $this->actingAs($corretor);
+        app(ProfileContext::class)->set($perfil, member: null, asConsultant: true);
+
+        Livewire::test(InsuranceIndex::class)
+            ->set('policyInsuranceType', 'vida')
+            ->set('policyInsurerName', 'Cadastrada pelo corretor')
+            ->set('policyMonthlyPremium', '100.00')
+            ->set('policyStartDate', '2026-01-01')
+            ->call('savePolicy')
+            ->assertHasNoErrors();
+
+        $apolice = InsurancePolicy::withoutProfileScope()->where('insurer_name', 'Cadastrada pelo corretor')->sole();
+        self::assertSame($corretor->id, $apolice->broker_id);
+    }
+
+    public function test_corretor_nao_ve_o_campo_de_escolher_corretor_no_formulario(): void
+    {
+        [$perfil, , $titular] = $this->criarPerfil();
+        $corretor = User::factory()->broker()->create();
+        ConsultantClient::factory()->create([
+            'consultant_id' => $corretor->id, 'client_id' => $titular->id, 'status' => ConsultantClientStatus::Active,
+        ]);
+
+        $this->actingAs($corretor);
+        app(ProfileContext::class)->set($perfil, member: null, asConsultant: true);
+
+        Livewire::test(InsuranceIndex::class)->assertDontSee('Compartilhar com corretor');
+    }
+
     /** @return array{0: FinancialProfile, 1: ProfileMember, 2: User} */
     private function criarPerfil(): array
     {

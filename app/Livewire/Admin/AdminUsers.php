@@ -7,11 +7,14 @@ use App\Enums\UserRole;
 use App\Models\ConsultantClient;
 use App\Models\ConsultantInvite;
 use App\Models\FinancialProfile;
+use App\Models\ProfessionalInvite;
 use App\Models\User;
 use App\Services\ClientInviteService;
+use App\Services\ProfessionalInviteService;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 
@@ -34,6 +37,16 @@ class AdminUsers extends Component
 
     public bool $showInviteForm = false;
 
+    public string $professionalName = '';
+
+    public string $professionalEmail = '';
+
+    public string $professionalRole = 'consultant';
+
+    public ?string $lastProfessionalInviteLink = null;
+
+    public bool $showProfessionalInviteForm = false;
+
     /** id da conta com o painel de exclusão aberto, ou nulo. */
     public ?string $excluindoUserId = null;
 
@@ -47,6 +60,7 @@ class AdminUsers extends Component
     public function toggleInviteForm(): void
     {
         $this->showInviteForm = ! $this->showInviteForm;
+        $this->showProfessionalInviteForm = false;
         $this->cancelarExclusao();
 
         if ($this->showInviteForm) {
@@ -76,11 +90,83 @@ class AdminUsers extends Component
         session()->flash('status', 'Convite criado — copie o link abaixo e envie pro seu amigo.');
     }
 
+    public function toggleProfessionalInviteForm(): void
+    {
+        $this->showProfessionalInviteForm = ! $this->showProfessionalInviteForm;
+        $this->showInviteForm = false;
+        $this->cancelarExclusao();
+
+        if ($this->showProfessionalInviteForm) {
+            $this->reset('professionalName', 'professionalEmail', 'lastProfessionalInviteLink');
+            $this->professionalRole = 'consultant';
+            $this->resetErrorBag();
+        }
+    }
+
+    /**
+     * Cria conta de Consultor ou Corretor — só quem entra aqui vira
+     * profissional; o autocadastro continua não existindo pra esses papéis
+     * (ver App\Console\Commands\CreateConsultant, que fazia isso só pelo
+     * terminal antes desta tela existir). O papel é o único diferencial:
+     * a conta nasce sem nenhum perfil financeiro, sem nenhum vínculo — o
+     * profissional que cria os próprios vínculos depois (ConsultantLinkService).
+     */
+    public function inviteProfessional(ProfessionalInviteService $invites): void
+    {
+        $data = $this->validate([
+            'professionalName' => ['required', 'string', 'max:255'],
+            'professionalEmail' => ['required', 'email', 'max:255'],
+            'professionalRole' => ['required', Rule::in(['consultant', 'broker'])],
+        ], attributes: [
+            'professionalName' => 'nome',
+            'professionalEmail' => 'e-mail',
+            'professionalRole' => 'papel',
+        ]);
+
+        if (User::where('email', $data['professionalEmail'])->exists()) {
+            $this->addError('professionalEmail', 'Esse e-mail já tem conta no Cerne.');
+
+            return;
+        }
+
+        $this->lastProfessionalInviteLink = $invites->send(
+            auth()->user(),
+            $data['professionalName'],
+            $data['professionalEmail'],
+            UserRole::from($data['professionalRole']),
+        );
+        $this->reset('professionalName', 'professionalEmail');
+        $this->professionalRole = 'consultant';
+        session()->flash('status', 'Convite de acesso profissional criado — copie o link abaixo e envie.');
+    }
+
+    public function reenviarConviteProfissional(string $id, ProfessionalInviteService $invites): void
+    {
+        $convite = ProfessionalInvite::query()
+            ->where('status', InviteStatus::Pending)
+            ->findOrFail($id);
+
+        $this->lastProfessionalInviteLink = $invites->resend($convite);
+        session()->flash('status', 'Convite reenviado.');
+    }
+
+    /** Convites profissionais (Consultor/Corretor) ainda não aceitos. */
+    public function getPendingProfessionalInvitesProperty(): Collection
+    {
+        return ProfessionalInvite::query()
+            ->where('status', InviteStatus::Pending)
+            ->latest()
+            ->get()
+            ->reject(fn (ProfessionalInvite $invite) => $invite->isExpired())
+            ->values();
+    }
+
     public function pedirExclusao(string $userId): void
     {
         $this->excluindoUserId = $userId;
         $this->confirmacaoExclusao = '';
         $this->showInviteForm = false;
+        $this->showProfessionalInviteForm = false;
         $this->resetErrorBag();
     }
 

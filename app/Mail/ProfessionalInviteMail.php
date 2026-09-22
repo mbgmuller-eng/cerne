@@ -2,39 +2,38 @@
 
 namespace App\Mail;
 
-use App\Models\User;
+use App\Models\ProfessionalInvite;
 use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Queue\SerializesModels;
 
-class ConsultantLinkRequestMail extends Mailable
+class ProfessionalInviteMail extends Mailable
 {
     use Queueable, SerializesModels;
 
     public function __construct(
-        public User $consultant,
+        public ProfessionalInvite $invite,
         public string $link,
     ) {}
 
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: $this->consultant->isBroker()
-                ? "{$this->consultant->name} quer ser seu corretor de seguros no Cerne"
-                : "{$this->consultant->name} quer se vincular à sua conta no Cerne",
+            subject: "Sua conta de {$this->invite->role->label()} no Cerne está pronta",
         );
     }
 
     public function content(): Content
     {
         return new Content(
-            markdown: 'mail.consultant-link-request',
+            markdown: 'mail.professional-invite',
             with: [
-                'consultantName' => $this->consultant->name,
-                'isBroker' => $this->consultant->isBroker(),
+                'name' => $this->invite->name,
+                'roleLabel' => $this->invite->role->label(),
                 'link' => $this->link,
+                'expiresAt' => $this->invite->expires_at,
             ],
         );
     }
