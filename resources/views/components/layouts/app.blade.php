@@ -37,6 +37,39 @@
     // celular (poucas abas, sem cabeçalho de seção nenhum).
     $nav = collect($navSections)->flatMap(fn (array $s) => $s['items'])->all();
 
+    // Cor da barra de dentro do perfil: a do SETOR que a pessoa está
+    // vendo, não o tema claro/escuro (esse continua só no conteúdo — ver
+    // memory: project_multi_product_branding). Corretor só tem Seguros,
+    // então é sempre verde pra ele, em qualquer tela dentro do perfil
+    // (inclusive Minha conta); quem tem tudo começa em Finanças/navy e só
+    // vira verde dentro de Seguros. Documentos/Saúde ainda não têm rota —
+    // entram só como rótulo "em breve", sem cor de fundo própria ainda.
+    $moduloAtivo = ($user?->isBroker() || request()->routeIs('insurance.index')) ? 'seguros' : 'financas';
+    $corBarraModulo = $moduloAtivo === 'seguros' ? 'bg-seguros-800' : 'bg-brand-800';
+
+    // Rótulo de cada seção sempre no tom do próprio setor, esteja a barra
+    // preenchida daquele setor ou não — é o que deixa "onde eu poderia
+    // ir" legível mesmo quando a barra inteira está em navy.
+    $navSections = collect($navSections)->map(function (array $s) {
+        $tintPorSetor = [
+            'Finanças' => 'text-white/40',
+            'Seguros' => 'text-seguros-200',
+            'Documentos' => 'text-documentos-200',
+            'Saúde' => 'text-saude-200',
+        ];
+
+        return $s + ['tint' => $tintPorSetor[$s['label']] ?? 'text-white/40'];
+    })->all();
+
+    // Documentos e Saúde ainda não têm nenhuma tela — só o lugar
+    // reservado no menu, pra já nascer com a estrutura que os próximos
+    // produtos vão ocupar (ver memory: project_multi_product_branding).
+    // Corretor não ganha essas seções: ele só tem Seguros mesmo.
+    if (! $user?->isBroker()) {
+        $navSections[] = ['label' => 'Documentos', 'items' => [], 'tint' => 'text-documentos-200', 'emBreve' => true];
+        $navSections[] = ['label' => 'Saúde', 'items' => [], 'tint' => 'text-saude-200', 'emBreve' => true];
+    }
+
     // Na barra inferior cabem 5; o resto vai para "Mais".
     $tabsPrincipais = array_slice($nav, 0, 4);
     $tabsMais = array_slice($nav, 4);
@@ -141,21 +174,29 @@
          Barra lateral (desktop)
          ============================================================ --}}
     @if ($dentroDoPerfil)
-        <aside class="sticky top-0 hidden h-screen w-64 shrink-0 flex-col border-r border-brand-950/5 bg-white lg:flex dark:border-white/10 dark:bg-slate-900">
+        {{-- Cor da barra = módulo ativo (ver $corBarraModulo acima), não o
+             tema claro/escuro do app — por isso os textos aqui usam tom
+             fixo (branco translúcido), não o par claro/dark: de sempre. --}}
+        <aside @class(['sticky top-0 hidden h-screen w-64 shrink-0 flex-col lg:flex', $corBarraModulo])>
             <div class="px-6 pt-6 pb-4">
                 <a href="{{ route('dashboard') }}" class="flex items-center gap-2">
                     <x-brand-mark class="h-7 w-7" />
-                    <span class="font-display text-2xl font-semibold tracking-tight text-brand-800 dark:text-white">Cerne</span>
+                    <span class="font-display text-2xl font-semibold tracking-tight text-white">Cerne</span>
                 </a>
-                <p class="mt-1 truncate text-xs text-slate-500 dark:text-slate-400">{{ $profile->profile_name }}</p>
+                <p class="mt-1 truncate text-xs text-white/50">{{ $profile->profile_name }}</p>
             </div>
 
             <nav class="flex-1 space-y-0.5 overflow-y-auto px-3">
                 @foreach ($navSections as $secao)
                     <div @class(['pt-4' => ! $loop->first])>
-                        <p class="px-3 pb-1 text-[10px] font-semibold tracking-wide text-slate-400 uppercase dark:text-slate-500">{{ $secao['label'] }}</p>
+                        <p @class(['px-3 pb-1 text-[10px] font-semibold tracking-wide uppercase', $secao['tint']])>
+                            {{ $secao['label'] }}
+                            @if ($secao['emBreve'] ?? false)
+                                <span class="ml-1 rounded bg-white/10 px-1.5 py-0.5 text-[9px] font-normal tracking-normal text-white/50 normal-case">em breve</span>
+                            @endif
+                        </p>
                         @foreach ($secao['items'] as [$route, $label, $curto, $icone])
-                            <a href="{{ route($route) }}" @class(['nav-item', 'nav-item-active' => request()->routeIs($route)])>
+                            <a href="{{ route($route) }}" @class(['nav-item-chrome', 'nav-item-chrome-active' => request()->routeIs($route)])>
                                 <x-nav-icon :name="$icone" />
                                 <span>{{ $label }}</span>
                             </a>
@@ -164,39 +205,45 @@
                 @endforeach
             </nav>
 
-            <div class="border-t border-brand-950/5 p-3 dark:border-white/10">
+            <div class="border-t border-white/10 p-3">
                 @if ($context->isConsultant())
-                    <div class="mb-2 rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-900 ring-1 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-300 dark:ring-amber-500/20">
+                    <div class="mb-2 rounded-xl bg-amber-500/10 px-3 py-2 text-xs text-amber-300 ring-1 ring-amber-500/20">
                         Você está vendo este perfil <span class="font-medium">como {{ $user?->isBroker() ? 'corretor' : 'consultor' }}</span>.
                     </div>
                 @endif
 
-                <a href="{{ route('my-account') }}" @class(['nav-item mb-1', 'nav-item-active' => request()->routeIs('my-account')])>
+                <a href="{{ route('my-account') }}" @class(['nav-item-chrome mb-1', 'nav-item-chrome-active' => request()->routeIs('my-account')])>
                     <x-nav-icon name="users" />
                     <span>Minha conta</span>
                 </a>
 
                 <div class="flex items-center gap-3 px-2 py-1.5">
-                    <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-100 text-xs font-semibold text-brand-800 dark:bg-white/10 dark:text-white">
+                    <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/10 text-xs font-semibold text-white">
                         {{ mb_strtoupper(mb_substr($user->name, 0, 1)) }}
                     </div>
                     <div class="min-w-0 flex-1">
-                        <p class="truncate text-sm font-medium text-slate-800 dark:text-slate-100">{{ $user->name }}</p>
-                        <p class="truncate text-xs text-slate-500 dark:text-slate-400">{{ $user->email }}</p>
+                        <p class="truncate text-sm font-medium text-white">{{ $user->name }}</p>
+                        <p class="truncate text-xs text-white/50">{{ $user->email }}</p>
                     </div>
                     <form method="POST" action="{{ route('logout') }}">
                         @csrf
-                        <button type="submit" class="btn-ghost px-2" title="Sair">
+                        <button type="submit" class="btn-ghost !text-white/60 px-2" title="Sair">
                             <x-nav-icon name="logout" class="h-4 w-4" />
                         </button>
                     </form>
-                    <livewire:notifications.notification-center direction="up" />
+                    {{-- O botão do sino é do componente compartilhado
+                         (usado no cabeçalho também, com fundo claro) — o
+                         seletor aqui força a cor certa só nesta instância,
+                         sem mexer no componente em si. --}}
+                    <div class="[&>div>button]:!text-white/60">
+                        <livewire:notifications.notification-center direction="up" />
+                    </div>
                 </div>
 
                 @if ($user->isLinkedProfessional())
                     @foreach ($navConsultor as [$route, $label, $curto, $icone])
                         @if ($route !== 'admin.users')
-                            <a href="{{ route($route) }}" @class(['nav-item', 'mt-1' => $loop->first])>
+                            <a href="{{ route($route) }}" @class(['nav-item-chrome', 'mt-1' => $loop->first])>
                                 <x-nav-icon :name="$icone" />
                                 <span>{{ $label }}</span>
                             </a>
@@ -205,7 +252,7 @@
                 @endif
 
                 @if ($user->isPlatformAdmin())
-                    <a href="{{ route('admin.users') }}" class="nav-item mt-1">
+                    <a href="{{ route('admin.users') }}" class="nav-item-chrome mt-1">
                         <x-nav-icon name="admin" />
                         <span>Painel admin</span>
                     </a>
@@ -341,13 +388,22 @@
         @endif
 
         {{-- Cabeçalho compacto: em desktop com perfil ele some (a lateral
-             já cumpre o papel); sem perfil ou no celular ele fica. --}}
+             já cumpre o papel); sem perfil ou no celular ele fica. Dentro
+             do perfil, leva a mesma cor de módulo da barra lateral (ver
+             $corBarraModulo) — fora disso, continua no claro/escuro de
+             sempre. --}}
         <header @class([
-            'sticky top-0 z-20 border-b border-brand-950/5 bg-white/90 backdrop-blur dark:border-white/10 dark:bg-slate-900/90',
+            'sticky top-0 z-20',
             'lg:hidden' => $mostraAsideDesktop,
+            "$corBarraModulo border-b border-white/10" => $dentroDoPerfil,
+            'border-b border-brand-950/5 bg-white/90 backdrop-blur dark:border-white/10 dark:bg-slate-900/90' => ! $dentroDoPerfil,
         ])>
             <div class="mx-auto flex h-14 max-w-6xl items-center justify-between gap-3 px-4">
-                <a href="{{ route('dashboard') }}" class="flex shrink-0 items-center gap-2 font-display text-xl font-semibold tracking-tight text-brand-800 dark:text-white">
+                <a href="{{ route('dashboard') }}" @class([
+                    'flex shrink-0 items-center gap-2 font-display text-xl font-semibold tracking-tight',
+                    'text-white' => $dentroDoPerfil,
+                    'text-brand-800 dark:text-white' => ! $dentroDoPerfil,
+                ])>
                     <x-brand-mark class="h-6 w-6" />
                     Cerne
                 </a>
@@ -360,13 +416,17 @@
                      celular. --}}
                 <div class="flex min-w-0 items-center gap-2 overflow-x-auto">
                     @if ($context->isConsultant())
-                        <span class="badge bg-amber-50 text-amber-900 ring-1 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-300 dark:ring-amber-500/20">{{ $user?->isBroker() ? 'corretor' : 'consultor' }}</span>
+                        <span @class([
+                            'badge ring-1',
+                            'bg-amber-500/10 text-amber-300 ring-amber-500/20' => $dentroDoPerfil,
+                            'bg-amber-50 text-amber-900 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-300 dark:ring-amber-500/20' => ! $dentroDoPerfil,
+                        ])>{{ $user?->isBroker() ? 'corretor' : 'consultor' }}</span>
                     @endif
 
                     @if ($user?->isLinkedProfessional())
                         @foreach ($navConsultor as [$route, $label, $curto, $icone])
                             @if ($route !== 'admin.users')
-                                <a href="{{ route($route) }}" class="btn-ghost" title="{{ $label }}">
+                                <a href="{{ route($route) }}" @class(['btn-ghost', '!text-white/60' => $dentroDoPerfil]) title="{{ $label }}">
                                     <x-nav-icon :name="$icone" class="h-4 w-4" />
                                     <span class="ml-1.5 hidden sm:inline">{{ $curto }}</span>
                                 </a>
@@ -375,7 +435,7 @@
                     @endif
 
                     @if ($user?->isPlatformAdmin())
-                        <a href="{{ route('admin.users') }}" class="btn-ghost" title="Painel admin">
+                        <a href="{{ route('admin.users') }}" @class(['btn-ghost', '!text-white/60' => $dentroDoPerfil]) title="Painel admin">
                             <x-nav-icon name="admin" class="h-4 w-4" />
                             <span class="ml-1.5 hidden sm:inline">Admin</span>
                         </a>
@@ -385,14 +445,16 @@
 
                     <form method="POST" action="{{ route('logout') }}">
                         @csrf
-                        <button type="submit" class="btn-ghost" title="Sair">
+                        <button type="submit" @class(['btn-ghost', '!text-white/60' => $dentroDoPerfil]) title="Sair">
                             <x-nav-icon name="logout" class="h-4 w-4" />
                             <span class="ml-1.5 hidden sm:inline">Sair</span>
                         </button>
                     </form>
 
                     @auth
-                        <livewire:notifications.notification-center />
+                        <div @class(['[&>div>button]:!text-white/60' => $dentroDoPerfil])>
+                            <livewire:notifications.notification-center />
+                        </div>
                     @endauth
                 </div>
             </div>
@@ -441,17 +503,17 @@
             x-transition:leave-start="translate-y-0"
             x-transition:leave-end="translate-y-full"
             x-cloak
-            class="relative rounded-t-3xl bg-white px-4 pt-3 pb-4 shadow-[0_-8px_32px_-8px_rgb(11_29_58_/_0.2)] dark:bg-slate-900"
+            @class(['relative rounded-t-3xl px-4 pt-3 pb-4 shadow-[0_-8px_32px_-8px_rgb(11_29_58_/_0.2)]', $corBarraModulo])
         >
-            <div class="mx-auto mb-3 h-1 w-10 rounded-full bg-slate-200 dark:bg-slate-700"></div>
+            <div class="mx-auto mb-3 h-1 w-10 rounded-full bg-white/20"></div>
             <div class="grid grid-cols-4 gap-1">
                 @foreach ($tabsMais as [$route, $label, $curto, $icone])
-                    <a href="{{ route($route) }}" @class(['tab-item rounded-xl py-3', 'tab-item-active bg-brand-50 dark:bg-accent-500/15' => request()->routeIs($route)])>
+                    <a href="{{ route($route) }}" @class(['tab-item-chrome rounded-xl py-3', 'tab-item-chrome-active bg-white/10' => request()->routeIs($route)])>
                         <x-nav-icon :name="$icone" class="h-6 w-6" />
                         <span>{{ $curto }}</span>
                     </a>
                 @endforeach
-                <a href="{{ route('my-account') }}" @class(['tab-item rounded-xl py-3', 'tab-item-active bg-brand-50 dark:bg-accent-500/15' => request()->routeIs('my-account')])>
+                <a href="{{ route('my-account') }}" @class(['tab-item-chrome rounded-xl py-3', 'tab-item-chrome-active bg-white/10' => request()->routeIs('my-account')])>
                     <x-nav-icon name="users" class="h-6 w-6" />
                     <span>Minha conta</span>
                 </a>
@@ -459,14 +521,14 @@
         </div>
 
         {{-- Abas --}}
-        <nav class="relative flex border-t border-brand-950/5 bg-white/95 backdrop-blur dark:border-white/10 dark:bg-slate-900/95" style="padding-bottom: env(safe-area-inset-bottom)">
+        <nav @class(['relative flex border-t border-white/10', $corBarraModulo]) style="padding-bottom: env(safe-area-inset-bottom)">
             @foreach ($tabsPrincipais as [$route, $label, $curto, $icone])
-                <a href="{{ route($route) }}" @class(['tab-item', 'tab-item-active' => request()->routeIs($route)])>
+                <a href="{{ route($route) }}" @class(['tab-item-chrome', 'tab-item-chrome-active' => request()->routeIs($route)])>
                     <x-nav-icon :name="$icone" class="h-6 w-6" />
                     <span>{{ $curto }}</span>
                 </a>
             @endforeach
-            <button type="button" @click="mais = !mais" @class(['tab-item', 'tab-item-active' => $emMais])>
+            <button type="button" @click="mais = !mais" @class(['tab-item-chrome', 'tab-item-chrome-active' => $emMais])>
                 <x-nav-icon name="menu" class="h-6 w-6" />
                 <span>Mais</span>
             </button>

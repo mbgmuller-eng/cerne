@@ -62,6 +62,21 @@
     --color-accent-900: #064e3b;
     --color-accent-950: #022c22;
 
+    /* Cor por produto — Cerne Finanças usa a marca (brand) acima; cada
+       outro produto tem a própria. Só os tons realmente usados hoje: 800
+       preenche a barra lateral quando a pessoa está naquele módulo (ver
+       app.blade.php, $moduloAtivo), 200 é o tom claro do rótulo da seção
+       na barra — sempre visível nessa cor, esteja a barra preenchida
+       daquele módulo ou não. Documentos e Saúde ainda não têm tela
+       própria (rótulo "em breve"), mas já entram na paleta.
+       Ver memory: project_multi_product_branding. */
+    --color-seguros-200: #97c459;
+    --color-seguros-800: #173404;
+    --color-documentos-200: #ef9f27;
+    --color-documentos-800: #633806;
+    --color-saude-200: #afa9ec;
+    --color-saude-800: #3c3489;
+
     /* Papel — fundo de superfície, frio (slate-50/200) em vez do antigo
        tom quente. */
     --color-paper: #f8fafc;
@@ -168,6 +183,20 @@
         @apply bg-brand-50 font-medium text-brand-800 dark:bg-accent-500/15 dark:text-accent-400;
     }
 
+    /* Item da barra de dentro do perfil — o fundo dessa barra é sempre
+       escuro (a cor do módulo ativo, não o tema claro/escuro do app), daí
+       não seguir o par nav-item/dark: de cima: aqui não existe estado
+       "claro". Overlay branco translúcido funciona em cima de qualquer
+       cor de módulo (navy, verde-floresta, ...) sem precisar de um tom de
+       "ativo" por módulo. */
+    .nav-item-chrome {
+        @apply flex items-center gap-3 rounded-xl px-3 py-2 text-sm text-white/70 transition hover:bg-white/10 hover:text-white;
+    }
+
+    .nav-item-chrome-active {
+        @apply bg-white/10 font-medium text-white;
+    }
+
     /* Item da barra inferior (celular) */
     .tab-item {
         @apply flex flex-1 flex-col items-center gap-0.5 py-2 text-[10px] font-medium text-slate-500 transition dark:text-slate-400;
@@ -175,6 +204,17 @@
 
     .tab-item-active {
         @apply text-brand-700 dark:text-accent-400;
+    }
+
+    /* Mesma ideia de nav-item-chrome, pra barra inferior do celular
+       dentro do perfil — fundo sempre escuro (cor do módulo ativo), não
+       o tema claro/escuro. */
+    .tab-item-chrome {
+        @apply flex flex-1 flex-col items-center gap-0.5 py-2 text-[10px] font-medium text-white/60 transition;
+    }
+
+    .tab-item-chrome-active {
+        @apply text-white;
     }
 
     /* Seletor de tema (claro/sistema/escuro) — ver x-theme-switcher e
