@@ -17,6 +17,7 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 #[Fillable([
     'profile_id', 'member_id', 'broker_id', 'insured_person_name', 'insurance_type', 'insurer_name', 'policy_number', 'insured_item',
@@ -56,6 +57,12 @@ class InsurancePolicy extends Model
     public function broker(): BelongsTo
     {
         return $this->belongsTo(User::class, 'broker_id');
+    }
+
+    /** @return HasMany<InsurancePolicyRenewal> */
+    public function renewals(): HasMany
+    {
+        return $this->hasMany(InsurancePolicyRenewal::class)->latest('renewed_at');
     }
 
     /**

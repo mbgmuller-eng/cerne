@@ -7,6 +7,7 @@ use App\Models\Concerns\BelongsToProfileOrShared;
 use App\Models\ConsultantClient;
 use App\Models\ConsultantInvite;
 use App\Models\FinancialProfile;
+use App\Models\InsurancePolicyRenewal;
 use App\Models\Lead;
 use App\Models\LeadActivity;
 use App\Models\PartnerInvite;
@@ -43,6 +44,7 @@ class TenancyCoverageTest extends TestCase
         ConsultantInvite::class => 'o convite existe antes de qualquer perfil ser criado',
         Lead::class => 'contato que ainda não é cliente — existe antes de qualquer perfil, mesmo raciocínio de ConsultantInvite; pertence ao consultor (consultant_id)',
         LeadActivity::class => 'segue o Lead — nunca consultada fora do escopo de um lead_id já resolvido',
+        InsurancePolicyRenewal::class => 'segue a InsurancePolicy — sem profile_id próprio, nunca consultada fora do escopo de um insurance_policy_id já resolvido (mesmo raciocínio de LeadActivity)',
         PartnerInvite::class => 'consultado pelo consultor sobre um perfil que não é o contexto ativo dele — filtra profile_id explicitamente, mesmo raciocínio de ConsultantInvite',
         ProfessionalInvite::class => 'convite de conta profissional (Consultor/Corretor) — a conta que nasce dele não tem perfil próprio nenhum, mesmo raciocínio de ConsultantInvite',
 

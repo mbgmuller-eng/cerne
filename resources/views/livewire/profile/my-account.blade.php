@@ -17,6 +17,25 @@
                 <dt class="text-xs text-slate-500 dark:text-slate-400">E-mail</dt>
                 <dd class="mt-0.5 text-sm text-slate-800 dark:text-slate-200">{{ $user->email }}</dd>
             </div>
+
+            @if ($ownMember)
+                <div>
+                    <dt class="text-xs text-slate-500 dark:text-slate-400">Aniversário</dt>
+                    @if ($editingOwnBirthdate)
+                        <dd class="mt-1 flex items-center gap-2">
+                            <input type="date" wire:model="ownBirthdateInput" class="input py-1 text-xs">
+                            <button type="button" wire:click="saveOwnBirthdate" class="btn-primary px-2 py-1 text-xs">Salvar</button>
+                            <button type="button" wire:click="toggleOwnBirthdate" class="btn-ghost px-2 py-1 text-xs">Cancelar</button>
+                        </dd>
+                        @error('ownBirthdateInput') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                    @else
+                        <dd class="mt-0.5 flex items-center gap-2 text-sm text-slate-800 dark:text-slate-200">
+                            {{ $ownMember->birthdate?->format('d/m/Y') ?? 'Não cadastrado' }}
+                            <button type="button" wire:click="toggleOwnBirthdate" class="text-xs text-brand-700 hover:underline dark:text-brand-300">Editar</button>
+                        </dd>
+                    @endif
+                </div>
+            @endif
         </dl>
     </section>
 
@@ -60,6 +79,25 @@
                         @endif
                     </dd>
                 </div>
+
+                @if ($canManageMembers)
+                    <div>
+                        <dt class="text-xs text-slate-500 dark:text-slate-400">Aniversário</dt>
+                        @if ($editingPartnerBirthdate)
+                            <dd class="mt-1 flex items-center gap-2">
+                                <input type="date" wire:model="partnerBirthdateInput" class="input py-1 text-xs">
+                                <button type="button" wire:click="savePartnerBirthdate" class="btn-primary px-2 py-1 text-xs">Salvar</button>
+                                <button type="button" wire:click="togglePartnerBirthdate" class="btn-ghost px-2 py-1 text-xs">Cancelar</button>
+                            </dd>
+                            @error('partnerBirthdateInput') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                        @else
+                            <dd class="mt-0.5 flex items-center gap-2 text-sm text-slate-800 dark:text-slate-200">
+                                {{ $partner->birthdate?->format('d/m/Y') ?? 'Não cadastrado' }}
+                                <button type="button" wire:click="togglePartnerBirthdate" class="text-xs text-brand-700 hover:underline dark:text-brand-300">Editar</button>
+                            </dd>
+                        @endif
+                    </div>
+                @endif
             </dl>
 
             @if ($partner->user === null && $canInvitePartner)
@@ -150,7 +188,7 @@
     <section class="card p-5">
         <p class="text-sm font-semibold text-slate-900 dark:text-white">Notificações</p>
         <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">
-            Avisos no sino do app estão sempre ativos. Escolha os outros canais para vencimento de conta, fatura de cartão e status de importação de PDF:
+            Avisos no sino do app estão sempre ativos. Escolha os outros canais para vencimento de conta, fatura de cartão, status de importação de PDF e, se você for consultor ou corretor, datas importantes da carteira:
         </p>
 
         <div class="mt-3 space-y-3">

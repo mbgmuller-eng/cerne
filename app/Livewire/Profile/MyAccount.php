@@ -7,6 +7,7 @@ use App\Enums\InviteStatus;
 use App\Enums\MemberRole;
 use App\Livewire\Concerns\RequiresActiveProfile;
 use App\Models\ConsultantClient;
+use App\Models\FinancialProfile;
 use App\Models\PartnerInvite;
 use App\Models\ProfileMember;
 use App\Services\ClientOnboardingService;
@@ -45,6 +46,14 @@ class MyAccount extends Component
 
     public bool $notifyPush = false;
 
+    public bool $editingOwnBirthdate = false;
+
+    public string $ownBirthdateInput = '';
+
+    public bool $editingPartnerBirthdate = false;
+
+    public string $partnerBirthdateInput = '';
+
     public function mount(): void
     {
         $this->redirectOrAbortWithoutProfile();
@@ -70,6 +79,70 @@ class MyAccount extends Component
         if (! $value) {
             auth()->user()->update(['notify_push_enabled' => false]);
         }
+    }
+
+    /**
+     * Aniversário entra em "Datas importantes" (ver ImportantDatesService)
+     * — o próprio titular/cônjuge preenche aqui; o consultor/corretor
+     * preenche pela tela deles (ImportantDates::saveBirthdate()), não por
+     * aqui, porque eles nunca têm um perfil de cliente "aberto" como
+     * `member()` — só quem É o membro edita a própria data por esta tela.
+     */
+    public function toggleOwnBirthdate(): void
+    {
+        $this->editingOwnBirthdate = ! $this->editingOwnBirthdate;
+
+        if ($this->editingOwnBirthdate) {
+            $membro = app(ProfileContext::class)->member();
+            $this->ownBirthdateInput = $membro?->birthdate?->toDateString() ?? '';
+            $this->resetErrorBag();
+        }
+    }
+
+    public function saveOwnBirthdate(): void
+    {
+        $membro = app(ProfileContext::class)->member();
+        abort_if($membro === null, 403);
+
+        $data = $this->validate([
+            'ownBirthdateInput' => ['required', 'date', 'before:today'],
+        ], attributes: ['ownBirthdateInput' => 'data de nascimento']);
+
+        $membro->update(['birthdate' => $data['ownBirthdateInput']]);
+
+        $this->editingOwnBirthdate = false;
+        session()->flash('status', 'Aniversário salvo.');
+    }
+
+    /** Editar a data do cônjuge é gestão do perfil — mesma policy de convidar/cadastrar cônjuge. */
+    public function togglePartnerBirthdate(): void
+    {
+        $this->editingPartnerBirthdate = ! $this->editingPartnerBirthdate;
+
+        if ($this->editingPartnerBirthdate) {
+            $profile = app(ProfileContext::class)->profile();
+            $parceiro = $this->resolvePartnerMember($profile);
+            $this->partnerBirthdateInput = $parceiro?->birthdate?->toDateString() ?? '';
+            $this->resetErrorBag();
+        }
+    }
+
+    public function savePartnerBirthdate(): void
+    {
+        $profile = app(ProfileContext::class)->profile();
+        $this->authorize('manageMembers', $profile);
+
+        $parceiro = $this->resolvePartnerMember($profile);
+        abort_if($parceiro === null, 404);
+
+        $data = $this->validate([
+            'partnerBirthdateInput' => ['required', 'date', 'before:today'],
+        ], attributes: ['partnerBirthdateInput' => 'data de nascimento']);
+
+        $parceiro->update(['birthdate' => $data['partnerBirthdateInput']]);
+
+        $this->editingPartnerBirthdate = false;
+        session()->flash('status', 'Aniversário salvo.');
     }
 
     public function toggleInviteForm(): void
@@ -161,28 +234,7 @@ class MyAccount extends Component
             ->where('status', ConsultantClientStatus::Active)
             ->first();
 
-        // "Meu cônjuge" é sempre o OUTRO membro, não "o secundário" — pra
-        // quem é o secundário, o cônjuge é o titular, não ele mesmo. Mas
-        // isso só faz sentido quando QUEM ESTÁ VENDO é um membro de
-        // verdade: um consultor olhando o perfil do cliente não é membro
-        // nenhum, memberId() vem nulo, e where('id', '!=', null) do
-        // Eloquent vira WHERE id IS NOT NULL (Laravel converte comparação
-        // com null pra whereNull/whereNotNull) — ou seja, "qualquer
-        // membro", inclusive o titular, o que fazia o consultor ver o
-        // próprio cliente listado como cônjuge dele mesmo. Pro consultor,
-        // cônjuge só pode significar o membro Secondary mesmo (só existe
-        // um por perfil — ver PartnerInviteService::alreadyHasPartner()).
-        $partnerMember = $context->memberId() !== null
-            ? ProfileMember::query()
-                ->where('profile_id', $profile->id)
-                ->where('id', '!=', $context->memberId())
-                ->with('user')
-                ->first()
-            : ProfileMember::query()
-                ->where('profile_id', $profile->id)
-                ->where('role', MemberRole::Secondary)
-                ->with('user')
-                ->first();
+        $partnerMember = $this->resolvePartnerMember($profile);
 
         $pendingInvite = PartnerInvite::query()
             ->where('profile_id', $profile->id)
@@ -210,6 +262,41 @@ class MyAccount extends Component
             // convite por e-mail (ver PartnerInviteService::send()).
             'canInvitePartner' => ($partnerMember === null || $partnerMember->user === null)
                 && auth()->user()->can('manageMembers', $profile),
+            // Nulo quando quem está vendo não é membro de verdade (ex.:
+            // consultor com cliente aberto) — só então o card "meus dados"
+            // ganha o editor de aniversário.
+            'ownMember' => $context->member(),
+            'canManageMembers' => auth()->user()->can('manageMembers', $profile),
         ]);
+    }
+
+    /**
+     * "Meu cônjuge" é sempre o OUTRO membro, não "o secundário" — pra quem
+     * é o secundário, o cônjuge é o titular, não ele mesmo. Mas isso só
+     * faz sentido quando QUEM ESTÁ VENDO é um membro de verdade: um
+     * consultor olhando o perfil do cliente não é membro nenhum,
+     * memberId() vem nulo, e where('id', '!=', null) do Eloquent vira
+     * WHERE id IS NOT NULL (Laravel converte comparação com null pra
+     * whereNull/whereNotNull) — ou seja, "qualquer membro", inclusive o
+     * titular, o que fazia o consultor ver o próprio cliente listado como
+     * cônjuge dele mesmo. Pro consultor, cônjuge só pode significar o
+     * membro Secondary mesmo (só existe um por perfil — ver
+     * PartnerInviteService::alreadyHasPartner()).
+     */
+    private function resolvePartnerMember(FinancialProfile $profile): ?ProfileMember
+    {
+        $context = app(ProfileContext::class);
+
+        return $context->memberId() !== null
+            ? ProfileMember::query()
+                ->where('profile_id', $profile->id)
+                ->where('id', '!=', $context->memberId())
+                ->with('user')
+                ->first()
+            : ProfileMember::query()
+                ->where('profile_id', $profile->id)
+                ->where('role', MemberRole::Secondary)
+                ->with('user')
+                ->first();
     }
 }

@@ -62,6 +62,12 @@ return [
 
     'notifications' => [
         'days_before_due' => env('CERNE_NOTIFY_DAYS_BEFORE_DUE', 3),
+
+        // Datas importantes (aniversário de cliente, renovação/vencimento
+        // de apólice, vencimento de investimento) avisam o profissional com
+        // mais folga que uma conta vencendo — dá tempo de ligar pro
+        // cliente antes da data, não só no dia.
+        'days_before_important_date' => env('CERNE_NOTIFY_DAYS_BEFORE_IMPORTANT_DATE', 7),
     ],
 
     /*

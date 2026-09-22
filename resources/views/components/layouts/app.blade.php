@@ -45,11 +45,13 @@
     // financeiras. A dele é só Seguros da carteira + Leads.
     $navConsultor = $user?->isBroker() ? [
         ['consultant.portfolio.insurance', 'Seguros da carteira', 'Seguros', 'shield'],
+        ['consultant.portfolio.important-dates', 'Datas importantes', 'Datas', 'bell'],
         ['consultant.leads', 'Leads', 'Leads', 'contact'],
     ] : [
         ['consultant.portfolio', 'Painel da carteira', 'Carteira', 'invest'],
         ['consultant.portfolio.insurance', 'Seguros da carteira', 'Seguros', 'shield'],
         ['consultant.portfolio.investments', 'Investimentos da carteira', 'Invest.', 'flow'],
+        ['consultant.portfolio.important-dates', 'Datas importantes', 'Datas', 'bell'],
         ['consultant.leads', 'Leads', 'Leads', 'contact'],
     ];
     if ($user?->isPlatformAdmin()) {

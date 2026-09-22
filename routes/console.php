@@ -1,6 +1,7 @@
 <?php
 
 use App\Services\FixedBillService;
+use App\Services\ImportantDatesService;
 use App\Services\InvestmentSnapshotService;
 use App\Services\InvoiceService;
 use App\Services\RecurringIncomeService;
@@ -63,6 +64,21 @@ Schedule::call(function (): void {
 
     logger()->info('Snapshots de investimento', ['criadas' => $criadas]);
 })->monthlyOn(1, '03:30')->name('snapshots')->withoutOverlapping();
+
+// Datas importantes: aniversário de cliente/cônjuge, renovação/vencimento
+// de apólice, vencimento de investimento — avisa o(s) profissional(is)
+// vinculado(s), nunca o cliente (ver ImportantDatesService).
+Schedule::call(function (): void {
+    $service = app(ImportantDatesService::class);
+    $resultado = [
+        'aniversarios' => $service->notifyUpcomingBirthdays(),
+        'aniversarios_apolice' => $service->notifyUpcomingPolicyAnniversaries(),
+        'vencimentos_apolice' => $service->notifyUpcomingPolicyExpiries(),
+        'vencimentos_investimento' => $service->notifyUpcomingInvestmentMaturities(),
+    ];
+
+    logger()->info('Datas importantes', $resultado);
+})->dailyAt('03:25')->name('datas-importantes')->withoutOverlapping();
 
 // Documentos: os que ficaram "Na fila" porque a ANTHROPIC_API_KEY ainda
 // não estava configurada no envio. Idempotente pelo próprio estado — um

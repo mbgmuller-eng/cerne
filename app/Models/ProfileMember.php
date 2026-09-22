@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
-#[Fillable(['profile_id', 'user_id', 'name', 'role', 'color_hex', 'is_active'])]
+#[Fillable(['profile_id', 'user_id', 'name', 'role', 'color_hex', 'is_active', 'birthdate'])]
 class ProfileMember extends Model
 {
     use HasFactory, HasUuids;
@@ -20,6 +20,7 @@ class ProfileMember extends Model
         return [
             'role' => MemberRole::class,
             'is_active' => 'boolean',
+            'birthdate' => 'date',
         ];
     }
 
