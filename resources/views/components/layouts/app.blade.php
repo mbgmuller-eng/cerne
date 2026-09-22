@@ -47,6 +47,17 @@
     $moduloAtivo = ($user?->isBroker() || request()->routeIs('insurance.index')) ? 'seguros' : 'financas';
     $corBarraModulo = $moduloAtivo === 'seguros' ? 'bg-seguros-800' : 'bg-brand-800';
 
+    // No escuro a barra volta a ser neutra (slate-900, como o app sempre
+    // foi) — preencher a barra inteira com uma cor saturada no escuro
+    // cansa a vista (Marcelo achou "não agradável no PC"). A cor do
+    // módulo continua aparecendo, só que como acento no item ativo, não
+    // mais como fundo da barra inteira. Isso é só pro DESKTOP — no
+    // celular o preenchimento cheio já está confirmado como bom nos dois
+    // temas, não mexe.
+    $corAtivoEscuroDesktop = $moduloAtivo === 'seguros'
+        ? 'dark:bg-seguros-800/60 dark:text-seguros-200'
+        : 'dark:bg-accent-500/15 dark:text-accent-400';
+
     // Rótulo de cada seção sempre no tom do próprio setor, esteja a barra
     // preenchida daquele setor ou não — é o que deixa "onde eu poderia
     // ir" legível mesmo quando a barra inteira está em navy.
@@ -74,6 +85,23 @@
     $tabsPrincipais = array_slice($nav, 0, 4);
     $tabsMais = array_slice($nav, 4);
     $emMais = collect($tabsMais)->contains(fn ($t) => request()->routeIs($t[0]));
+
+    // Mesmo agrupamento por setor da barra lateral, só que sem repetir
+    // os 4 itens que já estão nas abas principais — a gaveta "Mais" tinha
+    // ficado uma lista só, sem separar Seguros de Finanças.
+    $rotasNasAbas = collect($tabsPrincipais)->pluck('0')->all();
+    $navSectionsMais = collect($navSections)
+        ->map(function (array $s) use ($rotasNasAbas) {
+            // $s + [...] NÃO sobrescreveria 'items' (o + de array mantém o
+            // valor do lado esquerdo quando a chave já existe) — por isso
+            // a atribuição direta aqui, não a união.
+            $s['items'] = collect($s['items'])->reject(fn (array $item) => in_array($item[0], $rotasNasAbas, true))->values()->all();
+
+            return $s;
+        })
+        ->filter(fn (array $s) => count($s['items']) > 0 || ($s['emBreve'] ?? false))
+        ->values()
+        ->all();
 
     // "Painel da carteira" e as telas irmãs não são telas DE um perfil —
     // são a área de gestão do consultor. Sem esta distinção, o perfil do
@@ -174,10 +202,12 @@
          Barra lateral (desktop)
          ============================================================ --}}
     @if ($dentroDoPerfil)
-        {{-- Cor da barra = módulo ativo (ver $corBarraModulo acima), não o
-             tema claro/escuro do app — por isso os textos aqui usam tom
-             fixo (branco translúcido), não o par claro/dark: de sempre. --}}
-        <aside @class(['sticky top-0 hidden h-screen w-64 shrink-0 flex-col lg:flex', $corBarraModulo])>
+        {{-- Fundo = módulo ativo no claro (ver $corBarraModulo); no
+             escuro volta a ser neutro (dark:bg-slate-900) e o módulo vira
+             só o acento do item ativo (ver $corAtivoEscuroDesktop) — por
+             isso os textos aqui usam tom fixo (branco translúcido), que
+             funciona em cima de QUALQUER um dos dois fundos escuros. --}}
+        <aside @class(['sticky top-0 hidden h-screen w-64 shrink-0 flex-col lg:flex dark:bg-slate-900', $corBarraModulo])>
             <div class="px-6 pt-6 pb-4">
                 <a href="{{ route('dashboard') }}" class="flex items-center gap-2">
                     <x-brand-mark class="h-7 w-7" />
@@ -196,7 +226,7 @@
                             @endif
                         </p>
                         @foreach ($secao['items'] as [$route, $label, $curto, $icone])
-                            <a href="{{ route($route) }}" @class(['nav-item-chrome', 'nav-item-chrome-active' => request()->routeIs($route)])>
+                            <a href="{{ route($route) }}" @class(['nav-item-chrome', 'nav-item-chrome-active '.$corAtivoEscuroDesktop => request()->routeIs($route)])>
                                 <x-nav-icon :name="$icone" />
                                 <span>{{ $label }}</span>
                             </a>
@@ -212,7 +242,7 @@
                     </div>
                 @endif
 
-                <a href="{{ route('my-account') }}" @class(['nav-item-chrome mb-1', 'nav-item-chrome-active' => request()->routeIs('my-account')])>
+                <a href="{{ route('my-account') }}" @class(['nav-item-chrome mb-1', 'nav-item-chrome-active '.$corAtivoEscuroDesktop => request()->routeIs('my-account')])>
                     <x-nav-icon name="users" />
                     <span>Minha conta</span>
                 </a>
@@ -506,17 +536,34 @@
             @class(['relative rounded-t-3xl px-4 pt-3 pb-4 shadow-[0_-8px_32px_-8px_rgb(11_29_58_/_0.2)]', $corBarraModulo])
         >
             <div class="mx-auto mb-3 h-1 w-10 rounded-full bg-white/20"></div>
-            <div class="grid grid-cols-4 gap-1">
-                @foreach ($tabsMais as [$route, $label, $curto, $icone])
-                    <a href="{{ route($route) }}" @class(['tab-item-chrome rounded-xl py-3', 'tab-item-chrome-active bg-white/10' => request()->routeIs($route)])>
-                        <x-nav-icon :name="$icone" class="h-6 w-6" />
-                        <span>{{ $curto }}</span>
-                    </a>
+            <div class="max-h-[60vh] overflow-y-auto">
+                @foreach ($navSectionsMais as $secao)
+                    <div @class(['pt-3' => ! $loop->first, 'pb-1'])>
+                        <p @class(['px-1 pb-1 text-[10px] font-semibold tracking-wide uppercase', $secao['tint']])>
+                            {{ $secao['label'] }}
+                            @if ($secao['emBreve'] ?? false)
+                                <span class="ml-1 rounded bg-white/10 px-1.5 py-0.5 text-[9px] font-normal tracking-normal text-white/50 normal-case">em breve</span>
+                            @endif
+                        </p>
+                        @if (count($secao['items']) > 0)
+                            <div class="grid grid-cols-4 gap-1">
+                                @foreach ($secao['items'] as [$route, $label, $curto, $icone])
+                                    <a href="{{ route($route) }}" @class(['tab-item-chrome rounded-xl py-3', 'tab-item-chrome-active bg-white/10' => request()->routeIs($route)])>
+                                        <x-nav-icon :name="$icone" class="h-6 w-6" />
+                                        <span>{{ $curto }}</span>
+                                    </a>
+                                @endforeach
+                            </div>
+                        @endif
+                    </div>
                 @endforeach
-                <a href="{{ route('my-account') }}" @class(['tab-item-chrome rounded-xl py-3', 'tab-item-chrome-active bg-white/10' => request()->routeIs('my-account')])>
-                    <x-nav-icon name="users" class="h-6 w-6" />
-                    <span>Minha conta</span>
-                </a>
+
+                <div class="mt-3 border-t border-white/10 pt-3">
+                    <a href="{{ route('my-account') }}" @class(['tab-item-chrome rounded-xl py-3', 'tab-item-chrome-active bg-white/10' => request()->routeIs('my-account')])>
+                        <x-nav-icon name="users" class="h-6 w-6" />
+                        <span>Minha conta</span>
+                    </a>
+                </div>
             </div>
         </div>
 
