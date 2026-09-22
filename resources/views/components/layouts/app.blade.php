@@ -9,19 +9,33 @@
     // tela financeira, travada no mount() de cada uma (ver
     // RequiresActiveProfile e os guards em cada tela). O menu já não
     // oferece o que ele não pode abrir.
-    $nav = $user?->isBroker() ? [
-        ['insurance.index', 'Seguros', 'Seguros', 'shield'],
-    ] : [
+    //
+    // Agrupado por setor pro menu lateral (ver $navSections abaixo) — item
+    // de Seguros chama "Apólices", não "Seguros", pra não repetir o nome
+    // do cabeçalho da seção logo em cima dele. Primeiro passo de uma
+    // reorganização maior por produto (Cerne Finanças/Seguros/...), ainda
+    // sem cor própria por setor.
+    $navFinancas = [
         ['dashboard', 'Visão geral', 'Início', 'home'],
         ['cashflow.index', 'Fluxo de caixa', 'Fluxo', 'flow'],
         ['fixedbills.index', 'Contas fixas', 'Fixas', 'bills'],
         ['accounts.index', 'Contas & Cartões', 'Contas', 'cards'],
         ['investments.index', 'Investimentos', 'Invest.', 'invest'],
-        ['insurance.index', 'Seguros', 'Seguros', 'shield'],
         ['goals.index', 'Objetivos', 'Metas', 'target'],
         ['documents.index', 'Importar', 'Importar', 'upload'],
         ['categorization-rules.index', 'Regras de categorização', 'Regras', 'tag'],
     ];
+    $navSeguros = [
+        ['insurance.index', 'Apólices', 'Seguros', 'shield'],
+    ];
+
+    $navSections = $user?->isBroker()
+        ? [['label' => 'Seguros', 'items' => $navSeguros]]
+        : [['label' => 'Finanças', 'items' => $navFinancas], ['label' => 'Seguros', 'items' => $navSeguros]];
+
+    // Achatado, na ordem das seções acima — usado pela barra inferior do
+    // celular (poucas abas, sem cabeçalho de seção nenhum).
+    $nav = collect($navSections)->flatMap(fn (array $s) => $s['items'])->all();
 
     // Na barra inferior cabem 5; o resto vai para "Mais".
     $tabsPrincipais = array_slice($nav, 0, 4);
@@ -137,11 +151,16 @@
             </div>
 
             <nav class="flex-1 space-y-0.5 overflow-y-auto px-3">
-                @foreach ($nav as [$route, $label, $curto, $icone])
-                    <a href="{{ route($route) }}" @class(['nav-item', 'nav-item-active' => request()->routeIs($route)])>
-                        <x-nav-icon :name="$icone" />
-                        <span>{{ $label }}</span>
-                    </a>
+                @foreach ($navSections as $secao)
+                    <div @class(['pt-4' => ! $loop->first])>
+                        <p class="px-3 pb-1 text-[10px] font-semibold tracking-wide text-slate-400 uppercase dark:text-slate-500">{{ $secao['label'] }}</p>
+                        @foreach ($secao['items'] as [$route, $label, $curto, $icone])
+                            <a href="{{ route($route) }}" @class(['nav-item', 'nav-item-active' => request()->routeIs($route)])>
+                                <x-nav-icon :name="$icone" />
+                                <span>{{ $label }}</span>
+                            </a>
+                        @endforeach
+                    </div>
                 @endforeach
             </nav>
 
