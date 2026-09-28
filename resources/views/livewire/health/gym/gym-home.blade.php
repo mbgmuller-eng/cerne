@@ -52,28 +52,33 @@
                 @if ($next->focus)
                     <p class="text-sm text-slate-500 dark:text-slate-400">{{ $next->focus }}</p>
                 @endif
-                @if (! $inProgress)
-                    <button type="button" wire:click="startSession('{{ $next->id }}')" class="btn-primary mt-4">Iniciar treino</button>
-                @endif
+                <div class="mt-4 flex flex-wrap gap-2">
+                    @if (! $inProgress)
+                        <button type="button" wire:click="startSession('{{ $next->id }}')" class="btn-primary">Iniciar treino</button>
+                    @endif
+                    <a href="{{ route('health.gym.workout', $next->id) }}" wire:navigate class="btn-secondary">Ver treino</a>
+                </div>
             </div>
         @endif
 
         <ul class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             @foreach ($workouts as $treino)
-                <li class="card p-5 {{ $next?->id === $treino->id ? 'ring-1 ring-saude-800/40 dark:ring-saude-200/40' : '' }}">
-                    <p class="text-sm font-medium text-slate-800 dark:text-slate-200">{{ $treino->name }}</p>
-                    @if ($treino->focus)
-                        <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{{ $treino->focus }}</p>
-                    @endif
-                    <div class="mt-3 flex items-center justify-between gap-2">
-                        <p class="text-xs text-slate-400">
+                <li class="card overflow-hidden {{ $next?->id === $treino->id ? 'ring-1 ring-saude-800/40 dark:ring-saude-200/40' : '' }}">
+                    <a href="{{ route('health.gym.workout', $treino) }}" wire:navigate class="block p-5 hover:bg-slate-50 dark:hover:bg-white/5">
+                        <p class="text-sm font-medium text-slate-800 dark:text-slate-200">{{ $treino->name }}</p>
+                        @if ($treino->focus)
+                            <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{{ $treino->focus }}</p>
+                        @endif
+                        <p class="mt-3 text-xs text-slate-400">
                             {{ $treino->workout_exercises_count }} {{ $treino->workout_exercises_count === 1 ? 'exercício' : 'exercícios' }}
                         </p>
-                        {{-- Fazer fora da ordem da rotação (ex.: pulou um dia): a sequência continua a partir do último concluído. --}}
-                        @if (! $inProgress && $treino->workout_exercises_count > 0 && $next?->id !== $treino->id)
+                    </a>
+                    {{-- Fazer fora da ordem da rotação (ex.: pulou um dia): a sequência continua a partir do último concluído. --}}
+                    @if (! $inProgress && $treino->workout_exercises_count > 0 && $next?->id !== $treino->id)
+                        <div class="border-t border-slate-100 px-5 py-2 dark:border-white/10">
                             <button type="button" wire:click="startSession('{{ $treino->id }}')" class="btn-ghost px-2 py-1 text-xs">Iniciar este</button>
-                        @endif
-                    </div>
+                        </div>
+                    @endif
                 </li>
             @endforeach
         </ul>
