@@ -74,9 +74,7 @@
                         @foreach ($treino->workoutExercises as $item)
                             <li class="flex items-start justify-between gap-3 py-3" wire:key="i-{{ $item->id }}">
                                 <div class="flex min-w-0 items-start gap-3">
-                                    @if ($item->exercise->imageUrl())
-                                        <img src="{{ $item->exercise->imageUrl() }}" alt="" class="h-12 w-12 shrink-0 rounded-lg object-cover ring-1 ring-slate-200 dark:ring-white/10">
-                                    @endif
+                                    <x-gym.exercise-photo :exercise="$item->exercise" size="h-12 w-12 rounded-lg" />
                                     <div class="min-w-0">
                                     <p class="text-sm text-slate-800 dark:text-slate-200">{{ $item->exercise->name }}</p>
                                     <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">

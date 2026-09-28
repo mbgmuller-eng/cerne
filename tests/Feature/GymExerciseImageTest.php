@@ -194,6 +194,64 @@ class GymExerciseImageTest extends TestCase
         self::assertNull($exercicio->imageUrl());
     }
 
+    public function test_dois_quadros_alternam_e_cada_um_e_servido_no_seu_endpoint(): void
+    {
+        $item = $this->criarExercicioComFoto();
+        app(GymPlanService::class)->setExerciseImage(
+            $item->exercise,
+            UploadedFile::fake()->image('inicio.jpg'),
+            UploadedFile::fake()->image('fim.jpg'),
+        );
+        $item->exercise->refresh();
+
+        self::assertTrue($item->exercise->hasAnimatedImage());
+        self::assertStringContainsString('&f=2', $item->exercise->imageUrl(2));
+        self::assertStringNotContainsString('f=2', $item->exercise->imageUrl(1));
+
+        $this->get($item->exercise->imageUrl(1))->assertOk();
+        $this->get($item->exercise->imageUrl(2))->assertOk();
+    }
+
+    public function test_trocar_so_o_primeiro_quadro_descarta_o_segundo_antigo(): void
+    {
+        $item = $this->criarExercicioComFoto();
+        $servico = app(GymPlanService::class);
+        $servico->setExerciseImage($item->exercise, UploadedFile::fake()->image('inicio.jpg'), UploadedFile::fake()->image('fim.jpg'));
+        $antigo2 = $item->exercise->fresh()->image_path_2;
+
+        // Reedita mandando só um quadro novo (fluxo manual da tela) — o quadro 2 antigo não pode sobrar.
+        $servico->setExerciseImage($item->exercise, UploadedFile::fake()->image('novo.jpg'));
+
+        $item->exercise->refresh();
+        self::assertNull($item->exercise->image_path_2);
+        self::assertFalse($item->exercise->hasAnimatedImage());
+        Storage::disk(config('cerne.gym_images.disk'))->assertMissing($antigo2);
+    }
+
+    public function test_remover_apaga_os_dois_quadros(): void
+    {
+        $item = $this->criarExercicioComFoto();
+        $servico = app(GymPlanService::class);
+        $servico->setExerciseImage($item->exercise, UploadedFile::fake()->image('inicio.jpg'), UploadedFile::fake()->image('fim.jpg'));
+        [$c1, $c2] = [$item->exercise->fresh()->image_path, $item->exercise->fresh()->image_path_2];
+
+        $servico->setExerciseImage($item->exercise, null, remove: true);
+
+        $item->exercise->refresh();
+        self::assertNull($item->exercise->image_path);
+        self::assertNull($item->exercise->image_path_2);
+        Storage::disk(config('cerne.gym_images.disk'))->assertMissing($c1);
+        Storage::disk(config('cerne.gym_images.disk'))->assertMissing($c2);
+    }
+
+    public function test_rota_devolve_404_pro_segundo_quadro_quando_so_existe_um(): void
+    {
+        $item = $this->criarExercicioComFoto();
+
+        self::assertNull($item->exercise->imageUrl(2));
+        $this->get(route('health.gym.exercise-image', $item->exercise->id).'?f=2')->assertNotFound();
+    }
+
     private function criarExercicioComFoto(): GymWorkoutExercise
     {
         Livewire::test(GymPlanEditor::class)

@@ -121,34 +121,51 @@ class GymPlanService
      * item do treino: vale em todo treino e toda fase que usarem esse
      * exercício. Sempre apaga o arquivo antigo do disco — nunca deixa
      * lixo órfão pra trás.
+     *
+     * `$file2` é o segundo quadro (início/fim do movimento) — só o vínculo
+     * automático de referência (cerne:gym-link-images) usa; o upload feito
+     * à mão na tela manda só `$file`. `$remove` apaga os dois quadros.
      */
-    public function setExerciseImage(GymExercise $exercise, ?UploadedFile $file, bool $remove = false): GymExercise
+    public function setExerciseImage(GymExercise $exercise, ?UploadedFile $file, ?UploadedFile $file2 = null, bool $remove = false): GymExercise
+    {
+        // Trocar só o quadro 1 (upload manual) descarta um quadro 2 que
+        // tivesse ficado de um vínculo automático anterior — os dois
+        // quadros são um PAR, um quadro 1 novo sem par não pode ficar
+        // animando contra um quadro 2 de outra foto.
+        $exercise->update([
+            'image_path' => $this->storeImage($exercise, $exercise->image_path, $file, $remove),
+            'image_path_2' => $this->storeImage($exercise, $exercise->image_path_2, $file2, $remove || ($file !== null && $file2 === null)),
+        ]);
+
+        return $exercise;
+    }
+
+    /**
+     * Um quadro da foto: apaga o antigo (se está sendo trocado ou removido)
+     * e grava o novo, se veio um. `$dropExisting` cobre o caso do segundo
+     * quadro sumir quando SÓ o primeiro é trocado (uma foto nova de um
+     * upload manual não tem par — não faz sentido manter o quadro 2 antigo
+     * pendurado nela).
+     */
+    private function storeImage(GymExercise $exercise, ?string $atual, ?UploadedFile $file, bool $dropExisting): ?string
     {
         $disco = Storage::disk(config('cerne.gym_images.disk'));
 
-        if ($exercise->image_path !== null && ($file !== null || $remove)) {
-            $disco->delete($exercise->image_path);
+        if ($atual !== null && ($file !== null || $dropExisting)) {
+            $disco->delete($atual);
         }
 
         if ($file === null) {
-            if ($remove) {
-                $exercise->update(['image_path' => null]);
-            }
-
-            return $exercise;
+            return $dropExisting ? null : $atual;
         }
 
         // Nome aleatório: não expõe o nome original do arquivo e não colide
         // entre pessoas diferentes, mesmo com o mesmo nome de exercício.
-        $caminho = $file->storeAs(
+        return $file->storeAs(
             config('cerne.gym_images.path').'/'.$exercise->member_id,
             Str::uuid().'.'.$file->extension(),
             config('cerne.gym_images.disk'),
         );
-
-        $exercise->update(['image_path' => $caminho]);
-
-        return $exercise;
     }
 
     /** @param  array<string, mixed>  $meta */

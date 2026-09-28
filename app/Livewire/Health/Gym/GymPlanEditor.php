@@ -191,7 +191,7 @@ class GymPlanEditor extends Component
         }
 
         if ($this->exImage !== null || $this->removeImage) {
-            $service->setExerciseImage($exercise, $this->exImage, $this->removeImage);
+            $service->setExerciseImage($exercise, $this->exImage, remove: $this->removeImage);
         }
 
         $this->showExerciseForm = false;

@@ -15,9 +15,7 @@
 <div class="space-y-6">
 
     <div class="flex items-start gap-4">
-        @if ($exercicio->imageUrl())
-            <img src="{{ $exercicio->imageUrl() }}" alt="{{ $exercicio->name }}" class="h-20 w-20 shrink-0 rounded-xl object-cover ring-1 ring-slate-200 dark:ring-white/10">
-        @endif
+        <x-gym.exercise-photo :exercise="$exercicio" size="h-20 w-20 rounded-xl" />
         <div class="min-w-0">
         <a href="{{ route('health.gym.progress') }}" wire:navigate class="text-xs text-slate-500 hover:underline dark:text-slate-400">← Evolução</a>
         <h1 class="mt-1 font-display text-3xl font-semibold tracking-tight text-slate-900 dark:text-white">{{ $exercicio->name }}</h1>
