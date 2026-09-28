@@ -50,6 +50,16 @@ class GymHistoryImporter
             return ['Bloco "plan" precisa de "name" e "workouts".'];
         }
 
+        if (isset($plano['activate']) && ! is_bool($plano['activate'])) {
+            $erros[] = 'plan.activate deve ser true ou false.';
+        }
+        if (isset($plano['notes']) && (! is_string($plano['notes']) || mb_strlen($plano['notes']) > 5000)) {
+            $erros[] = 'plan.notes deve ser texto de até 5000 caracteres.';
+        }
+        if (isset($plano['started_on']) && ! $this->validDate($plano['started_on'])) {
+            $erros[] = 'plan.started_on inválida (use AAAA-MM-DD).';
+        }
+
         // treino => [exercício => tipo de medida]
         $catalogo = [];
         foreach ($plano['workouts'] as $i => $treino) {
@@ -167,11 +177,22 @@ class GymHistoryImporter
             $plano = GymPlan::query()->where('name', trim($spec['name']))->first();
 
             if ($plano === null) {
-                // Não rouba o "ativo" de um plano que a pessoa já montou à mão.
+                $ativar = (bool) ($spec['activate'] ?? false);
+
+                if ($ativar) {
+                    // Nova fase assume o lugar da atual; a anterior fica no histórico.
+                    GymPlan::query()->where('is_active', true)->update([
+                        'is_active' => false,
+                        'ended_on' => $spec['started_on'] ?? now()->toDateString(),
+                    ]);
+                }
+
+                // Sem "activate", não rouba o "ativo" de um plano que a pessoa já montou à mão.
                 $plano = GymPlan::create([
                     'name' => trim($spec['name']),
-                    'is_active' => ! GymPlan::query()->where('is_active', true)->exists(),
+                    'is_active' => $ativar || ! GymPlan::query()->where('is_active', true)->exists(),
                     'started_on' => $spec['started_on'] ?? null,
+                    'notes' => $spec['notes'] ?? null,
                 ]);
                 $relatorio['plan_created'] = true;
             }

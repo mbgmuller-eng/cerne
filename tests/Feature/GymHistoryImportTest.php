@@ -114,6 +114,78 @@ class GymHistoryImportTest extends TestCase
         self::assertFalse(GymPlan::query()->where('name', 'Fase 1')->firstOrFail()->is_active);
     }
 
+    public function test_nova_fase_com_activate_encerra_a_anterior_reaproveita_exercicios_e_reinicia_a_rotacao(): void
+    {
+        $this->entrar();
+        $importador = app(GymHistoryImporter::class);
+        $importador->import($this->dados());
+
+        $fase2 = [
+            'version' => 1,
+            'plan' => [
+                'name' => 'Fase 2', 'started_on' => '2026-09-28', 'activate' => true, 'notes' => "Orientações\nda fase",
+                'workouts' => [
+                    ['name' => 'Treino A', 'exercises' => [
+                        ['name' => 'Agachamento', 'muscle_group' => 'legs', 'measure_type' => 'load_reps', 'sets' => 3, 'reps_min' => 8, 'reps_max' => 10],
+                    ]],
+                    ['name' => 'Treino B', 'exercises' => []],
+                ],
+            ],
+        ];
+        self::assertSame([], $importador->validate($fase2));
+        $r = $importador->import($fase2);
+
+        $antiga = GymPlan::query()->where('name', 'Fase 1')->firstOrFail();
+        $nova = GymPlan::query()->where('name', 'Fase 2')->firstOrFail();
+
+        self::assertFalse($antiga->is_active);
+        self::assertSame('2026-09-28', $antiga->ended_on->toDateString());
+        self::assertTrue($nova->is_active);
+        self::assertSame("Orientações\nda fase", $nova->notes);
+        self::assertSame(0, $r['exercises']); // "Agachamento" já era do catálogo: o histórico continua ligado
+        self::assertSame(3, GymExercise::query()->count());
+        self::assertSame($nova->id, app(GymPlanService::class)->activePlan()->id);
+        // Sessões da fase anterior não contam: a rotação recomeça no primeiro treino da nova.
+        self::assertSame('Treino A', app(GymPlanService::class)->nextWorkout($nova)->name);
+
+        \Livewire\Livewire::test(\App\Livewire\Health\Gym\GymHome::class)
+            ->assertSee('Orientações da fase')
+            ->assertSee('Orientações');
+    }
+
+    public function test_validacao_de_activate_notes_e_data_de_inicio(): void
+    {
+        $dados = $this->dados();
+        $dados['plan']['activate'] = 'sim';
+        $dados['plan']['notes'] = ['x'];
+        $dados['plan']['started_on'] = '28/09/2026';
+
+        $erros = implode("\n", app(GymHistoryImporter::class)->validate($dados));
+
+        self::assertStringContainsString('activate', $erros);
+        self::assertStringContainsString('notes', $erros);
+        self::assertStringContainsString('started_on', $erros);
+    }
+
+    public function test_conjuge_sem_perfil_proprio_importa_pelo_comando_e_o_titular_nao_ve(): void
+    {
+        $usuarioConjuge = User::factory()->create(['email' => 'esposa@cerne.test']);
+        $conjuge = ProfileMember::factory()->secondary()->create(['profile_id' => $this->perfil->id, 'user_id' => $usuarioConjuge->id]);
+        $arquivo = tempnam(sys_get_temp_dir(), 'gym');
+        file_put_contents($arquivo, json_encode($this->dados()));
+
+        $this->artisan('cerne:gym-import', ['file' => $arquivo, '--email' => 'esposa@cerne.test'])->assertSuccessful();
+
+        self::assertSame(2, GymSession::withoutGlobalScopes()->where('member_id', $conjuge->id)->count());
+        self::assertSame(0, GymSession::withoutGlobalScopes()->where('member_id', $this->membro->id)->count());
+
+        // Titular abrindo a própria conta não enxerga nada da esposa.
+        $this->entrar();
+        self::assertSame(0, GymSession::query()->count());
+
+        unlink($arquivo);
+    }
+
     public function test_reaproveita_exercicio_e_treino_que_ja_existem(): void
     {
         $this->entrar();

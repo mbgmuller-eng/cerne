@@ -46,11 +46,13 @@ class ImportGymHistory extends Command
         }
 
         $usuario = User::query()->where('email', $email)->first();
-        $perfil = $usuario?->ownedProfiles()->first();
+        // Titular usa o perfil próprio; cônjuge (sem perfil próprio) o perfil do casal — mesma regra do SetProfileContext.
+        $perfil = $usuario?->ownedProfiles()->first()
+            ?? $usuario?->memberships()->where('is_active', true)->first()?->profile;
         $membro = $perfil?->memberFor($usuario);
 
         if ($membro === null) {
-            $this->components->error("Não achei um perfil próprio com membro para {$email}. O treino é pessoal: precisa ser a conta da própria pessoa.");
+            $this->components->error("Não achei um perfil com membro para {$email}. O treino é pessoal: precisa ser a conta da própria pessoa (titular ou cônjuge com login).");
 
             return self::FAILURE;
         }

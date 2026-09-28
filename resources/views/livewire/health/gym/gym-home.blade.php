@@ -16,6 +16,13 @@
         </div>
     </div>
 
+    @if ($plan?->notes)
+        <details class="card px-5 py-3">
+            <summary class="cursor-pointer text-sm font-medium text-slate-700 dark:text-slate-300">Orientações da fase</summary>
+            <div class="mt-3 whitespace-pre-line text-sm text-slate-600 dark:text-slate-300">{{ $plan->notes }}</div>
+        </details>
+    @endif
+
     @if ($inProgress)
         <div class="card flex flex-wrap items-center justify-between gap-3 border-l-4 border-l-saude-800 p-5">
             <div>
