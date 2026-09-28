@@ -12,7 +12,10 @@ use App\Models\GymWorkout;
 use App\Models\GymWorkoutExercise;
 use DomainException;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 /**
  * Montagem do plano de academia: fase, treinos da rotação, exercícios de
@@ -111,6 +114,41 @@ class GymPlanService
             'exercise_id' => $exercise->id,
             'position' => $proxima,
         ]);
+    }
+
+    /**
+     * Troca (ou remove) a foto do exercício. A foto é do CATÁLOGO, não do
+     * item do treino: vale em todo treino e toda fase que usarem esse
+     * exercício. Sempre apaga o arquivo antigo do disco — nunca deixa
+     * lixo órfão pra trás.
+     */
+    public function setExerciseImage(GymExercise $exercise, ?UploadedFile $file, bool $remove = false): GymExercise
+    {
+        $disco = Storage::disk(config('cerne.gym_images.disk'));
+
+        if ($exercise->image_path !== null && ($file !== null || $remove)) {
+            $disco->delete($exercise->image_path);
+        }
+
+        if ($file === null) {
+            if ($remove) {
+                $exercise->update(['image_path' => null]);
+            }
+
+            return $exercise;
+        }
+
+        // Nome aleatório: não expõe o nome original do arquivo e não colide
+        // entre pessoas diferentes, mesmo com o mesmo nome de exercício.
+        $caminho = $file->storeAs(
+            config('cerne.gym_images.path').'/'.$exercise->member_id,
+            Str::uuid().'.'.$file->extension(),
+            config('cerne.gym_images.disk'),
+        );
+
+        $exercise->update(['image_path' => $caminho]);
+
+        return $exercise;
     }
 
     /** @param  array<string, mixed>  $meta */

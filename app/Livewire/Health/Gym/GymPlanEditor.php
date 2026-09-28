@@ -12,9 +12,11 @@ use App\Models\GymWorkout;
 use App\Models\GymWorkoutExercise;
 use App\Services\GymPlanService;
 use DomainException;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
+use Livewire\WithFileUploads;
 
 /**
  * Montagem da fase de treino: treinos da rotação (A/B/C) e os exercícios
@@ -26,7 +28,7 @@ use Livewire\Component;
 #[Layout('components.layouts.app')]
 class GymPlanEditor extends Component
 {
-    use RequiresActiveProfile, RequiresPersonalHealth;
+    use RequiresActiveProfile, RequiresPersonalHealth, WithFileUploads;
 
     public bool $showPlanForm = false;
     public string $planName = '';
@@ -47,6 +49,11 @@ class GymPlanEditor extends Component
     public string $exRest = '60';
     public string $exEquipment = '';
     public string $exNotes = '';
+
+    /** @var UploadedFile|null */
+    public $exImage = null;
+    public bool $removeImage = false;
+    public ?string $exImageUrl = null;
 
     public function mount(): void
     {
@@ -124,6 +131,7 @@ class GymPlanEditor extends Component
         $this->exRest = (string) ($item->rest_seconds ?? '');
         $this->exEquipment = $item->defaultEquipment?->name ?? '';
         $this->exNotes = (string) $item->notes;
+        $this->exImageUrl = $item->exercise->imageUrl();
         $this->showExerciseForm = true;
     }
 
@@ -148,10 +156,11 @@ class GymPlanEditor extends Component
             'exRest' => ['nullable', 'integer', 'min:0', 'max:600'],
             'exEquipment' => ['nullable', 'string', 'max:80'],
             'exNotes' => ['nullable', 'string', 'max:500'],
+            'exImage' => ['nullable', 'image', 'max:'.config('cerne.gym_images.max_kb')],
         ], attributes: [
             'exName' => 'nome', 'exSets' => 'séries', 'exRepsMin' => 'repetições mínimas',
             'exRepsMax' => 'repetições máximas', 'exDuration' => 'duração', 'exRest' => 'pausa',
-            'exEquipment' => 'equipamento', 'exNotes' => 'observações',
+            'exEquipment' => 'equipamento', 'exNotes' => 'observações', 'exImage' => 'foto',
         ]);
 
         $equipment = $service->findOrCreateEquipment($this->exEquipment);
@@ -168,7 +177,9 @@ class GymPlanEditor extends Component
         if ($this->editingItemId !== null) {
             // Nome, grupo e tipo ficam travados na edição: o exercício é
             // compartilhado com outros treinos e com o histórico.
-            $service->updateExercise(GymWorkoutExercise::query()->with('exercise')->findOrFail($this->editingItemId), $meta);
+            $item = GymWorkoutExercise::query()->with('exercise')->findOrFail($this->editingItemId);
+            $service->updateExercise($item, $meta);
+            $exercise = $item->exercise;
         } else {
             $workout = GymWorkout::query()->findOrFail($this->exerciseWorkoutId);
             $exercise = $service->findOrCreateExercise(
@@ -177,6 +188,10 @@ class GymPlanEditor extends Component
                 GymMeasureType::from($this->exType),
             );
             $service->addExercise($workout, $exercise, $meta);
+        }
+
+        if ($this->exImage !== null || $this->removeImage) {
+            $service->setExerciseImage($exercise, $this->exImage, $this->removeImage);
         }
 
         $this->showExerciseForm = false;
@@ -224,6 +239,7 @@ class GymPlanEditor extends Component
         $this->reset(
             'editingItemId', 'exerciseWorkoutId', 'exName', 'exGroup', 'exType', 'exSets',
             'exRepsMin', 'exRepsMax', 'exDuration', 'exRest', 'exEquipment', 'exNotes',
+            'exImage', 'removeImage', 'exImageUrl',
         );
         $this->resetErrorBag();
     }

@@ -73,7 +73,11 @@
                     <ul class="mt-4 divide-y divide-slate-100 dark:divide-white/10">
                         @foreach ($treino->workoutExercises as $item)
                             <li class="flex items-start justify-between gap-3 py-3" wire:key="i-{{ $item->id }}">
-                                <div class="min-w-0">
+                                <div class="flex min-w-0 items-start gap-3">
+                                    @if ($item->exercise->imageUrl())
+                                        <img src="{{ $item->exercise->imageUrl() }}" alt="" class="h-12 w-12 shrink-0 rounded-lg object-cover ring-1 ring-slate-200 dark:ring-white/10">
+                                    @endif
+                                    <div class="min-w-0">
                                     <p class="text-sm text-slate-800 dark:text-slate-200">{{ $item->exercise->name }}</p>
                                     <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
                                         {{ $item->exercise->muscle_group->label() }}
@@ -93,6 +97,7 @@
                                     @if ($item->notes)
                                         <p class="mt-0.5 text-xs text-slate-400">{{ $item->notes }}</p>
                                     @endif
+                                    </div>
                                 </div>
                                 <div class="flex shrink-0 items-center gap-1">
                                     <button type="button" wire:click="moveExercise('{{ $item->id }}', -1)" @disabled($loop->first) class="btn-ghost px-2 py-1 text-xs disabled:opacity-30" aria-label="Subir exercício">↑</button>
@@ -183,6 +188,26 @@
                         @foreach ($equipmentNames as $nome) <option value="{{ $nome }}"></option> @endforeach
                     </datalist>
                     @error('exEquipment') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                </div>
+
+                <div class="@sm:col-span-2" x-data="{ preview: null }">
+                    <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Foto do exercício (opcional)</label>
+
+                    @if ($exImageUrl && ! $removeImage)
+                        <div class="mt-1.5 flex items-center gap-3">
+                            <img src="{{ $exImageUrl }}" alt="" class="h-16 w-16 rounded-lg object-cover ring-1 ring-slate-200 dark:ring-white/10">
+                            <button type="button" wire:click="$set('removeImage', true)" class="btn-ghost px-2 py-1 text-xs text-red-700 dark:text-red-400">Remover foto</button>
+                        </div>
+                    @else
+                        <input type="file" accept="image/*" wire:model="exImage"
+                            x-on:change="preview = ($event.target.files[0]) ? URL.createObjectURL($event.target.files[0]) : null"
+                            class="input mt-1.5">
+                        <template x-if="preview">
+                            <img :src="preview" alt="" class="mt-2 h-16 w-16 rounded-lg object-cover ring-1 ring-slate-200 dark:ring-white/10">
+                        </template>
+                        <p wire:loading wire:target="exImage" class="mt-1 text-xs text-slate-400">Enviando foto...</p>
+                    @endif
+                    @error('exImage') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
                 </div>
 
                 <div class="@sm:col-span-2">

@@ -123,6 +123,20 @@ return [
 
     /*
     |---------------------------------------------------------------------------
+    | Fotos de exercício (Cerne Saúde › Academia)
+    |---------------------------------------------------------------------------
+    | Mesmo disco privado dos documentos: é dado de saúde, servido só pra
+    | quem tem acesso ao exercício (ver GymExerciseImageController).
+    */
+
+    'gym_images' => [
+        'disk' => env('CERNE_DOCUMENTS_DISK', 'local'),
+        'path' => 'academia-imagens',
+        'max_kb' => 4096,
+    ],
+
+    /*
+    |---------------------------------------------------------------------------
     | Precisão numérica
     |---------------------------------------------------------------------------
     | Dinheiro em 2 casas; quantidade e preço médio de ativos em 6, porque

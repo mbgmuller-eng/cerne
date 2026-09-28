@@ -6,6 +6,7 @@ use App\Http\Controllers\Auth\AcceptPartnerInviteController;
 use App\Http\Controllers\Auth\AcceptProfessionalInviteController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\ConsultantLinkController;
+use App\Http\Controllers\GymExerciseImageController;
 use App\Http\Controllers\ProfileSwitchController;
 use App\Http\Controllers\PushSubscriptionController;
 use App\Http\Controllers\PwaController;
@@ -83,6 +84,7 @@ Route::middleware('auth')->group(function (): void {
     Route::get('/saude/academia/treino/{session}', GymSessionRun::class)->name('health.gym.session');
     Route::get('/saude/academia/progresso', GymProgress::class)->name('health.gym.progress');
     Route::get('/saude/academia/exercicio/{exercise}', GymExerciseHistory::class)->name('health.gym.exercise');
+    Route::get('/saude/academia/exercicios/{exercise}/imagem', [GymExerciseImageController::class, 'show'])->name('health.gym.exercise-image');
     Route::get('/importar', DocumentsIndex::class)->name('documents.index');
     Route::get('/regras-de-categorizacao', CategorizationRulesIndex::class)->name('categorization-rules.index');
     Route::get('/contas', AccountsIndex::class)->name('accounts.index');

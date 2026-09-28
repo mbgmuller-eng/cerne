@@ -20,6 +20,15 @@
 
     media.addEventListener('change', applyIfSystem);
 
+    // wire:navigate busca a página seguinte e faz o morph do <html> inteiro
+    // contra o HTML que o servidor devolveu — que, em "sistema", nunca tem
+    // a classe "dark" (só o JS decide isso). O morph troca a classe pela
+    // versão sem "dark" e não reexecuta o script inline do <head> (script
+    // idêntico entre páginas, o morphdom não considera isso uma mudança).
+    // Resultado: cada navegação interna voltava pro claro mesmo com o
+    // sistema em escuro. Reaplica a mesma lógica depois de cada morph.
+    document.addEventListener('livewire:navigated', applyIfSystem);
+
     function setActiveButton(value) {
         document.querySelectorAll('[data-theme-switcher] [data-theme-value]').forEach((button) => {
             button.classList.toggle('theme-switch-active', button.dataset.themeValue === value);

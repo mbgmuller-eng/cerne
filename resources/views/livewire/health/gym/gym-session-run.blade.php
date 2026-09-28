@@ -62,7 +62,11 @@
 
         <section class="card p-5" wire:key="ex-{{ $item->id }}">
             <div class="flex items-start justify-between gap-3">
-                <div class="min-w-0">
+                <div class="flex min-w-0 items-start gap-3">
+                    @if ($exercicio->imageUrl())
+                        <img src="{{ $exercicio->imageUrl() }}" alt="" class="h-14 w-14 shrink-0 rounded-lg object-cover ring-1 ring-slate-200 dark:ring-white/10">
+                    @endif
+                    <div class="min-w-0">
                     <h2 class="text-sm font-semibold text-slate-900 dark:text-white">{{ $exercicio->name }}</h2>
                     <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
                         {{ $exercicio->muscle_group->label() }} · meta {{ $item->target_sets }}×
@@ -86,6 +90,7 @@
                     @isset($hint[$item->id])
                         <p class="mt-1 text-xs {{ $hint[$item->id]['type'] === 'raise' ? 'text-emerald-700 dark:text-emerald-400' : 'text-amber-700 dark:text-amber-400' }}">{{ $hint[$item->id]['message'] }}</p>
                     @endisset
+                    </div>
                 </div>
                 <span class="shrink-0 text-xs tabular-nums {{ $qtd >= $item->target_sets ? 'text-emerald-700 dark:text-emerald-400' : 'text-slate-400' }}">
                     {{ $qtd }}/{{ $item->target_sets }}
