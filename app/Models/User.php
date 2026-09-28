@@ -16,7 +16,7 @@ use NotificationChannels\WebPush\HasPushSubscriptions;
 
 #[Fillable([
     'name', 'email', 'password', 'role', 'phone', 'avatar_url', 'is_active', 'is_platform_admin', 'theme',
-    'notify_email_enabled', 'notify_push_enabled',
+    'notify_email_enabled', 'notify_push_enabled', 'gym_keep_awake', 'gym_vibrate', 'gym_sound',
 ])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
@@ -39,6 +39,9 @@ class User extends Authenticatable
             'theme' => ThemePreference::class,
             'notify_email_enabled' => 'boolean',
             'notify_push_enabled' => 'boolean',
+            'gym_keep_awake' => 'boolean',
+            'gym_vibrate' => 'boolean',
+            'gym_sound' => 'boolean',
         ];
     }
 

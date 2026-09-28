@@ -25,6 +25,11 @@ use App\Livewire\Dashboard;
 use App\Livewire\Documents\DocumentsIndex;
 use App\Livewire\FixedBills\FixedBillsIndex;
 use App\Livewire\Goals\GoalsIndex;
+use App\Livewire\Health\Gym\GymExerciseHistory;
+use App\Livewire\Health\Gym\GymHome;
+use App\Livewire\Health\Gym\GymPlanEditor;
+use App\Livewire\Health\Gym\GymProgress;
+use App\Livewire\Health\Gym\GymSessionRun;
 use App\Livewire\Insurance\InsuranceIndex;
 use App\Livewire\Investments\InvestmentsIndex;
 use App\Livewire\Profile\MyAccount;
@@ -70,6 +75,14 @@ Route::middleware('auth')->group(function (): void {
     Route::get('/investimentos', InvestmentsIndex::class)->name('investments.index');
     Route::get('/seguros', InsuranceIndex::class)->name('insurance.index');
     Route::get('/objetivos', GoalsIndex::class)->name('goals.index');
+
+    // Saúde pessoal: só o dono abre (RequiresPersonalHealth) — consultor
+    // e corretor levam 403 mesmo com o cliente aberto.
+    Route::get('/saude/academia', GymHome::class)->name('health.gym.index');
+    Route::get('/saude/academia/plano', GymPlanEditor::class)->name('health.gym.plan');
+    Route::get('/saude/academia/treino/{session}', GymSessionRun::class)->name('health.gym.session');
+    Route::get('/saude/academia/progresso', GymProgress::class)->name('health.gym.progress');
+    Route::get('/saude/academia/exercicio/{exercise}', GymExerciseHistory::class)->name('health.gym.exercise');
     Route::get('/importar', DocumentsIndex::class)->name('documents.index');
     Route::get('/regras-de-categorizacao', CategorizationRulesIndex::class)->name('categorization-rules.index');
     Route::get('/contas', AccountsIndex::class)->name('accounts.index');

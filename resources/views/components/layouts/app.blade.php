@@ -29,9 +29,22 @@
         ['insurance.index', 'Apólices', 'Seguros', 'shield'],
     ];
 
+    $navSaude = [
+        ['health.gym.index', 'Academia', 'Academia', 'dumbbell'],
+    ];
+
+    // Saúde é dado pessoal: consultor/corretor operando o perfil de um
+    // cliente NÃO ganha a seção (nem como "em breve") — ver
+    // PersonalHealthScope. Documentos ainda não tem tela, só o lugar
+    // reservado (ver memory: project_multi_product_branding).
     $navSections = $user?->isBroker()
         ? [['label' => 'Seguros', 'items' => $navSeguros]]
-        : [['label' => 'Finanças', 'items' => $navFinancas], ['label' => 'Seguros', 'items' => $navSeguros]];
+        : array_values(array_filter([
+            ['label' => 'Finanças', 'items' => $navFinancas],
+            ['label' => 'Seguros', 'items' => $navSeguros],
+            ['label' => 'Documentos', 'items' => [], 'emBreve' => true],
+            $context->isConsultant() ? null : ['label' => 'Saúde', 'items' => $navSaude],
+        ]));
 
     // Achatado, na ordem das seções acima — usado pela barra inferior do
     // celular (poucas abas, sem cabeçalho de seção nenhum).
@@ -42,10 +55,18 @@
     // memory: project_multi_product_branding). Corretor só tem Seguros,
     // então é sempre verde pra ele, em qualquer tela dentro do perfil
     // (inclusive Minha conta); quem tem tudo começa em Finanças/navy e só
-    // vira verde dentro de Seguros. Documentos/Saúde ainda não têm rota —
-    // entram só como rótulo "em breve", sem cor de fundo própria ainda.
-    $moduloAtivo = ($user?->isBroker() || request()->routeIs('insurance.index')) ? 'seguros' : 'financas';
-    $corBarraModulo = $moduloAtivo === 'seguros' ? 'bg-seguros-800' : 'bg-brand-800';
+    // vira verde dentro de Seguros e violeta dentro de Saúde.
+    $moduloAtivo = match (true) {
+        (bool) $user?->isBroker() => 'seguros',
+        request()->routeIs('health.*') => 'saude',
+        request()->routeIs('insurance.index') => 'seguros',
+        default => 'financas',
+    };
+    $corBarraModulo = [
+        'seguros' => 'bg-seguros-800',
+        'saude' => 'bg-saude-800',
+        'financas' => 'bg-brand-800',
+    ][$moduloAtivo];
 
     // No escuro a barra volta a ser neutra (slate-900, como o app sempre
     // foi) — preencher a barra inteira com uma cor saturada no escuro
@@ -54,9 +75,11 @@
     // mais como fundo da barra inteira. Isso é só pro DESKTOP — no
     // celular o preenchimento cheio já está confirmado como bom nos dois
     // temas, não mexe.
-    $corAtivoEscuroDesktop = $moduloAtivo === 'seguros'
-        ? 'dark:bg-seguros-800/60 dark:text-seguros-200'
-        : 'dark:bg-accent-500/15 dark:text-accent-400';
+    $corAtivoEscuroDesktop = [
+        'seguros' => 'dark:bg-seguros-800/60 dark:text-seguros-200',
+        'saude' => 'dark:bg-saude-800/60 dark:text-saude-200',
+        'financas' => 'dark:bg-accent-500/15 dark:text-accent-400',
+    ][$moduloAtivo];
 
     // Rótulo de cada seção sempre no tom do próprio setor, esteja a barra
     // preenchida daquele setor ou não — é o que deixa "onde eu poderia
@@ -71,15 +94,6 @@
 
         return $s + ['tint' => $tintPorSetor[$s['label']] ?? 'text-white/40'];
     })->all();
-
-    // Documentos e Saúde ainda não têm nenhuma tela — só o lugar
-    // reservado no menu, pra já nascer com a estrutura que os próximos
-    // produtos vão ocupar (ver memory: project_multi_product_branding).
-    // Corretor não ganha essas seções: ele só tem Seguros mesmo.
-    if (! $user?->isBroker()) {
-        $navSections[] = ['label' => 'Documentos', 'items' => [], 'tint' => 'text-documentos-200', 'emBreve' => true];
-        $navSections[] = ['label' => 'Saúde', 'items' => [], 'tint' => 'text-saude-200', 'emBreve' => true];
-    }
 
     // Na barra inferior cabem 5; o resto vai para "Mais".
     $tabsPrincipais = array_slice($nav, 0, 4);
@@ -188,7 +202,7 @@
     <link rel="apple-touch-icon" href="{{ asset('icons/icon-180.png') }}">
     <link rel="icon" href="{{ asset('icons/icon-192.png') }}" type="image/png">
 
-    @vite(['resources/css/app.css', 'resources/js/app.js', 'resources/js/push.js'])
+    @vite(['resources/css/app.css', 'resources/js/app.js', 'resources/js/push.js', 'resources/js/gym.js'])
     {{-- Preload + @font-face de Fraunces/Inter — sem isto os arquivos são
          baixados no build (ver vite.config.js) mas nunca ficam ligados à
          página, e o navegador cai no fallback do sistema silenciosamente. --}}

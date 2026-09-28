@@ -228,3 +228,16 @@ O que **não** se verifica sozinho:
 O app é instalável no celular: o navegador oferece "Adicionar à tela inicial" a partir do manifesto em `/manifest.webmanifest`. Ícones em `public/icons/` (gerados por script — placeholder até haver identidade visual).
 
 O service worker (`public/sw.js`) **cacheia apenas arquivos estáticos** — build do Vite e ícones. Nenhuma resposta do servidor entra no cache: um saldo servido do cache seria um número errado apresentado como certo, e num aparelho compartilhado poderia aparecer depois do logout.
+
+## Importar histórico de academia (opcional, uma vez)
+
+Cerne Saúde › Academia aceita um histórico já estruturado (JSON revisado pela própria pessoa). É comando de servidor porque o arquivo tem dado de saúde — não há tela de upload. Formato em `database/examples/gym-history.example.json`.
+
+```bash
+scp -P 65002 -i ~/.ssh/cerne_hostinger historico_treinos.json u165451165@89.117.7.59:~/historico_treinos.json
+ssh -p 65002 -i ~/.ssh/cerne_hostinger u165451165@89.117.7.59 "cd ~/cerne && php artisan cerne:gym-import ~/historico_treinos.json --email=CONTA_DA_PESSOA --dry-run"
+# conferiu o relatório? repita sem --dry-run:
+ssh -p 65002 -i ~/.ssh/cerne_hostinger u165451165@89.117.7.59 "cd ~/cerne && php artisan cerne:gym-import ~/historico_treinos.json --email=CONTA_DA_PESSOA && rm ~/historico_treinos.json"
+```
+
+A conta precisa ter perfil próprio com membro (treino é pessoal). Validação acusa o arquivo inteiro antes de gravar; rodar de novo não duplica (sessão = treino + data). Apague o JSON do servidor depois.

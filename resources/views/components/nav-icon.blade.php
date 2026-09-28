@@ -67,6 +67,9 @@
         @case('tag')
             <path d="M12.5 3H5a2 2 0 0 0-2 2v7.5a1 1 0 0 0 .3.7l8.5 8.5a1 1 0 0 0 1.4 0l7.5-7.5a1 1 0 0 0 0-1.4l-8.5-8.5a1 1 0 0 0-.7-.3Z"/><circle cx="8" cy="8" r="1.5" fill="currentColor" stroke="none"/>
             @break
+        @case('dumbbell')
+            <path d="M6.5 6.5v11"/><path d="M17.5 6.5v11"/><path d="M3 9v6"/><path d="M21 9v6"/><path d="M6.5 12h11"/>
+            @break
         @case('mail')
             <rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/>
             @break

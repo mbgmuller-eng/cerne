@@ -60,7 +60,7 @@
     "src": "_inter-700-normal-Yt3aPRUw.woff2"
   },
   "resources/css/app.css": {
-    "file": "assets/app-CKpaq_1m.css",
+    "file": "assets/app-B5syliTv.css",
     "name": "app",
     "names": [
       "app.css"
@@ -72,6 +72,12 @@
     "file": "assets/app-D4MkdPsL.js",
     "name": "app",
     "src": "resources/js/app.js",
+    "isEntry": true
+  },
+  "resources/js/gym.js": {
+    "file": "assets/gym-Ba5hdQYq.js",
+    "name": "gym",
+    "src": "resources/js/gym.js",
     "isEntry": true
   },
   "resources/js/push.js": {

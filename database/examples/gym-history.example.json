@@ -1,0 +1,45 @@
+{
+  "version": 1,
+  "plan": {
+    "name": "Fase 1",
+    "started_on": "2026-07-27",
+    "workouts": [
+      {
+        "name": "Treino A",
+        "focus": "Peito e core",
+        "exercises": [
+          {
+            "name": "Supino Reto Halteres",
+            "muscle_group": "chest",
+            "measure_type": "load_reps",
+            "sets": 3,
+            "reps_min": 12,
+            "reps_max": 12,
+            "rest_seconds": 60,
+            "equipment": "Halteres"
+          },
+          {
+            "name": "Prancha Frontal",
+            "muscle_group": "core",
+            "measure_type": "duration",
+            "sets": 3,
+            "duration_seconds": 45
+          }
+        ]
+      }
+    ]
+  },
+  "sessions": [
+    {
+      "workout": "Treino A",
+      "date": "2026-08-07",
+      "date_approx": false,
+      "notes": null,
+      "sets": [
+        { "exercise": "Supino Reto Halteres", "set": 1, "reps": 12, "load": "12", "mode": "per_dumbbell", "equipment": "Halteres" },
+        { "exercise": "Supino Reto Halteres", "set": 2, "reps": 12, "load": "12", "mode": "per_dumbbell", "equipment": "Halteres" },
+        { "exercise": "Prancha Frontal", "set": 1, "duration": 45 }
+      ]
+    }
+  ]
+}
