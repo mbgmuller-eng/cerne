@@ -241,3 +241,22 @@ ssh -p 65002 -i ~/.ssh/cerne_hostinger u165451165@89.117.7.59 "cd ~/cerne && php
 ```
 
 A conta precisa ter perfil próprio com membro (treino é pessoal). Validação acusa o arquivo inteiro antes de gravar; rodar de novo não duplica (sessão = treino + data). Apague o JSON do servidor depois.
+
+## Catálogo compartilhado de exercícios (Academia)
+
+Referência genérica (nome, grupo muscular, foto) que qualquer cliente vê ao montar o plano — não é dado de saúde de ninguém, por isso não é por conta (ver `App\Models\GymExerciseCatalog`, padrão `BelongsToProfileOrShared` igual `ExpenseCategory`/`Bank`).
+
+**Dados do catálogo** (nome/grupo/tipo/observação, sem foto) — roda como qualquer seeder, não é automático no deploy:
+```bash
+ssh -p 65002 -i ~/.ssh/cerne_hostinger u165451165@89.117.7.59 "cd ~/cerne && php artisan db:seed --class=GymExerciseCatalogSeeder"
+```
+Idempotente (`updateOrCreate` por nome) — rodar de novo atualiza texto sem tocar na foto já vinculada.
+
+**Fotos do catálogo** — mesmo esquema do `cerne:gym-link-images` pessoal, mas sem `--email` (o catálogo não tem dono):
+```bash
+scp -P 65002 -i ~/.ssh/cerne_hostinger -r pasta_com_fotos u165451165@89.117.7.59:~/gym-catalog-images
+scp -P 65002 -i ~/.ssh/cerne_hostinger mapping.json u165451165@89.117.7.59:~/mapping.json
+ssh -p 65002 -i ~/.ssh/cerne_hostinger u165451165@89.117.7.59 "cd ~/cerne && php artisan cerne:gym-catalog-link-images ~/mapping.json --dry-run"
+# conferiu? repita sem --dry-run, depois apague os arquivos do servidor
+ssh -p 65002 -i ~/.ssh/cerne_hostinger u165451165@89.117.7.59 "cd ~/cerne && php artisan cerne:gym-catalog-link-images ~/mapping.json && rm -rf ~/gym-catalog-images ~/mapping.json"
+```

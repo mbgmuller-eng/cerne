@@ -8,6 +8,7 @@ use App\Livewire\Concerns\RequiresActiveProfile;
 use App\Livewire\Concerns\RequiresPersonalHealth;
 use App\Models\GymEquipment;
 use App\Models\GymExercise;
+use App\Models\GymExerciseCatalog;
 use App\Models\GymWorkout;
 use App\Models\GymWorkoutExercise;
 use App\Services\GymPlanService;
@@ -54,6 +55,10 @@ class GymPlanEditor extends Component
     public $exImage = null;
     public bool $removeImage = false;
     public ?string $exImageUrl = null;
+
+    /** Exercício do catálogo compartilhado que bateu com o nome digitado — só em criação nova. */
+    public ?string $catalogMatchId = null;
+    public ?string $catalogHint = null;
 
     public function mount(): void
     {
@@ -140,6 +145,41 @@ class GymPlanEditor extends Component
         $this->showExerciseForm = false;
     }
 
+    /**
+     * Nome bateu exato com o catálogo compartilhado? Preenche grupo, tipo
+     * e pausa sozinho — a pessoa ainda pode mudar tudo antes de salvar.
+     * Só em criação nova: editando, nome/grupo/tipo já estão travados.
+     */
+    public function updatedExName(): void
+    {
+        if ($this->editingItemId !== null) {
+            return;
+        }
+
+        $nome = trim($this->exName);
+        $catalogo = $nome === ''
+            ? null
+            : GymExerciseCatalog::query()->active()->whereRaw('LOWER(name) = ?', [mb_strtolower($nome)])->first();
+
+        if ($catalogo === null) {
+            $this->catalogMatchId = null;
+            $this->catalogHint = null;
+
+            return;
+        }
+
+        $this->catalogMatchId = $catalogo->id;
+        $this->exGroup = $catalogo->muscle_group->value;
+        $this->exType = $catalogo->measure_type->value;
+        $this->updatedExType();
+        if ($catalogo->equipment_hint !== null && trim($this->exEquipment) === '') {
+            $this->exEquipment = $catalogo->equipment_hint;
+        }
+
+        $partes = array_filter([$catalogo->muscle_group->label(), $catalogo->equipment_hint]);
+        $this->catalogHint = 'Do catálogo — '.implode(' · ', $partes).($catalogo->imageUrl() ? ' · já tem foto' : '');
+    }
+
     public function saveExercise(GymPlanService $service): void
     {
         $timed = GymMeasureType::from($this->exType)->usesStopwatch();
@@ -188,6 +228,17 @@ class GymPlanEditor extends Component
                 GymMeasureType::from($this->exType),
             );
             $service->addExercise($workout, $exercise, $meta);
+
+            // Sem upload manual: se o nome bateu com o catálogo, herda a
+            // foto de lá (só entra em exercício que ainda não tem foto
+            // nenhuma — findOrCreateExercise pode ter reaproveitado um já
+            // existente, com foto própria, que não pode ser sobrescrita).
+            if ($this->catalogMatchId !== null && $this->exImage === null && ! $this->removeImage) {
+                $catalogo = GymExerciseCatalog::query()->find($this->catalogMatchId);
+                if ($catalogo !== null) {
+                    $service->copyCatalogImage($exercise, $catalogo);
+                }
+            }
         }
 
         if ($this->exImage !== null || $this->removeImage) {
@@ -227,7 +278,10 @@ class GymPlanEditor extends Component
             'workouts' => $plan
                 ? $plan->workouts()->with('workoutExercises.exercise', 'workoutExercises.defaultEquipment')->get()
                 : collect(),
-            'exerciseNames' => GymExercise::query()->orderBy('name')->pluck('name'),
+            // Sugestões do datalist: o que a pessoa já usou + o catálogo compartilhado, sem repetir nome.
+            'exerciseNames' => GymExercise::query()->pluck('name')
+                ->merge(GymExerciseCatalog::query()->active()->pluck('name'))
+                ->unique()->sort()->values(),
             'equipmentNames' => GymEquipment::query()->orderBy('name')->pluck('name'),
             'editingExisting' => $this->editingItemId !== null,
             'timed' => GymMeasureType::tryFrom($this->exType)?->usesStopwatch() ?? false,
@@ -239,7 +293,7 @@ class GymPlanEditor extends Component
         $this->reset(
             'editingItemId', 'exerciseWorkoutId', 'exName', 'exGroup', 'exType', 'exSets',
             'exRepsMin', 'exRepsMax', 'exDuration', 'exRest', 'exEquipment', 'exNotes',
-            'exImage', 'removeImage', 'exImageUrl',
+            'exImage', 'removeImage', 'exImageUrl', 'catalogMatchId', 'catalogHint',
         );
         $this->resetErrorBag();
     }

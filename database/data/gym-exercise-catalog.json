@@ -1,0 +1,912 @@
+[
+    {
+        "name": "Supino Reto com Barra",
+        "muscle_group": "chest",
+        "measure_type": "load_reps",
+        "equipment_hint": "Barra livre",
+        "notes": "Pegada pouco mais larga que os ombros"
+    },
+    {
+        "name": "Supino Reto com Halteres",
+        "muscle_group": "chest",
+        "measure_type": "load_reps",
+        "equipment_hint": "Halteres",
+        "notes": "Maior amplitude que a barra"
+    },
+    {
+        "name": "Supino Inclinado com Barra",
+        "muscle_group": "chest",
+        "measure_type": "load_reps",
+        "equipment_hint": "Barra livre",
+        "notes": "Banco 30-45°"
+    },
+    {
+        "name": "Supino Inclinado com Halteres",
+        "muscle_group": "chest",
+        "measure_type": "load_reps",
+        "equipment_hint": "Halteres",
+        "notes": "Mais amplitude e ativação estabilizadora"
+    },
+    {
+        "name": "Supino Declinado",
+        "muscle_group": "chest",
+        "measure_type": "load_reps",
+        "equipment_hint": "Barra ou halteres",
+        "notes": "Menos comum; cuidado com ombro"
+    },
+    {
+        "name": "Crucifixo Reto",
+        "muscle_group": "chest",
+        "measure_type": "load_reps",
+        "equipment_hint": "Halteres",
+        "notes": "Cotovelos levemente flexionados"
+    },
+    {
+        "name": "Crucifixo Inclinado",
+        "muscle_group": "chest",
+        "measure_type": "load_reps",
+        "equipment_hint": "Halteres",
+        "notes": null
+    },
+    {
+        "name": "Crossover (Cabo)",
+        "muscle_group": "chest",
+        "measure_type": "load_reps",
+        "equipment_hint": "Cabo/polia dupla",
+        "notes": "Ajustar altura da polia muda o foco (alto→inferior, baixo→superior)"
+    },
+    {
+        "name": "Peck Deck / Voador",
+        "muscle_group": "chest",
+        "measure_type": "load_reps",
+        "equipment_hint": "Máquina",
+        "notes": "Baixo estresse articular"
+    },
+    {
+        "name": "Supino na Máquina (Press)",
+        "muscle_group": "chest",
+        "measure_type": "load_reps",
+        "equipment_hint": "Máquina",
+        "notes": "Boa opção para iniciantes/técnica"
+    },
+    {
+        "name": "Flexão de Braço",
+        "muscle_group": "chest",
+        "measure_type": "load_reps",
+        "equipment_hint": "Peso do corpo",
+        "notes": "Pés elevados = mais peito superior"
+    },
+    {
+        "name": "Flexão com Pés Elevados",
+        "muscle_group": "chest",
+        "measure_type": "load_reps",
+        "equipment_hint": "Peso do corpo",
+        "notes": null
+    },
+    {
+        "name": "Paralelas (Dips)",
+        "muscle_group": "chest",
+        "measure_type": "load_reps",
+        "equipment_hint": "Peso do corpo/máquina assistida",
+        "notes": "Inclinar tronco à frente para mais peito"
+    },
+    {
+        "name": "Pullover com Halter",
+        "muscle_group": "chest",
+        "measure_type": "load_reps",
+        "equipment_hint": "Halter",
+        "notes": "Trabalha expansão da caixa torácica"
+    },
+    {
+        "name": "Supino Fechado",
+        "muscle_group": "chest",
+        "measure_type": "load_reps",
+        "equipment_hint": "Barra livre",
+        "notes": "Pegada estreita"
+    },
+    {
+        "name": "Barra Fixa (Pull-up)",
+        "muscle_group": "back",
+        "measure_type": "load_reps",
+        "equipment_hint": "Peso do corpo/assistida",
+        "notes": "Pegada pronada"
+    },
+    {
+        "name": "Barra Fixa Supinada (Chin-up)",
+        "muscle_group": "back",
+        "measure_type": "load_reps",
+        "equipment_hint": "Peso do corpo/assistida",
+        "notes": "Mais bíceps que a pronada"
+    },
+    {
+        "name": "Puxada Frontal (Pulley)",
+        "muscle_group": "back",
+        "measure_type": "load_reps",
+        "equipment_hint": "Cabo/polia alta",
+        "notes": "Pegada aberta = mais largura"
+    },
+    {
+        "name": "Puxada Frontal Pegada Neutra",
+        "muscle_group": "back",
+        "measure_type": "load_reps",
+        "equipment_hint": "Cabo/polia alta",
+        "notes": "Boa para ombro sensível"
+    },
+    {
+        "name": "Puxada Atrás da Nuca",
+        "muscle_group": "back",
+        "measure_type": "load_reps",
+        "equipment_hint": "Cabo/polia alta",
+        "notes": "Evitar se ombro tiver restrição"
+    },
+    {
+        "name": "Remada Curvada com Barra",
+        "muscle_group": "back",
+        "measure_type": "load_reps",
+        "equipment_hint": "Barra livre",
+        "notes": "Tronco a ~45°, lombar neutra"
+    },
+    {
+        "name": "Remada Curvada com Halteres",
+        "muscle_group": "back",
+        "measure_type": "load_reps",
+        "equipment_hint": "Halteres",
+        "notes": "Um braço ou os dois juntos"
+    },
+    {
+        "name": "Remada Unilateral com Halter",
+        "muscle_group": "back",
+        "measure_type": "load_reps",
+        "equipment_hint": "Halter",
+        "notes": "Apoio em banco"
+    },
+    {
+        "name": "Remada Baixa no Cabo",
+        "muscle_group": "back",
+        "measure_type": "load_reps",
+        "equipment_hint": "Cabo/polia baixa",
+        "notes": "Pegada triângulo, V ou reta"
+    },
+    {
+        "name": "Remada Cavalinho (T-bar)",
+        "muscle_group": "back",
+        "measure_type": "load_reps",
+        "equipment_hint": "Barra T/máquina",
+        "notes": "Boa espessura de costas"
+    },
+    {
+        "name": "Remada Máquina (Hammer)",
+        "muscle_group": "back",
+        "measure_type": "load_reps",
+        "equipment_hint": "Máquina",
+        "notes": "Trajetória guiada"
+    },
+    {
+        "name": "Pulldown com Braços Retos",
+        "muscle_group": "back",
+        "measure_type": "load_reps",
+        "equipment_hint": "Cabo/polia alta",
+        "notes": "Braços quase estendidos"
+    },
+    {
+        "name": "Hiperextensão (Banco Romano)",
+        "muscle_group": "back",
+        "measure_type": "load_reps",
+        "equipment_hint": "Peso do corpo/anilha",
+        "notes": "Cuidado com hiperextensão excessiva"
+    },
+    {
+        "name": "Face Pull",
+        "muscle_group": "back",
+        "measure_type": "load_reps",
+        "equipment_hint": "Cabo com corda",
+        "notes": "Ótimo para postura e saúde do ombro"
+    },
+    {
+        "name": "Encolhimento de Ombros (Shrug)",
+        "muscle_group": "back",
+        "measure_type": "load_reps",
+        "equipment_hint": "Barra ou halteres",
+        "notes": "Sem rotação do ombro"
+    },
+    {
+        "name": "Desenvolvimento Militar com Barra",
+        "muscle_group": "shoulders",
+        "measure_type": "load_reps",
+        "equipment_hint": "Barra livre",
+        "notes": "Em pé ou sentado"
+    },
+    {
+        "name": "Desenvolvimento com Halteres",
+        "muscle_group": "shoulders",
+        "measure_type": "load_reps",
+        "equipment_hint": "Halteres",
+        "notes": "Maior amplitude que a barra"
+    },
+    {
+        "name": "Desenvolvimento na Máquina",
+        "muscle_group": "shoulders",
+        "measure_type": "load_reps",
+        "equipment_hint": "Máquina",
+        "notes": "Trajetória guiada"
+    },
+    {
+        "name": "Elevação Lateral",
+        "muscle_group": "shoulders",
+        "measure_type": "load_reps",
+        "equipment_hint": "Halteres",
+        "notes": "Cotovelo levemente flexionado"
+    },
+    {
+        "name": "Elevação Lateral no Cabo",
+        "muscle_group": "shoulders",
+        "measure_type": "load_reps",
+        "equipment_hint": "Cabo",
+        "notes": "Tensão constante"
+    },
+    {
+        "name": "Elevação Frontal",
+        "muscle_group": "shoulders",
+        "measure_type": "load_reps",
+        "equipment_hint": "Halteres ou barra",
+        "notes": null
+    },
+    {
+        "name": "Crucifixo Invertido",
+        "muscle_group": "shoulders",
+        "measure_type": "load_reps",
+        "equipment_hint": "Halteres",
+        "notes": "Tronco inclinado à frente"
+    },
+    {
+        "name": "Peck Deck Invertido",
+        "muscle_group": "shoulders",
+        "measure_type": "load_reps",
+        "equipment_hint": "Máquina",
+        "notes": "Isolamento, baixo estresse"
+    },
+    {
+        "name": "Rotação Externa (halter/cabo/polia)",
+        "muscle_group": "shoulders",
+        "measure_type": "load_reps",
+        "equipment_hint": "Halter, cabo ou máquina de polia",
+        "notes": "Carga leve, foco em controle"
+    },
+    {
+        "name": "Rotação Interna (cabo/polia)",
+        "muscle_group": "shoulders",
+        "measure_type": "load_reps",
+        "equipment_hint": "Cabo ou máquina de polia",
+        "notes": "Complementa a externa"
+    },
+    {
+        "name": "Arnold Press",
+        "muscle_group": "shoulders",
+        "measure_type": "load_reps",
+        "equipment_hint": "Halteres",
+        "notes": "Rotação do punho durante o movimento"
+    },
+    {
+        "name": "Rosca Direta com Barra",
+        "muscle_group": "arms",
+        "measure_type": "load_reps",
+        "equipment_hint": "Barra reta ou W",
+        "notes": "Cotovelos fixos ao lado do corpo"
+    },
+    {
+        "name": "Rosca Alternada com Halteres",
+        "muscle_group": "arms",
+        "measure_type": "load_reps",
+        "equipment_hint": "Halteres",
+        "notes": "Um braço de cada vez"
+    },
+    {
+        "name": "Rosca Simultânea com Halteres",
+        "muscle_group": "arms",
+        "measure_type": "load_reps",
+        "equipment_hint": "Halteres",
+        "notes": "Os dois braços juntos"
+    },
+    {
+        "name": "Rosca Martelo",
+        "muscle_group": "arms",
+        "measure_type": "load_reps",
+        "equipment_hint": "Halteres",
+        "notes": "Pegada neutra"
+    },
+    {
+        "name": "Rosca Scott (Banco Scott)",
+        "muscle_group": "arms",
+        "measure_type": "load_reps",
+        "equipment_hint": "Barra ou halter",
+        "notes": "Elimina o balanço do tronco"
+    },
+    {
+        "name": "Rosca no Cabo",
+        "muscle_group": "arms",
+        "measure_type": "load_reps",
+        "equipment_hint": "Cabo/polia baixa",
+        "notes": "Tensão constante"
+    },
+    {
+        "name": "Rosca Concentrada",
+        "muscle_group": "arms",
+        "measure_type": "load_reps",
+        "equipment_hint": "Halter",
+        "notes": "Apoiado no banco, foco no pico"
+    },
+    {
+        "name": "Rosca 21",
+        "muscle_group": "arms",
+        "measure_type": "load_reps",
+        "equipment_hint": "Barra",
+        "notes": "7 parciais baixas + 7 altas + 7 completas"
+    },
+    {
+        "name": "Tríceps Corda no Cabo",
+        "muscle_group": "arms",
+        "measure_type": "load_reps",
+        "equipment_hint": "Cabo/polia alta",
+        "notes": "Afastar as pontas da corda no final"
+    },
+    {
+        "name": "Tríceps Barra no Cabo",
+        "muscle_group": "arms",
+        "measure_type": "load_reps",
+        "equipment_hint": "Cabo/polia alta",
+        "notes": "Barra reta ou V"
+    },
+    {
+        "name": "Tríceps Testa com Barra",
+        "muscle_group": "arms",
+        "measure_type": "load_reps",
+        "equipment_hint": "Barra W ou reta",
+        "notes": "Deitado no banco"
+    },
+    {
+        "name": "Tríceps Testa com Halteres",
+        "muscle_group": "arms",
+        "measure_type": "load_reps",
+        "equipment_hint": "Halteres",
+        "notes": "Maior amplitude"
+    },
+    {
+        "name": "Tríceps Francês (acima da cabeça)",
+        "muscle_group": "arms",
+        "measure_type": "load_reps",
+        "equipment_hint": "Halter ou cabo",
+        "notes": "Sentado ou em pé"
+    },
+    {
+        "name": "Mergulho no Banco (Bench Dip)",
+        "muscle_group": "arms",
+        "measure_type": "load_reps",
+        "equipment_hint": "Peso do corpo",
+        "notes": "Pés apoiados no chão ou elevados"
+    },
+    {
+        "name": "Kickback (Coice de Tríceps)",
+        "muscle_group": "arms",
+        "measure_type": "load_reps",
+        "equipment_hint": "Halter",
+        "notes": "Tronco inclinado, cotovelo fixo"
+    },
+    {
+        "name": "Flexão de Punho",
+        "muscle_group": "forearms",
+        "measure_type": "load_reps",
+        "equipment_hint": "Halteres/barra",
+        "notes": "Antebraço apoiado, só o punho se move"
+    },
+    {
+        "name": "Extensão de Punho",
+        "muscle_group": "forearms",
+        "measure_type": "load_reps",
+        "equipment_hint": "Halteres/barra",
+        "notes": "Mesma posição, movimento invertido"
+    },
+    {
+        "name": "Rosca Inversa",
+        "muscle_group": "forearms",
+        "measure_type": "load_reps",
+        "equipment_hint": "Barra",
+        "notes": "Pegada pronada"
+    },
+    {
+        "name": "Pronação/Supinação com Halter",
+        "muscle_group": "forearms",
+        "measure_type": "load_reps",
+        "equipment_hint": "Halter",
+        "notes": "Útil para tenistas/esportes de raquete"
+    },
+    {
+        "name": "Farmer's Walk (Caminhada do Fazendeiro)",
+        "muscle_group": "forearms",
+        "measure_type": "distance_duration",
+        "equipment_hint": "Halteres/kettlebells",
+        "notes": "Carrega peso caminhando; também é funcional"
+    },
+    {
+        "name": "Agachamento Livre com Barra",
+        "muscle_group": "legs",
+        "measure_type": "load_reps",
+        "equipment_hint": "Barra livre",
+        "notes": "Base da maioria dos treinos de perna"
+    },
+    {
+        "name": "Agachamento Frontal",
+        "muscle_group": "legs",
+        "measure_type": "load_reps",
+        "equipment_hint": "Barra livre",
+        "notes": "Exige mais mobilidade de tornozelo/punho"
+    },
+    {
+        "name": "Agachamento Sumô",
+        "muscle_group": "legs",
+        "measure_type": "load_reps",
+        "equipment_hint": "Barra ou halter",
+        "notes": "Pés bem afastados, pontas para fora"
+    },
+    {
+        "name": "Agachamento Búlgaro",
+        "muscle_group": "legs",
+        "measure_type": "load_reps",
+        "equipment_hint": "Halteres/barra",
+        "notes": "Pé de trás apoiado em banco"
+    },
+    {
+        "name": "Leg Press 45°",
+        "muscle_group": "legs",
+        "measure_type": "load_reps",
+        "equipment_hint": "Máquina",
+        "notes": "Amplitude controlada, joelho alinhado"
+    },
+    {
+        "name": "Hack Squat",
+        "muscle_group": "legs",
+        "measure_type": "load_reps",
+        "equipment_hint": "Máquina",
+        "notes": "Trajetória guiada, menos exigência de equilíbrio"
+    },
+    {
+        "name": "Cadeira Extensora",
+        "muscle_group": "legs",
+        "measure_type": "load_reps",
+        "equipment_hint": "Máquina",
+        "notes": "Cuidado com joelho sensível"
+    },
+    {
+        "name": "Afundo (Lunge) Caminhando",
+        "muscle_group": "legs",
+        "measure_type": "load_reps",
+        "equipment_hint": "Halteres/barra",
+        "notes": "Passadas alternadas avançando"
+    },
+    {
+        "name": "Afundo Estático",
+        "muscle_group": "legs",
+        "measure_type": "load_reps",
+        "equipment_hint": "Halteres/barra",
+        "notes": "Sem deslocamento"
+    },
+    {
+        "name": "Afundo Reverso",
+        "muscle_group": "legs",
+        "measure_type": "load_reps",
+        "equipment_hint": "Halteres/barra",
+        "notes": "Passada para trás, mais amigável ao joelho"
+    },
+    {
+        "name": "Step-up (Subida no Step)",
+        "muscle_group": "legs",
+        "measure_type": "load_reps",
+        "equipment_hint": "Halteres/step ou banco",
+        "notes": "Unilateral"
+    },
+    {
+        "name": "Agachamento Sissy",
+        "muscle_group": "legs",
+        "measure_type": "load_reps",
+        "equipment_hint": "Peso do corpo/apoio",
+        "notes": "Avançado, alta exigência de joelho"
+    },
+    {
+        "name": "Levantamento Terra",
+        "muscle_group": "legs",
+        "measure_type": "load_reps",
+        "equipment_hint": "Barra livre",
+        "notes": "Padrão de movimento completo"
+    },
+    {
+        "name": "Levantamento Terra Romeno (RDL)",
+        "muscle_group": "legs",
+        "measure_type": "load_reps",
+        "equipment_hint": "Barra ou halteres",
+        "notes": "Joelho quase estendido, quadril dobra"
+    },
+    {
+        "name": "Levantamento Terra Sumô",
+        "muscle_group": "legs",
+        "measure_type": "load_reps",
+        "equipment_hint": "Barra livre",
+        "notes": "Pegada e pés mais afastados"
+    },
+    {
+        "name": "Stiff",
+        "muscle_group": "legs",
+        "measure_type": "load_reps",
+        "equipment_hint": "Barra ou halteres",
+        "notes": "Similar ao RDL, menos flexão de joelho"
+    },
+    {
+        "name": "Mesa Flexora",
+        "muscle_group": "legs",
+        "measure_type": "load_reps",
+        "equipment_hint": "Máquina",
+        "notes": "Deitado, flexão de joelho"
+    },
+    {
+        "name": "Cadeira Flexora",
+        "muscle_group": "legs",
+        "measure_type": "load_reps",
+        "equipment_hint": "Máquina",
+        "notes": "Sentado, variação da mesa"
+    },
+    {
+        "name": "Cadeira Flexora Unilateral",
+        "muscle_group": "legs",
+        "measure_type": "load_reps",
+        "equipment_hint": "Máquina",
+        "notes": "Uma perna de cada vez"
+    },
+    {
+        "name": "Good Morning",
+        "muscle_group": "legs",
+        "measure_type": "load_reps",
+        "equipment_hint": "Barra livre",
+        "notes": "Avançado, exige técnica"
+    },
+    {
+        "name": "Elevação Pélvica com Pernas Estendidas (Nordic Curl assistido)",
+        "muscle_group": "legs",
+        "measure_type": "load_reps",
+        "equipment_hint": "Peso do corpo/banco",
+        "notes": "Avançado"
+    },
+    {
+        "name": "Hip Thrust",
+        "muscle_group": "glutes",
+        "measure_type": "load_reps",
+        "equipment_hint": "Barra/halter + banco",
+        "notes": "O exercício mais direcionado para glúteo máximo"
+    },
+    {
+        "name": "Ponte de Glúteo",
+        "muscle_group": "glutes",
+        "measure_type": "load_reps",
+        "equipment_hint": "Peso do corpo/carga sobre o quadril",
+        "notes": "Versão no chão do hip thrust"
+    },
+    {
+        "name": "Máquina de Glúteo (Extensão de Quadril)",
+        "muscle_group": "glutes",
+        "measure_type": "load_reps",
+        "equipment_hint": "Máquina",
+        "notes": "Empurra a perna para trás"
+    },
+    {
+        "name": "Coice no Cabo (Cable Kickback)",
+        "muscle_group": "glutes",
+        "measure_type": "load_reps",
+        "equipment_hint": "Cabo/tornozeleira",
+        "notes": "Tronco levemente inclinado"
+    },
+    {
+        "name": "Cadeira Abdutora",
+        "muscle_group": "glutes",
+        "measure_type": "load_reps",
+        "equipment_hint": "Máquina",
+        "notes": "Pernas se afastam contra resistência"
+    },
+    {
+        "name": "Caminhada Lateral com Elástico (Band Walk)",
+        "muscle_group": "glutes",
+        "measure_type": "load_reps",
+        "equipment_hint": "Mini band",
+        "notes": "Passos laterais, quadril baixo"
+    },
+    {
+        "name": "Abdução de Quadril Deitado",
+        "muscle_group": "glutes",
+        "measure_type": "load_reps",
+        "equipment_hint": "Peso do corpo/tornozeleira",
+        "notes": "Deitado de lado"
+    },
+    {
+        "name": "Elevação Pélvica Unilateral",
+        "muscle_group": "glutes",
+        "measure_type": "load_reps",
+        "equipment_hint": "Peso do corpo/halter",
+        "notes": "Uma perna de cada vez, maior exigência de estabilidade"
+    },
+    {
+        "name": "Step-up",
+        "muscle_group": "glutes",
+        "measure_type": "load_reps",
+        "equipment_hint": "Halteres/step ou banco",
+        "notes": "Ver também Quadríceps"
+    },
+    {
+        "name": "Panturrilha em Pé (Standing Calf Raise)",
+        "muscle_group": "legs",
+        "measure_type": "load_reps",
+        "equipment_hint": "Máquina ou halteres",
+        "notes": "Amplitude completa, pausa no topo"
+    },
+    {
+        "name": "Panturrilha Sentada (Seated Calf Raise)",
+        "muscle_group": "legs",
+        "measure_type": "load_reps",
+        "equipment_hint": "Máquina",
+        "notes": "Joelho flexionado muda o foco"
+    },
+    {
+        "name": "Panturrilha no Leg Press",
+        "muscle_group": "legs",
+        "measure_type": "load_reps",
+        "equipment_hint": "Leg press",
+        "notes": "Empurra só com a ponta do pé"
+    },
+    {
+        "name": "Panturrilha Unilateral (no degrau)",
+        "muscle_group": "legs",
+        "measure_type": "load_reps",
+        "equipment_hint": "Peso do corpo/halter",
+        "notes": "Bom para simetria entre os lados"
+    },
+    {
+        "name": "Saltos (Jump Rope / Pular Corda)",
+        "muscle_group": "legs",
+        "measure_type": "duration",
+        "equipment_hint": "Corda",
+        "notes": "Também entra em Cardio"
+    },
+    {
+        "name": "Abdominal Supra (Crunch)",
+        "muscle_group": "core",
+        "measure_type": "load_reps",
+        "equipment_hint": "Peso do corpo",
+        "notes": "Amplitude curta"
+    },
+    {
+        "name": "Abdominal na Máquina",
+        "muscle_group": "core",
+        "measure_type": "load_reps",
+        "equipment_hint": "Máquina",
+        "notes": "Carga progressiva"
+    },
+    {
+        "name": "Abdominal no Cabo (Crunch Cabo)",
+        "muscle_group": "core",
+        "measure_type": "load_reps",
+        "equipment_hint": "Cabo/polia alta",
+        "notes": "Ajoelhado, curva a coluna"
+    },
+    {
+        "name": "Elevação de Pernas Deitado",
+        "muscle_group": "core",
+        "measure_type": "load_reps",
+        "equipment_hint": "Peso do corpo",
+        "notes": "Lombar sensível: flexionar joelhos"
+    },
+    {
+        "name": "Elevação de Pernas na Paralela/Barra",
+        "muscle_group": "core",
+        "measure_type": "load_reps",
+        "equipment_hint": "Peso do corpo",
+        "notes": "Mais avançado"
+    },
+    {
+        "name": "Abdominal Infra",
+        "muscle_group": "core",
+        "measure_type": "load_reps",
+        "equipment_hint": "Peso do corpo",
+        "notes": "Joelhos flexionados para proteger lombar"
+    },
+    {
+        "name": "Prancha Frontal",
+        "muscle_group": "core",
+        "measure_type": "duration",
+        "equipment_hint": "Peso do corpo",
+        "notes": "Corpo alinhado, sem elevar o quadril"
+    },
+    {
+        "name": "Prancha Lateral",
+        "muscle_group": "core",
+        "measure_type": "duration",
+        "equipment_hint": "Peso do corpo",
+        "notes": "Quadril alinhado, sem cair"
+    },
+    {
+        "name": "Abdominal Oblíquo (Bicicleta)",
+        "muscle_group": "core",
+        "measure_type": "load_reps",
+        "equipment_hint": "Peso do corpo",
+        "notes": "Cotovelo ao joelho oposto"
+    },
+    {
+        "name": "Russian Twist",
+        "muscle_group": "core",
+        "measure_type": "load_reps",
+        "equipment_hint": "Peso do corpo/anilha/medicine ball",
+        "notes": "Pés no chão ou elevados"
+    },
+    {
+        "name": "Woodchop no Cabo",
+        "muscle_group": "core",
+        "measure_type": "load_reps",
+        "equipment_hint": "Cabo/polia",
+        "notes": "Movimento diagonal alto-baixo ou baixo-alto"
+    },
+    {
+        "name": "Pallof Press",
+        "muscle_group": "core",
+        "measure_type": "load_reps",
+        "equipment_hint": "Cabo/polia",
+        "notes": "Resiste à rotação, não gira o tronco"
+    },
+    {
+        "name": "Dead Bug",
+        "muscle_group": "core",
+        "measure_type": "load_reps",
+        "equipment_hint": "Peso do corpo",
+        "notes": "Alternativa segura à elevação de pernas"
+    },
+    {
+        "name": "Ab Wheel (Roda Abdominal)",
+        "muscle_group": "core",
+        "measure_type": "load_reps",
+        "equipment_hint": "Roda",
+        "notes": "Avançado, alta exigência de estabilidade"
+    },
+    {
+        "name": "Kettlebell Swing",
+        "muscle_group": "other",
+        "measure_type": "load_reps",
+        "equipment_hint": "Kettlebell",
+        "notes": "Movimento explosivo de quadril"
+    },
+    {
+        "name": "Clean (Arranco/Clean com Kettlebell ou Halter)",
+        "muscle_group": "other",
+        "measure_type": "load_reps",
+        "equipment_hint": "Kettlebell/halter",
+        "notes": "Técnica exige aprendizado"
+    },
+    {
+        "name": "Turkish Get-up",
+        "muscle_group": "other",
+        "measure_type": "load_reps",
+        "equipment_hint": "Kettlebell",
+        "notes": "Avançado, movimento longo e controlado"
+    },
+    {
+        "name": "Goblet Squat",
+        "muscle_group": "other",
+        "measure_type": "load_reps",
+        "equipment_hint": "Kettlebell/halter",
+        "notes": "Bom para ensinar padrão de agachamento"
+    },
+    {
+        "name": "TRX Row (Remada Suspensa)",
+        "muscle_group": "other",
+        "measure_type": "load_reps",
+        "equipment_hint": "TRX/fitas de suspensão",
+        "notes": "Ajuste o ângulo do corpo para a dificuldade"
+    },
+    {
+        "name": "TRX Chest Press",
+        "muscle_group": "other",
+        "measure_type": "load_reps",
+        "equipment_hint": "TRX/fitas de suspensão",
+        "notes": null
+    },
+    {
+        "name": "Battle Rope (Corda Naval)",
+        "muscle_group": "other",
+        "measure_type": "load_reps",
+        "equipment_hint": "Cordas navais",
+        "notes": "Ondulações ou batidas alternadas"
+    },
+    {
+        "name": "Prensa de Trenó (Sled Push/Pull)",
+        "muscle_group": "other",
+        "measure_type": "load_reps",
+        "equipment_hint": "Trenó/sled",
+        "notes": "Baixo impacto articular"
+    },
+    {
+        "name": "Salto Vertical (Box Jump/Contramovimento)",
+        "muscle_group": "other",
+        "measure_type": "load_reps",
+        "equipment_hint": "Caixa/peso do corpo",
+        "notes": "Aterrissagem controlada"
+    },
+    {
+        "name": "Salto Lateral (Skater Jump)",
+        "muscle_group": "other",
+        "measure_type": "load_reps",
+        "equipment_hint": "Peso do corpo",
+        "notes": "Bom para esportes com deslocamento lateral"
+    },
+    {
+        "name": "Arremesso de Medicine Ball",
+        "muscle_group": "other",
+        "measure_type": "load_reps",
+        "equipment_hint": "Medicine ball",
+        "notes": "Contra a parede ou no chão"
+    },
+    {
+        "name": "Burpee",
+        "muscle_group": "other",
+        "measure_type": "load_reps",
+        "equipment_hint": "Peso do corpo",
+        "notes": "Alta demanda cardiovascular"
+    },
+    {
+        "name": "Esteira (caminhada/corrida)",
+        "muscle_group": "cardio",
+        "measure_type": "distance_duration",
+        "equipment_hint": "Esteira",
+        "notes": "Inclinação aumenta a intensidade sem correr"
+    },
+    {
+        "name": "Bicicleta Ergométrica",
+        "muscle_group": "cardio",
+        "measure_type": "distance_duration",
+        "equipment_hint": "Bike",
+        "notes": "Boa opção para joelho sensível"
+    },
+    {
+        "name": "Elíptico",
+        "muscle_group": "cardio",
+        "measure_type": "distance_duration",
+        "equipment_hint": "Elíptico",
+        "notes": "Trabalha membros superiores e inferiores"
+    },
+    {
+        "name": "Escada (StairMaster)",
+        "muscle_group": "cardio",
+        "measure_type": "duration",
+        "equipment_hint": "Escada ergométrica",
+        "notes": "Alta demanda de posterior/glúteo"
+    },
+    {
+        "name": "Remo Ergométrico (Rowing)",
+        "muscle_group": "cardio",
+        "measure_type": "distance_duration",
+        "equipment_hint": "Remo",
+        "notes": "Combina pernas, costas e braços"
+    },
+    {
+        "name": "HIIT em Intervalos (esteira/bike)",
+        "muscle_group": "cardio",
+        "measure_type": "duration",
+        "equipment_hint": "Esteira ou bike",
+        "notes": "Alterna esforço forte e leve"
+    },
+    {
+        "name": "Pular Corda",
+        "muscle_group": "cardio",
+        "measure_type": "duration",
+        "equipment_hint": "Corda",
+        "notes": "Alto impacto"
+    },
+    {
+        "name": "Circuito Metabólico (kettlebell/battle rope/sled)",
+        "muscle_group": "cardio",
+        "measure_type": "duration",
+        "equipment_hint": "Vários",
+        "notes": "Combina força e cardio em blocos curtos"
+    }
+]

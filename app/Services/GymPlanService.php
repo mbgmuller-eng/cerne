@@ -6,6 +6,7 @@ use App\Enums\GymMeasureType;
 use App\Enums\GymMuscleGroup;
 use App\Models\GymEquipment;
 use App\Models\GymExercise;
+use App\Models\GymExerciseCatalog;
 use App\Models\GymPlan;
 use App\Models\GymSession;
 use App\Models\GymWorkout;
@@ -166,6 +167,36 @@ class GymPlanService
             Str::uuid().'.'.$file->extension(),
             config('cerne.gym_images.disk'),
         );
+    }
+
+    /**
+     * Copia a foto do CATÁLOGO compartilhado pro exercício recém-criado —
+     * só quando ele ainda não tem foto própria (nunca sobrescreve o que
+     * a pessoa já tinha) e o catálogo tem o que copiar. É cópia de
+     * verdade no disco: a foto da pessoa fica independente da entrada do
+     * catálogo dali em diante (editar/remover uma nunca afeta a outra).
+     */
+    public function copyCatalogImage(GymExercise $exercise, GymExerciseCatalog $catalogo): GymExercise
+    {
+        if ($exercise->image_path !== null || $catalogo->image_path === null) {
+            return $exercise;
+        }
+
+        $disco = Storage::disk(config('cerne.gym_images.disk'));
+        $pasta = config('cerne.gym_images.path').'/'.$exercise->member_id;
+
+        $caminho1 = $pasta.'/'.Str::uuid().'.'.pathinfo($catalogo->image_path, PATHINFO_EXTENSION);
+        $disco->copy($catalogo->image_path, $caminho1);
+
+        $caminho2 = null;
+        if ($catalogo->image_path_2 !== null) {
+            $caminho2 = $pasta.'/'.Str::uuid().'.'.pathinfo($catalogo->image_path_2, PATHINFO_EXTENSION);
+            $disco->copy($catalogo->image_path_2, $caminho2);
+        }
+
+        $exercise->update(['image_path' => $caminho1, 'image_path_2' => $caminho2]);
+
+        return $exercise;
     }
 
     /** @param  array<string, mixed>  $meta */
