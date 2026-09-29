@@ -155,7 +155,14 @@
          em app.js — store global, não por linha). Nunca navega a página, então
          "voltar" é só fechar o modal — sem o problema do PWA no iPhone preso
          numa visualização sem histórico de navegação nenhum pra desfazer. --}}
-    <div x-data x-show="$store.documentViewer.aberto" x-cloak x-on:keydown.escape.window="$store.documentViewer.fechar()" class="fixed inset-0 z-40">
+    <div
+        x-data
+        x-init="$store.documentViewer.pdfContainer = $refs.pdfContainer"
+        x-show="$store.documentViewer.aberto"
+        x-cloak
+        x-on:keydown.escape.window="$store.documentViewer.fechar()"
+        class="fixed inset-0 z-40"
+    >
         <div class="fixed inset-0 bg-slate-950/50 dark:bg-black/60" x-on:click="$store.documentViewer.fechar()"></div>
 
         <div class="fixed inset-0 overflow-y-auto">
@@ -177,12 +184,12 @@
                         </div>
                         <p x-show="$store.documentViewer.erro" x-cloak x-text="$store.documentViewer.erro" class="py-12 text-center text-xs text-red-700 dark:text-red-400"></p>
 
-                        <template x-if="$store.documentViewer.blobUrl && $store.documentViewer.mimeType === 'application/pdf'">
-                            <iframe :src="$store.documentViewer.blobUrl" class="h-[75vh] w-full rounded-lg border border-slate-100 dark:border-white/10"></iframe>
-                        </template>
-                        <template x-if="$store.documentViewer.blobUrl && $store.documentViewer.mimeType !== 'application/pdf'">
-                            <img :src="$store.documentViewer.blobUrl" class="mx-auto max-h-[75vh] max-w-full rounded-lg">
-                        </template>
+                        {{-- pdf.js desenha as páginas aqui dentro (ver renderizarPdf em app.js)
+                             — precisa existir no DOM desde o início pro $refs funcionar,
+                             por isso x-show em vez de x-if/template. --}}
+                        <div x-ref="pdfContainer" x-show="$store.documentViewer.mimeType === 'application/pdf'" class="max-h-[75vh] overflow-y-auto"></div>
+
+                        <img x-show="$store.documentViewer.blobUrl && $store.documentViewer.mimeType !== 'application/pdf'" :src="$store.documentViewer.blobUrl" class="mx-auto max-h-[75vh] max-w-full rounded-lg">
                     </div>
                 </div>
             </div>
