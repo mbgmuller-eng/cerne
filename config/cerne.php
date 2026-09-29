@@ -142,6 +142,20 @@ return [
 
     /*
     |---------------------------------------------------------------------------
+    | Área de Documentos (CNH, passaporte, apólice, exame...)
+    |---------------------------------------------------------------------------
+    | Mesmo disco privado dos demais documentos — pasta própria só pra não
+    | misturar com o que a importação por IA usa (cerne.documents.path).
+    */
+
+    'document_vault' => [
+        'disk' => env('CERNE_DOCUMENTS_DISK', 'local'),
+        'path' => 'documentos-pessoais',
+        'max_kb' => 10240,
+    ],
+
+    /*
+    |---------------------------------------------------------------------------
     | Precisão numérica
     |---------------------------------------------------------------------------
     | Dinheiro em 2 casas; quantidade e preço médio de ativos em 6, porque

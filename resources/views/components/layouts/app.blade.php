@@ -35,16 +35,22 @@
         ['health.appointments.index', 'Agenda de Saúde', 'Agenda', 'calendar'],
     ];
 
+    $navDocumentos = [
+        ['documents.vault.index', 'Meus documentos', 'Documentos', 'folder'],
+    ];
+
     // Saúde é dado pessoal: consultor/corretor operando o perfil de um
-    // cliente NÃO ganha a seção (nem como "em breve") — ver
-    // PersonalHealthScope. Documentos ainda não tem tela, só o lugar
-    // reservado (ver memory: project_multi_product_branding).
+    // cliente NÃO ganha a seção (ver PersonalHealthScope/CoupleHealthScope
+    // — não têm acesso a NADA ali, então a seção nem aparece). Documentos é
+    // diferente: o profissional pode ver um subconjunto (ver
+    // DocumentVisibilityScope), então a seção continua aparecendo pra ele,
+    // só a lista dentro é que fica menor.
     $navSections = $user?->isBroker()
         ? [['label' => 'Seguros', 'items' => $navSeguros]]
         : array_values(array_filter([
             ['label' => 'Finanças', 'items' => $navFinancas],
             ['label' => 'Seguros', 'items' => $navSeguros],
-            ['label' => 'Documentos', 'items' => [], 'emBreve' => true],
+            ['label' => 'Documentos', 'items' => $navDocumentos],
             $context->isConsultant() ? null : ['label' => 'Saúde', 'items' => $navSaude],
         ]));
 
@@ -61,12 +67,14 @@
     $moduloAtivo = match (true) {
         (bool) $user?->isBroker() => 'seguros',
         request()->routeIs('health.*') => 'saude',
+        request()->routeIs('documents.vault.*') => 'documentos',
         request()->routeIs('insurance.index') => 'seguros',
         default => 'financas',
     };
     $corBarraModulo = [
         'seguros' => 'bg-seguros-800',
         'saude' => 'bg-saude-800',
+        'documentos' => 'bg-documentos-800',
         'financas' => 'bg-brand-800',
     ][$moduloAtivo];
 
@@ -80,6 +88,7 @@
     $corAtivoEscuroDesktop = [
         'seguros' => 'dark:bg-seguros-800/60 dark:text-seguros-200',
         'saude' => 'dark:bg-saude-800/60 dark:text-saude-200',
+        'documentos' => 'dark:bg-documentos-800/60 dark:text-documentos-200',
         'financas' => 'dark:bg-accent-500/15 dark:text-accent-400',
     ][$moduloAtivo];
 

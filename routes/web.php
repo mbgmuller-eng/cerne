@@ -6,6 +6,7 @@ use App\Http\Controllers\Auth\AcceptPartnerInviteController;
 use App\Http\Controllers\Auth\AcceptProfessionalInviteController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\ConsultantLinkController;
+use App\Http\Controllers\DocumentFileController;
 use App\Http\Controllers\GymExerciseCatalogImageController;
 use App\Http\Controllers\GymExerciseImageController;
 use App\Http\Controllers\HealthEmergencyController;
@@ -27,6 +28,7 @@ use App\Livewire\Consultant\PortfolioInvestments;
 use App\Livewire\Consultant\PortfolioOverview;
 use App\Livewire\Dashboard;
 use App\Livewire\Documents\DocumentsIndex;
+use App\Livewire\Documents\DocumentVaultIndex;
 use App\Livewire\FixedBills\FixedBillsIndex;
 use App\Livewire\Goals\GoalsIndex;
 use App\Livewire\Health\Gym\GymExerciseHistory;
@@ -87,6 +89,11 @@ Route::middleware('auth')->group(function (): void {
     Route::get('/investimentos', InvestmentsIndex::class)->name('investments.index');
     Route::get('/seguros', InsuranceIndex::class)->name('insurance.index');
     Route::get('/objetivos', GoalsIndex::class)->name('goals.index');
+
+    // Documentos: visível ao consultor/corretor também (ao contrário de
+    // Saúde) — só que filtrado por categoria (DocumentVisibilityScope).
+    Route::get('/documentos', DocumentVaultIndex::class)->name('documents.vault.index');
+    Route::get('/documentos/{document}/arquivo', [DocumentFileController::class, 'show'])->name('documents.vault.file');
 
     // Saúde pessoal: só o dono abre (RequiresPersonalHealth) — consultor
     // e corretor levam 403 mesmo com o cliente aberto.
