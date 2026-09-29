@@ -46,6 +46,13 @@
                         <div class="flex shrink-0 items-center gap-2">
                             <button
                                 type="button"
+                                @click="$store.documentViewer.abrir(@js(route('documents.vault.file', $documento->id)), @js($documento->mime_type), @js($documento->title), @js($documento->original_filename))"
+                                class="btn-ghost px-2 py-1 text-xs"
+                            >
+                                Ver
+                            </button>
+                            <button
+                                type="button"
                                 @click="baixar(@js(route('documents.vault.file', $documento->id)), @js($documento->original_filename))"
                                 :disabled="baixando"
                                 class="text-xs font-medium text-documentos-800 hover:underline disabled:opacity-60 dark:text-documentos-200"
@@ -143,4 +150,42 @@
             </form>
         </x-modal>
     @endif
+
+    {{-- Visualizador: um modal só pra lista inteira (ver x-data="documentViewer"
+         em app.js — store global, não por linha). Nunca navega a página, então
+         "voltar" é só fechar o modal — sem o problema do PWA no iPhone preso
+         numa visualização sem histórico de navegação nenhum pra desfazer. --}}
+    <div x-data x-show="$store.documentViewer.aberto" x-cloak x-on:keydown.escape.window="$store.documentViewer.fechar()" class="fixed inset-0 z-40">
+        <div class="fixed inset-0 bg-slate-950/50 dark:bg-black/60" x-on:click="$store.documentViewer.fechar()"></div>
+
+        <div class="fixed inset-0 overflow-y-auto">
+            <div class="flex min-h-full items-start justify-center p-4 pt-10 sm:items-center sm:pt-4">
+                <div class="relative w-full sm:max-w-3xl card p-5">
+                    <div class="flex items-baseline justify-between gap-3">
+                        <h2 class="min-w-0 truncate text-sm font-semibold text-slate-900 dark:text-white" x-text="$store.documentViewer.titulo"></h2>
+                        <div class="flex shrink-0 items-center gap-3">
+                            <button type="button" x-show="$store.documentViewer.blobUrl" x-cloak @click="$store.documentViewer.baixar()" class="text-xs font-medium text-documentos-800 hover:underline dark:text-documentos-200">
+                                Baixar
+                            </button>
+                            <button type="button" @click="$store.documentViewer.fechar()" class="btn-ghost px-2 py-1 text-xs">Fechar</button>
+                        </div>
+                    </div>
+
+                    <div class="mt-4">
+                        <div x-show="$store.documentViewer.carregando" x-cloak class="py-12 text-center text-xs text-slate-400">
+                            Abrindo...
+                        </div>
+                        <p x-show="$store.documentViewer.erro" x-cloak x-text="$store.documentViewer.erro" class="py-12 text-center text-xs text-red-700 dark:text-red-400"></p>
+
+                        <template x-if="$store.documentViewer.blobUrl && $store.documentViewer.mimeType === 'application/pdf'">
+                            <iframe :src="$store.documentViewer.blobUrl" class="h-[75vh] w-full rounded-lg border border-slate-100 dark:border-white/10"></iframe>
+                        </template>
+                        <template x-if="$store.documentViewer.blobUrl && $store.documentViewer.mimeType !== 'application/pdf'">
+                            <img :src="$store.documentViewer.blobUrl" class="mx-auto max-h-[75vh] max-w-full rounded-lg">
+                        </template>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>

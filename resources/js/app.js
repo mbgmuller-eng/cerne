@@ -282,4 +282,78 @@ document.addEventListener('alpine:init', () => {
             }
         },
     }));
+
+    /**
+     * Documentos: "Ver" antes de baixar — a pessoa às vezes não tem
+     * certeza de qual documento é, e precisa olhar sem sair da tela.
+     *
+     * Store global (não Alpine.data por linha) porque o visualizador é UM
+     * modal só, compartilhado por toda a lista — cada linha só manda abrir
+     * com a URL/tipo dela. Busca o arquivo como blob e mostra num
+     * <iframe>/<img> apontando pro blob: nunca navega a página, então o
+     * mesmo problema do botão de baixar (iPhone preso na visualização do
+     * Safari, sem "voltar") nem chega a existir aqui — fechar o modal é só
+     * escrever `aberto = false`, sem histórico de navegação nenhum de
+     * verdade envolvido.
+     */
+    Alpine.store('documentViewer', {
+        aberto: false,
+        carregando: false,
+        erro: '',
+        titulo: '',
+        mimeType: '',
+        nomeArquivo: '',
+        blob: null,
+        blobUrl: null,
+
+        async abrir(url, mimeType, titulo, nomeArquivo) {
+            this.erro = '';
+            this.titulo = titulo;
+            this.mimeType = mimeType;
+            this.nomeArquivo = nomeArquivo;
+            this.blob = null;
+            this.blobUrl = null;
+            this.carregando = true;
+            this.aberto = true;
+
+            try {
+                const resposta = await fetch(url, { credentials: 'same-origin' });
+
+                if (!resposta.ok) {
+                    throw new Error('visualizacao-falhou');
+                }
+
+                this.blob = await resposta.blob();
+                this.blobUrl = URL.createObjectURL(this.blob);
+            } catch (e) {
+                this.erro = 'Não foi possível abrir o documento agora.';
+            } finally {
+                this.carregando = false;
+            }
+        },
+
+        baixar() {
+            if (this.blobUrl === null) {
+                return;
+            }
+
+            const link = document.createElement('a');
+            link.href = this.blobUrl;
+            link.download = this.nomeArquivo;
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+        },
+
+        fechar() {
+            this.aberto = false;
+
+            if (this.blobUrl !== null) {
+                URL.revokeObjectURL(this.blobUrl);
+            }
+
+            this.blob = null;
+            this.blobUrl = null;
+        },
+    });
 });
