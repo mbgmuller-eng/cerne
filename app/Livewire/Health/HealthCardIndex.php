@@ -99,6 +99,11 @@ class HealthCardIndex extends Component
         $service->removeCondition(HealthCondition::query()->findOrFail($conditionId));
     }
 
+    public function regenerateEmergencyToken(string $memberId, HealthCardService $service): void
+    {
+        $service->regenerateEmergencyToken($this->membroOuFalha($memberId), $this->autor());
+    }
+
     public function newMedication(string $memberId): void
     {
         $this->resetMedicationForm();

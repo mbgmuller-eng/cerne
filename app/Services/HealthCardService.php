@@ -9,6 +9,7 @@ use App\Models\HealthCondition;
 use App\Models\HealthMedication;
 use App\Models\HealthMedicationChange;
 use App\Models\ProfileMember;
+use Illuminate\Support\Str;
 
 /**
  * Ficha de saúde do casal (Cerne Saúde, fase A): tipo sanguíneo, alergia,
@@ -63,6 +64,78 @@ class HealthCardService
     public function removeCondition(HealthCondition $condition): void
     {
         $condition->delete();
+    }
+
+    /**
+     * Garante um código de emergência pra ficha — gera na primeira vez
+     * que a pessoa pede o QR Code, nunca antes (sem QR Code pedido, não
+     * existe token nenhum espalhado por aí à toa).
+     */
+    public function ensureEmergencyToken(ProfileMember $member): HealthCard
+    {
+        $card = $this->cardFor($member);
+
+        if ($card->emergency_token === null) {
+            $card->update(['emergency_token' => $this->novoToken()]);
+        }
+
+        return $card;
+    }
+
+    /** Troca o código — o QR Code (impresso, adesivo) com o antigo para de funcionar. É a forma simples de revogar. */
+    public function regenerateEmergencyToken(ProfileMember $member, ProfileMember $autor): HealthCard
+    {
+        $card = $this->cardFor($member);
+        $card->update(['emergency_token' => $this->novoToken(), 'updated_by_member_id' => $autor->id]);
+
+        return $card;
+    }
+
+    /**
+     * Os dados pro visitante que escaneou o QR Code — sem login, sem
+     * ProfileContext, por isso o bypass explícito do escopo aqui dentro
+     * (nunca no controller). Só o mínimo pra uma emergência: tipo
+     * sanguíneo, alergia, doença, remédio em uso (nome e dose, sem a
+     * linha do tempo) e telefone de quem mais tiver conta no perfil.
+     *
+     * @return array{member: ProfileMember, card: HealthCard, allergies: \Illuminate\Support\Collection, conditions: \Illuminate\Support\Collection, medications: \Illuminate\Support\Collection, contacts: \Illuminate\Support\Collection}|null
+     */
+    public function emergencyPayload(string $token): ?array
+    {
+        // withoutGlobalScopes() cheio, não só withoutCoupleHealthScope(): o
+        // visitante nunca logou, então BelongsToProfile também não tem
+        // ProfileContext nenhum pra filtrar — e falha fechado (zero linhas)
+        // sem o bypass explícito dos dois escopos.
+        $card = HealthCard::query()->withoutGlobalScopes()->where('emergency_token', $token)->first();
+
+        if ($card === null) {
+            return null;
+        }
+
+        $membro = ProfileMember::withoutGlobalScopes()->findOrFail($card->member_id);
+
+        return [
+            'member' => $membro,
+            'card' => $card,
+            'allergies' => HealthAllergy::query()->withoutGlobalScopes()->where('member_id', $membro->id)->orderBy('created_at')->get(),
+            'conditions' => HealthCondition::query()->withoutGlobalScopes()->where('member_id', $membro->id)->orderBy('created_at')->get(),
+            'medications' => HealthMedication::query()->withoutGlobalScopes()->where('member_id', $membro->id)->where('is_active', true)->orderBy('name')->get(),
+            'contacts' => ProfileMember::withoutGlobalScopes()
+                ->where('profile_id', $membro->profile_id)
+                ->where('is_active', true)
+                ->whereNotNull('user_id')
+                ->with('user')
+                ->get()
+                ->map(fn (ProfileMember $m) => ['name' => $m->name, 'phone' => $m->user?->phone])
+                ->filter(fn (array $c) => filled($c['phone'])),
+        ];
+    }
+
+    private function novoToken(): string
+    {
+        // Aleatório o bastante pra não dar pra adivinhar tentando —
+        // mesma ordem de grandeza de um token de sessão.
+        return Str::random(32);
     }
 
     /** @param  array<string, mixed>  $dados  name, dose, schedule, reason, prescriber, started_on */

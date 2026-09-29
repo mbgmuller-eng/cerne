@@ -8,6 +8,8 @@ use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\ConsultantLinkController;
 use App\Http\Controllers\GymExerciseCatalogImageController;
 use App\Http\Controllers\GymExerciseImageController;
+use App\Http\Controllers\HealthEmergencyController;
+use App\Http\Controllers\HealthQrCodeController;
 use App\Http\Controllers\ProfileSwitchController;
 use App\Http\Controllers\PushSubscriptionController;
 use App\Http\Controllers\PwaController;
@@ -33,6 +35,7 @@ use App\Livewire\Health\Gym\GymPlanEditor;
 use App\Livewire\Health\Gym\GymProgress;
 use App\Livewire\Health\Gym\GymSessionRun;
 use App\Livewire\Health\Gym\GymWorkoutShow;
+use App\Livewire\Health\HealthAppointmentIndex;
 use App\Livewire\Health\HealthCardIndex;
 use App\Livewire\Insurance\InsuranceIndex;
 use App\Livewire\Investments\InvestmentsIndex;
@@ -64,6 +67,11 @@ Route::middleware('guest')->group(function (): void {
     Route::get('/convite-profissional/{token}', [AcceptProfessionalInviteController::class, 'show'])->name('professional-invite.accept');
     Route::post('/convite-profissional/{token}', [AcceptProfessionalInviteController::class, 'store'])->name('professional-invite.store');
 });
+
+// QR Code de emergência: pública de propósito (quem escaneia é um
+// socorrista ou familiar sem conta) — token opaco no lugar de login, ver
+// HealthCardService::emergencyPayload().
+Route::get('/saude/emergencia/{token}', [HealthEmergencyController::class, 'show'])->name('health.emergency.show');
 
 /*
 | Autenticados
@@ -97,6 +105,8 @@ Route::middleware('auth')->group(function (): void {
     // Ficha de saúde: visível aos DOIS do casal (CoupleHealthScope) —
     // diferente da Academia, mas com o mesmo bloqueio a consultor/corretor.
     Route::get('/saude/ficha', HealthCardIndex::class)->name('health.card.index');
+    Route::get('/saude/ficha/{memberId}/qrcode', [HealthQrCodeController::class, 'show'])->name('health.qrcode.show');
+    Route::get('/saude/agenda', HealthAppointmentIndex::class)->name('health.appointments.index');
     Route::get('/importar', DocumentsIndex::class)->name('documents.index');
     Route::get('/regras-de-categorizacao', CategorizationRulesIndex::class)->name('categorization-rules.index');
     Route::get('/contas', AccountsIndex::class)->name('accounts.index');

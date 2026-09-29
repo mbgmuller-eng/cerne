@@ -132,6 +132,19 @@
                     </ul>
                 @endif
             </div>
+            {{-- QR Code de emergência --}}
+            <div class="flex items-center gap-4 border-t border-slate-100 pt-4 dark:border-white/10">
+                <img src="{{ route('health.qrcode.show', $membro->id) }}?v={{ $card->updated_at?->timestamp }}" alt="QR Code de emergência de {{ $membro->name }}" class="h-24 w-24 shrink-0 rounded-lg border border-slate-100 dark:border-white/10">
+                <div class="min-w-0">
+                    <p class="text-xs font-medium text-slate-700 dark:text-slate-300">QR Code de emergência</p>
+                    <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+                        Sem login: mostra tipo sanguíneo, alergias, doenças, remédios em uso e contatos. Imprima ou salve no celular.
+                    </p>
+                    <button type="button" wire:click="regenerateEmergencyToken('{{ $membro->id }}')" wire:confirm="Gerar um novo código? O QR Code impresso atual para de funcionar." class="mt-1.5 text-xs text-slate-400 hover:text-red-700 dark:hover:text-red-400">
+                        Gerar novo código
+                    </button>
+                </div>
+            </div>
         </section>
     @endforeach
 

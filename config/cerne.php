@@ -68,6 +68,11 @@ return [
         // mais folga que uma conta vencendo — dá tempo de ligar pro
         // cliente antes da data, não só no dia.
         'days_before_important_date' => env('CERNE_NOTIFY_DAYS_BEFORE_IMPORTANT_DATE', 7),
+
+        // Consulta/exame: 1 dia é o suficiente pra lembrar sem virar ruído
+        // — diferente de conta e apólice, marcar com muita antecedência
+        // não muda nada que a pessoa precise FAZER antes da data.
+        'days_before_appointment' => env('CERNE_NOTIFY_DAYS_BEFORE_APPOINTMENT', 1),
     ],
 
     /*

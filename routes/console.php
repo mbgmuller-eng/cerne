@@ -1,6 +1,7 @@
 <?php
 
 use App\Services\FixedBillService;
+use App\Services\HealthAppointmentService;
 use App\Services\ImportantDatesService;
 use App\Services\InvestmentSnapshotService;
 use App\Services\InvoiceService;
@@ -79,6 +80,14 @@ Schedule::call(function (): void {
 
     logger()->info('Datas importantes', $resultado);
 })->dailyAt('03:25')->name('datas-importantes')->withoutOverlapping();
+
+// Agenda de saúde: avisa consulta/exame de amanhã — pros donos da conta,
+// nunca pro consultor (ver HealthAppointmentService::recipientsFor()).
+Schedule::call(function (): void {
+    $notificados = app(HealthAppointmentService::class)->notifyUpcoming();
+
+    logger()->info('Agenda de saúde', ['notificados' => $notificados]);
+})->dailyAt('03:35')->name('agenda-saude')->withoutOverlapping();
 
 // Documentos: os que ficaram "Na fila" porque a ANTHROPIC_API_KEY ainda
 // não estava configurada no envio. Idempotente pelo próprio estado — um

@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /** Cabeçalho da ficha de saúde de UMA pessoa — hoje só o tipo sanguíneo. */
-#[Fillable(['profile_id', 'member_id', 'blood_type', 'updated_by_member_id'])]
+#[Fillable(['profile_id', 'member_id', 'blood_type', 'updated_by_member_id', 'emergency_token'])]
 class HealthCard extends Model
 {
     use BelongsToProfile, HasUuids, IsCoupleHealthData;

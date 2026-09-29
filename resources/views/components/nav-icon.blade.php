@@ -73,6 +73,9 @@
         @case('heart')
             <path d="M12 20.5s-7.5-4.6-9.7-9C.8 8 2 4.5 5.3 3.7c2-.5 3.8.3 4.9 1.9L12 7.5l1.8-1.9c1.1-1.6 2.9-2.4 4.9-1.9C22 4.5 23.2 8 21.7 11.5c-2.2 4.4-9.7 9-9.7 9Z"/>
             @break
+        @case('calendar')
+            <rect x="3" y="4.5" width="18" height="16" rx="2"/><path d="M3 9.5h18"/><path d="M8 3v3M16 3v3"/><circle cx="8.5" cy="14" r="1.1" fill="currentColor" stroke="none"/><circle cx="12" cy="14" r="1.1" fill="currentColor" stroke="none"/><circle cx="15.5" cy="14" r="1.1" fill="currentColor" stroke="none"/>
+            @break
         @case('mail')
             <rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/>
             @break
