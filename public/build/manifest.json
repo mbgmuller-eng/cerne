@@ -59,21 +59,8 @@
     "file": "assets/inter-700-normal-Yt3aPRUw.woff2",
     "src": "_inter-700-normal-Yt3aPRUw.woff2"
   },
-  "node_modules/pdfjs-dist/build/pdf.mjs": {
-    "file": "assets/pdf-DJDzPtC9.js",
-    "name": "pdf",
-    "src": "node_modules/pdfjs-dist/build/pdf.mjs",
-    "isDynamicEntry": true,
-    "imports": [
-      "resources/js/app.js"
-    ]
-  },
-  "node_modules/pdfjs-dist/build/pdf.worker.min.mjs": {
-    "file": "assets/pdf.worker.min-Dswkl-cV.mjs",
-    "src": "node_modules/pdfjs-dist/build/pdf.worker.min.mjs"
-  },
   "resources/css/app.css": {
-    "file": "assets/app-BH0FOtwK.css",
+    "file": "assets/app-BEjIb7M-.css",
     "name": "app",
     "names": [
       "app.css"
@@ -82,16 +69,10 @@
     "isEntry": true
   },
   "resources/js/app.js": {
-    "file": "assets/app-C50bwrmH.js",
+    "file": "assets/app-CVb1wstg.js",
     "name": "app",
     "src": "resources/js/app.js",
-    "isEntry": true,
-    "dynamicImports": [
-      "node_modules/pdfjs-dist/build/pdf.mjs"
-    ],
-    "assets": [
-      "assets/pdf.worker.min-Dswkl-cV.mjs"
-    ]
+    "isEntry": true
   },
   "resources/js/gym.js": {
     "file": "assets/gym-Ba5hdQYq.js",

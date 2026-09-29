@@ -295,11 +295,14 @@ class DocumentVaultTest extends TestCase
         $documento = $this->criarDocumento();
         $this->entrarComo($this->titular);
 
-        // attachment, não inline: abrir embutido prendia quem tem o Cerne
-        // instalado como PWA no iPhone numa visualização sem "voltar" nenhum.
+        // inline, não attachment: "Ver" num PDF abre esta URL numa aba
+        // nova — nenhum navegador sabe renderizar PDF embutido, só em
+        // navegação de página inteira, e inline é o que deixa a aba
+        // mostrar o arquivo em vez de só baixar. "Baixar" não depende
+        // deste cabeçalho (busca via JS e força o download do lado dele).
         $this->get(route('documents.vault.file', $documento->id))
             ->assertOk()
-            ->assertHeader('Content-Disposition', 'attachment; filename="cnh.pdf"');
+            ->assertHeader('Content-Disposition', 'inline; filename="cnh.pdf"');
     }
 
     private function criarDocumento(): Document

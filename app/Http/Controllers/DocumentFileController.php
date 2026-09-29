@@ -12,11 +12,13 @@ use Illuminate\Support\Facades\Storage;
  * DocumentVisibilityScope — um documento fora do alcance de quem pediu
  * nunca chega aqui, a rota devolve 404 antes de tentar abrir o arquivo.
  *
- * `attachment`, não `inline`: a tela busca isto via JS (baixarArquivo em
- * app.js) e nunca navega pra cá diretamente, mas se alguém colar a URL
- * direto no navegador, "baixar" em vez de "abrir dentro do app" é o
- * comportamento seguro por padrão — inline dentro de um PWA instalado no
- * iPhone prendia a pessoa na visualização, sem "voltar" nenhum.
+ * `inline`, não `attachment`: o botão "Ver" de um PDF abre esta URL numa
+ * aba nova (nenhum navegador — nem Android, nem Desktop, nem iPhone —
+ * sabe renderizar PDF DENTRO de um elemento embutido, só em navegação de
+ * página inteira; `inline` é o que deixa a aba nova mostrar o PDF em vez
+ * de só baixar). O botão "Baixar" não depende deste cabeçalho — busca via
+ * JS (baixarArquivo em app.js) e força o download do lado do navegador
+ * de qualquer forma.
  */
 class DocumentFileController extends Controller
 {
@@ -28,7 +30,7 @@ class DocumentFileController extends Controller
 
         return response($disco->get($document->storage_path), 200, [
             'Content-Type' => $document->mime_type,
-            'Content-Disposition' => 'attachment; filename="'.addslashes($document->original_filename).'"',
+            'Content-Disposition' => 'inline; filename="'.addslashes($document->original_filename).'"',
             // Privado: documento pessoal, não pode ficar em cache
             // compartilhado (proxy, CDN) nem num aparelho de uso comum.
             'Cache-Control' => 'private, max-age=86400',

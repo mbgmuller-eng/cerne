@@ -1,55 +1,3 @@
-// import() dinâmico, não estático: pdf.js pesa ~400KB, e só a tela de
-// Documentos usa isto — carregado de verdade só na primeira vez que
-// alguém clica "Ver" num PDF, não em toda página do app (app.js é
-// carregado em TODAS elas).
-let pdfjsLibPromise = null;
-
-function carregarPdfjs() {
-    pdfjsLibPromise ??= import('pdfjs-dist').then((pdfjsLib) => {
-        // Vite resolve isto pro arquivo real do worker e empacota como
-        // asset próprio — sem isso, pdf.js tenta buscar o worker de um
-        // caminho que não existe no build e falha calado.
-        pdfjsLib.GlobalWorkerOptions.workerSrc = new URL('pdfjs-dist/build/pdf.worker.min.mjs', import.meta.url).href;
-
-        return pdfjsLib;
-    });
-
-    return pdfjsLibPromise;
-}
-
-/**
- * Desenha cada página do PDF num <canvas>, empilhados dentro de `container`.
- *
- * Por que pdf.js e não um <iframe>/<embed> apontando pro blob: SÓ o Chrome
- * de desktop tem visualizador de PDF nativo embutível num iframe — Android
- * (Chrome, e os outros também) não tem NENHUM visualizador embutível, e
- * mostra um retângulo cinza com um botão "Abrir" que nem funciona (blob:
- * não navega pra fora da página que criou). pdf.js desenha em canvas —
- * funciona igual em qualquer navegador, porque não depende de plugin
- * nenhum do sistema.
- */
-async function renderizarPdf(container, blob) {
-    container.innerHTML = '';
-
-    const pdfjsLib = await carregarPdfjs();
-    const pdf = await pdfjsLib.getDocument({ data: await blob.arrayBuffer() }).promise;
-
-    for (let numeroPagina = 1; numeroPagina <= pdf.numPages; numeroPagina++) {
-        const pagina = await pdf.getPage(numeroPagina);
-        const viewport = pagina.getViewport({ scale: 1.5 });
-
-        const canvas = document.createElement('canvas');
-        canvas.width = viewport.width;
-        canvas.height = viewport.height;
-        canvas.className = 'mx-auto mb-2 max-w-full rounded-lg border border-slate-100 dark:border-white/10';
-        canvas.style.width = '100%';
-        canvas.style.height = 'auto';
-        container.appendChild(canvas);
-
-        await pagina.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
-    }
-}
-
 /**
  * Tema (claro/escuro/sistema): aplica a classe em <html> na hora e salva
  * a preferência no servidor em segundo plano — ver
@@ -336,39 +284,35 @@ document.addEventListener('alpine:init', () => {
     }));
 
     /**
-     * Documentos: "Ver" antes de baixar — a pessoa às vezes não tem
-     * certeza de qual documento é, e precisa olhar sem sair da tela.
+     * Documentos: "Ver" uma IMAGEM antes de baixar — a pessoa às vezes não
+     * tem certeza de qual documento é, e precisa olhar sem sair da tela.
+     *
+     * Só imagem: PDF não passa por aqui — nenhum navegador (Android,
+     * Desktop, iPhone) sabe renderizar PDF dentro de um elemento embutido,
+     * só em navegação de página inteira, então "Ver" num PDF abre a URL
+     * numa aba nova direto (ver o botão na blade), sem passar por este
+     * store. Imagem sempre funcionou bem num <img> normal.
      *
      * Store global (não Alpine.data por linha) porque o visualizador é UM
      * modal só, compartilhado por toda a lista — cada linha só manda abrir
-     * com a URL/tipo dela. Busca o arquivo como blob: nunca navega a
-     * página, então o mesmo problema do botão de baixar (iPhone preso na
+     * com a URL dela. Busca o arquivo como blob: nunca navega a página,
+     * então o mesmo problema do botão de baixar (iPhone preso na
      * visualização do Safari, sem "voltar") nem chega a existir aqui —
      * fechar o modal é só escrever `aberto = false`, sem histórico de
      * navegação nenhum de verdade envolvido.
-     *
-     * `pdfContainer` é o elemento onde o PDF é desenhado — registrado uma
-     * vez pelo x-init do próprio modal (ver a blade), porque $refs é por
-     * componente Alpine e o botão de cada linha é um componente diferente
-     * do modal.
      */
     Alpine.store('documentViewer', {
         aberto: false,
         carregando: false,
         erro: '',
         titulo: '',
-        mimeType: '',
         nomeArquivo: '',
-        blob: null,
         blobUrl: null,
-        pdfContainer: null,
 
-        async abrir(url, mimeType, titulo, nomeArquivo) {
+        async abrir(url, titulo, nomeArquivo) {
             this.erro = '';
             this.titulo = titulo;
-            this.mimeType = mimeType;
             this.nomeArquivo = nomeArquivo;
-            this.blob = null;
             this.blobUrl = null;
             this.carregando = true;
             this.aberto = true;
@@ -380,14 +324,7 @@ document.addEventListener('alpine:init', () => {
                     throw new Error('visualizacao-falhou');
                 }
 
-                this.blob = await resposta.blob();
-                // blobUrl serve pro <img> (imagem) e pro botão "Baixar" dos
-                // dois tipos — o PDF, além disso, é desenhado à parte.
-                this.blobUrl = URL.createObjectURL(this.blob);
-
-                if (this.mimeType === 'application/pdf') {
-                    await renderizarPdf(this.pdfContainer, this.blob);
-                }
+                this.blobUrl = URL.createObjectURL(await resposta.blob());
             } catch (e) {
                 this.erro = 'Não foi possível abrir o documento agora.';
             } finally {
@@ -415,12 +352,7 @@ document.addEventListener('alpine:init', () => {
                 URL.revokeObjectURL(this.blobUrl);
             }
 
-            this.blob = null;
             this.blobUrl = null;
-
-            if (this.pdfContainer !== null) {
-                this.pdfContainer.innerHTML = '';
-            }
         },
     });
 });

@@ -44,13 +44,23 @@
                             <p x-show="erro" x-cloak x-text="erro" class="mt-1 text-xs text-red-700 dark:text-red-400"></p>
                         </div>
                         <div class="flex shrink-0 items-center gap-2">
-                            <button
-                                type="button"
-                                @click="$store.documentViewer.abrir(@js(route('documents.vault.file', $documento->id)), @js($documento->mime_type), @js($documento->title), @js($documento->original_filename))"
-                                class="btn-ghost px-2 py-1 text-xs"
-                            >
-                                Ver
-                            </button>
+                            @if ($documento->mime_type === 'application/pdf')
+                                {{-- PDF: nenhum navegador (Android, desktop, iPhone) sabe renderizar
+                                     PDF dentro de um elemento embutido — só em navegação de página
+                                     inteira. Abre numa aba nova, deixando o visualizador nativo de
+                                     cada aparelho cuidar disso; fechar/trocar de aba volta pro Cerne. --}}
+                                <a href="{{ route('documents.vault.file', $documento->id) }}" target="_blank" rel="noopener" class="btn-ghost px-2 py-1 text-xs">
+                                    Ver
+                                </a>
+                            @else
+                                <button
+                                    type="button"
+                                    @click="$store.documentViewer.abrir(@js(route('documents.vault.file', $documento->id)), @js($documento->title), @js($documento->original_filename))"
+                                    class="btn-ghost px-2 py-1 text-xs"
+                                >
+                                    Ver
+                                </button>
+                            @endif
                             <button
                                 type="button"
                                 @click="baixar(@js(route('documents.vault.file', $documento->id)), @js($documento->original_filename))"
@@ -151,13 +161,14 @@
         </x-modal>
     @endif
 
-    {{-- Visualizador: um modal só pra lista inteira (ver x-data="documentViewer"
-         em app.js — store global, não por linha). Nunca navega a página, então
-         "voltar" é só fechar o modal — sem o problema do PWA no iPhone preso
-         numa visualização sem histórico de navegação nenhum pra desfazer. --}}
+    {{-- Visualizador de IMAGEM: um modal só pra lista inteira (ver
+         x-data="documentViewer" em app.js — store global, não por linha).
+         Só imagem passa por aqui (PDF abre em aba nova, ver botão "Ver"
+         acima). Nunca navega a página, então "voltar" é só fechar o modal
+         — sem o problema do PWA no iPhone preso numa visualização sem
+         histórico de navegação nenhum pra desfazer. --}}
     <div
         x-data
-        x-init="$store.documentViewer.pdfContainer = $refs.pdfContainer"
         x-show="$store.documentViewer.aberto"
         x-cloak
         x-on:keydown.escape.window="$store.documentViewer.fechar()"
@@ -184,12 +195,7 @@
                         </div>
                         <p x-show="$store.documentViewer.erro" x-cloak x-text="$store.documentViewer.erro" class="py-12 text-center text-xs text-red-700 dark:text-red-400"></p>
 
-                        {{-- pdf.js desenha as páginas aqui dentro (ver renderizarPdf em app.js)
-                             — precisa existir no DOM desde o início pro $refs funcionar,
-                             por isso x-show em vez de x-if/template. --}}
-                        <div x-ref="pdfContainer" x-show="$store.documentViewer.mimeType === 'application/pdf'" class="max-h-[75vh] overflow-y-auto"></div>
-
-                        <img x-show="$store.documentViewer.blobUrl && $store.documentViewer.mimeType !== 'application/pdf'" :src="$store.documentViewer.blobUrl" class="mx-auto max-h-[75vh] max-w-full rounded-lg">
+                        <img x-show="$store.documentViewer.blobUrl" :src="$store.documentViewer.blobUrl" class="mx-auto max-h-[75vh] max-w-full rounded-lg">
                     </div>
                 </div>
             </div>
