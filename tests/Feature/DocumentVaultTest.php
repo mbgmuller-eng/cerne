@@ -295,7 +295,11 @@ class DocumentVaultTest extends TestCase
         $documento = $this->criarDocumento();
         $this->entrarComo($this->titular);
 
-        $this->get(route('documents.vault.file', $documento->id))->assertOk();
+        // attachment, não inline: abrir embutido prendia quem tem o Cerne
+        // instalado como PWA no iPhone numa visualização sem "voltar" nenhum.
+        $this->get(route('documents.vault.file', $documento->id))
+            ->assertOk()
+            ->assertHeader('Content-Disposition', 'attachment; filename="cnh.pdf"');
     }
 
     private function criarDocumento(): Document

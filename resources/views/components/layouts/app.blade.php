@@ -463,51 +463,61 @@
                     Cerne
                 </a>
 
-                {{-- min-w-0 é o que permite este grupo encolher menos que
-                     seu conteúdo e rolar por dentro (overflow-x-auto) em
-                     vez de estourar a largura da tela — consultor/admin
-                     têm bem mais botões aqui do que o cliente comum, e
-                     sem isto eles simplesmente somiam pra fora da tela no
-                     celular. --}}
-                <div class="flex min-w-0 items-center gap-2 overflow-x-auto">
-                    @if ($context->isConsultant())
-                        <span @class([
-                            'badge ring-1',
-                            'bg-amber-500/10 text-amber-300 ring-amber-500/20' => $dentroDoPerfil,
-                            'bg-amber-50 text-amber-900 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-300 dark:ring-amber-500/20' => ! $dentroDoPerfil,
-                        ])>{{ $user?->isBroker() ? 'corretor' : 'consultor' }}</span>
-                    @endif
+                {{-- O sino fica FORA do trecho rolável, de propósito: um
+                     ancestral com overflow-x força overflow-y a também virar
+                     clipping (regra do CSS, não dá pra escapar só com
+                     overflow-x sozinho) — o painel do sino, que abre pra
+                     baixo, ficava cortado numa faixa de ~32px de altura e
+                     nunca aparecia no celular (tocar no sino não fazia nada
+                     visível). Com o sino fora do overflow-x-auto, sobra sem
+                     ancestral que corte o painel. --}}
+                <div class="flex min-w-0 flex-1 items-center justify-end gap-2">
+                    {{-- min-w-0 é o que permite este grupo encolher menos que
+                         seu conteúdo e rolar por dentro (overflow-x-auto) em
+                         vez de estourar a largura da tela — consultor/admin
+                         têm bem mais botões aqui do que o cliente comum, e
+                         sem isto eles simplesmente somiam pra fora da tela no
+                         celular. --}}
+                    <div class="flex min-w-0 items-center gap-2 overflow-x-auto">
+                        @if ($context->isConsultant())
+                            <span @class([
+                                'badge ring-1',
+                                'bg-amber-500/10 text-amber-300 ring-amber-500/20' => $dentroDoPerfil,
+                                'bg-amber-50 text-amber-900 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-300 dark:ring-amber-500/20' => ! $dentroDoPerfil,
+                            ])>{{ $user?->isBroker() ? 'corretor' : 'consultor' }}</span>
+                        @endif
 
-                    @if ($user?->isLinkedProfessional())
-                        @foreach ($navConsultor as [$route, $label, $curto, $icone])
-                            @if ($route !== 'admin.users')
-                                <a href="{{ route($route) }}" @class(['btn-ghost', '!text-white/60' => $dentroDoPerfil]) title="{{ $label }}">
-                                    <x-nav-icon :name="$icone" class="h-4 w-4" />
-                                    <span class="ml-1.5 hidden sm:inline">{{ $curto }}</span>
-                                </a>
-                            @endif
-                        @endforeach
-                    @endif
+                        @if ($user?->isLinkedProfessional())
+                            @foreach ($navConsultor as [$route, $label, $curto, $icone])
+                                @if ($route !== 'admin.users')
+                                    <a href="{{ route($route) }}" @class(['btn-ghost', '!text-white/60' => $dentroDoPerfil]) title="{{ $label }}">
+                                        <x-nav-icon :name="$icone" class="h-4 w-4" />
+                                        <span class="ml-1.5 hidden sm:inline">{{ $curto }}</span>
+                                    </a>
+                                @endif
+                            @endforeach
+                        @endif
 
-                    @if ($user?->isPlatformAdmin())
-                        <a href="{{ route('admin.users') }}" @class(['btn-ghost', '!text-white/60' => $dentroDoPerfil]) title="Painel admin">
-                            <x-nav-icon name="admin" class="h-4 w-4" />
-                            <span class="ml-1.5 hidden sm:inline">Admin</span>
-                        </a>
-                    @endif
+                        @if ($user?->isPlatformAdmin())
+                            <a href="{{ route('admin.users') }}" @class(['btn-ghost', '!text-white/60' => $dentroDoPerfil]) title="Painel admin">
+                                <x-nav-icon name="admin" class="h-4 w-4" />
+                                <span class="ml-1.5 hidden sm:inline">Admin</span>
+                            </a>
+                        @endif
 
-                    <x-theme-switcher :current="$theme" />
+                        <x-theme-switcher :current="$theme" />
 
-                    <form method="POST" action="{{ route('logout') }}">
-                        @csrf
-                        <button type="submit" @class(['btn-ghost', '!text-white/60' => $dentroDoPerfil]) title="Sair">
-                            <x-nav-icon name="logout" class="h-4 w-4" />
-                            <span class="ml-1.5 hidden sm:inline">Sair</span>
-                        </button>
-                    </form>
+                        <form method="POST" action="{{ route('logout') }}">
+                            @csrf
+                            <button type="submit" @class(['btn-ghost', '!text-white/60' => $dentroDoPerfil]) title="Sair">
+                                <x-nav-icon name="logout" class="h-4 w-4" />
+                                <span class="ml-1.5 hidden sm:inline">Sair</span>
+                            </button>
+                        </form>
+                    </div>
 
                     @auth
-                        <div @class(['[&>div>button]:!text-white/60' => $dentroDoPerfil])>
+                        <div @class(['shrink-0', '[&>div>button]:!text-white/60' => $dentroDoPerfil])>
                             <livewire:notifications.notification-center />
                         </div>
                     @endauth

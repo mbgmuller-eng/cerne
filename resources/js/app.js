@@ -86,6 +86,35 @@
  * por isso o botão só aparece quando `window.SpeechRecognition` (ou o
  * prefixo `webkit`) existe de fato.
  */
+/**
+ * Baixa um arquivo forçando o "Salvar como" do navegador em vez de
+ * navegar/abrir embutido — usado tanto pelo QR de emergência quanto pela
+ * área de Documentos. Buscar como blob (em vez de só um <a href download>
+ * apontando pra URL) é o que garante o download de verdade também no
+ * Safari/iOS: o Safari tem visualizador nativo de PDF/imagem que ignora o
+ * atributo `download` e abre o arquivo por cima do app — inclusive dentro
+ * de um PWA instalado na tela de início, onde não existe "voltar" nenhum
+ * pra essa visualização, forçando a pessoa a fechar e reabrir o app.
+ * Baixar como blob nunca navega a página, então esse problema não existe.
+ */
+async function baixarArquivo(url, nomeArquivo) {
+    const resposta = await fetch(url, { credentials: 'same-origin' });
+
+    if (!resposta.ok) {
+        throw new Error('download-falhou');
+    }
+
+    const blob = await resposta.blob();
+    const blobUrl = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = blobUrl;
+    link.download = nomeArquivo;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(blobUrl);
+}
+
 document.addEventListener('alpine:init', () => {
     Alpine.data('voiceExpense', () => ({
         suportado: false,
@@ -226,23 +255,28 @@ document.addEventListener('alpine:init', () => {
             this.baixando = true;
 
             try {
-                const resposta = await fetch(this.imageUrl, { credentials: 'same-origin' });
-
-                if (!resposta.ok) {
-                    throw new Error('download-falhou');
-                }
-
-                const blob = await resposta.blob();
-                const blobUrl = URL.createObjectURL(blob);
-                const link = document.createElement('a');
-                link.href = blobUrl;
-                link.download = this.fileName;
-                document.body.appendChild(link);
-                link.click();
-                link.remove();
-                URL.revokeObjectURL(blobUrl);
+                await baixarArquivo(this.imageUrl, this.fileName);
             } catch (e) {
                 this.erro = 'Não foi possível baixar a imagem agora.';
+            } finally {
+                this.baixando = false;
+            }
+        },
+    }));
+
+    /** Documentos: baixar o arquivo original — ver baixarArquivo() acima pro motivo de não ser um <a download> simples. */
+    Alpine.data('documentDownload', () => ({
+        baixando: false,
+        erro: '',
+
+        async baixar(url, nomeArquivo) {
+            this.erro = '';
+            this.baixando = true;
+
+            try {
+                await baixarArquivo(url, nomeArquivo);
+            } catch (e) {
+                this.erro = 'Não foi possível baixar o documento agora.';
             } finally {
                 this.baixando = false;
             }

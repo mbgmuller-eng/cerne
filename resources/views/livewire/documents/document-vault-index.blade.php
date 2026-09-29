@@ -20,8 +20,12 @@
         @else
             <ul class="space-y-2">
                 @foreach ($documents as $documento)
-                    <li class="flex items-center justify-between gap-3 rounded-xl border border-slate-100 p-3 dark:border-white/10" wire:key="doc-{{ $documento->id }}">
-                        <a href="{{ route('documents.vault.file', $documento->id) }}" target="_blank" rel="noopener" class="min-w-0 flex-1">
+                    <li
+                        wire:key="doc-{{ $documento->id }}"
+                        x-data="documentDownload"
+                        class="flex items-center justify-between gap-3 rounded-xl border border-slate-100 p-3 dark:border-white/10"
+                    >
+                        <div class="min-w-0 flex-1">
                             <p class="text-sm font-medium text-slate-800 dark:text-slate-200">{{ $documento->title }}</p>
                             <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
                                 {{ $documento->category->label() }}
@@ -37,15 +41,25 @@
                                     · <span class="{{ $documento->expires_on->isPast() ? 'text-red-700 dark:text-red-400' : '' }}">vence {{ $documento->expires_on->format('d/m/Y') }}</span>
                                 @endif
                             </p>
-                        </a>
-                        @if ($podeGerenciar)
-                            <div class="flex shrink-0 items-center gap-2">
+                            <p x-show="erro" x-cloak x-text="erro" class="mt-1 text-xs text-red-700 dark:text-red-400"></p>
+                        </div>
+                        <div class="flex shrink-0 items-center gap-2">
+                            <button
+                                type="button"
+                                @click="baixar(@js(route('documents.vault.file', $documento->id)), @js($documento->original_filename))"
+                                :disabled="baixando"
+                                class="text-xs font-medium text-documentos-800 hover:underline disabled:opacity-60 dark:text-documentos-200"
+                            >
+                                <span x-show="!baixando">Baixar</span>
+                                <span x-show="baixando" x-cloak>Baixando...</span>
+                            </button>
+                            @if ($podeGerenciar)
                                 <button type="button" wire:click="editDocument('{{ $documento->id }}')" class="btn-ghost px-2 py-1 text-xs">Editar</button>
                                 <button type="button" wire:click="delete('{{ $documento->id }}')" wire:confirm="Remover este documento?" class="text-xs text-slate-400 hover:text-red-700 dark:hover:text-red-400">
                                     remover
                                 </button>
-                            </div>
-                        @endif
+                            @endif
+                        </div>
                     </li>
                 @endforeach
             </ul>
