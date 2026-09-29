@@ -27,6 +27,7 @@ class DocumentVaultIndex extends Component
     use RequiresActiveProfile, WithFileUploads;
 
     public bool $showForm = false;
+    public ?string $editingId = null;
     public string $category = '';
     public string $title = '';
     public string $memberId = '';
@@ -47,6 +48,22 @@ class DocumentVaultIndex extends Component
         $this->showForm = true;
     }
 
+    public function editDocument(string $documentId): void
+    {
+        $this->abortUnlessCanManage();
+        $documento = Document::query()->findOrFail($documentId);
+
+        $this->resetForm();
+        $this->editingId = $documento->id;
+        $this->category = $documento->category->value;
+        $this->title = $documento->title;
+        $this->memberId = (string) $documento->member_id;
+        $this->insurancePolicyId = (string) $documento->insurance_policy_id;
+        $this->expiresOn = $documento->expires_on?->toDateString() ?? '';
+        $this->visibleToProfessional = $documento->visible_to_professional;
+        $this->showForm = true;
+    }
+
     public function closeForm(): void
     {
         $this->showForm = false;
@@ -61,7 +78,8 @@ class DocumentVaultIndex extends Component
             'insurancePolicyId' => ['required_if:category,'.DocumentCategory::InsurancePolicy->value],
             'expiresOn' => ['nullable', 'date'],
             'arquivo' => [
-                'required',
+                // Só obrigatório ao criar — editar é só metadado, ver DocumentService::update().
+                $this->editingId === null ? 'required' : 'nullable',
                 'file',
                 'mimes:pdf,jpg,jpeg,png',
                 'max:'.config('cerne.document_vault.max_kb'),
@@ -74,14 +92,20 @@ class DocumentVaultIndex extends Component
         $this->abortUnlessCanManage();
         $data = $this->validate();
 
-        $service->upload($this->arquivo, [
+        $dados = [
             'category' => $data['category'],
             'title' => $data['title'],
             'member_id' => $data['memberId'] !== '' ? $data['memberId'] : null,
             'insurance_policy_id' => $data['insurancePolicyId'] !== '' ? $data['insurancePolicyId'] : null,
             'expires_on' => $data['expiresOn'] !== '' ? $data['expiresOn'] : null,
             'visible_to_professional' => $this->visibleToProfessional,
-        ], $this->autor());
+        ];
+
+        if ($this->editingId !== null) {
+            $service->update(Document::query()->findOrFail($this->editingId), $dados);
+        } else {
+            $service->upload($this->arquivo, $dados, $this->autor());
+        }
 
         $this->showForm = false;
     }
@@ -99,6 +123,7 @@ class DocumentVaultIndex extends Component
             'membros' => $this->membros(),
             'policies' => InsurancePolicy::query()->active()->orderBy('insurer_name')->get(),
             'podeGerenciar' => ! app(ProfileContext::class)->isConsultant(),
+            'editingExisting' => $this->editingId !== null,
         ]);
     }
 
@@ -124,7 +149,7 @@ class DocumentVaultIndex extends Component
 
     private function resetForm(): void
     {
-        $this->reset('category', 'title', 'memberId', 'insurancePolicyId', 'expiresOn', 'visibleToProfessional', 'arquivo');
+        $this->reset('editingId', 'category', 'title', 'memberId', 'insurancePolicyId', 'expiresOn', 'visibleToProfessional', 'arquivo');
         $this->resetErrorBag();
     }
 }

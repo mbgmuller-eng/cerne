@@ -43,6 +43,29 @@ class DocumentService
         ]);
     }
 
+    /**
+     * Só metadado — trocar o arquivo em si é upload novo (apagar e subir de
+     * novo), não edição. Cobre o caso comum: título errado, categoria
+     * errada, ou apólice/pessoa que mudou depois.
+     *
+     * @param  array<string, mixed>  $dados  category, title, member_id, insurance_policy_id, expires_on, visible_to_professional
+     */
+    public function update(Document $documento, array $dados): Document
+    {
+        $categoria = DocumentCategory::from($dados['category']);
+
+        $documento->update([
+            'member_id' => $dados['member_id'] ?? null,
+            'category' => $categoria,
+            'insurance_policy_id' => $categoria === DocumentCategory::InsurancePolicy ? ($dados['insurance_policy_id'] ?? null) : null,
+            'title' => trim($dados['title']),
+            'expires_on' => $dados['expires_on'] ?? null,
+            'visible_to_professional' => $categoria === DocumentCategory::Other && (bool) ($dados['visible_to_professional'] ?? false),
+        ]);
+
+        return $documento;
+    }
+
     public function delete(Document $documento): void
     {
         Storage::disk(config('cerne.document_vault.disk'))->delete($documento->storage_path);

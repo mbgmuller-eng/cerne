@@ -77,6 +77,53 @@ class DocumentVaultTest extends TestCase
             ->assertHasErrors(['insurancePolicyId']);
     }
 
+    public function test_editar_corrige_titulo_sem_pedir_arquivo_novo(): void
+    {
+        $this->entrarComo($this->titular);
+        $service = app(DocumentService::class);
+        $documento = $service->upload(UploadedFile::fake()->create('cnh.pdf', 100, 'application/pdf'), [
+            'category' => 'driver_license', 'title' => 'CNH errada', 'member_id' => $this->titular->id,
+        ], $this->titular);
+        $caminhoOriginal = $documento->storage_path;
+
+        Livewire::test(DocumentVaultIndex::class)
+            ->call('editDocument', $documento->id)
+            ->assertSet('title', 'CNH errada')
+            ->set('title', 'CNH — Marcelo')
+            ->call('save')
+            ->assertHasNoErrors();
+
+        $documento->refresh();
+        self::assertSame('CNH — Marcelo', $documento->title);
+        self::assertSame($caminhoOriginal, $documento->storage_path);
+        self::assertSame(1, Document::query()->count());
+    }
+
+    public function test_editar_trocando_para_apolice_exige_vinculo(): void
+    {
+        $this->entrarComo($this->titular);
+        $documento = app(DocumentService::class)->upload(UploadedFile::fake()->create('a.pdf', 10, 'application/pdf'), [
+            'category' => 'other', 'title' => 'Documento',
+        ], $this->titular);
+
+        Livewire::test(DocumentVaultIndex::class)
+            ->call('editDocument', $documento->id)
+            ->set('category', 'insurance_policy')
+            ->call('save')
+            ->assertHasErrors(['insurancePolicyId']);
+    }
+
+    public function test_consultor_nao_pode_editar_documento(): void
+    {
+        $documento = $this->criarDocumento();
+
+        [$consultor, $perfil] = $this->criarConsultorVinculado();
+        $this->actingAs($consultor);
+        app(ProfileContext::class)->set($perfil, member: null, asConsultant: true);
+
+        Livewire::test(DocumentVaultIndex::class)->call('editDocument', $documento->id)->assertStatus(403);
+    }
+
     public function test_remover_apaga_o_arquivo_do_disco(): void
     {
         $this->entrarComo($this->titular);

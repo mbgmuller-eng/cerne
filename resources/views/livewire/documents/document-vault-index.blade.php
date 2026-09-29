@@ -39,9 +39,12 @@
                             </p>
                         </a>
                         @if ($podeGerenciar)
-                            <button type="button" wire:click="delete('{{ $documento->id }}')" wire:confirm="Remover este documento?" class="shrink-0 text-xs text-slate-400 hover:text-red-700 dark:hover:text-red-400">
-                                remover
-                            </button>
+                            <div class="flex shrink-0 items-center gap-2">
+                                <button type="button" wire:click="editDocument('{{ $documento->id }}')" class="btn-ghost px-2 py-1 text-xs">Editar</button>
+                                <button type="button" wire:click="delete('{{ $documento->id }}')" wire:confirm="Remover este documento?" class="text-xs text-slate-400 hover:text-red-700 dark:hover:text-red-400">
+                                    remover
+                                </button>
+                            </div>
                         @endif
                     </li>
                 @endforeach
@@ -53,7 +56,7 @@
         <x-modal wire-model="showForm">
             <form wire:submit="save" class="space-y-4">
                 <div class="flex items-baseline justify-between">
-                    <h2 class="text-sm font-semibold text-slate-900 dark:text-white">Novo documento</h2>
+                    <h2 class="text-sm font-semibold text-slate-900 dark:text-white">{{ $editingExisting ? 'Editar documento' : 'Novo documento' }}</h2>
                     <button type="button" wire:click="closeForm" class="btn-ghost px-2 py-1 text-xs">Cancelar</button>
                 </div>
 
@@ -112,12 +115,14 @@
                         </label>
                     @endif
 
-                    <div>
-                        <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Arquivo (PDF, JPG ou PNG)</label>
-                        <input type="file" wire:model="arquivo" accept=".pdf,.jpg,.jpeg,.png" class="input mt-1.5">
-                        <div wire:loading wire:target="arquivo" class="mt-1 text-xs text-slate-400">Enviando...</div>
-                        @error('arquivo') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
-                    </div>
+                    @if (! $editingExisting)
+                        <div>
+                            <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Arquivo (PDF, JPG ou PNG)</label>
+                            <input type="file" wire:model="arquivo" accept=".pdf,.jpg,.jpeg,.png" class="input mt-1.5">
+                            <div wire:loading wire:target="arquivo" class="mt-1 text-xs text-slate-400">Enviando...</div>
+                            @error('arquivo') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                        </div>
+                    @endif
                 </div>
 
                 <button type="submit" class="btn-primary w-full">Salvar</button>
