@@ -1,3 +1,13 @@
+# mime.types da hospedagem não conhece .mjs (checado via SSH — nem
+# listado), então o servidor mandava um Content-Type genérico que o
+# navegador recusa executar como Worker de módulo. Isso quebrava o
+# visualizador de PDF (pdf.worker.min.mjs) em produção mesmo funcionando
+# local — o servidor de dev do PHP tem um default são pra .mjs, a
+# hospedagem não.
+<IfModule mod_mime.c>
+    AddType text/javascript .mjs
+</IfModule>
+
 <IfModule mod_rewrite.c>
     <IfModule mod_negotiation.c>
         Options -MultiViews -Indexes
