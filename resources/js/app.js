@@ -171,4 +171,55 @@ document.addEventListener('alpine:init', () => {
             }
         },
     }));
+
+    /**
+     * Compartilhar/baixar o QR Code de emergência como IMAGEM, não como
+     * link — pra ir direto pro WhatsApp/e-mail/Fotos do celular. A Web
+     * Share API (nível 2, com `files`) é quem faz isso: abre a folha de
+     * compartilhamento nativa do aparelho com o PNG já anexado. Onde ela
+     * não existe (a maioria dos navegadores de desktop), cai pra download
+     * comum — mesmo clique, o navegador decide o que consegue fazer.
+     */
+    Alpine.data('qrShare', () => ({
+        compartilhando: false,
+        erro: '',
+
+        async compartilhar(url, nomeArquivo) {
+            this.erro = '';
+            this.compartilhando = true;
+
+            try {
+                const resposta = await fetch(url, { credentials: 'same-origin' });
+
+                if (!resposta.ok) {
+                    throw new Error('download-falhou');
+                }
+
+                const blob = await resposta.blob();
+                const arquivo = new File([blob], nomeArquivo, { type: blob.type || 'image/png' });
+
+                if (navigator.canShare && navigator.canShare({ files: [arquivo] })) {
+                    await navigator.share({ files: [arquivo], title: 'QR Code de emergência' });
+
+                    return;
+                }
+
+                const blobUrl = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = blobUrl;
+                link.download = nomeArquivo;
+                document.body.appendChild(link);
+                link.click();
+                link.remove();
+                URL.revokeObjectURL(blobUrl);
+            } catch (e) {
+                // AbortError: a pessoa cancelou a folha de compartilhamento — não é erro.
+                if (e?.name !== 'AbortError') {
+                    this.erro = 'Não foi possível compartilhar agora. Tente novamente.';
+                }
+            } finally {
+                this.compartilhando = false;
+            }
+        },
+    }));
 });
