@@ -224,6 +224,29 @@ class HealthCardTest extends TestCase
         self::assertSame('A+', app(HealthCardService::class)->cardFor($this->titular)->fresh()->blood_type);
     }
 
+    public function test_regenerar_token_atualiza_o_link_de_compartilhar_na_tela(): void
+    {
+        // Confirma que o HTML renderizado nunca fica com o token antigo —
+        // pré-requisito do wire:key no bloco do QR Code (ver blade): sem
+        // ele, o morph do navegador preserva o x-data do Alpine entre
+        // atualizações (comportamento padrão do Livewire+Alpine) e o link
+        // fica apontando pro token ANTIGO depois de "Gerar novo código",
+        // quieto, sem erro nenhum — isso o teste de servidor não alcança,
+        // só o comportamento documentado do wire:key garante.
+        $this->entrarComo($this->titular);
+        $tokenAntigo = app(HealthCardService::class)->ensureEmergencyToken($this->titular)->emergency_token;
+
+        $componente = Livewire::test(HealthCardIndex::class);
+        self::assertStringContainsString($tokenAntigo, $componente->html());
+
+        $componente->call('regenerateEmergencyToken', $this->titular->id);
+        $tokenNovo = app(HealthCardService::class)->cardFor($this->titular)->fresh()->emergency_token;
+
+        self::assertNotSame($tokenAntigo, $tokenNovo);
+        self::assertStringContainsString($tokenNovo, $componente->html());
+        self::assertStringNotContainsString($tokenAntigo, $componente->html());
+    }
+
     public function test_criar_e_editar_remedio_pela_tela(): void
     {
         $this->entrarComo($this->titular);

@@ -184,7 +184,10 @@ class HealthCardIndex extends Component
         $fichas = $membros->mapWithKeys(function (ProfileMember $membro) use ($service) {
             return [$membro->id => [
                 'membro' => $membro,
-                'card' => $service->cardFor($membro),
+                // ensureEmergencyToken, não cardFor: o link de compartilhar
+                // (abaixo, na view) precisa do token pronto na hora de
+                // montar a URL — não só quando alguém pedir a imagem do QR.
+                'card' => $service->ensureEmergencyToken($membro),
                 'allergies' => HealthAllergy::query()->where('member_id', $membro->id)->orderBy('created_at')->get(),
                 'conditions' => HealthCondition::query()->where('member_id', $membro->id)->orderBy('created_at')->get(),
                 'medications' => HealthMedication::query()->where('member_id', $membro->id)

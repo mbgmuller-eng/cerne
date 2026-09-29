@@ -173,52 +173,78 @@ document.addEventListener('alpine:init', () => {
     }));
 
     /**
-     * Compartilhar/baixar o QR Code de emergência como IMAGEM, não como
-     * link — pra ir direto pro WhatsApp/e-mail/Fotos do celular. A Web
-     * Share API (nível 2, com `files`) é quem faz isso: abre a folha de
-     * compartilhamento nativa do aparelho com o PNG já anexado. Onde ela
-     * não existe (a maioria dos navegadores de desktop), cai pra download
-     * comum — mesmo clique, o navegador decide o que consegue fazer.
+     * QR Code de emergência: DUAS ações bem separadas, porque resolvem
+     * problemas diferentes.
+     *
+     * `compartilharLink` manda o LINK (não a imagem) pela folha de
+     * compartilhamento nativa — é o que faz sentido pra mandar pra uma
+     * pessoa (ela toca e abre a ficha, sem precisar escanear nada).
+     * Compartilhar a imagem do QR por WhatsApp não serve pra isso: quem
+     * recebe só vê uma figura, sem como "clicar" nela.
+     *
+     * `baixarImagem` continua baixando o PNG de verdade — serve pra
+     * imprimir ou guardar como foto (carteira, geladeira), onde faz
+     * sentido ter o código pra ESCANEAR, não um link pra clicar.
      */
-    Alpine.data('qrShare', () => ({
+    Alpine.data('qrShare', (config) => ({
+        url: config.url,
+        imageUrl: config.imageUrl,
+        title: config.title,
+        fileName: config.fileName,
         compartilhando: false,
+        baixando: false,
+        mensagem: '',
         erro: '',
 
-        async compartilhar(url, nomeArquivo) {
+        async compartilharLink() {
             this.erro = '';
+            this.mensagem = '';
             this.compartilhando = true;
 
             try {
-                const resposta = await fetch(url, { credentials: 'same-origin' });
+                if (navigator.share) {
+                    await navigator.share({ title: this.title, url: this.url });
+
+                    return;
+                }
+
+                await navigator.clipboard.writeText(this.url);
+                this.mensagem = 'Link copiado!';
+            } catch (e) {
+                // AbortError: a pessoa cancelou a folha de compartilhamento — não é erro.
+                if (e?.name !== 'AbortError') {
+                    this.erro = 'Não foi possível compartilhar o link agora.';
+                }
+            } finally {
+                this.compartilhando = false;
+            }
+        },
+
+        async baixarImagem() {
+            this.erro = '';
+            this.mensagem = '';
+            this.baixando = true;
+
+            try {
+                const resposta = await fetch(this.imageUrl, { credentials: 'same-origin' });
 
                 if (!resposta.ok) {
                     throw new Error('download-falhou');
                 }
 
                 const blob = await resposta.blob();
-                const arquivo = new File([blob], nomeArquivo, { type: blob.type || 'image/png' });
-
-                if (navigator.canShare && navigator.canShare({ files: [arquivo] })) {
-                    await navigator.share({ files: [arquivo], title: 'QR Code de emergência' });
-
-                    return;
-                }
-
                 const blobUrl = URL.createObjectURL(blob);
                 const link = document.createElement('a');
                 link.href = blobUrl;
-                link.download = nomeArquivo;
+                link.download = this.fileName;
                 document.body.appendChild(link);
                 link.click();
                 link.remove();
                 URL.revokeObjectURL(blobUrl);
             } catch (e) {
-                // AbortError: a pessoa cancelou a folha de compartilhamento — não é erro.
-                if (e?.name !== 'AbortError') {
-                    this.erro = 'Não foi possível compartilhar agora. Tente novamente.';
-                }
+                this.erro = 'Não foi possível baixar a imagem agora.';
             } finally {
-                this.compartilhando = false;
+                this.baixando = false;
             }
         },
     }));

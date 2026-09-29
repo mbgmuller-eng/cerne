@@ -133,8 +133,20 @@
                 @endif
             </div>
             {{-- QR Code de emergência --}}
-            @php $qrCodeUrl = route('health.qrcode.show', $membro->id) . '?v=' . $card->updated_at?->timestamp; @endphp
-            <div x-data="qrShare" class="flex items-center gap-4 border-t border-slate-100 pt-4 dark:border-white/10">
+            @php
+                $qrCodeUrl = route('health.qrcode.show', $membro->id) . '?v=' . $card->updated_at?->timestamp;
+                $emergencyUrl = route('health.emergency.show', $card->emergency_token);
+            @endphp
+            <div
+                wire:key="qr-{{ $card->emergency_token }}"
+                x-data="qrShare({
+                    url: @js($emergencyUrl),
+                    imageUrl: @js($qrCodeUrl),
+                    title: @js('QR Code de emergência — '.$membro->name),
+                    fileName: @js('qrcode-emergencia-'.\Illuminate\Support\Str::slug($membro->name).'.png'),
+                })"
+                class="flex items-center gap-4 border-t border-slate-100 pt-4 dark:border-white/10"
+            >
                 <img src="{{ $qrCodeUrl }}" alt="QR Code de emergência de {{ $membro->name }}" class="h-24 w-24 shrink-0 rounded-lg border border-slate-100 dark:border-white/10">
                 <div class="min-w-0">
                     <p class="text-xs font-medium text-slate-700 dark:text-slate-300">QR Code de emergência</p>
@@ -142,15 +154,25 @@
                         Sem login: mostra tipo sanguíneo, alergias, doenças, remédios em uso e contatos.
                     </p>
                     <p x-show="erro" x-cloak x-text="erro" class="mt-1 text-xs text-red-700 dark:text-red-400"></p>
+                    <p x-show="mensagem" x-cloak x-text="mensagem" class="mt-1 text-xs text-saude-800 dark:text-saude-200"></p>
                     <div class="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
                         <button
                             type="button"
-                            @click="compartilhar('{{ $qrCodeUrl }}', 'qrcode-emergencia-{{ \Illuminate\Support\Str::slug($membro->name) }}.png')"
+                            @click="compartilharLink"
                             :disabled="compartilhando"
                             class="text-xs font-medium text-saude-800 hover:underline disabled:opacity-60 dark:text-saude-200"
                         >
-                            <span x-show="!compartilhando">Compartilhar / baixar</span>
-                            <span x-show="compartilhando" x-cloak>Preparando...</span>
+                            <span x-show="!compartilhando">Compartilhar link</span>
+                            <span x-show="compartilhando" x-cloak>Enviando...</span>
+                        </button>
+                        <button
+                            type="button"
+                            @click="baixarImagem"
+                            :disabled="baixando"
+                            class="text-xs text-slate-500 hover:underline disabled:opacity-60 dark:text-slate-400"
+                        >
+                            <span x-show="!baixando">Baixar imagem</span>
+                            <span x-show="baixando" x-cloak>Baixando...</span>
                         </button>
                         <button type="button" wire:click="regenerateEmergencyToken('{{ $membro->id }}')" wire:confirm="Gerar um novo código? O QR Code impresso atual para de funcionar." class="text-xs text-slate-400 hover:text-red-700 dark:hover:text-red-400">
                             Gerar novo código
