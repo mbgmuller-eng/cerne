@@ -31,6 +31,7 @@
 
     $navSaude = [
         ['health.gym.index', 'Academia', 'Academia', 'dumbbell'],
+        ['health.card.index', 'Ficha de Saúde', 'Ficha', 'heart'],
     ];
 
     // Saúde é dado pessoal: consultor/corretor operando o perfil de um

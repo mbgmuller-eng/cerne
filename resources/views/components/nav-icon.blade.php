@@ -70,6 +70,9 @@
         @case('dumbbell')
             <path d="M6.5 6.5v11"/><path d="M17.5 6.5v11"/><path d="M3 9v6"/><path d="M21 9v6"/><path d="M6.5 12h11"/>
             @break
+        @case('heart')
+            <path d="M12 20.5s-7.5-4.6-9.7-9C.8 8 2 4.5 5.3 3.7c2-.5 3.8.3 4.9 1.9L12 7.5l1.8-1.9c1.1-1.6 2.9-2.4 4.9-1.9C22 4.5 23.2 8 21.7 11.5c-2.2 4.4-9.7 9-9.7 9Z"/>
+            @break
         @case('mail')
             <rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/>
             @break

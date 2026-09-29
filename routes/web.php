@@ -33,6 +33,7 @@ use App\Livewire\Health\Gym\GymPlanEditor;
 use App\Livewire\Health\Gym\GymProgress;
 use App\Livewire\Health\Gym\GymSessionRun;
 use App\Livewire\Health\Gym\GymWorkoutShow;
+use App\Livewire\Health\HealthCardIndex;
 use App\Livewire\Insurance\InsuranceIndex;
 use App\Livewire\Investments\InvestmentsIndex;
 use App\Livewire\Profile\MyAccount;
@@ -92,6 +93,10 @@ Route::middleware('auth')->group(function (): void {
     Route::get('/saude/academia/exercicios/{exercise}/imagem', [GymExerciseImageController::class, 'show'])->name('health.gym.exercise-image');
     // Catálogo compartilhado: não é dado pessoal, não passa por RequiresPersonalHealth — qualquer autenticado pode ver.
     Route::get('/saude/academia/catalogo/{exercise}/imagem', [GymExerciseCatalogImageController::class, 'show'])->name('health.gym.catalog-image');
+
+    // Ficha de saúde: visível aos DOIS do casal (CoupleHealthScope) —
+    // diferente da Academia, mas com o mesmo bloqueio a consultor/corretor.
+    Route::get('/saude/ficha', HealthCardIndex::class)->name('health.card.index');
     Route::get('/importar', DocumentsIndex::class)->name('documents.index');
     Route::get('/regras-de-categorizacao', CategorizationRulesIndex::class)->name('categorization-rules.index');
     Route::get('/contas', AccountsIndex::class)->name('accounts.index');
