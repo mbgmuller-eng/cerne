@@ -7,6 +7,7 @@ use App\Enums\GymLoadMode;
 use App\Enums\GymMeasureType;
 use App\Enums\GymMuscleGroup;
 use App\Livewire\Health\Gym\GymHome;
+use App\Livewire\Health\Gym\GymProgress;
 use App\Livewire\Health\Gym\GymSessionRun;
 use App\Models\ConsultantClient;
 use App\Models\FinancialProfile;
@@ -273,6 +274,58 @@ class GymProgressTest extends TestCase
             ->withSession(['cerne.active_profile_id' => $this->perfil->id])
             ->get(route('health.gym.exercise', $this->supino->id))
             ->assertNotFound();
+    }
+
+    public function test_relatorio_recorta_primeira_e_ultima_marca_do_periodo(): void
+    {
+        // 5 treinos ao longo de 100 dias (ver treinar(), dia = now()->subDays(100 - contador)).
+        $this->treinar([['20', 10]]); // dia mais antigo
+        $this->treinar([['22', 10]]);
+        $this->treinar([['24', 10]]); // só este entra no período
+        $this->treinar([['26', 10]]);
+        $this->treinar([['28', 10]]); // dia mais recente
+
+        $terceira = GymSession::query()->orderBy('performed_on')->get()[2];
+        $periodo = $terceira->performed_on;
+
+        $linhas = app(GymProgressService::class)->periodReport($periodo->copy(), $periodo->copy());
+
+        self::assertCount(1, $linhas);
+        $linha = $linhas->first();
+        self::assertSame(1, $linha['sessions_count']);
+        self::assertSame('24.00', $linha['first']['value']);
+        self::assertSame('24.00', $linha['last']['value']);
+    }
+
+    public function test_relatorio_vazio_fora_do_periodo_com_treinos(): void
+    {
+        $this->treinar([['20', 10]]);
+
+        $linhas = app(GymProgressService::class)->periodReport(now()->addYear(), now()->addYear()->addDay());
+
+        self::assertTrue($linhas->isEmpty());
+    }
+
+    public function test_baixar_relatorio_gera_pdf_para_download(): void
+    {
+        $this->treinar([['20', 10]]);
+        $this->treinar([['24', 10]]);
+
+        Livewire::test(GymProgress::class)
+            ->set('inicioRelatorio', now()->subDays(100)->toDateString())
+            ->set('fimRelatorio', now()->toDateString())
+            ->call('baixarRelatorio')
+            ->assertFileDownloaded();
+    }
+
+    public function test_fim_antes_do_inicio_da_erro_de_validacao(): void
+    {
+        Livewire::test(GymProgress::class)
+            ->set('inicioRelatorio', now()->toDateString())
+            ->set('fimRelatorio', now()->subDay()->toDateString())
+            ->call('baixarRelatorio')
+            ->assertHasErrors(['fimRelatorio'])
+            ->assertNoFileDownloaded();
     }
 
     public function test_consultor_leva_403_nas_telas_de_evolucao(): void

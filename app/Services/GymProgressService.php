@@ -58,7 +58,30 @@ class GymProgressService
      */
     public function overview(): Collection
     {
-        $logs = $this->finishedLogs()->groupBy('exercise_id');
+        return $this->exerciseRows($this->finishedLogs())->sortByDesc('last_date')->values();
+    }
+
+    /**
+     * Mesma análise do overview(), só que recortada a um período — usado
+     * no relatório em PDF. Primeira/última marca do período (não do
+     * histórico inteiro) é o que responde "como evoluiu NESSE intervalo".
+     *
+     * @return Collection<int, array<string, mixed>>
+     */
+    public function periodReport(CarbonInterface $inicio, CarbonInterface $fim): Collection
+    {
+        return $this->exerciseRows($this->finishedLogs(null, $inicio, $fim))
+            ->sortBy(fn (array $linha) => $linha['exercise']->name)
+            ->values();
+    }
+
+    /**
+     * @param  Collection<int, GymSetLog>  $logs
+     * @return Collection<int, array<string, mixed>>
+     */
+    private function exerciseRows(Collection $logs): Collection
+    {
+        $logs = $logs->groupBy('exercise_id');
 
         if ($logs->isEmpty()) {
             return collect();
@@ -81,19 +104,25 @@ class GymProgressService
             }
 
             $analise = $this->analyzeLogs($exercicio->measure_type, $linhas, $metas->get($exerciseId));
-            $ultima = collect($analise['sessions'])->last();
+            $sessoes = $analise['sessions'];
+
+            if ($sessoes === []) {
+                return null;
+            }
 
             return [
                 'exercise' => $exercicio,
-                'sessions_count' => count($analise['sessions']),
-                'last_date' => $ultima['date'] ?? null,
+                'sessions_count' => count($sessoes),
+                'first' => $sessoes[0],
+                'last' => end($sessoes),
+                'last_date' => end($sessoes)['date'],
                 'best' => $analise['best'],
                 'metric' => $analise['metric'],
                 'plateau' => $analise['plateau'],
                 'suggestion' => $analise['suggestion'],
                 'status' => $analise['suggestion']['type'] ?? 'ok',
             ];
-        })->filter()->sortByDesc('last_date')->values();
+        })->filter();
     }
 
     /**
@@ -217,11 +246,17 @@ class GymProgressService
     }
 
     /** @return Collection<int, GymSetLog> */
-    private function finishedLogs(?string $exerciseId = null): Collection
+    private function finishedLogs(?string $exerciseId = null, ?CarbonInterface $inicio = null, ?CarbonInterface $fim = null): Collection
     {
         return GymSetLog::query()
             ->when($exerciseId, fn ($q) => $q->where('exercise_id', $exerciseId))
-            ->whereHas('session', fn ($q) => $q->whereNotNull('finished_at'))
+            ->whereHas('session', function ($q) use ($inicio, $fim): void {
+                $q->whereNotNull('finished_at');
+
+                if ($inicio !== null && $fim !== null) {
+                    $q->whereBetween('performed_on', [$inicio->toDateString(), $fim->toDateString()]);
+                }
+            })
             ->with('session:id,performed_on,finished_at', 'equipment:id,name')
             ->orderBy('completed_at')
             ->get();

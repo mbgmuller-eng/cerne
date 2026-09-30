@@ -35,6 +35,7 @@ use App\Livewire\Health\Gym\GymExerciseHistory;
 use App\Livewire\Health\Gym\GymHome;
 use App\Livewire\Health\Gym\GymPlanEditor;
 use App\Livewire\Health\Gym\GymProgress;
+use App\Livewire\Health\Gym\GymSessionHistory;
 use App\Livewire\Health\Gym\GymSessionRun;
 use App\Livewire\Health\Gym\GymWorkoutShow;
 use App\Livewire\Health\HealthAppointmentIndex;
@@ -103,6 +104,7 @@ Route::middleware('auth')->group(function (): void {
     // "treinos/{workout}" é o treino do PLANO, só pra consultar antes de começar.
     Route::get('/saude/academia/treinos/{workout}', GymWorkoutShow::class)->name('health.gym.workout');
     Route::get('/saude/academia/treino/{session}', GymSessionRun::class)->name('health.gym.session');
+    Route::get('/saude/academia/historico', GymSessionHistory::class)->name('health.gym.history');
     Route::get('/saude/academia/progresso', GymProgress::class)->name('health.gym.progress');
     Route::get('/saude/academia/exercicio/{exercise}', GymExerciseHistory::class)->name('health.gym.exercise');
     Route::get('/saude/academia/exercicios/{exercise}/imagem', [GymExerciseImageController::class, 'show'])->name('health.gym.exercise-image');

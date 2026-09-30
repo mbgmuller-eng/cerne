@@ -106,12 +106,17 @@
 
     @if ($recent->isNotEmpty())
         <section>
-            <h2 class="text-sm font-semibold text-slate-900 dark:text-white">Últimas sessões</h2>
+            <div class="flex items-baseline justify-between">
+                <h2 class="text-sm font-semibold text-slate-900 dark:text-white">Últimas sessões</h2>
+                <a href="{{ route('health.gym.history') }}" wire:navigate class="text-xs text-saude-800 hover:underline dark:text-saude-200">Ver histórico completo</a>
+            </div>
             <ul class="card mt-3 divide-y divide-slate-100 dark:divide-white/10">
                 @foreach ($recent as $sessao)
-                    <li class="flex items-center justify-between px-5 py-3 text-sm">
-                        <span class="text-slate-800 dark:text-slate-200">{{ $sessao->workout?->name }}</span>
-                        <span class="text-xs text-slate-400">{{ $sessao->performed_on->format('d/m/Y') }}</span>
+                    <li>
+                        <a href="{{ route('health.gym.session', $sessao->id) }}" wire:navigate class="flex items-center justify-between px-5 py-3 text-sm hover:bg-slate-50 dark:hover:bg-white/5">
+                            <span class="text-slate-800 dark:text-slate-200">{{ $sessao->workout?->name }}</span>
+                            <span class="text-xs text-slate-400">{{ $sessao->performed_on->format('d/m/Y') }}</span>
+                        </a>
                     </li>
                 @endforeach
             </ul>

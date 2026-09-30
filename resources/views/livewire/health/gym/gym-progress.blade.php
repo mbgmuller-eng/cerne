@@ -4,10 +4,29 @@
 
 <div class="space-y-6">
 
-    <div>
-        <a href="{{ route('health.gym.index') }}" wire:navigate class="text-xs text-slate-500 hover:underline dark:text-slate-400">← Academia</a>
-        <h1 class="mt-1 font-display text-3xl font-semibold tracking-tight text-slate-900 dark:text-white">Evolução</h1>
-        <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Cada exercício, treino a treino. Só treinos finalizados entram.</p>
+    <div class="flex flex-wrap items-start justify-between gap-4">
+        <div>
+            <a href="{{ route('health.gym.index') }}" wire:navigate class="text-xs text-slate-500 hover:underline dark:text-slate-400">← Academia</a>
+            <h1 class="mt-1 font-display text-3xl font-semibold tracking-tight text-slate-900 dark:text-white">Evolução</h1>
+            <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Cada exercício, treino a treino. Só treinos finalizados entram.</p>
+        </div>
+
+        <form wire:submit="baixarRelatorio" class="card flex flex-wrap items-end gap-2 p-3">
+            <div>
+                <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">De</label>
+                <input type="date" wire:model="inicioRelatorio" class="input mt-1 text-sm">
+                @error('inicioRelatorio') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+            </div>
+            <div>
+                <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Até</label>
+                <input type="date" wire:model="fimRelatorio" class="input mt-1 text-sm">
+                @error('fimRelatorio') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+            </div>
+            <button type="submit" class="btn-secondary px-3 py-2 text-sm" wire:loading.attr="disabled" wire:target="baixarRelatorio">
+                <span wire:loading.remove wire:target="baixarRelatorio">Baixar relatório PDF</span>
+                <span wire:loading wire:target="baixarRelatorio">Gerando...</span>
+            </button>
+        </form>
     </div>
 
     @if ($rows->isEmpty())
