@@ -143,6 +143,36 @@ class SubscriptionIndexTest extends TestCase
         self::assertFalse($assinatura->isCurrent());
     }
 
+    /**
+     * Assinatura de cortesia (ex.: Marcelo, concedida direto no banco pra
+     * cobrir os clientes vinculados sem cobrança) não tem
+     * asaas_subscription_id: cancelar precisa encerrar o acesso localmente
+     * sem tentar chamar uma API que não tem o que cancelar lá.
+     */
+    public function test_cancelar_assinatura_de_cortesia_nao_chama_a_asaas(): void
+    {
+        $usuario = User::factory()->create();
+        $assinatura = Subscription::create([
+            'user_id' => $usuario->id,
+            'kind' => SubscriptionKind::Direct,
+            'bundle' => SubscriptionBundle::Completo,
+            'status' => \App\Enums\SubscriptionStatus::Active,
+            'asaas_subscription_id' => null,
+            'started_at' => now(),
+        ]);
+
+        $asaas = Mockery::mock(AsaasClient::class);
+        $asaas->shouldNotReceive('cancelSubscription');
+        $this->app->instance(AsaasClient::class, $asaas);
+
+        Livewire::actingAs($usuario)->test(\App\Livewire\Subscription\SubscriptionIndex::class)
+            ->call('cancelar');
+
+        $assinatura->refresh();
+        self::assertSame(\App\Enums\SubscriptionStatus::Cancelled, $assinatura->status);
+        self::assertNotNull($assinatura->cancelled_at);
+    }
+
     public function test_cancelar_sem_assinatura_ativa_nao_chama_a_asaas(): void
     {
         $usuario = User::factory()->create();

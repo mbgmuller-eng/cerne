@@ -58,7 +58,8 @@ class MyAccountSubscriptionTest extends TestCase
             ->assertSee('Individual')
             ->assertSee('Completo')
             ->assertSee('Pix')
-            ->assertSee(now()->addDays(20)->format('d/m/Y'));
+            ->assertSee(now()->addDays(20)->format('d/m/Y'))
+            ->assertSee('Gerenciar assinatura');
     }
 
     public function test_cliente_vinculado_sem_assinatura_propria_ve_cobertura_do_profissional(): void
@@ -85,7 +86,8 @@ class MyAccountSubscriptionTest extends TestCase
             ->assertSee('Vinculada')
             ->assertSee('Bruno Corretor')
             ->assertSee('Corretor')
-            ->assertSee('Cobrindo');
+            ->assertSee('Cobrindo')
+            ->assertDontSee('Gerenciar assinatura');
     }
 
     public function test_profissional_sem_cliente_aberto_ve_a_propria_conta(): void

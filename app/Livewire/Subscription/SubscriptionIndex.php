@@ -102,7 +102,12 @@ class SubscriptionIndex extends Component
             return;
         }
 
-        $asaas->cancelSubscription($assinatura->asaas_subscription_id);
+        // Assinatura de cortesia (concedida direto no banco, sem passar
+        // pela Asaas — ver "fora de escopo fase 1" no plano) não tem
+        // asaas_subscription_id: nada pra cancelar lá, só localmente.
+        if ($assinatura->asaas_subscription_id !== null) {
+            $asaas->cancelSubscription($assinatura->asaas_subscription_id);
+        }
 
         $assinatura->update([
             'status' => SubscriptionStatus::Cancelled,

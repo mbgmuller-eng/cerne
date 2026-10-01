@@ -56,7 +56,9 @@
             <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">Nenhuma assinatura ativa ainda.</p>
         @endif
 
-        @if ($ownMember)
+        {{-- Vinculado a profissional e sem assinatura própria: nada pra
+             gerenciar aqui, o acesso já vem de graça pelo profissional. --}}
+        @if ($ownMember && ($minhaAssinatura || $profissionaisVinculados->isEmpty()))
             <a href="{{ route('subscription.index') }}" class="mt-3 inline-block text-xs text-brand-700 hover:underline dark:text-brand-300">Gerenciar assinatura</a>
         @endif
     </section>
