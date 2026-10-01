@@ -65,4 +65,20 @@ class EmailVerificationTest extends TestCase
 
         Notification::assertSentTo($usuario, \App\Notifications\VerifyEmailAddress::class);
     }
+
+    /**
+     * Regressão: /sair já esteve dentro do grupo ['auth', 'verified'] —
+     * uma conta não verificada clicando "Sair" era barrada pelo próprio
+     * middleware "verified" antes de chegar no logout, preso num loop
+     * de volta pra /verificar-email, sem conseguir nem deslogar.
+     */
+    public function test_conta_nao_verificada_consegue_fazer_logout(): void
+    {
+        $usuario = User::factory()->unverified()->create();
+
+        $this->actingAs($usuario)->post(route('logout'))
+            ->assertRedirect();
+
+        self::assertFalse(auth()->check());
+    }
 }

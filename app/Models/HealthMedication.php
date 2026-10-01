@@ -32,9 +32,15 @@ class HealthMedication extends Model
         return $this->belongsTo(ProfileMember::class, 'created_by_member_id');
     }
 
-    /** Mais recente primeiro — é uma linha do tempo, lida de cima pra baixo. */
+    /**
+     * Mais recente primeiro — é uma linha do tempo, lida de cima pra baixo.
+     * Desempate por `id` (UUID v7, ordenado por tempo em milissegundos):
+     * `created_at` só tem precisão de segundo, então duas mudanças na
+     * mesma ação (ex.: suspender e retomar em sequência no mesmo teste)
+     * podem empatar nela e sair em ordem indeterminada sem isto.
+     */
     public function changes(): HasMany
     {
-        return $this->hasMany(HealthMedicationChange::class, 'medication_id')->latest('created_at');
+        return $this->hasMany(HealthMedicationChange::class, 'medication_id')->latest('created_at')->latest('id');
     }
 }

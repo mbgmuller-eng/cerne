@@ -111,6 +111,11 @@ Route::middleware('auth')->group(function (): void {
 
         return back()->with('status', 'Link reenviado — confira seu e-mail.');
     })->middleware('throttle:6,1')->name('verification.send');
+
+    // Sair precisa estar alcançável mesmo sem e-mail verificado — senão
+    // quem se cadastrou e ainda não confirmou fica preso sem conseguir
+    // nem deslogar (o "verified" do grupo abaixo bloquearia isto também).
+    Route::post('/sair', [LoginController::class, 'destroy'])->name('logout');
 });
 
 /*
@@ -188,6 +193,4 @@ Route::middleware(['auth', 'verified'])->group(function (): void {
     Route::get('/vinculo/{consultantClient}', [ConsultantLinkController::class, 'show'])->name('link.show')->middleware('signed');
     Route::post('/vinculo/{consultantClient}/autorizar', [ConsultantLinkController::class, 'accept'])->name('link.accept');
     Route::post('/vinculo/{consultantClient}/recusar', [ConsultantLinkController::class, 'decline'])->name('link.decline');
-
-    Route::post('/sair', [LoginController::class, 'destroy'])->name('logout');
 });

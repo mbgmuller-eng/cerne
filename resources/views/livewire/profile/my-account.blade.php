@@ -2,7 +2,7 @@
 
     <div>
         <h1 class="font-display text-3xl font-semibold tracking-tight text-slate-900 dark:text-white">Minha conta</h1>
-        <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Seus dados, seu consultor e quem mais tem acesso a esse perfil.</p>
+        <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Seus dados, sua assinatura e quem mais tem acesso a esse perfil.</p>
     </div>
 
     {{-- Meus dados ------------------------------------------------------ --}}
@@ -39,23 +39,53 @@
         </dl>
     </section>
 
-    {{-- Meu consultor ----------------------------------------------------- --}}
+    {{-- Assinatura ---------------------------------------------------- --}}
     <section class="card p-5">
-        <p class="text-sm font-semibold text-slate-900 dark:text-white">Meu consultor</p>
+        <p class="text-sm font-semibold text-slate-900 dark:text-white">Assinatura</p>
 
-        @if ($consultant)
-            <dl class="mt-3 grid gap-3 sm:grid-cols-2">
-                <div>
-                    <dt class="text-xs text-slate-500 dark:text-slate-400">Nome</dt>
-                    <dd class="mt-0.5 text-sm text-slate-800 dark:text-slate-200">{{ $consultant->name }}</dd>
-                </div>
-                <div>
-                    <dt class="text-xs text-slate-500 dark:text-slate-400">E-mail</dt>
-                    <dd class="mt-0.5 text-sm text-slate-800 dark:text-slate-200">{{ $consultant->email }}</dd>
-                </div>
-            </dl>
+        @if ($minhaAssinatura)
+            <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Individual: paga diretamente, sem depender de profissional vinculado.</p>
+            <div class="mt-3">
+                <x-subscription-summary :subscription="$minhaAssinatura" />
+            </div>
+        @elseif ($profissionaisVinculados->isNotEmpty())
+            <p class="mt-1 text-sm text-slate-600 dark:text-slate-300">
+                Vinculada: o acesso vem da assinatura do profissional abaixo, sem custo pra você.
+            </p>
         @else
-            <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">Nenhum consultor vinculado no momento.</p>
+            <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">Nenhuma assinatura ativa ainda.</p>
+        @endif
+
+        @if ($ownMember)
+            <a href="{{ route('subscription.index') }}" class="mt-3 inline-block text-xs text-brand-700 hover:underline dark:text-brand-300">Gerenciar assinatura</a>
+        @endif
+    </section>
+
+    {{-- Profissionais vinculados ---------------------------------------- --}}
+    <section class="card p-5">
+        <p class="text-sm font-semibold text-slate-900 dark:text-white">Profissionais vinculados</p>
+
+        @if ($profissionaisVinculados->isNotEmpty())
+            <div class="mt-3 space-y-3">
+                @foreach ($profissionaisVinculados as $vinculo)
+                    <div class="flex items-center justify-between gap-3 rounded-lg bg-slate-50 px-3 py-2 dark:bg-slate-700/50">
+                        <div>
+                            <p class="text-sm text-slate-800 dark:text-slate-200">{{ $vinculo->consultant->name }}</p>
+                            <p class="text-xs text-slate-500 dark:text-slate-400">{{ $vinculo->consultant->role->label() }} · {{ $vinculo->consultant->email }}</p>
+                        </div>
+                        @php
+                            $assinaturaDele = $assinaturasProfissionais->get($vinculo->consultant_id);
+                        @endphp
+                        <span @class([
+                            'badge shrink-0',
+                            'bg-emerald-100 text-emerald-800 dark:bg-emerald-500/10 dark:text-emerald-400' => $assinaturaDele?->isCurrent(),
+                            'bg-amber-100 text-amber-800 dark:bg-amber-500/10 dark:text-amber-400' => ! $assinaturaDele?->isCurrent(),
+                        ])>{{ $assinaturaDele?->isCurrent() ? 'Cobrindo' : 'Sem cobertura ativa' }}</span>
+                    </div>
+                @endforeach
+            </div>
+        @else
+            <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">Nenhum profissional vinculado no momento.</p>
         @endif
     </section>
 
@@ -184,28 +214,6 @@
         </x-modal>
     </section>
 
-    {{-- Notificações ---------------------------------------------------- --}}
-    <section class="card p-5">
-        <p class="text-sm font-semibold text-slate-900 dark:text-white">Notificações</p>
-        <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">
-            Avisos no sino do app estão sempre ativos. Escolha os outros canais para vencimento de conta, fatura de cartão, status de importação de PDF e, se você for consultor ou corretor, datas importantes da carteira:
-        </p>
-
-        <div class="mt-3 space-y-3">
-            <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
-                <input type="checkbox" wire:model.live="notifyEmail" class="rounded border-slate-300 dark:border-slate-600 text-brand-700 dark:text-brand-400 focus:ring-brand-500">
-                E-mail
-            </label>
-            <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
-                <input
-                    type="checkbox"
-                    wire:model.live="notifyPush"
-                    class="rounded border-slate-300 dark:border-slate-600 text-brand-700 dark:text-brand-400 focus:ring-brand-500"
-                    @change="if ($event.target.checked) { window.cerneSubscribeToPush?.() }"
-                >
-                Notificações push (neste navegador)
-            </label>
-        </div>
-    </section>
+    @include('livewire.profile.partials.notifications')
 
 </div>

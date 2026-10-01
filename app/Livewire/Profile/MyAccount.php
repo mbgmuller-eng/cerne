@@ -2,14 +2,15 @@
 
 namespace App\Livewire\Profile;
 
-use App\Enums\ConsultantClientStatus;
 use App\Enums\InviteStatus;
 use App\Enums\MemberRole;
+use App\Enums\SubscriptionKind;
 use App\Livewire\Concerns\RequiresActiveProfile;
 use App\Models\ConsultantClient;
 use App\Models\FinancialProfile;
 use App\Models\PartnerInvite;
 use App\Models\ProfileMember;
+use App\Models\Subscription;
 use App\Services\ClientOnboardingService;
 use App\Services\PartnerInviteService;
 use App\Support\ProfileContext;
@@ -54,12 +55,25 @@ class MyAccount extends Component
 
     public string $partnerBirthdateInput = '';
 
+    /**
+     * Profissional não tem FinancialProfile próprio — nunca teria um
+     * perfil "ativo" pra RequiresActiveProfile exigir, e cairia sempre
+     * redirecionado pra Carteira antes de ver a própria conta. Pula o
+     * requisito de perfil pra ele SÓ quando não tem cliente aberto — com
+     * cliente aberto, continua vendo os dados do cliente, igual sempre foi
+     * (ver isViewingOwnProfessionalAccount()); render() que decide pra
+     * qual view manda em cada caso.
+     */
     public function mount(): void
     {
-        $this->redirectOrAbortWithoutProfile();
-
         $this->notifyEmail = auth()->user()->notify_email_enabled;
         $this->notifyPush = auth()->user()->notify_push_enabled;
+
+        if ($this->isViewingOwnProfessionalAccount()) {
+            return;
+        }
+
+        $this->redirectOrAbortWithoutProfile();
     }
 
     public function updatedNotifyEmail(bool $value): void
@@ -225,14 +239,12 @@ class MyAccount extends Component
 
     public function render()
     {
+        if ($this->isViewingOwnProfessionalAccount()) {
+            return $this->renderProfessionalAccount();
+        }
+
         $context = app(ProfileContext::class);
         $profile = $context->profile();
-
-        $consultantLink = ConsultantClient::query()
-            ->with('consultant')
-            ->where('client_id', $profile->owner_user_id)
-            ->where('status', ConsultantClientStatus::Active)
-            ->first();
 
         $partnerMember = $this->resolvePartnerMember($profile);
 
@@ -251,10 +263,33 @@ class MyAccount extends Component
         // comportamento de sempre não muda.
         $donoDosDados = $context->member()?->user ?? $profile->owner;
 
+        // Um cliente pode ter mais de um profissional vinculado (um
+        // consultor financeiro E um corretor de seguros, por exemplo) —
+        // por isso lista todos, não só o primeiro.
+        $profissionaisVinculados = ConsultantClient::query()
+            ->with('consultant')
+            ->where('client_id', $donoDosDados->id)
+            ->active()
+            ->get();
+
+        $assinaturasProfissionais = Subscription::query()
+            ->ofKind(SubscriptionKind::Professional)
+            ->whereIn('user_id', $profissionaisVinculados->pluck('consultant_id'))
+            ->get()
+            ->keyBy('user_id');
+
+        $minhaAssinatura = Subscription::query()
+            ->where('user_id', $donoDosDados->id)
+            ->ofKind(SubscriptionKind::Direct)
+            ->latest('created_at')
+            ->first();
+
         return view('livewire.profile.my-account', [
             'profile' => $profile,
             'user' => $donoDosDados,
-            'consultant' => $consultantLink?->consultant,
+            'minhaAssinatura' => $minhaAssinatura,
+            'profissionaisVinculados' => $profissionaisVinculados,
+            'assinaturasProfissionais' => $assinaturasProfissionais,
             'partner' => $partnerMember,
             'pendingInvite' => $pendingInvite,
             // Sem cônjuge ainda, OU cônjuge cadastrado sem login (ver
@@ -264,9 +299,47 @@ class MyAccount extends Component
                 && auth()->user()->can('manageMembers', $profile),
             // Nulo quando quem está vendo não é membro de verdade (ex.:
             // consultor com cliente aberto) — só então o card "meus dados"
-            // ganha o editor de aniversário.
+            // ganha o editor de aniversário, e só então "Gerenciar
+            // assinatura" aparece (é a assinatura de quem está vendo, não
+            // a do cliente aberto).
             'ownMember' => $context->member(),
             'canManageMembers' => auth()->user()->can('manageMembers', $profile),
+        ]);
+    }
+
+    /**
+     * Só é "a conta do profissional" quando ele não tem cliente nenhum
+     * aberto — com cliente aberto, o profissional continua vendo os
+     * dados DAQUELE cliente nesta mesma tela, igual sempre foi (ver
+     * ProfileContext). Sem isso, um consultor com cliente aberto
+     * acabaria sempre vendo a própria conta, nunca a do cliente.
+     */
+    private function isViewingOwnProfessionalAccount(): bool
+    {
+        return auth()->user()->isLinkedProfessional() && app(ProfileContext::class)->profile() === null;
+    }
+
+    /** Clientes vinculados e ativos, não a carteira inteira — isto é "minha conta", não o painel da carteira. */
+    private function renderProfessionalAccount()
+    {
+        $profissional = auth()->user();
+
+        $minhaAssinatura = Subscription::query()
+            ->where('user_id', $profissional->id)
+            ->ofKind(SubscriptionKind::Professional)
+            ->latest('created_at')
+            ->first();
+
+        $clientesVinculados = ConsultantClient::query()
+            ->with('client')
+            ->where('consultant_id', $profissional->id)
+            ->active()
+            ->get();
+
+        return view('livewire.profile.professional-account', [
+            'profissional' => $profissional,
+            'minhaAssinatura' => $minhaAssinatura,
+            'clientesVinculados' => $clientesVinculados,
         ]);
     }
 

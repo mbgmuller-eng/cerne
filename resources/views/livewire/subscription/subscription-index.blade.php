@@ -12,33 +12,23 @@
     @endif
 
     @if ($assinaturaAtual)
-        <section class="card space-y-1 p-5">
+        <section class="card space-y-3 p-5">
             <p class="eyebrow">Sua assinatura</p>
-            <p class="text-sm text-slate-800 dark:text-slate-200">
-                {{ $assinaturaAtual->bundle->label() }} ·
-                <span @class([
-                    'font-medium',
-                    'text-emerald-700 dark:text-emerald-400' => $temAcessoAtivo,
-                    'text-amber-700 dark:text-amber-400' => ! $temAcessoAtivo,
-                ])>{{ $assinaturaAtual->status->label() }}</span>
-            </p>
-            @if ($assinaturaAtual->current_period_ends_at && $assinaturaAtual->status !== \App\Enums\SubscriptionStatus::Cancelled)
-                <p class="text-xs text-slate-500 dark:text-slate-400">Renova em {{ $assinaturaAtual->current_period_ends_at->format('d/m/Y') }}</p>
-            @elseif ($assinaturaAtual->status === \App\Enums\SubscriptionStatus::Cancelled && $assinaturaAtual->cancelled_at)
-                <p class="text-xs text-slate-500 dark:text-slate-400">Cancelada em {{ $assinaturaAtual->cancelled_at->format('d/m/Y') }}</p>
-            @endif
-
-            @if ($temAcessoAtivo)
-                <button
-                    type="button"
-                    wire:click="cancelar"
-                    wire:confirm="Cancelar sua assinatura? O acesso é encerrado na hora, sem prorata do período já pago."
-                    wire:loading.attr="disabled"
-                    class="btn-ghost mt-2 px-0 text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-500/10"
-                >
-                    Cancelar assinatura
-                </button>
-            @endif
+            <x-subscription-summary :subscription="$assinaturaAtual">
+                <x-slot:actions>
+                    @if ($temAcessoAtivo)
+                        <button
+                            type="button"
+                            wire:click="cancelar"
+                            wire:confirm="Cancelar sua assinatura? O acesso é encerrado na hora, sem prorata do período já pago."
+                            wire:loading.attr="disabled"
+                            class="btn-ghost mt-2 px-0 text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-500/10"
+                        >
+                            Cancelar assinatura
+                        </button>
+                    @endif
+                </x-slot:actions>
+            </x-subscription-summary>
         </section>
     @endif
 
