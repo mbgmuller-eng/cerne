@@ -43,22 +43,38 @@ class AsaasClient
     }
 
     /**
-     * `nextDueDate` 7 dias à frente é o teste grátis inteiro — não existe
-     * campo "trial" na Asaas, é só a primeira cobrança nascer mais tarde.
+     * `nextDueDate` à frente é o teste grátis inteiro — não existe campo
+     * "trial" na Asaas, é só a primeira cobrança nascer mais tarde.
      * Cartão e Pix tratados igual (`asaasBillingType()`): nenhum dos dois
      * cobra sozinho hoje, os dois clicam a fatura — cobrança automática de
      * cartão de verdade exigiria tokenizar o cartão pelo nosso backend e
      * depende de aprovação da Asaas pra produção (ver o plano).
      *
+     * $clientCap soma o adicional da faixa (ver config/billing.php,
+     * client_tier_surcharge) ao preço do pacote — só relevante pra
+     * assinatura Professional, null em Direct. $diasAteprimeiraCobranca
+     * passa a 0 num upgrade de faixa (ConsultantCapacityService): quem já
+     * é cliente pagante não ganha outro teste grátis só por subir de
+     * faixa.
+     *
      * @return array{id: string, invoiceUrl: ?string}
      */
-    public function createSubscription(string $customerId, SubscriptionBundle $bundle, PaymentMethod $metodoPagamento, string $descricao): array
-    {
+    public function createSubscription(
+        string $customerId,
+        SubscriptionBundle $bundle,
+        PaymentMethod $metodoPagamento,
+        string $descricao,
+        ?int $clientCap = null,
+        int $diasAteprimeiraCobranca = 7,
+    ): array {
+        $valor = config("billing.prices.{$bundle->value}")
+            + ($clientCap !== null ? config("billing.client_tier_surcharge.{$clientCap}", 0) : 0);
+
         $resposta = $this->request()->post('/subscriptions', [
             'customer' => $customerId,
             'billingType' => $metodoPagamento->asaasBillingType(),
-            'nextDueDate' => now()->addDays(7)->toDateString(),
-            'value' => config("billing.prices.{$bundle->value}"),
+            'nextDueDate' => now()->addDays($diasAteprimeiraCobranca)->toDateString(),
+            'value' => $valor,
             'cycle' => 'MONTHLY',
             'description' => $descricao,
         ])->throw();

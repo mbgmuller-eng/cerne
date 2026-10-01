@@ -3,12 +3,16 @@
 namespace Tests\Feature;
 
 use App\Enums\ConsultantClientStatus;
+use App\Enums\SubscriptionBundle;
+use App\Enums\SubscriptionKind;
+use App\Enums\SubscriptionStatus;
 use App\Livewire\Consultant\PortfolioInsurance;
 use App\Mail\ClientInviteMail;
 use App\Mail\ConsultantLinkRequestMail;
 use App\Models\ConsultantClient;
 use App\Models\ConsultantInvite;
 use App\Models\FinancialProfile;
+use App\Models\Subscription;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Mail;
@@ -83,6 +87,34 @@ class BrokerLinkRequestTest extends TestCase
             ->assertHasErrors(['inviteEmail']);
 
         self::assertSame(1, ConsultantClient::query()->count());
+    }
+
+    public function test_corretor_bloqueado_no_teto_da_faixa_nao_convida(): void
+    {
+        $corretor = User::factory()->broker()->create();
+        Subscription::create([
+            'user_id' => $corretor->id,
+            'kind' => SubscriptionKind::Professional,
+            'bundle' => SubscriptionBundle::FinancasSegurosDocumentos,
+            'client_cap' => 1,
+            'status' => SubscriptionStatus::Active,
+            'started_at' => now(),
+        ]);
+        $jaVinculado = User::factory()->create();
+        FinancialProfile::factory()->create(['owner_user_id' => $jaVinculado->id]);
+        ConsultantClient::factory()->create([
+            'consultant_id' => $corretor->id, 'client_id' => $jaVinculado->id, 'status' => ConsultantClientStatus::Active,
+        ]);
+        $this->actingAs($corretor);
+
+        Livewire::test(PortfolioInsurance::class)
+            ->call('toggleInviteForm')
+            ->set('inviteName', 'Nome Qualquer')
+            ->set('inviteEmail', 'novo@exemplo.com')
+            ->call('invite')
+            ->assertHasErrors(['inviteEmail']);
+
+        self::assertSame(0, ConsultantInvite::query()->count());
     }
 
     public function test_consultor_nao_ve_o_botao_de_vincular_cliente_em_seguros_da_carteira(): void

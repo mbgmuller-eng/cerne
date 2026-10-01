@@ -4,11 +4,15 @@ namespace Tests\Feature;
 
 use App\Enums\ConsultantClientStatus;
 use App\Enums\InviteStatus;
+use App\Enums\SubscriptionBundle;
+use App\Enums\SubscriptionKind;
+use App\Enums\SubscriptionStatus;
 use App\Livewire\Consultant\PortfolioOverview;
 use App\Mail\ClientInviteMail;
 use App\Models\ConsultantClient;
 use App\Models\ConsultantInvite;
 use App\Models\FinancialProfile;
+use App\Models\Subscription;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Mail;
@@ -173,6 +177,82 @@ class PortfolioOverviewInviteTest extends TestCase
         $this->expectException(\Illuminate\Database\Eloquent\ModelNotFoundException::class);
 
         Livewire::test(PortfolioOverview::class)->call('enviarConviteDeAcesso', $perfil->id);
+    }
+
+    public function test_convite_bloqueado_quando_atinge_o_teto_da_faixa(): void
+    {
+        $consultor = User::factory()->consultant()->create();
+        Subscription::create([
+            'user_id' => $consultor->id,
+            'kind' => SubscriptionKind::Professional,
+            'bundle' => SubscriptionBundle::Completo,
+            'client_cap' => 1,
+            'status' => SubscriptionStatus::Active,
+            'started_at' => now(),
+        ]);
+        $cliente = User::factory()->create();
+        ConsultantClient::factory()->create([
+            'consultant_id' => $consultor->id,
+            'client_id' => $cliente->id,
+            'status' => ConsultantClientStatus::Active,
+        ]);
+        FinancialProfile::factory()->create(['owner_user_id' => $cliente->id]);
+
+        $this->actingAs($consultor);
+
+        Livewire::test(PortfolioOverview::class)
+            ->call('toggleInviteForm')
+            ->set('inviteName', 'Fernanda Lima')
+            ->set('inviteEmail', 'fernanda@exemplo.com')
+            ->call('invite')
+            ->assertHasErrors(['inviteEmail']);
+
+        self::assertSame(0, ConsultantInvite::query()->count());
+    }
+
+    public function test_convite_passa_sem_assinatura_nenhuma_mesmo_com_clientes_vinculados(): void
+    {
+        Mail::fake();
+        $consultor = User::factory()->consultant()->create();
+        $cliente = User::factory()->create();
+        ConsultantClient::factory()->create([
+            'consultant_id' => $consultor->id,
+            'client_id' => $cliente->id,
+            'status' => ConsultantClientStatus::Active,
+        ]);
+        FinancialProfile::factory()->create(['owner_user_id' => $cliente->id]);
+
+        $this->actingAs($consultor);
+
+        Livewire::test(PortfolioOverview::class)
+            ->call('toggleInviteForm')
+            ->set('inviteName', 'Fernanda Lima')
+            ->set('inviteEmail', 'fernanda@exemplo.com')
+            ->call('invite')
+            ->assertHasNoErrors();
+    }
+
+    public function test_convite_passa_com_assinatura_de_cortesia_sem_teto(): void
+    {
+        Mail::fake();
+        $consultor = User::factory()->consultant()->create();
+        Subscription::create([
+            'user_id' => $consultor->id,
+            'kind' => SubscriptionKind::Professional,
+            'bundle' => SubscriptionBundle::Completo,
+            'client_cap' => null,
+            'status' => SubscriptionStatus::Active,
+            'started_at' => now(),
+        ]);
+
+        $this->actingAs($consultor);
+
+        Livewire::test(PortfolioOverview::class)
+            ->call('toggleInviteForm')
+            ->set('inviteName', 'Fernanda Lima')
+            ->set('inviteEmail', 'fernanda@exemplo.com')
+            ->call('invite')
+            ->assertHasNoErrors();
     }
 
     public function test_quem_nao_e_consultor_recebe_403(): void

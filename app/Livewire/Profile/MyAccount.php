@@ -13,6 +13,7 @@ use App\Models\PartnerInvite;
 use App\Models\ProfileMember;
 use App\Models\Subscription;
 use App\Services\ClientOnboardingService;
+use App\Services\ConsultantCapacityService;
 use App\Services\PartnerInviteService;
 use App\Support\ProfileContext;
 use Livewire\Attributes\Layout;
@@ -366,6 +367,7 @@ class MyAccount extends Component
             'profissional' => $profissional,
             'minhaAssinatura' => $minhaAssinatura,
             'clientesVinculados' => $clientesVinculados,
+            'vagasRestantes' => app(ConsultantCapacityService::class)->remainingSlots($profissional),
         ]);
     }
 

@@ -15,7 +15,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /** Carência de PastDue antes de travar o acesso — ver isCurrent(). */
 #[Fillable([
-    'user_id', 'kind', 'bundle', 'status', 'billing_type', 'current_period_ends_at',
+    'user_id', 'kind', 'bundle', 'client_cap', 'status', 'billing_type', 'current_period_ends_at',
     'asaas_subscription_id', 'started_at', 'cancelled_at',
 ])]
 class Subscription extends Model
@@ -29,6 +29,7 @@ class Subscription extends Model
         return [
             'kind' => SubscriptionKind::class,
             'bundle' => SubscriptionBundle::class,
+            'client_cap' => 'integer',
             'status' => SubscriptionStatus::class,
             'billing_type' => PaymentMethod::class,
             'current_period_ends_at' => 'date',

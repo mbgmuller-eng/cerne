@@ -50,8 +50,17 @@
     <section class="card p-5">
         <p class="text-sm font-semibold text-slate-900 dark:text-white">
             Clientes vinculados
-            <span class="font-normal text-slate-400">({{ $clientesVinculados->count() }})</span>
+            @if ($minhaAssinatura?->client_cap !== null)
+                <span class="font-normal text-slate-400">({{ $clientesVinculados->count() }} de {{ $minhaAssinatura->client_cap }})</span>
+            @else
+                <span class="font-normal text-slate-400">({{ $clientesVinculados->count() }})</span>
+            @endif
         </p>
+        @if ($vagasRestantes === 0)
+            <p class="mt-1 text-xs text-amber-700 dark:text-amber-400">
+                Limite da faixa atingido. <a href="{{ route('subscription.index') }}" class="underline">Aumente o limite</a> pra vincular mais clientes.
+            </p>
+        @endif
 
         @if ($clientesVinculados->isNotEmpty())
             <div class="mt-3 space-y-2">

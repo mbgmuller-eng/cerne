@@ -53,10 +53,63 @@ class SubscriptionIndexTest extends TestCase
         Livewire::actingAs($profissional)->test(\App\Livewire\Subscription\SubscriptionIndex::class)
             ->set('cpfCnpj', '52998224725')
             ->set('metodoPagamento', PaymentMethod::Pix->value)
+            ->set('clientCap', '10')
             ->call('assinar', SubscriptionBundle::Completo->value);
 
         $assinatura = Subscription::query()->where('user_id', $profissional->id)->sole();
         self::assertSame(SubscriptionKind::Professional, $assinatura->kind);
+        self::assertSame(10, $assinatura->client_cap);
+    }
+
+    public function test_profissional_sem_faixa_escolhida_e_rejeitado(): void
+    {
+        $this->fakeAsaas();
+        $profissional = User::factory()->consultant()->create();
+
+        Livewire::actingAs($profissional)->test(\App\Livewire\Subscription\SubscriptionIndex::class)
+            ->set('cpfCnpj', '52998224725')
+            ->set('metodoPagamento', PaymentMethod::Pix->value)
+            ->call('assinar', SubscriptionBundle::Completo->value)
+            ->assertHasErrors('clientCap');
+
+        self::assertSame(0, Subscription::query()->where('user_id', $profissional->id)->count());
+    }
+
+    public function test_cliente_direct_nao_precisa_de_faixa(): void
+    {
+        $this->fakeAsaas();
+        $usuario = User::factory()->create();
+
+        Livewire::actingAs($usuario)->test(\App\Livewire\Subscription\SubscriptionIndex::class)
+            ->set('cpfCnpj', '52998224725')
+            ->set('metodoPagamento', PaymentMethod::Pix->value)
+            ->call('assinar', SubscriptionBundle::Completo->value)
+            ->assertHasNoErrors();
+
+        $assinatura = Subscription::query()->where('user_id', $usuario->id)->sole();
+        self::assertNull($assinatura->client_cap);
+    }
+
+    public function test_assinar_como_profissional_manda_pra_asaas_o_preco_do_pacote_mais_o_adicional_da_faixa(): void
+    {
+        $profissional = User::factory()->consultant()->create();
+
+        $asaas = Mockery::mock(AsaasClient::class);
+        $asaas->shouldReceive('findOrCreateCustomer')->andReturn('cus_teste');
+        $asaas->shouldReceive('createSubscription')
+            ->once()
+            ->with('cus_teste', SubscriptionBundle::Completo, PaymentMethod::Pix, Mockery::type('string'), 25)
+            ->andReturn(['id' => 'sub_teste', 'invoiceUrl' => null]);
+        $this->app->instance(AsaasClient::class, $asaas);
+
+        Livewire::actingAs($profissional)->test(\App\Livewire\Subscription\SubscriptionIndex::class)
+            ->set('cpfCnpj', '52998224725')
+            ->set('metodoPagamento', PaymentMethod::Pix->value)
+            ->set('clientCap', '25')
+            ->call('assinar', SubscriptionBundle::Completo->value);
+
+        $assinatura = Subscription::query()->where('user_id', $profissional->id)->sole();
+        self::assertSame(25, $assinatura->client_cap);
     }
 
     public function test_cpf_invalido_e_rejeitado(): void
@@ -171,6 +224,87 @@ class SubscriptionIndexTest extends TestCase
         $assinatura->refresh();
         self::assertSame(\App\Enums\SubscriptionStatus::Cancelled, $assinatura->status);
         self::assertNotNull($assinatura->cancelled_at);
+    }
+
+    public function test_aumentar_faixa_cancela_a_atual_e_cria_uma_nova_sem_teste_gratis(): void
+    {
+        $profissional = User::factory()->consultant()->create();
+        $atual = Subscription::create([
+            'user_id' => $profissional->id,
+            'kind' => SubscriptionKind::Professional,
+            'bundle' => SubscriptionBundle::Completo,
+            'client_cap' => 10,
+            'billing_type' => PaymentMethod::Pix,
+            'status' => SubscriptionStatus::Active,
+            'asaas_subscription_id' => 'sub_antiga',
+            'started_at' => now(),
+        ]);
+
+        $asaas = Mockery::mock(AsaasClient::class);
+        $asaas->shouldReceive('cancelSubscription')->once()->with('sub_antiga');
+        $asaas->shouldReceive('findOrCreateCustomer')->once()->andReturn('cus_teste');
+        $asaas->shouldReceive('createSubscription')
+            ->once()
+            ->with('cus_teste', SubscriptionBundle::Completo, PaymentMethod::Pix, Mockery::type('string'), 25, 0)
+            ->andReturn(['id' => 'sub_nova', 'invoiceUrl' => null]);
+        $this->app->instance(AsaasClient::class, $asaas);
+
+        Livewire::actingAs($profissional)->test(\App\Livewire\Subscription\SubscriptionIndex::class)
+            ->call('aumentarFaixa', 25);
+
+        self::assertSame(SubscriptionStatus::Cancelled, $atual->fresh()->status);
+
+        $nova = Subscription::query()->where('user_id', $profissional->id)->ofKind(SubscriptionKind::Professional)->where('status', SubscriptionStatus::PastDue)->sole();
+        self::assertSame(25, $nova->client_cap);
+        self::assertSame(SubscriptionBundle::Completo, $nova->bundle);
+        self::assertSame('sub_nova', $nova->asaas_subscription_id);
+    }
+
+    public function test_aumentar_faixa_pra_valor_menor_ou_igual_nao_faz_nada(): void
+    {
+        $profissional = User::factory()->consultant()->create();
+        Subscription::create([
+            'user_id' => $profissional->id,
+            'kind' => SubscriptionKind::Professional,
+            'bundle' => SubscriptionBundle::Completo,
+            'client_cap' => 25,
+            'billing_type' => PaymentMethod::Pix,
+            'status' => SubscriptionStatus::Active,
+            'asaas_subscription_id' => 'sub_atual',
+            'started_at' => now(),
+        ]);
+
+        $asaas = Mockery::mock(AsaasClient::class);
+        $asaas->shouldNotReceive('cancelSubscription');
+        $asaas->shouldNotReceive('createSubscription');
+        $this->app->instance(AsaasClient::class, $asaas);
+
+        Livewire::actingAs($profissional)->test(\App\Livewire\Subscription\SubscriptionIndex::class)
+            ->call('aumentarFaixa', 10);
+
+        self::assertSame(1, Subscription::query()->where('user_id', $profissional->id)->count());
+    }
+
+    public function test_aumentar_faixa_sem_teto_nenhum_na_atual_e_bloqueado(): void
+    {
+        $profissional = User::factory()->consultant()->create();
+        Subscription::create([
+            'user_id' => $profissional->id,
+            'kind' => SubscriptionKind::Professional,
+            'bundle' => SubscriptionBundle::Completo,
+            'client_cap' => null,
+            'status' => SubscriptionStatus::Active,
+            'started_at' => now(),
+        ]);
+
+        $asaas = Mockery::mock(AsaasClient::class);
+        $asaas->shouldNotReceive('cancelSubscription');
+        $asaas->shouldNotReceive('createSubscription');
+        $this->app->instance(AsaasClient::class, $asaas);
+
+        Livewire::actingAs($profissional)->test(\App\Livewire\Subscription\SubscriptionIndex::class)
+            ->call('aumentarFaixa', 25)
+            ->assertStatus(404);
     }
 
     public function test_cancelar_sem_assinatura_ativa_nao_chama_a_asaas(): void

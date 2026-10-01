@@ -30,6 +30,9 @@ class SubscriptionIndex extends Component
 
     public string $metodoPagamento = '';
 
+    /** Só preenchido/validado pra quem assina como profissional — ver rules(). */
+    public string $clientCap = '';
+
     public function mount(): void
     {
         $this->cpfCnpj = Auth::user()->cpf_cnpj ?? '';
@@ -37,10 +40,16 @@ class SubscriptionIndex extends Component
 
     public function rules(): array
     {
-        return [
+        $regras = [
             'cpfCnpj' => ['required', 'string', new CpfCnpj],
             'metodoPagamento' => ['required', Rule::in(array_column(PaymentMethod::cases(), 'value'))],
         ];
+
+        if ($this->kind() === SubscriptionKind::Professional) {
+            $regras['clientCap'] = ['required', Rule::in(array_keys(config('billing.client_tier_surcharge')))];
+        }
+
+        return $regras;
     }
 
     /**
@@ -59,13 +68,17 @@ class SubscriptionIndex extends Component
 
         $pacote = SubscriptionBundle::from($bundle);
         $metodo = PaymentMethod::from($data['metodoPagamento']);
+        // Só profissional escolhe faixa — ver rules(), cliente Direct nunca
+        // tem 'clientCap' no array validado.
+        $teto = isset($data['clientCap']) ? (int) $data['clientCap'] : null;
         $customerId = $asaas->findOrCreateCustomer($usuario->fresh());
-        $resultado = $asaas->createSubscription($customerId, $pacote, $metodo, "Cerne — {$pacote->label()}");
+        $resultado = $asaas->createSubscription($customerId, $pacote, $metodo, "Cerne — {$pacote->label()}", $teto);
 
         Subscription::create([
             'user_id' => $usuario->id,
             'kind' => $this->kind(),
             'bundle' => $pacote,
+            'client_cap' => $teto,
             'billing_type' => $metodo,
             'status' => SubscriptionStatus::Trialing,
             // Fim do teste grátis — mesmo campo que current_period_ends_at
@@ -117,6 +130,71 @@ class SubscriptionIndex extends Component
         session()->flash('status', 'Assinatura cancelada. O acesso foi encerrado agora.');
     }
 
+    /**
+     * Sobe de faixa — não existe endpoint de "mudar valor" na Asaas (só
+     * criar e cancelar, ver AsaasClient), então cancela a assinatura atual
+     * e cria uma nova, maior, com o MESMO pacote/forma de pagamento. Sem
+     * os 7 dias de teste: quem já paga não ganha outro trial só por
+     * precisar de mais clientes (ver AsaasClient::createSubscription(),
+     * diasAteprimeiraCobranca = 0) — a nova nasce PastDue, cobra na hora,
+     * mesma regra de sempre pra quem está em atraso.
+     */
+    public function aumentarFaixa(int $novoTeto, AsaasClient $asaas)
+    {
+        abort_unless($this->kind() === SubscriptionKind::Professional, 403);
+        abort_unless(in_array($novoTeto, array_keys(config('billing.client_tier_surcharge')), true), 422);
+
+        $atual = Subscription::query()
+            ->where('user_id', Auth::id())
+            ->ofKind(SubscriptionKind::Professional)
+            ->latest('created_at')
+            ->first();
+
+        abort_if($atual === null || ! $atual->isCurrent() || $atual->client_cap === null, 404);
+
+        if ($novoTeto <= $atual->client_cap) {
+            session()->flash('status', 'Essa já é sua faixa atual ou uma faixa menor.');
+
+            return;
+        }
+
+        $usuario = Auth::user();
+
+        if ($atual->asaas_subscription_id !== null) {
+            $asaas->cancelSubscription($atual->asaas_subscription_id);
+        }
+
+        $atual->update(['status' => SubscriptionStatus::Cancelled, 'cancelled_at' => now()]);
+
+        $customerId = $asaas->findOrCreateCustomer($usuario->fresh());
+        $resultado = $asaas->createSubscription(
+            $customerId,
+            $atual->bundle,
+            $atual->billing_type,
+            "Cerne — {$atual->bundle->label()}",
+            $novoTeto,
+            diasAteprimeiraCobranca: 0,
+        );
+
+        Subscription::create([
+            'user_id' => $usuario->id,
+            'kind' => SubscriptionKind::Professional,
+            'bundle' => $atual->bundle,
+            'client_cap' => $novoTeto,
+            'billing_type' => $atual->billing_type,
+            'status' => SubscriptionStatus::PastDue,
+            'current_period_ends_at' => now(),
+            'asaas_subscription_id' => $resultado['id'],
+            'started_at' => now(),
+        ]);
+
+        if ($resultado['invoiceUrl'] !== null) {
+            return $this->redirect($resultado['invoiceUrl']);
+        }
+
+        session()->flash('status', 'Faixa aumentada. A cobrança já foi gerada — acompanhe pelo e-mail da Asaas.');
+    }
+
     public function render()
     {
         $assinaturaAtual = Subscription::query()
@@ -130,6 +208,7 @@ class SubscriptionIndex extends Component
             'assinaturaAtual' => $assinaturaAtual,
             'temAcessoAtivo' => $assinaturaAtual?->isCurrent() ?? false,
             'souProfissional' => $this->kind() === SubscriptionKind::Professional,
+            'faixasClientes' => config('billing.client_tier_surcharge'),
         ]);
     }
 

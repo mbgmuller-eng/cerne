@@ -9,6 +9,7 @@ use App\Models\ConsultantInvite;
 use App\Models\FinancialProfile;
 use App\Models\User;
 use App\Services\ClientInviteService;
+use App\Services\ConsultantCapacityService;
 use App\Services\ConsultantLinkService;
 use App\Services\ConsultantPortfolioService;
 use App\Services\PartnerInviteService;
@@ -114,7 +115,7 @@ class PortfolioOverview extends Component
      * (ConsultantLinkService) — ninguém ganha uma segunda conta só porque
      * um consultor diferente tentou convidar o mesmo endereço.
      */
-    public function invite(ClientInviteService $invites, ConsultantLinkService $links): void
+    public function invite(ClientInviteService $invites, ConsultantLinkService $links, ConsultantCapacityService $capacity): void
     {
         $this->validate([
             'inviteName' => ['required', 'string', 'max:255'],
@@ -125,6 +126,13 @@ class PortfolioOverview extends Component
         ]);
 
         $consultor = auth()->user();
+
+        if (! $capacity->hasRoomForNewClient($consultor)) {
+            $this->addError('inviteEmail', 'Você atingiu o limite de clientes do seu plano atual. Assine uma faixa maior pra adicionar mais.');
+
+            return;
+        }
+
         $existente = User::where('email', $this->inviteEmail)->first();
 
         if ($existente === null) {

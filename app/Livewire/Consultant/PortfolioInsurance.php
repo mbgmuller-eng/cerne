@@ -7,6 +7,7 @@ use App\Enums\InviteStatus;
 use App\Models\ConsultantInvite;
 use App\Models\InsurancePolicy;
 use App\Services\ClientInviteService;
+use App\Services\ConsultantCapacityService;
 use App\Services\ConsultantLinkService;
 use App\Services\ConsultantPortfolioService;
 use Illuminate\Support\Collection;
@@ -60,7 +61,7 @@ class PortfolioInsurance extends Component
         }
     }
 
-    public function invite(ClientInviteService $invites, ConsultantLinkService $links): void
+    public function invite(ClientInviteService $invites, ConsultantLinkService $links, ConsultantCapacityService $capacity): void
     {
         $this->validate([
             'inviteName' => ['required', 'string', 'max:255'],
@@ -69,6 +70,12 @@ class PortfolioInsurance extends Component
             'inviteName' => 'nome',
             'inviteEmail' => 'e-mail',
         ]);
+
+        if (! $capacity->hasRoomForNewClient(auth()->user())) {
+            $this->addError('inviteEmail', 'Você atingiu o limite de clientes do seu plano atual. Assine uma faixa maior pra adicionar mais.');
+
+            return;
+        }
 
         $this->lastInviteLink = $links->inviteOrRequest(auth()->user(), $this->inviteName, $this->inviteEmail, $invites);
         $this->reset('inviteName', 'inviteEmail');

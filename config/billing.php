@@ -19,4 +19,21 @@ return [
         SubscriptionBundle::Completo->value => 39.90,
     ],
 
+    /*
+    |---------------------------------------------------------------------------
+    | Faixas de clientes (só assinatura Professional)
+    |---------------------------------------------------------------------------
+    | Chave = teto de clientes vinculados e ativos; valor = acréscimo
+    | mensal somado ao preço do pacote (ver 'prices' acima). Acima da maior
+    | faixa não é self-service — vira acordo manual, concedido direto no
+    | banco com client_cap = null (sem teto), mesmo caminho que já criou a
+    | assinatura de cortesia do Marcelo. Ver ConsultantCapacityService.
+    */
+
+    'client_tier_surcharge' => [
+        10 => 0,
+        25 => 50.00,
+        50 => 120.00,
+    ],
+
 ];
