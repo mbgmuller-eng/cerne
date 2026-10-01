@@ -18,6 +18,7 @@
     <link rel="icon" href="{{ asset('icons/icon-192.png') }}" type="image/png">
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     {{ \Illuminate\Support\Facades\Vite::fonts() }}
+    @livewireStyles
 </head>
 <body class="h-full bg-paper text-slate-800 antialiased dark:bg-slate-900 dark:text-slate-200">
     <header class="sticky top-0 z-10 border-b border-slate-200/70 bg-paper/90 backdrop-blur dark:border-white/10 dark:bg-slate-900/90">
@@ -58,5 +59,6 @@
             </p>
         </div>
     </footer>
+    @livewireScripts
 </body>
 </html>

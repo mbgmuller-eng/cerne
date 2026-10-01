@@ -1,5 +1,13 @@
+<?php
+    // Vem do botão específico de cada área na landing (?papel=consultant
+    // ou ?papel=broker) — já entra marcado como profissional, na
+    // especialidade certa, sem a pessoa precisar escolher de novo.
+    $papelPreSelecionado = in_array(request('papel'), ['consultant', 'broker'], true) ? request('papel') : null;
+    $tipoPadrao = old('tipo_conta', $papelPreSelecionado ? 'profissional' : 'cliente');
+    $papelPadrao = old('papel', $papelPreSelecionado);
+?>
 <x-layouts.guest title="Criar conta · Cerne">
-    <div x-data="{ tipo: '{{ old('tipo_conta', 'cliente') }}' }">
+    <div x-data="{ tipo: '{{ $tipoPadrao }}' }">
         <h1 class="font-display text-2xl font-semibold text-slate-900 dark:text-white">Criar conta</h1>
         <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Sem convite: sua conta, sua assinatura.</p>
 
@@ -7,11 +15,11 @@
             @csrf
 
             <div class="grid grid-cols-2 gap-2">
-                <label @class(['cursor-pointer rounded-lg border px-3 py-2 text-center text-sm font-medium', 'border-brand-700 bg-brand-50 text-brand-900 dark:border-brand-500 dark:bg-brand-500/10 dark:text-brand-200' => old('tipo_conta', 'cliente') === 'cliente', 'border-slate-200 text-slate-600 dark:border-slate-700 dark:text-slate-400' => old('tipo_conta', 'cliente') !== 'cliente'])>
+                <label @class(['cursor-pointer rounded-lg border px-3 py-2 text-center text-sm font-medium', 'border-brand-700 bg-brand-50 text-brand-900 dark:border-brand-500 dark:bg-brand-500/10 dark:text-brand-200' => $tipoPadrao === 'cliente', 'border-slate-200 text-slate-600 dark:border-slate-700 dark:text-slate-400' => $tipoPadrao !== 'cliente'])>
                     <input type="radio" name="tipo_conta" value="cliente" x-model="tipo" class="sr-only">
                     Sou cliente
                 </label>
-                <label @class(['cursor-pointer rounded-lg border px-3 py-2 text-center text-sm font-medium', 'border-brand-700 bg-brand-50 text-brand-900 dark:border-brand-500 dark:bg-brand-500/10 dark:text-brand-200' => old('tipo_conta') === 'profissional', 'border-slate-200 text-slate-600 dark:border-slate-700 dark:text-slate-400' => old('tipo_conta') !== 'profissional'])>
+                <label @class(['cursor-pointer rounded-lg border px-3 py-2 text-center text-sm font-medium', 'border-brand-700 bg-brand-50 text-brand-900 dark:border-brand-500 dark:bg-brand-500/10 dark:text-brand-200' => $tipoPadrao === 'profissional', 'border-slate-200 text-slate-600 dark:border-slate-700 dark:text-slate-400' => $tipoPadrao !== 'profissional'])>
                     <input type="radio" name="tipo_conta" value="profissional" x-model="tipo" class="sr-only">
                     Sou profissional
                 </label>
@@ -23,8 +31,8 @@
             <div x-show="tipo === 'profissional'" x-cloak>
                 <label class="block text-sm font-medium text-slate-700 dark:text-slate-300">Você é</label>
                 <select name="papel" class="input mt-1.5">
-                    <option value="consultant" @selected(old('papel') === 'consultant')>Consultor financeiro</option>
-                    <option value="broker" @selected(old('papel') === 'broker')>Corretor de seguros</option>
+                    <option value="consultant" @selected($papelPadrao === 'consultant')>Consultor financeiro</option>
+                    <option value="broker" @selected($papelPadrao === 'broker')>Corretor de seguros</option>
                 </select>
                 @error('papel')
                     <p class="mt-1.5 text-sm text-red-700 dark:text-red-400">{{ $message }}</p>
