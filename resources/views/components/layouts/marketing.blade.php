@@ -50,7 +50,7 @@
                 <x-brand-mark class="h-5 w-5" />
                 Cerne
             </span>
-            <p>Consultoria financeira, seguros, documentos e saúde — num só lugar.</p>
+            <p>Consultoria financeira, seguros, documentos e saúde, num só lugar.</p>
             <p>
                 <a href="{{ route('legal.terms') }}" class="underline hover:text-slate-700 dark:hover:text-slate-200">Termos de Uso</a>
                 ·

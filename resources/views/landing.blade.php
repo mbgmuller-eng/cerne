@@ -1,15 +1,15 @@
-<x-layouts.marketing title="Cerne — finanças, seguros, documentos e saúde num só lugar">
+<x-layouts.marketing title="Cerne: finanças, seguros, documentos e saúde num só lugar">
 
     {{-- Hero --}}
     <section class="mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-24">
         <div class="max-w-2xl">
             <p class="eyebrow text-brand-700 dark:text-brand-300">Cerne</p>
             <h1 class="mt-3 font-display text-4xl font-semibold tracking-tight text-slate-900 sm:text-5xl dark:text-white">
-                Sua vida financeira, acompanhada de perto — com quem cuida dela.
+                Sua vida financeira, acompanhada de perto, sozinho ou com quem te ajuda a cuidar dela.
             </h1>
             <p class="mt-5 text-lg text-slate-600 dark:text-slate-300">
-                Fluxo de caixa, seguros, documentos importantes e saúde, organizados num só lugar.
-                Sozinho ou com o consultor/corretor de sua confiança — com a privacidade que você escolher.
+                Fluxo de caixa, seguros, documentos importantes e saúde, organizados num só lugar,
+                com a privacidade que você escolher.
             </p>
             <div class="mt-8 flex flex-wrap gap-3">
                 <a href="#planos" class="btn-primary px-6 py-3 text-base">Assinar</a>
@@ -25,8 +25,8 @@
                 <p class="eyebrow">Pra você</p>
                 <h2 class="mt-2 font-display text-xl font-semibold text-slate-900 dark:text-white">Assine direto</h2>
                 <p class="mt-2 text-sm text-slate-600 dark:text-slate-300">
-                    Cria sua conta, escolhe o pacote e já começa a organizar suas finanças, seus
-                    documentos e sua saúde — sem precisar de convite de ninguém.
+                    Cria sua conta, escolhe o pacote e já começa a organizar finanças, seguros,
+                    documentos e saúde. Sem convite de ninguém.
                 </p>
             </div>
             <div id="profissionais" class="card p-6">

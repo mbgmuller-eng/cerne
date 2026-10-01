@@ -1,7 +1,7 @@
 <x-layouts.guest title="Criar conta · Cerne">
     <div x-data="{ tipo: '{{ old('tipo_conta', 'cliente') }}' }">
         <h1 class="font-display text-2xl font-semibold text-slate-900 dark:text-white">Criar conta</h1>
-        <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Sem convite — sua conta, sua assinatura.</p>
+        <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Sem convite: sua conta, sua assinatura.</p>
 
         <form method="POST" action="{{ route('register.store') }}" class="mt-8 space-y-5">
             @csrf

@@ -1,7 +1,7 @@
 <x-layouts.marketing title="Termos de Uso · Cerne">
     <div class="mx-auto max-w-3xl px-4 py-16 sm:px-6">
         <div class="mb-8 rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-900 ring-1 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-200 dark:ring-amber-500/20">
-            Rascunho — este texto ainda não passou por revisão jurídica. Não é a versão final.
+            Rascunho: este texto ainda não passou por revisão jurídica. Não é a versão final.
         </div>
 
         <h1 class="font-display text-3xl font-semibold tracking-tight text-slate-900 dark:text-white">Termos de Uso e Privacidade</h1>
