@@ -1,3 +1,11 @@
+<?php
+    // Cache-busting pras capturas de tela: o header delas é
+    // "Cache-Control: public, max-age=604800" (ver public/.htaccess) — sem
+    // isso, atualizar a imagem no servidor não adianta nada pra quem já
+    // carregou a página antes, o navegador segue servindo a versão velha
+    // por até 7 dias do próprio cache, sem bater no servidor de novo.
+    $marketingImage = fn (string $nome) => asset("images/marketing/{$nome}.jpg").'?v='.filemtime(public_path("images/marketing/{$nome}.jpg"));
+?>
 <x-layouts.marketing title="Cerne: finanças, seguros, documentos e saúde num só lugar">
 
     {{-- Hero --}}
@@ -31,11 +39,11 @@
         </div>
 
         <div class="mt-6">
-            <x-screenshot-frame x-show="aba === 'painel'" src="{{ asset('images/marketing/painel.jpg') }}" alt="Visão geral do painel financeiro no Cerne" />
-            <x-screenshot-frame x-show="aba === 'fluxo'" x-cloak src="{{ asset('images/marketing/fluxo-de-caixa.jpg') }}" alt="Fluxo de caixa do mês no Cerne" />
-            <x-screenshot-frame x-show="aba === 'seguros'" x-cloak src="{{ asset('images/marketing/seguros.jpg') }}" alt="Apólices de seguro organizadas no Cerne" />
-            <x-screenshot-frame x-show="aba === 'documentos'" x-cloak src="{{ asset('images/marketing/documentos.jpg') }}" alt="Cofre de documentos no Cerne" />
-            <x-screenshot-frame x-show="aba === 'saude'" x-cloak src="{{ asset('images/marketing/saude.jpg') }}" alt="Treino de academia acompanhado no Cerne" />
+            <x-screenshot-frame x-show="aba === 'painel'" src="{{ $marketingImage('painel') }}" alt="Visão geral do painel financeiro no Cerne" />
+            <x-screenshot-frame x-show="aba === 'fluxo'" x-cloak src="{{ $marketingImage('fluxo-de-caixa') }}" alt="Fluxo de caixa do mês no Cerne" />
+            <x-screenshot-frame x-show="aba === 'seguros'" x-cloak src="{{ $marketingImage('seguros') }}" alt="Apólices de seguro organizadas no Cerne" />
+            <x-screenshot-frame x-show="aba === 'documentos'" x-cloak src="{{ $marketingImage('documentos') }}" alt="Cofre de documentos no Cerne" />
+            <x-screenshot-frame x-show="aba === 'saude'" x-cloak src="{{ $marketingImage('saude') }}" alt="Treino de academia acompanhado no Cerne" />
         </div>
     </section>
 
@@ -68,7 +76,7 @@
 
                 <div class="mt-6 grid gap-5 md:grid-cols-3">
                     <div class="card flex flex-col overflow-hidden">
-                        <img src="{{ asset('images/marketing/carteira-consultor.jpg') }}" alt="Painel da carteira de um consultor financeiro" class="h-40 w-full object-cover object-top">
+                        <img src="{{ $marketingImage('carteira-consultor') }}" alt="Painel da carteira de um consultor financeiro" class="h-40 w-full object-cover object-top">
                         <div class="flex flex-1 flex-col p-5">
                             <h3 class="font-display text-base font-semibold text-slate-900 dark:text-white">Consultor financeiro</h3>
                             <ul class="mt-3 space-y-1.5 text-sm text-slate-600 dark:text-slate-300">
@@ -81,7 +89,7 @@
                     </div>
 
                     <div class="card flex flex-col overflow-hidden">
-                        <img src="{{ asset('images/marketing/carteira-seguros.jpg') }}" alt="Apólices da carteira de um corretor de seguros" class="h-40 w-full object-cover object-top">
+                        <img src="{{ $marketingImage('carteira-seguros') }}" alt="Apólices da carteira de um corretor de seguros" class="h-40 w-full object-cover object-top">
                         <div class="flex flex-1 flex-col p-5">
                             <h3 class="font-display text-base font-semibold text-slate-900 dark:text-white">Corretor de seguros</h3>
                             <ul class="mt-3 space-y-1.5 text-sm text-slate-600 dark:text-slate-300">
