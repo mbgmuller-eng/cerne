@@ -120,6 +120,47 @@ class MyAccountSubscriptionTest extends TestCase
             ->assertSee('Clientes vinculados');
     }
 
+    public function test_profissional_remove_cliente_vinculado(): void
+    {
+        $corretor = User::factory()->broker()->create(['name' => 'Bruno Corretor']);
+        $cliente = User::factory()->create(['name' => 'André Albuquerque']);
+        $vinculo = ConsultantClient::factory()->create([
+            'consultant_id' => $corretor->id,
+            'client_id' => $cliente->id,
+            'status' => ConsultantClientStatus::Active,
+            'accepted_at' => now(),
+        ]);
+
+        $this->actingAs($corretor);
+
+        Livewire::test(MyAccount::class)
+            ->assertSee('André Albuquerque')
+            ->call('removerCliente', $vinculo->id)
+            ->assertDontSee('André Albuquerque');
+
+        self::assertSame(ConsultantClientStatus::Inactive, $vinculo->fresh()->status);
+    }
+
+    public function test_profissional_nao_remove_cliente_de_outro_profissional(): void
+    {
+        $corretor = User::factory()->broker()->create();
+        $outroCorretor = User::factory()->broker()->create();
+        $cliente = User::factory()->create();
+        $vinculo = ConsultantClient::factory()->create([
+            'consultant_id' => $outroCorretor->id,
+            'client_id' => $cliente->id,
+            'status' => ConsultantClientStatus::Active,
+        ]);
+
+        $this->actingAs($corretor);
+
+        Livewire::test(MyAccount::class)
+            ->call('removerCliente', $vinculo->id)
+            ->assertStatus(404);
+
+        self::assertSame(ConsultantClientStatus::Active, $vinculo->fresh()->status);
+    }
+
     public function test_profissional_com_cliente_aberto_continua_vendo_a_conta_do_cliente(): void
     {
         [$profile, $titular] = $this->criarPerfilIndividual();

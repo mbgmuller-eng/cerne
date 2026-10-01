@@ -56,9 +56,17 @@
         @if ($clientesVinculados->isNotEmpty())
             <div class="mt-3 space-y-2">
                 @foreach ($clientesVinculados as $vinculo)
-                    <div class="rounded-lg bg-slate-50 px-3 py-2 dark:bg-slate-700/50">
-                        <p class="text-sm text-slate-800 dark:text-slate-200">{{ $vinculo->client->name }}</p>
-                        <p class="text-xs text-slate-500 dark:text-slate-400">{{ $vinculo->client->email }} · vinculado desde {{ $vinculo->accepted_at?->format('d/m/Y') ?? '—' }}</p>
+                    <div class="flex items-center justify-between gap-3 rounded-lg bg-slate-50 px-3 py-2 dark:bg-slate-700/50">
+                        <div>
+                            <p class="text-sm text-slate-800 dark:text-slate-200">{{ $vinculo->client->name }}</p>
+                            <p class="text-xs text-slate-500 dark:text-slate-400">{{ $vinculo->client->email }} · vinculado desde {{ $vinculo->accepted_at?->format('d/m/Y') ?? '—' }}</p>
+                        </div>
+                        <button
+                            type="button"
+                            wire:click="removerCliente('{{ $vinculo->id }}')"
+                            wire:confirm="Remover {{ $vinculo->client->name }} da carteira? O acesso que vem da sua assinatura é encerrado na hora."
+                            class="shrink-0 text-xs text-red-700 hover:underline dark:text-red-400"
+                        >Remover</button>
                     </div>
                 @endforeach
             </div>

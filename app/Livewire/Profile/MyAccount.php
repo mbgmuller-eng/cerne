@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Profile;
 
+use App\Enums\ConsultantClientStatus;
 use App\Enums\InviteStatus;
 use App\Enums\MemberRole;
 use App\Enums\SubscriptionKind;
@@ -235,6 +236,31 @@ class MyAccount extends Component
         $this->reset('partnerOnlyName');
         $this->showPartnerOnlyForm = false;
         session()->flash('status', 'Cônjuge cadastrado — sem login, só você (e o consultor) acessam os dados dele(a).');
+    }
+
+    /**
+     * Desvincula um cliente — some da carteira e perde na hora o acesso
+     * que vinha de graça pela assinatura Professional (EntitlementService
+     * e MemberPrivacyScope só leem vínculo Active). Não apaga a linha: um
+     * convite novo pro mesmo e-mail reabre ela (ver
+     * ConsultantLinkService::request(), que já faz updateOrCreate em cima
+     * do par consultant_id/client_id).
+     */
+    public function removerCliente(string $consultantClientId): void
+    {
+        abort_unless(auth()->user()->isLinkedProfessional(), 403);
+
+        $vinculo = ConsultantClient::query()
+            ->where('id', $consultantClientId)
+            ->where('consultant_id', auth()->id())
+            ->active()
+            ->first();
+
+        abort_if($vinculo === null, 404);
+
+        $vinculo->update(['status' => ConsultantClientStatus::Inactive]);
+
+        session()->flash('status', 'Cliente removido da carteira. O acesso foi encerrado agora.');
     }
 
     public function render()

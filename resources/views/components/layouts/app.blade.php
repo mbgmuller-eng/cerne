@@ -132,7 +132,14 @@
     // são a área de gestão do consultor. Sem esta distinção, o perfil do
     // último cliente aberto (guardado na sessão) continuava ditando o menu
     // de navegação mesmo aqui, como se ainda estivéssemos dentro dele.
-    $areaConsultor = request()->routeIs('consultant.*');
+    // "Minha conta" e "Assinatura" são rotas compartilhadas com o cliente
+    // comum (não têm prefixo consultant.*) — mas, pro profissional sem
+    // cliente nenhum aberto, são telas DELE, não de ninguém, e precisam do
+    // mesmo layout da área do consultor. Sem isto caíam no "nenhuma área"
+    // (sem barra lateral, cabeçalho compacto mesmo no PC) por não ter
+    // $profile nem bater com consultant.* — sem jeito nenhum de navegar.
+    $areaConsultor = request()->routeIs('consultant.*')
+        || ($profile === null && $user?->isLinkedProfessional() && request()->routeIs(['my-account', 'subscription.index']));
     $areaAdmin = request()->routeIs('admin.*');
     $dentroDoPerfil = $profile && ! $areaConsultor && ! $areaAdmin;
     $mostraAsideDesktop = $dentroDoPerfil || $areaConsultor || $areaAdmin;
