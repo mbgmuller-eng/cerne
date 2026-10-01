@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Subscription;
 
+use App\Enums\PaymentMethod;
 use App\Enums\SubscriptionBundle;
 use App\Enums\SubscriptionKind;
 use App\Enums\SubscriptionStatus;
@@ -9,6 +10,7 @@ use App\Models\Subscription;
 use App\Rules\CpfCnpj;
 use App\Services\AsaasClient;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\Rule;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 
@@ -26,6 +28,8 @@ class SubscriptionIndex extends Component
 {
     public string $cpfCnpj = '';
 
+    public string $metodoPagamento = '';
+
     public function mount(): void
     {
         $this->cpfCnpj = Auth::user()->cpf_cnpj ?? '';
@@ -35,9 +39,18 @@ class SubscriptionIndex extends Component
     {
         return [
             'cpfCnpj' => ['required', 'string', new CpfCnpj],
+            'metodoPagamento' => ['required', Rule::in(array_column(PaymentMethod::cases(), 'value'))],
         ];
     }
 
+    /**
+     * 7 dias grátis pra qualquer pacote, cartão ou Pix — ver
+     * AsaasClient::createSubscription(). Nenhum dos dois cobra sozinho
+     * hoje: a pessoa clica a fatura quando o teste acabar (ou antes, se
+     * quiser). Status nasce Trialing, não PastDue — isCurrent() já trata
+     * os dois igual, liberando acesso, mas Trialing é o que de fato
+     * aconteceu.
+     */
     public function assinar(string $bundle, AsaasClient $asaas)
     {
         $data = $this->validate();
@@ -45,17 +58,21 @@ class SubscriptionIndex extends Component
         $usuario->update(['cpf_cnpj' => $data['cpfCnpj']]);
 
         $pacote = SubscriptionBundle::from($bundle);
+        $metodo = PaymentMethod::from($data['metodoPagamento']);
         $customerId = $asaas->findOrCreateCustomer($usuario->fresh());
-        $resultado = $asaas->createSubscription($customerId, $pacote, "Cerne — {$pacote->label()}");
+        $resultado = $asaas->createSubscription($customerId, $pacote, $metodo, "Cerne — {$pacote->label()}");
 
         Subscription::create([
             'user_id' => $usuario->id,
             'kind' => $this->kind(),
             'bundle' => $pacote,
-            // Aguardando a primeira cobrança confirmar — sem
-            // current_period_ends_at, isCurrent() já nega acesso sozinho
-            // até o webhook de pagamento chegar.
-            'status' => SubscriptionStatus::PastDue,
+            'billing_type' => $metodo,
+            'status' => SubscriptionStatus::Trialing,
+            // Fim do teste grátis — mesmo campo que current_period_ends_at
+            // sempre teve, só que agora nasce preenchido em vez de nulo.
+            // O webhook de pagamento confirmado sobrescreve isso a cada
+            // ciclo normalmente.
+            'current_period_ends_at' => now()->addDays(7),
             'asaas_subscription_id' => $resultado['id'],
             'started_at' => now(),
         ]);
@@ -64,7 +81,7 @@ class SubscriptionIndex extends Component
             return $this->redirect($resultado['invoiceUrl']);
         }
 
-        session()->flash('status', 'Assinatura criada. Acompanhe o pagamento pelo e-mail da Asaas.');
+        session()->flash('status', 'Assinatura criada: 7 dias grátis pra testar. Acompanhe o pagamento pelo e-mail da Asaas quando o teste acabar.');
     }
 
     /**

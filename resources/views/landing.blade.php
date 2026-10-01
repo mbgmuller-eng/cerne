@@ -169,7 +169,7 @@
     <section id="planos" class="border-t border-slate-200/70 bg-white/60 py-16 dark:border-white/10 dark:bg-white/5">
         <div class="mx-auto max-w-6xl px-4 sm:px-6">
             <h2 class="font-display text-3xl font-semibold tracking-tight text-slate-900 dark:text-white">Planos</h2>
-            <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">Um valor mensal, cancele quando quiser.</p>
+            <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">7 dias grátis pra testar. Depois, um valor mensal, cancele quando quiser.</p>
 
             <div class="mt-8 grid gap-5 sm:grid-cols-3">
                 @foreach (\App\Enums\SubscriptionBundle::cases() as $pacote)
@@ -196,7 +196,8 @@
 
             <div class="mt-8 space-y-3">
                 @foreach ([
-                    'Como funciona a cobrança?' => 'Mensal, processada pela Asaas. Você escolhe entre Pix, boleto ou cartão na hora de pagar, sem precisar cadastrar cartão antes de decidir.',
+                    'Tem período de teste?' => 'Sim, 7 dias grátis em qualquer pacote, pra usar e decidir com calma. Você só é cobrado depois que o teste termina.',
+                    'Como funciona a cobrança?' => 'Mensal, processada pela Asaas, só em cartão de crédito ou Pix. Nenhum dos dois cobra sozinho hoje: você recebe o link de pagamento quando o teste acaba (ou a cada mês seguinte) e paga com um clique. Quem escolhe Pix recebe um aviso por e-mail 3 dias antes de cada vencimento.',
                     'Posso cancelar quando quiser?' => 'Sim, pela sua área de conta, sem precisar falar com ninguém. O acesso é encerrado na hora do cancelamento, sem desconto proporcional do período já pago.',
                     'O consultor ou corretor vê meus dados de Saúde?' => 'Não, nunca, em nenhuma circunstância, mesmo vinculado e com acesso ativo ao resto do seu perfil.',
                     'Minha assinatura cobre meu cônjuge também?' => 'Sim. A assinatura é por perfil financeiro, não por pessoa: se vocês dividem o mesmo perfil de casal, uma assinatura libera o acesso pros dois.',
@@ -223,9 +224,10 @@
             <a href="{{ route('login') }}" class="btn-secondary px-6 py-3 text-base">Já tenho conta</a>
         </div>
         <div class="mt-6 flex flex-wrap justify-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+            <span class="badge bg-slate-100 dark:bg-slate-800">7 dias grátis</span>
             <span class="badge bg-slate-100 dark:bg-slate-800">Cancele quando quiser</span>
             <span class="badge bg-slate-100 dark:bg-slate-800">Sem taxa de adesão</span>
-            <span class="badge bg-slate-100 dark:bg-slate-800">Pagamento via Asaas: Pix, boleto ou cartão</span>
+            <span class="badge bg-slate-100 dark:bg-slate-800">Cartão de crédito ou Pix</span>
         </div>
     </section>
 

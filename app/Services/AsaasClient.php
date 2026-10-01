@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\PaymentMethod;
 use App\Enums\SubscriptionBundle;
 use App\Models\User;
 use Illuminate\Support\Facades\Http;
@@ -41,13 +42,22 @@ class AsaasClient
         return $customerId;
     }
 
-    /** @return array{id: string, invoiceUrl: ?string} */
-    public function createSubscription(string $customerId, SubscriptionBundle $bundle, string $descricao): array
+    /**
+     * `nextDueDate` 7 dias à frente é o teste grátis inteiro — não existe
+     * campo "trial" na Asaas, é só a primeira cobrança nascer mais tarde.
+     * Cartão e Pix tratados igual (`asaasBillingType()`): nenhum dos dois
+     * cobra sozinho hoje, os dois clicam a fatura — cobrança automática de
+     * cartão de verdade exigiria tokenizar o cartão pelo nosso backend e
+     * depende de aprovação da Asaas pra produção (ver o plano).
+     *
+     * @return array{id: string, invoiceUrl: ?string}
+     */
+    public function createSubscription(string $customerId, SubscriptionBundle $bundle, PaymentMethod $metodoPagamento, string $descricao): array
     {
         $resposta = $this->request()->post('/subscriptions', [
             'customer' => $customerId,
-            'billingType' => 'UNDEFINED', // a pessoa escolhe Pix/boleto/cartão na fatura hospedada da Asaas
-            'nextDueDate' => now()->addDay()->toDateString(),
+            'billingType' => $metodoPagamento->asaasBillingType(),
+            'nextDueDate' => now()->addDays(7)->toDateString(),
             'value' => config("billing.prices.{$bundle->value}"),
             'cycle' => 'MONTHLY',
             'description' => $descricao,
@@ -77,6 +87,27 @@ class AsaasClient
             return $resposta->json('data.0.invoiceUrl');
         } catch (\Throwable $e) {
             Log::warning('Asaas: não achou a fatura inicial da assinatura', ['subscription_id' => $asaasSubscriptionId, 'erro' => $e->getMessage()]);
+
+            return null;
+        }
+    }
+
+    /**
+     * Link da cobrança PENDENTE mais recente — diferente de
+     * firstInvoiceUrl(), que sempre pega a primeira. Usado pelo lembrete
+     * de Pix (SubscriptionReminderService), onde a cobrança relevante é a
+     * do ciclo atual, não a do dia em que a assinatura nasceu.
+     */
+    public function currentInvoiceUrl(string $asaasSubscriptionId): ?string
+    {
+        try {
+            $resposta = $this->request()
+                ->get("/subscriptions/{$asaasSubscriptionId}/payments", ['status' => 'PENDING'])
+                ->throw();
+
+            return $resposta->json('data.0.invoiceUrl');
+        } catch (\Throwable $e) {
+            Log::warning('Asaas: não achou a fatura pendente da assinatura', ['subscription_id' => $asaasSubscriptionId, 'erro' => $e->getMessage()]);
 
             return null;
         }

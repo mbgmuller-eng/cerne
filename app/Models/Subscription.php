@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\PaymentMethod;
 use App\Enums\SubscriptionBundle;
 use App\Enums\SubscriptionKind;
 use App\Enums\SubscriptionStatus;
@@ -14,7 +15,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /** Carência de PastDue antes de travar o acesso — ver isCurrent(). */
 #[Fillable([
-    'user_id', 'kind', 'bundle', 'status', 'current_period_ends_at',
+    'user_id', 'kind', 'bundle', 'status', 'billing_type', 'current_period_ends_at',
     'asaas_subscription_id', 'started_at', 'cancelled_at',
 ])]
 class Subscription extends Model
@@ -29,6 +30,7 @@ class Subscription extends Model
             'kind' => SubscriptionKind::class,
             'bundle' => SubscriptionBundle::class,
             'status' => SubscriptionStatus::class,
+            'billing_type' => PaymentMethod::class,
             'current_period_ends_at' => 'date',
             'started_at' => 'date',
             'cancelled_at' => 'datetime',

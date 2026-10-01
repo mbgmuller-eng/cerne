@@ -44,6 +44,10 @@
 
     @if (! $temAcessoAtivo)
         <div class="space-y-4">
+            <p class="rounded-xl bg-emerald-50 px-4 py-3 text-sm text-emerald-900 ring-1 ring-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-300 dark:ring-emerald-500/20">
+                7 dias grátis em qualquer pacote. Você só é cobrado depois que o teste acabar.
+            </p>
+
             @if ($souProfissional)
                 <p class="text-xs text-slate-500 dark:text-slate-400">
                     Isso libera o pacote pra você e pra todos os seus clientes vinculados e ativos.
@@ -55,6 +59,24 @@
                 <input type="text" wire:model="cpfCnpj" class="input mt-1.5" placeholder="Só números" maxlength="18">
                 <p class="mt-1 text-xs text-slate-400">Exigido pela Asaas (nossa processadora de pagamento) pra emitir a cobrança.</p>
                 @error('cpfCnpj') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+
+                <label class="mt-4 block text-xs font-medium text-slate-500 dark:text-slate-400">Forma de pagamento</label>
+                <div class="mt-1.5 grid grid-cols-2 gap-2">
+                    @foreach (\App\Enums\PaymentMethod::cases() as $metodo)
+                        <label @class([
+                            'cursor-pointer rounded-lg border px-3 py-2 text-center text-sm font-medium',
+                            'border-brand-700 bg-brand-50 text-brand-900 dark:border-brand-500 dark:bg-brand-500/10 dark:text-brand-200' => $metodoPagamento === $metodo->value,
+                            'border-slate-200 text-slate-600 dark:border-slate-700 dark:text-slate-400' => $metodoPagamento !== $metodo->value,
+                        ])>
+                            <input type="radio" wire:model="metodoPagamento" value="{{ $metodo->value }}" class="sr-only">
+                            {{ $metodo->label() }}
+                        </label>
+                    @endforeach
+                </div>
+                @if ($metodoPagamento === 'pix')
+                    <p class="mt-1.5 text-xs text-slate-400">A gente avisa por e-mail 3 dias antes de cada vencimento, já que o Pix não tem débito automático.</p>
+                @endif
+                @error('metodoPagamento') <p class="mt-1.5 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
             </div>
 
             <div class="grid gap-3 @sm:grid-cols-3">

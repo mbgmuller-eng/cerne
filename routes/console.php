@@ -5,7 +5,9 @@ use App\Services\HealthAppointmentService;
 use App\Services\ImportantDatesService;
 use App\Services\InvestmentSnapshotService;
 use App\Services\InvoiceService;
+use App\Services\AsaasClient;
 use App\Services\RecurringIncomeService;
+use App\Services\SubscriptionReminderService;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Schedule;
 
@@ -88,6 +90,15 @@ Schedule::call(function (): void {
 
     logger()->info('Agenda de saúde', ['notificados' => $notificados]);
 })->dailyAt('03:35')->name('agenda-saude')->withoutOverlapping();
+
+// Assinatura por Pix: sem débito automático, avisa 3 dias antes do
+// vencimento (fim do teste grátis ou qualquer ciclo seguinte — é o mesmo
+// problema se repetindo todo mês).
+Schedule::call(function (): void {
+    $notificados = app(SubscriptionReminderService::class)->notifyUpcomingPixDueDates(app(AsaasClient::class));
+
+    logger()->info('Lembrete de Pix', ['notificados' => $notificados]);
+})->dailyAt('03:40')->name('lembrete-pix')->withoutOverlapping();
 
 // Documentos: os que ficaram "Na fila" porque a ANTHROPIC_API_KEY ainda
 // não estava configurada no envio. Idempotente pelo próprio estado — um

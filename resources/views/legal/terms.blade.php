@@ -29,7 +29,8 @@
             <section>
                 <h2 class="font-display text-lg font-semibold text-slate-900 dark:text-white">3. Assinatura e cobrança</h2>
                 <p class="mt-2">
-                    A assinatura é mensal e recorrente, processada pela Asaas (nossa processadora de pagamentos). Você
+                    Toda assinatura começa com 7 dias grátis, em qualquer pacote. Depois disso, é mensal e recorrente,
+                    processada pela Asaas (nossa processadora de pagamentos), só em cartão de crédito ou Pix. Você
                     pode cancelar a qualquer momento pela sua área de conta, sem falar com ninguém; o acesso é
                     encerrado na hora do cancelamento, sem desconto proporcional do período já pago. Assinaturas de
                     profissionais cobrem, sem custo adicional, os clientes vinculados e

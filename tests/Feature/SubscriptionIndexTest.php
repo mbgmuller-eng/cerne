@@ -2,8 +2,10 @@
 
 namespace Tests\Feature;
 
+use App\Enums\PaymentMethod;
 use App\Enums\SubscriptionBundle;
 use App\Enums\SubscriptionKind;
+use App\Enums\SubscriptionStatus;
 use App\Models\Subscription;
 use App\Models\User;
 use App\Services\AsaasClient;
@@ -36,6 +38,7 @@ class SubscriptionIndexTest extends TestCase
 
         Livewire::actingAs($usuario)->test(\App\Livewire\Subscription\SubscriptionIndex::class)
             ->set('cpfCnpj', '52998224725')
+            ->set('metodoPagamento', PaymentMethod::Pix->value)
             ->call('assinar', SubscriptionBundle::Completo->value);
 
         $assinatura = Subscription::query()->where('user_id', $usuario->id)->sole();
@@ -49,6 +52,7 @@ class SubscriptionIndexTest extends TestCase
 
         Livewire::actingAs($profissional)->test(\App\Livewire\Subscription\SubscriptionIndex::class)
             ->set('cpfCnpj', '52998224725')
+            ->set('metodoPagamento', PaymentMethod::Pix->value)
             ->call('assinar', SubscriptionBundle::Completo->value);
 
         $assinatura = Subscription::query()->where('user_id', $profissional->id)->sole();
@@ -62,10 +66,41 @@ class SubscriptionIndexTest extends TestCase
 
         Livewire::actingAs($usuario)->test(\App\Livewire\Subscription\SubscriptionIndex::class)
             ->set('cpfCnpj', '00000000000')
+            ->set('metodoPagamento', PaymentMethod::Pix->value)
             ->call('assinar', SubscriptionBundle::Completo->value)
             ->assertHasErrors('cpfCnpj');
 
         self::assertSame(0, Subscription::query()->where('user_id', $usuario->id)->count());
+    }
+
+    public function test_metodo_pagamento_vazio_e_rejeitado(): void
+    {
+        $this->fakeAsaas();
+        $usuario = User::factory()->create();
+
+        Livewire::actingAs($usuario)->test(\App\Livewire\Subscription\SubscriptionIndex::class)
+            ->set('cpfCnpj', '52998224725')
+            ->call('assinar', SubscriptionBundle::Completo->value)
+            ->assertHasErrors('metodoPagamento');
+
+        self::assertSame(0, Subscription::query()->where('user_id', $usuario->id)->count());
+    }
+
+    public function test_assinatura_nasce_em_teste_gratis_com_metodo_de_pagamento_gravado(): void
+    {
+        $this->fakeAsaas();
+        $usuario = User::factory()->create();
+
+        Livewire::actingAs($usuario)->test(\App\Livewire\Subscription\SubscriptionIndex::class)
+            ->set('cpfCnpj', '52998224725')
+            ->set('metodoPagamento', PaymentMethod::Pix->value)
+            ->call('assinar', SubscriptionBundle::Completo->value);
+
+        $assinatura = Subscription::query()->where('user_id', $usuario->id)->sole();
+        self::assertSame(SubscriptionStatus::Trialing, $assinatura->status);
+        self::assertSame(PaymentMethod::Pix, $assinatura->billing_type);
+        self::assertSame(now()->addDays(7)->toDateString(), $assinatura->current_period_ends_at->toDateString());
+        self::assertTrue($assinatura->isCurrent());
     }
 
     public function test_assinatura_professional_ativa_nao_mostra_formulario_pro_profissional(): void
