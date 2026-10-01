@@ -5,11 +5,10 @@
         <div class="max-w-2xl">
             <p class="eyebrow text-brand-700 dark:text-brand-300">Cerne</p>
             <h1 class="mt-3 font-display text-4xl font-semibold tracking-tight text-slate-900 sm:text-5xl dark:text-white">
-                Sua vida financeira, acompanhada de perto, sozinho ou com quem te ajuda a cuidar dela.
+                Finanças, seguros, documentos, saúde: tudo o que sustenta sua vida, num só lugar.
             </h1>
             <p class="mt-5 text-lg text-slate-600 dark:text-slate-300">
-                Fluxo de caixa, seguros, documentos importantes e saúde, organizados num só lugar,
-                com a privacidade que você escolher.
+                Sozinho, ou com quem te ajuda a cuidar dela, com a privacidade que você escolher.
             </p>
             <div class="mt-8 flex flex-wrap gap-3">
                 <a href="#planos" class="btn-primary px-6 py-3 text-base">Assinar</a>

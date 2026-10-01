@@ -34,14 +34,14 @@
 
             <div class="relative max-w-md">
                 <p class="font-display text-4xl leading-tight font-medium">
-                    Suas finanças, acompanhadas de perto.
+                    Finanças, seguros, documentos, saúde: tudo o que sustenta sua vida, num só lugar.
                 </p>
                 <p class="mt-4 text-brand-100">
-                    Fluxo de caixa, investimentos, seguros e objetivos — num só lugar, com a privacidade que o casal escolher.
+                    Sozinho, ou com quem te ajuda a cuidar dela.
                 </p>
             </div>
 
-            <p class="relative text-xs text-brand-200">Consultoria financeira</p>
+            <p class="relative text-xs text-brand-200">O centro da sua vida organizada</p>
         </div>
 
         {{-- Formulário --}}
@@ -52,7 +52,7 @@
                         <x-brand-mark class="h-8 w-8" />
                         <span class="font-display text-3xl font-semibold tracking-tight text-brand-800 dark:text-white">Cerne</span>
                     </span>
-                    <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Consultoria financeira</p>
+                    <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">O centro da sua vida organizada</p>
                 </div>
 
                 <div class="card p-8">

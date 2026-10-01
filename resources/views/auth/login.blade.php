@@ -1,6 +1,6 @@
 <x-layouts.guest title="Entrar · Cerne">
     <h1 class="font-display text-2xl font-semibold text-slate-900 dark:text-white">Entrar</h1>
-    <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Acesse suas finanças.</p>
+    <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Entre na sua conta.</p>
 
     <form method="POST" action="{{ route('login.store') }}" class="mt-8 space-y-5">
         @csrf

@@ -17,9 +17,9 @@ class PwaController extends Controller
     public function manifest(): JsonResponse
     {
         return response()->json([
-            'name' => 'Cerne — Consultoria financeira',
+            'name' => 'Cerne: o centro da sua vida organizada',
             'short_name' => 'Cerne',
-            'description' => 'Suas finanças, acompanhadas de perto.',
+            'description' => 'O centro da sua vida organizada.',
             'start_url' => route('dashboard'),
             'scope' => url('/'),
             'display' => 'standalone',
