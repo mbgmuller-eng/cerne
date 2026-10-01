@@ -35,4 +35,21 @@ return [
         ],
     ],
 
+    /*
+    |---------------------------------------------------------------------------
+    | Asaas (cobrança)
+    |---------------------------------------------------------------------------
+    | base_url muda por ambiente: sandbox pra testar sem mexer em dinheiro
+    | de verdade, produção só depois de confirmar o fluxo ponta a ponta.
+    | webhook_token é um valor que a GENTE escolhe ao cadastrar o webhook
+    | no painel da Asaas — não vem deles, é o segredo compartilhado que
+    | prova que a chamada de entrada é mesmo da Asaas.
+    */
+
+    'asaas' => [
+        'api_key' => env('ASAAS_API_KEY'),
+        'webhook_token' => env('ASAAS_WEBHOOK_TOKEN'),
+        'base_url' => env('ASAAS_BASE_URL', 'https://api-sandbox.asaas.com/v3'),
+    ],
+
 ];

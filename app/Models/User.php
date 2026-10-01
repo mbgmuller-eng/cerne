@@ -4,7 +4,10 @@ namespace App\Models;
 
 use App\Enums\ThemePreference;
 use App\Enums\UserRole;
+use App\Notifications\VerifyEmailAddress;
 use Database\Factories\UserFactory;
+use Illuminate\Auth\MustVerifyEmail as MustVerifyEmailTrait;
+use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
@@ -15,14 +18,14 @@ use Illuminate\Notifications\Notifiable;
 use NotificationChannels\WebPush\HasPushSubscriptions;
 
 #[Fillable([
-    'name', 'email', 'password', 'role', 'phone', 'avatar_url', 'is_active', 'is_platform_admin', 'theme',
-    'notify_email_enabled', 'notify_push_enabled', 'gym_keep_awake', 'gym_vibrate', 'gym_sound',
+    'name', 'email', 'password', 'role', 'phone', 'cpf_cnpj', 'asaas_customer_id', 'avatar_url', 'is_active', 'is_platform_admin', 'theme',
+    'notify_email_enabled', 'notify_push_enabled', 'gym_keep_awake', 'gym_vibrate', 'gym_sound', 'terms_accepted_at',
 ])]
 #[Hidden(['password', 'remember_token'])]
-class User extends Authenticatable
+class User extends Authenticatable implements MustVerifyEmail
 {
     /** @use HasFactory<UserFactory> */
-    use HasFactory, HasPushSubscriptions, HasUuids, Notifiable;
+    use HasFactory, HasPushSubscriptions, HasUuids, MustVerifyEmailTrait, Notifiable;
 
     /**
      * @return array<string, string>
@@ -31,6 +34,7 @@ class User extends Authenticatable
     {
         return [
             'email_verified_at' => 'datetime',
+            'terms_accepted_at' => 'datetime',
             'last_login_at' => 'datetime',
             'password' => 'hashed',
             'role' => UserRole::class,
@@ -43,6 +47,16 @@ class User extends Authenticatable
             'gym_vibrate' => 'boolean',
             'gym_sound' => 'boolean',
         ];
+    }
+
+    /**
+     * Sobrescreve a notification padrão do framework pela nossa (mesmo
+     * link assinado por baixo, só o template com a cara do Cerne) — ver
+     * App\Notifications\VerifyEmailAddress.
+     */
+    public function sendEmailVerificationNotification(): void
+    {
+        $this->notify(new VerifyEmailAddress);
     }
 
     // ---------------------------------------------------------------------

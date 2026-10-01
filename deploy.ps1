@@ -100,7 +100,7 @@ if ($NoCommit) {
 # ---------------------------------------------------------------------
 Step "Conferindo se .env / docs/ACESSOS.md nao vao pro commit"
 git add -A
-$perigosos = git diff --cached --name-only | Select-String -Pattern "^\.env|ACESSOS\.md"
+$perigosos = git diff --cached --name-only | Where-Object { $_ -ne '.env.example' } | Select-String -Pattern "^\.env|ACESSOS\.md"
 if ($perigosos) {
     git reset
     Falhar "Arquivo sensivel estagiado ($perigosos) - commit abortado. Confira o .gitignore."

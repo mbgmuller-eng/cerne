@@ -14,6 +14,7 @@ use App\Models\PartnerInvite;
 use App\Models\ProfessionalInvite;
 use App\Models\ProfileMember;
 use App\Models\Subscription;
+use App\Models\SubscriptionWebhookEvent;
 use App\Models\User;
 use Tests\TestCase;
 
@@ -38,6 +39,7 @@ class TenancyCoverageTest extends TestCase
         // Identidade do usuário, não dado de um perfil financeiro.
         User::class => 'é a conta que acessa perfis, não um dado que pertence a um perfil',
         Subscription::class => 'assinatura é do usuário (user_id) — não existe por perfil',
+        SubscriptionWebhookEvent::class => 'log de idempotência do webhook da Asaas — só existe pra sustentar um índice único em asaas_event_id, nunca consultado por perfil nenhum',
 
         // Vínculos consultor-cliente: ligam dois usuários, sem profile_id.
         ConsultantClient::class => 'liga consultor e cliente por user_id — não tem profile_id',

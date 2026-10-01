@@ -1,10 +1,13 @@
 <?php
 
 use App\Http\Controllers\Admin\ImpersonationController;
+use App\Http\Controllers\AsaasWebhookController;
 use App\Http\Controllers\Auth\AcceptInviteController;
 use App\Http\Controllers\Auth\AcceptPartnerInviteController;
 use App\Http\Controllers\Auth\AcceptProfessionalInviteController;
 use App\Http\Controllers\Auth\LoginController;
+use App\Http\Controllers\Auth\SelfRegistrationController;
+use App\Http\Controllers\Auth\VerifyEmailController;
 use App\Http\Controllers\ConsultantLinkController;
 use App\Http\Controllers\DocumentFileController;
 use App\Http\Controllers\GymExerciseCatalogImageController;
@@ -43,23 +46,33 @@ use App\Livewire\Health\HealthCardIndex;
 use App\Livewire\Insurance\InsuranceIndex;
 use App\Livewire\Investments\InvestmentsIndex;
 use App\Livewire\Profile\MyAccount;
+use App\Livewire\Subscription\SubscriptionIndex;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/manifest.webmanifest', [PwaController::class, 'manifest'])->name('pwa.manifest');
 
-Route::redirect('/', '/painel');
+// Vitrine pública: quem já está logado não precisa ver, cai direto no painel.
+Route::get('/', fn () => Auth::check() ? redirect()->route('dashboard') : view('landing'))->name('home');
+
+Route::view('/termos', 'legal.terms')->name('legal.terms');
 
 /*
 | Visitantes
 |
-| Não há cadastro público: o acesso ao Cerne nasce do convite de um
-| consultor (seção 2 da especificação).
+| Cadastro próprio (sem convite) também entra aqui — cliente ou
+| profissional, ver SelfRegistrationController.
 |
 | Estas telas usam POST HTML puro, sem Livewire — ver LoginController.
 */
 Route::middleware('guest')->group(function (): void {
     Route::get('/entrar', [LoginController::class, 'show'])->name('login');
     Route::post('/entrar', [LoginController::class, 'store'])->name('login.store');
+
+    Route::get('/cadastro', [SelfRegistrationController::class, 'show'])->name('register');
+    Route::post('/cadastro', [SelfRegistrationController::class, 'store'])->name('register.store');
 
     Route::get('/convite/{token}', [AcceptInviteController::class, 'show'])->name('invite.accept');
     Route::post('/convite/{token}', [AcceptInviteController::class, 'store'])->name('invite.store');
@@ -76,12 +89,42 @@ Route::middleware('guest')->group(function (): void {
 // HealthCardService::emergencyPayload().
 Route::get('/saude/emergencia/{token}', [HealthEmergencyController::class, 'show'])->name('health.emergency.show');
 
+// Webhook da Asaas: pública de propósito (é a Asaas chamando, não uma
+// pessoa logada) — autenticação é o header asaas-access-token, conferido
+// dentro do controller, não aqui.
+Route::post('/webhooks/asaas', [AsaasWebhookController::class, 'handle'])->name('webhooks.asaas');
+
 /*
-| Autenticados
+| Confirmação de e-mail — fora do grupo "verified" abaixo de propósito,
+| senão vira loop: o middleware redireciona pra cá justamente quando a
+| conta ainda não está verificada.
 */
 Route::middleware('auth')->group(function (): void {
+    Route::get('/verificar-email', fn () => view('auth.verify-email'))->name('verification.notice');
+
+    Route::get('/verificar-email/{id}/{hash}', VerifyEmailController::class)
+        ->middleware(['signed', 'throttle:6,1'])
+        ->name('verification.verify');
+
+    Route::post('/verificar-email/reenviar', function (Request $request): RedirectResponse {
+        $request->user()->sendEmailVerificationNotification();
+
+        return back()->with('status', 'Link reenviado — confira seu e-mail.');
+    })->middleware('throttle:6,1')->name('verification.send');
+});
+
+/*
+| Autenticados
+|
+| "verified" barra quem se cadastrou sozinho e ainda não confirmou o
+| e-mail — conta vinda de convite já nasce com email_verified_at
+| carimbado (ClientOnboardingService/ProfessionalOnboardingService), não
+| muda de comportamento pra ela.
+*/
+Route::middleware(['auth', 'verified'])->group(function (): void {
     Route::get('/painel', Dashboard::class)->name('dashboard');
     Route::get('/minha-conta', MyAccount::class)->name('my-account');
+    Route::get('/assinatura', SubscriptionIndex::class)->name('subscription.index');
     Route::post('/preferencias/tema', [ThemePreferenceController::class, 'store'])->name('theme.update');
     Route::post('/preferencias/push', [PushSubscriptionController::class, 'store'])->name('push.subscribe');
 

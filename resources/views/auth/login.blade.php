@@ -46,6 +46,6 @@
     </form>
 
     <p class="mt-8 text-center text-xs text-slate-500 dark:text-slate-400">
-        O acesso ao Cerne nasce do convite do seu consultor.
+        Ainda não tem conta? <a href="{{ route('register') }}" class="text-brand-800 underline dark:text-brand-300">Criar conta</a>
     </p>
 </x-layouts.guest>

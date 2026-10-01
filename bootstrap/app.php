@@ -37,6 +37,11 @@ return Application::configure(basePath: dirname(__DIR__))
         // não dá acesso à configuração do Nginx, então os cabeçalhos saem
         // daqui — ver SecurityHeaders.
         $middleware->append(SecurityHeaders::class);
+
+        // Webhook da Asaas não carrega token CSRF (não é um formulário do
+        // Cerne) — a autenticação dele é outra (header asaas-access-token,
+        // conferido no controller), não o CSRF do Laravel.
+        $middleware->validateCsrfTokens(except: ['webhooks/asaas']);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(

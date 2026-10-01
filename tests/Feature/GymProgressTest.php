@@ -6,6 +6,9 @@ use App\Enums\ConsultantClientStatus;
 use App\Enums\GymLoadMode;
 use App\Enums\GymMeasureType;
 use App\Enums\GymMuscleGroup;
+use App\Enums\SubscriptionBundle;
+use App\Enums\SubscriptionKind;
+use App\Enums\SubscriptionStatus;
 use App\Livewire\Health\Gym\GymHome;
 use App\Livewire\Health\Gym\GymProgress;
 use App\Livewire\Health\Gym\GymSessionRun;
@@ -18,6 +21,7 @@ use App\Models\GymSetLog;
 use App\Models\GymWorkout;
 use App\Models\GymWorkoutExercise;
 use App\Models\ProfileMember;
+use App\Models\Subscription;
 use App\Models\User;
 use App\Services\GymPlanService;
 use App\Services\GymProgressService;
@@ -52,6 +56,7 @@ class GymProgressTest extends TestCase
         $this->membro = ProfileMember::factory()->create(['profile_id' => $this->perfil->id, 'user_id' => $this->usuario->id]);
         $this->actingAs($this->usuario);
         app(ProfileContext::class)->set($this->perfil, $this->membro);
+        $this->concederAssinaturaSaude();
 
         $plano = app(GymPlanService::class);
         $this->treino = $plano->addWorkout($plano->createPlan('Fase 1'), 'Treino A', null);
@@ -388,6 +393,18 @@ class GymProgressTest extends TestCase
         GymSetLog::create([
             'session_id' => $sessao->id, 'exercise_id' => $exercicio->id, 'set_number' => 1,
             'duration_seconds' => $segundos, 'completed_at' => $data->copy()->addMinute(),
+        ]);
+    }
+
+    /** Academia é gateada por EntitlementService (módulo Saúde) — sem isso, GymHome dá 402. */
+    private function concederAssinaturaSaude(): void
+    {
+        Subscription::create([
+            'user_id' => $this->usuario->id,
+            'kind' => SubscriptionKind::Direct,
+            'bundle' => SubscriptionBundle::Completo,
+            'status' => SubscriptionStatus::Active,
+            'started_at' => now(),
         ]);
     }
 }

@@ -5,11 +5,15 @@ namespace Tests\Feature;
 use App\Enums\ConsultantClientStatus;
 use App\Enums\GymMeasureType;
 use App\Enums\GymMuscleGroup;
+use App\Enums\SubscriptionBundle;
+use App\Enums\SubscriptionKind;
+use App\Enums\SubscriptionStatus;
 use App\Livewire\Health\Gym\GymWorkoutShow;
 use App\Models\ConsultantClient;
 use App\Models\FinancialProfile;
 use App\Models\GymWorkout;
 use App\Models\ProfileMember;
+use App\Models\Subscription;
 use App\Models\User;
 use App\Services\GymPlanService;
 use App\Services\GymSessionService;
@@ -41,6 +45,12 @@ class GymWorkoutShowTest extends TestCase
         $this->membro = ProfileMember::factory()->create(['profile_id' => $this->perfil->id, 'user_id' => $this->usuario->id]);
         $this->actingAs($this->usuario);
         app(ProfileContext::class)->set($this->perfil, $this->membro);
+        // Academia é gateada por EntitlementService (módulo Saúde) — sem
+        // isso, GymHome dá 402.
+        Subscription::create([
+            'user_id' => $this->usuario->id, 'kind' => SubscriptionKind::Direct,
+            'bundle' => SubscriptionBundle::Completo, 'status' => SubscriptionStatus::Active, 'started_at' => now(),
+        ]);
 
         $service = app(GymPlanService::class);
         $this->treino = $service->addWorkout($service->createPlan('Fase 1'), 'Treino A', 'Peito e ombros');

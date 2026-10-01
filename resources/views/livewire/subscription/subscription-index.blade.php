@@ -1,0 +1,65 @@
+<div class="mx-auto max-w-2xl space-y-6">
+
+    <div>
+        <h1 class="font-display text-3xl font-semibold tracking-tight text-slate-900 dark:text-white">Assinatura</h1>
+        <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Escolha o pacote que cobre o que você precisa.</p>
+    </div>
+
+    @if (session('status'))
+        <div class="rounded-xl bg-brand-50 px-4 py-3 text-sm text-brand-900 ring-1 ring-brand-200 dark:bg-brand-500/10 dark:text-brand-200 dark:ring-brand-500/20">
+            {{ session('status') }}
+        </div>
+    @endif
+
+    @if ($assinaturaAtual)
+        <section class="card space-y-1 p-5">
+            <p class="eyebrow">Sua assinatura</p>
+            <p class="text-sm text-slate-800 dark:text-slate-200">
+                {{ $assinaturaAtual->bundle->label() }} ·
+                <span @class([
+                    'font-medium',
+                    'text-emerald-700 dark:text-emerald-400' => $temAcessoAtivo,
+                    'text-amber-700 dark:text-amber-400' => ! $temAcessoAtivo,
+                ])>{{ $assinaturaAtual->status->label() }}</span>
+            </p>
+            @if ($assinaturaAtual->current_period_ends_at)
+                <p class="text-xs text-slate-500 dark:text-slate-400">Renova em {{ $assinaturaAtual->current_period_ends_at->format('d/m/Y') }}</p>
+            @endif
+        </section>
+    @endif
+
+    @if (! $temAcessoAtivo)
+        <div class="space-y-4">
+            @if ($souProfissional)
+                <p class="text-xs text-slate-500 dark:text-slate-400">
+                    Isso libera o pacote pra você e pra todos os seus clientes vinculados e ativos.
+                </p>
+            @endif
+
+            <div class="card p-5">
+                <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">CPF ou CNPJ</label>
+                <input type="text" wire:model="cpfCnpj" class="input mt-1.5" placeholder="Só números" maxlength="18">
+                <p class="mt-1 text-xs text-slate-400">Exigido pela Asaas (nossa processadora de pagamento) pra emitir a cobrança.</p>
+                @error('cpfCnpj') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+            </div>
+
+            <div class="grid gap-3 @sm:grid-cols-3">
+                @foreach ($bundles as $pacote)
+                    <div class="card flex flex-col gap-2 p-5" wire:key="pacote-{{ $pacote->value }}">
+                        <p class="text-sm font-semibold text-slate-900 dark:text-white">{{ $pacote->label() }}</p>
+                        <p class="text-xs text-slate-500 dark:text-slate-400">
+                            {{ collect($pacote->modules())->map(fn ($m) => $m->label())->join(' · ') }}
+                        </p>
+                        <p class="mt-auto text-lg font-semibold text-slate-900 dark:text-white">
+                            {{ \App\Support\Money::format(config('billing.prices.'.$pacote->value)) }}
+                            <span class="text-xs font-normal text-slate-400">/mês</span>
+                        </p>
+                        <button type="button" wire:click="assinar('{{ $pacote->value }}')" wire:loading.attr="disabled" class="btn-primary w-full">
+                            Assinar
+                        </button>
+                    </div>
+                @endforeach
+            </div>
+        </div>
+    @endif
+</div>

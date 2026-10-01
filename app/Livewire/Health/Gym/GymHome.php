@@ -2,7 +2,9 @@
 
 namespace App\Livewire\Health\Gym;
 
+use App\Enums\PlatformModule;
 use App\Livewire\Concerns\RequiresActiveProfile;
+use App\Livewire\Concerns\RequiresModule;
 use App\Livewire\Concerns\RequiresPersonalHealth;
 use App\Models\GymSession;
 use App\Models\GymWorkout;
@@ -19,12 +21,13 @@ use Livewire\Component;
 #[Layout('components.layouts.app')]
 class GymHome extends Component
 {
-    use RequiresActiveProfile, RequiresPersonalHealth;
+    use RequiresActiveProfile, RequiresModule, RequiresPersonalHealth;
 
     public function mount(): void
     {
         $this->redirectOrAbortWithoutProfile();
         $this->abortUnlessPersonalHealthOwner();
+        $this->abortUnlessModuleEntitled(PlatformModule::Saude);
     }
 
     /** Abre a sessão do treino (ou retoma a que está em andamento) e vai pra tela de registro. */

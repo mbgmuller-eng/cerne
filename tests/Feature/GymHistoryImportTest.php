@@ -2,6 +2,9 @@
 
 namespace Tests\Feature;
 
+use App\Enums\SubscriptionBundle;
+use App\Enums\SubscriptionKind;
+use App\Enums\SubscriptionStatus;
 use App\Models\FinancialProfile;
 use App\Models\GymEquipment;
 use App\Models\GymExercise;
@@ -10,6 +13,7 @@ use App\Models\GymSession;
 use App\Models\GymSetLog;
 use App\Models\GymWorkout;
 use App\Models\ProfileMember;
+use App\Models\Subscription;
 use App\Models\User;
 use App\Services\GymHistoryImporter;
 use App\Services\GymPlanService;
@@ -301,6 +305,18 @@ class GymHistoryImportTest extends TestCase
     {
         $this->actingAs($this->usuario);
         app(ProfileContext::class)->set($this->perfil, $this->membro);
+
+        // Academia é gateada por EntitlementService (módulo Saúde) — sem
+        // isso, GymHome dá 402.
+        if (! Subscription::query()->where('user_id', $this->usuario->id)->exists()) {
+            Subscription::create([
+                'user_id' => $this->usuario->id,
+                'kind' => SubscriptionKind::Direct,
+                'bundle' => SubscriptionBundle::Completo,
+                'status' => SubscriptionStatus::Active,
+                'started_at' => now(),
+            ]);
+        }
     }
 
     /** @return array<string, mixed> */

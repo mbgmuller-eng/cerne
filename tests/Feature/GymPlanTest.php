@@ -5,6 +5,9 @@ namespace Tests\Feature;
 use App\Enums\ConsultantClientStatus;
 use App\Enums\GymMeasureType;
 use App\Enums\GymMuscleGroup;
+use App\Enums\SubscriptionBundle;
+use App\Enums\SubscriptionKind;
+use App\Enums\SubscriptionStatus;
 use App\Livewire\Health\Gym\GymHome;
 use App\Livewire\Health\Gym\GymPlanEditor;
 use App\Models\ConsultantClient;
@@ -16,6 +19,7 @@ use App\Models\GymSession;
 use App\Models\GymWorkout;
 use App\Models\GymWorkoutExercise;
 use App\Models\ProfileMember;
+use App\Models\Subscription;
 use App\Models\User;
 use App\Services\GymPlanService;
 use App\Support\ProfileContext;
@@ -280,6 +284,19 @@ class GymPlanTest extends TestCase
         $this->get(route('health.gym.plan'))->assertOk();
     }
 
+    public function test_sem_assinatura_nenhuma_academia_da_402(): void
+    {
+        $usuario = User::factory()->create();
+        $perfil = FinancialProfile::factory()->create(['owner_user_id' => $usuario->id]);
+        $membro = ProfileMember::factory()->create(['profile_id' => $perfil->id, 'user_id' => $usuario->id]);
+        $this->actingAs($usuario);
+        app(ProfileContext::class)->set($perfil, $membro);
+        // De propósito, sem conceder assinatura nenhuma — diferente de
+        // entrarComoDono(), que concede Completo.
+
+        $this->get(route('health.gym.index'))->assertStatus(402);
+    }
+
     public function test_consultor_com_cliente_aberto_leva_403_e_nao_ve_saude_no_menu(): void
     {
         $consultor = User::factory()->consultant()->create();
@@ -362,6 +379,12 @@ class GymPlanTest extends TestCase
 
         $this->actingAs($usuario);
         app(ProfileContext::class)->set($perfil, $titular);
+        // Academia é gateada por EntitlementService (módulo Saúde) — sem
+        // isso, GymHome dá 402.
+        Subscription::create([
+            'user_id' => $usuario->id, 'kind' => SubscriptionKind::Direct,
+            'bundle' => SubscriptionBundle::Completo, 'status' => SubscriptionStatus::Active, 'started_at' => now(),
+        ]);
 
         return [$perfil, $titular, $conjuge];
     }

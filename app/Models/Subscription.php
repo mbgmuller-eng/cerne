@@ -2,26 +2,35 @@
 
 namespace App\Models;
 
-use App\Enums\SubscriptionPlan;
+use App\Enums\SubscriptionBundle;
+use App\Enums\SubscriptionKind;
 use App\Enums\SubscriptionStatus;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['user_id', 'plan', 'status', 'started_at', 'expires_at', 'cancelled_at', 'external_subscription_id'])]
+/** Carência de PastDue antes de travar o acesso — ver isCurrent(). */
+#[Fillable([
+    'user_id', 'kind', 'bundle', 'status', 'current_period_ends_at',
+    'asaas_subscription_id', 'started_at', 'cancelled_at',
+])]
 class Subscription extends Model
 {
+    public const PAST_DUE_GRACE_DAYS = 5;
+
     use HasFactory, HasUuids;
 
     protected function casts(): array
     {
         return [
-            'plan' => SubscriptionPlan::class,
+            'kind' => SubscriptionKind::class,
+            'bundle' => SubscriptionBundle::class,
             'status' => SubscriptionStatus::class,
+            'current_period_ends_at' => 'date',
             'started_at' => 'date',
-            'expires_at' => 'date',
             'cancelled_at' => 'datetime',
         ];
     }
@@ -31,12 +40,23 @@ class Subscription extends Model
         return $this->belongsTo(User::class);
     }
 
+    /**
+     * Ativa/em teste: concede sempre. Em atraso: concede só dentro da
+     * carência, contada a partir da última cobrança confirmada. Cancelada:
+     * nunca.
+     */
     public function isCurrent(): bool
     {
-        if (! $this->status->grantsAccess()) {
-            return false;
-        }
+        return match ($this->status) {
+            SubscriptionStatus::Active, SubscriptionStatus::Trialing => true,
+            SubscriptionStatus::PastDue => $this->current_period_ends_at !== null
+                && $this->current_period_ends_at->copy()->addDays(self::PAST_DUE_GRACE_DAYS)->isFuture(),
+            SubscriptionStatus::Cancelled => false,
+        };
+    }
 
-        return $this->expires_at === null || $this->expires_at->isFuture();
+    public function scopeOfKind(Builder $query, SubscriptionKind $kind): Builder
+    {
+        return $query->where('kind', $kind);
     }
 }
