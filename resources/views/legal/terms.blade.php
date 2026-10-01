@@ -11,9 +11,9 @@
             <section>
                 <h2 class="font-display text-lg font-semibold text-slate-900 dark:text-white">1. O que é o Cerne</h2>
                 <p class="mt-2">
-                    O Cerne é uma plataforma de organização financeira, de seguros, documentos e saúde. Você pode usá-lo
-                    sozinho, assinando diretamente, ou através de um consultor financeiro ou corretor de seguros vinculado
-                    à sua conta.
+                    O Cerne é o centro de organização da sua vida: finanças, seguros, documentos e saúde, num só
+                    lugar. Você pode usá-lo sozinho, assinando diretamente, ou através de um consultor financeiro ou
+                    corretor de seguros vinculado à sua conta.
                 </p>
             </section>
 

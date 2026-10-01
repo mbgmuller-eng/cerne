@@ -1,7 +1,7 @@
 <x-mail::message>
 # Olá, {{ $partnerName }}
 
-**{{ $inviterName }}** convidou você para acompanhar as finanças da casa no Cerne.
+**{{ $inviterName }}** convidou você pro Cerne, pra cuidarem juntos do que sustenta a vida de vocês.
 
 Use o botão abaixo para definir sua senha e criar seu acesso.
 

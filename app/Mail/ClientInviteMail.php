@@ -34,6 +34,7 @@ class ClientInviteMail extends Mailable
             with: [
                 'clientName' => $this->invite->client_name,
                 'consultantName' => $this->invite->consultant?->name,
+                'isBroker' => $this->invite->consultant?->isBroker() ?? false,
                 'link' => $this->link,
                 'expiresAt' => $this->invite->expires_at,
             ],
