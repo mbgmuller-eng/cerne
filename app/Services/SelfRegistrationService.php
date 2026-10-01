@@ -21,9 +21,14 @@ use Illuminate\Support\Facades\DB;
  */
 class SelfRegistrationService
 {
-    public function registerClient(string $name, string $email, string $password): User
+    /**
+     * Data de nascimento do cliente vai pro ProfileMember, não pro User
+     * — é o campo que ImportantDatesService::notifyUpcomingBirthdays() já
+     * lê pra avisar o profissional vinculado do aniversário do cliente.
+     */
+    public function registerClient(string $name, string $email, string $password, string $birthdate): User
     {
-        return DB::transaction(function () use ($name, $email, $password): User {
+        return DB::transaction(function () use ($name, $email, $password, $birthdate): User {
             $user = User::create([
                 'name' => $name,
                 'email' => $email,
@@ -47,20 +52,26 @@ class SelfRegistrationService
                 'name' => $name,
                 'role' => MemberRole::Primary,
                 'is_active' => true,
+                'birthdate' => $birthdate,
             ]);
 
             return $user;
         });
     }
 
-    /** $role precisa ser Consultant ou Broker — a validação do controller já garante isso. */
-    public function registerProfessional(string $name, string $email, string $password, UserRole $role): User
+    /**
+     * $role precisa ser Consultant ou Broker — a validação do controller
+     * já garante isso. Profissional não tem ProfileMember, por isso a
+     * data de nascimento fica direto no User.
+     */
+    public function registerProfessional(string $name, string $email, string $password, UserRole $role, string $birthdate): User
     {
         return User::create([
             'name' => $name,
             'email' => $email,
             'password' => $password,
             'role' => $role,
+            'birthdate' => $birthdate,
             'is_active' => true,
             'terms_accepted_at' => now(),
         ]);

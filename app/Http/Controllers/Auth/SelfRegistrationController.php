@@ -35,18 +35,20 @@ class SelfRegistrationController extends Controller
             'nome' => ['required', 'string', 'max:100'],
             'email' => ['required', 'email', 'max:255', 'unique:users,email'],
             'papel' => ['required_if:tipo_conta,profissional', Rule::in(['consultant', 'broker'])],
+            'nascimento' => ['required', 'date', 'before:today', 'after:1900-01-01'],
             'password' => ['required', 'confirmed', Password::min(8)->letters()->numbers()],
             'termos' => ['accepted'],
         ], attributes: [
             'nome' => 'nome',
             'email' => 'e-mail',
+            'nascimento' => 'data de nascimento',
             'password' => 'senha',
             'termos' => 'termos de uso',
         ]);
 
         $user = $data['tipo_conta'] === 'profissional'
-            ? $registration->registerProfessional($data['nome'], $data['email'], $data['password'], UserRole::from($data['papel']))
-            : $registration->registerClient($data['nome'], $data['email'], $data['password']);
+            ? $registration->registerProfessional($data['nome'], $data['email'], $data['password'], UserRole::from($data['papel']), $data['nascimento'])
+            : $registration->registerClient($data['nome'], $data['email'], $data['password'], $data['nascimento']);
 
         $user->sendEmailVerificationNotification();
 

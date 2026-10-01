@@ -28,6 +28,7 @@ class SelfRegistrationTest extends TestCase
             'tipo_conta' => 'cliente',
             'nome' => 'Fernanda Lima',
             'email' => 'fernanda.lima@exemplo.com',
+            'nascimento' => '1990-05-15',
             'password' => 'Senha123',
             'password_confirmation' => 'Senha123',
             'termos' => '1',
@@ -53,11 +54,14 @@ class SelfRegistrationTest extends TestCase
         self::assertSame('Fernanda Lima', $perfil->profile_name);
         self::assertSame(ProfileType::Single, $perfil->profile_type);
 
-        self::assertTrue(ProfileMember::query()
+        $membro = ProfileMember::query()
             ->where('profile_id', $perfil->id)
             ->where('user_id', $usuario->id)
             ->where('role', MemberRole::Primary)
-            ->exists());
+            ->sole();
+
+        self::assertSame('1990-05-15', $membro->birthdate->toDateString());
+        self::assertNull($usuario->birthdate);
     }
 
     public function test_conta_nao_verificada_nao_abre_tela_protegida(): void
@@ -82,7 +86,24 @@ class SelfRegistrationTest extends TestCase
         $usuario = User::query()->where('email', 'corretor@exemplo.com')->sole();
 
         self::assertSame(UserRole::Broker, $usuario->role);
+        self::assertSame('1990-05-15', $usuario->birthdate->toDateString());
         self::assertSame(0, FinancialProfile::query()->where('owner_user_id', $usuario->id)->count());
+    }
+
+    public function test_nascimento_no_futuro_e_rejeitado(): void
+    {
+        $this->post(route('register.store'), $this->dadosValidos(['nascimento' => now()->addDay()->toDateString()]))
+            ->assertSessionHasErrors('nascimento');
+
+        self::assertSame(0, User::query()->where('email', 'fernanda.lima@exemplo.com')->count());
+    }
+
+    public function test_nascimento_vazio_e_rejeitado(): void
+    {
+        $this->post(route('register.store'), $this->dadosValidos(['nascimento' => '']))
+            ->assertSessionHasErrors('nascimento');
+
+        self::assertSame(0, User::query()->where('email', 'fernanda.lima@exemplo.com')->count());
     }
 
     public function test_profissional_sem_papel_e_rejeitado(): void

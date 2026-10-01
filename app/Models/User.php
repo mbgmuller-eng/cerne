@@ -18,7 +18,7 @@ use Illuminate\Notifications\Notifiable;
 use NotificationChannels\WebPush\HasPushSubscriptions;
 
 #[Fillable([
-    'name', 'email', 'password', 'role', 'phone', 'cpf_cnpj', 'asaas_customer_id', 'avatar_url', 'is_active', 'is_platform_admin', 'theme',
+    'name', 'email', 'password', 'role', 'phone', 'birthdate', 'cpf_cnpj', 'asaas_customer_id', 'avatar_url', 'is_active', 'is_platform_admin', 'theme',
     'notify_email_enabled', 'notify_push_enabled', 'gym_keep_awake', 'gym_vibrate', 'gym_sound', 'terms_accepted_at',
 ])]
 #[Hidden(['password', 'remember_token'])]
@@ -35,6 +35,7 @@ class User extends Authenticatable implements MustVerifyEmail
         return [
             'email_verified_at' => 'datetime',
             'terms_accepted_at' => 'datetime',
+            'birthdate' => 'date',
             'last_login_at' => 'datetime',
             'password' => 'hashed',
             'role' => UserRole::class,

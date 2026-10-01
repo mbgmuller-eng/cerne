@@ -56,6 +56,14 @@
             </div>
 
             <div>
+                <label for="nascimento" class="block text-sm font-medium text-slate-700 dark:text-slate-300">Data de nascimento</label>
+                <input id="nascimento" name="nascimento" type="date" value="{{ old('nascimento') }}" autocomplete="bday" required class="input mt-1.5">
+                @error('nascimento')
+                    <p class="mt-1.5 text-sm text-red-700 dark:text-red-400">{{ $message }}</p>
+                @enderror
+            </div>
+
+            <div>
                 <label for="password" class="block text-sm font-medium text-slate-700 dark:text-slate-300">Senha</label>
                 <input id="password" name="password" type="password" autocomplete="new-password" required class="input mt-1.5">
                 <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Mínimo de 8 caracteres, com letras e números.</p>
