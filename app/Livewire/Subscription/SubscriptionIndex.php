@@ -64,7 +64,35 @@ class SubscriptionIndex extends Component
             return $this->redirect($resultado['invoiceUrl']);
         }
 
-        session()->flash('status', 'Assinatura criada — acompanhe o pagamento pelo e-mail da Asaas.');
+        session()->flash('status', 'Assinatura criada. Acompanhe o pagamento pelo e-mail da Asaas.');
+    }
+
+    /**
+     * Cancelamento é imediato — sem prorata, sem manter acesso até o fim
+     * do período já pago. `isCurrent()` já nega acesso assim que o status
+     * vira Cancelled; manter acesso "até o fim do mês" exigiria rastrear
+     * isso à parte (fora de escopo por ora, ver conversa com o Marcelo).
+     */
+    public function cancelar(AsaasClient $asaas): void
+    {
+        $assinatura = Subscription::query()
+            ->where('user_id', Auth::id())
+            ->ofKind($this->kind())
+            ->latest('created_at')
+            ->first();
+
+        if ($assinatura === null || ! $assinatura->isCurrent()) {
+            return;
+        }
+
+        $asaas->cancelSubscription($assinatura->asaas_subscription_id);
+
+        $assinatura->update([
+            'status' => SubscriptionStatus::Cancelled,
+            'cancelled_at' => now(),
+        ]);
+
+        session()->flash('status', 'Assinatura cancelada. O acesso foi encerrado agora.');
     }
 
     public function render()

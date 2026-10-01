@@ -181,12 +181,43 @@
         </div>
     </section>
 
+    {{-- Perguntas frequentes --}}
+    <section class="border-t border-slate-200/70 py-16 dark:border-white/10">
+        <div class="mx-auto max-w-3xl px-4 sm:px-6">
+            <h2 class="font-display text-3xl font-semibold tracking-tight text-slate-900 dark:text-white">Perguntas frequentes</h2>
+
+            <div class="mt-8 space-y-3">
+                @foreach ([
+                    'Como funciona a cobrança?' => 'Mensal, processada pela Asaas. Você escolhe entre Pix, boleto ou cartão na hora de pagar, sem precisar cadastrar cartão antes de decidir.',
+                    'Posso cancelar quando quiser?' => 'Sim, pela sua área de conta, sem precisar falar com ninguém. O acesso é encerrado na hora do cancelamento, sem desconto proporcional do período já pago.',
+                    'O consultor ou corretor vê meus dados de Saúde?' => 'Não, nunca, em nenhuma circunstância, mesmo vinculado e com acesso ativo ao resto do seu perfil.',
+                    'Minha assinatura cobre meu cônjuge também?' => 'Sim. A assinatura é por perfil financeiro, não por pessoa: se vocês dividem o mesmo perfil de casal, uma assinatura libera o acesso pros dois.',
+                    'Qual a diferença entre assinar direto e ter um profissional vinculado?' => 'Se o seu consultor ou corretor já tem assinatura profissional ativa, seu acesso vem de graça por esse vínculo. Assinar direto só é necessário se você quiser usar o Cerne sozinho, sem nenhum profissional.',
+                    'Meus dados são compartilhados com terceiros?' => 'Não, além do necessário pra processar a cobrança (Asaas). Você decide o que fica privado entre você e seu cônjuge, e o que o seu consultor ou corretor vê.',
+                ] as $pergunta => $resposta)
+                    <div class="card overflow-hidden" x-data="{ open: false }">
+                        <button type="button" @click="open = ! open" class="flex w-full items-center justify-between gap-4 p-5 text-left">
+                            <span class="font-medium text-slate-900 dark:text-white">{{ $pergunta }}</span>
+                            <span class="shrink-0 text-xl leading-none text-slate-400" x-text="open ? '−' : '+'"></span>
+                        </button>
+                        <p class="px-5 pb-5 text-sm text-slate-600 dark:text-slate-300" x-show="open" x-cloak>{{ $resposta }}</p>
+                    </div>
+                @endforeach
+            </div>
+        </div>
+    </section>
+
     {{-- CTA final --}}
     <section class="mx-auto max-w-6xl px-4 py-16 text-center sm:px-6">
         <h2 class="font-display text-2xl font-semibold text-slate-900 dark:text-white">Pronto pra começar?</h2>
         <div class="mt-6 flex flex-wrap justify-center gap-3">
             <a href="{{ route('register') }}" class="btn-primary px-6 py-3 text-base">Criar minha conta</a>
             <a href="{{ route('login') }}" class="btn-secondary px-6 py-3 text-base">Já tenho conta</a>
+        </div>
+        <div class="mt-6 flex flex-wrap justify-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+            <span class="badge bg-slate-100 dark:bg-slate-800">Cancele quando quiser</span>
+            <span class="badge bg-slate-100 dark:bg-slate-800">Sem taxa de adesão</span>
+            <span class="badge bg-slate-100 dark:bg-slate-800">Pagamento via Asaas: Pix, boleto ou cartão</span>
         </div>
     </section>
 

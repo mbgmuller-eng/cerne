@@ -30,8 +30,9 @@
                 <h2 class="font-display text-lg font-semibold text-slate-900 dark:text-white">3. Assinatura e cobrança</h2>
                 <p class="mt-2">
                     A assinatura é mensal e recorrente, processada pela Asaas (nossa processadora de pagamentos). Você
-                    pode cancelar a qualquer momento pela sua área de conta; o acesso permanece ativo até o fim do
-                    período já pago. Assinaturas de profissionais cobrem, sem custo adicional, os clientes vinculados e
+                    pode cancelar a qualquer momento pela sua área de conta, sem falar com ninguém; o acesso é
+                    encerrado na hora do cancelamento, sem desconto proporcional do período já pago. Assinaturas de
+                    profissionais cobrem, sem custo adicional, os clientes vinculados e
                     ativos à sua conta, no pacote escolhido pelo profissional.
                 </p>
             </section>

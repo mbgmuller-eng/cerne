@@ -82,4 +82,41 @@ class SubscriptionIndexTest extends TestCase
         Livewire::actingAs($profissional)->test(\App\Livewire\Subscription\SubscriptionIndex::class)
             ->assertDontSee('CPF ou CNPJ');
     }
+
+    public function test_cancelar_chama_a_asaas_e_encerra_o_acesso_na_hora(): void
+    {
+        $usuario = User::factory()->create();
+        $assinatura = Subscription::create([
+            'user_id' => $usuario->id,
+            'kind' => SubscriptionKind::Direct,
+            'bundle' => SubscriptionBundle::Completo,
+            'status' => \App\Enums\SubscriptionStatus::Active,
+            'asaas_subscription_id' => 'sub_cancelar_teste',
+            'started_at' => now(),
+        ]);
+
+        $asaas = Mockery::mock(AsaasClient::class);
+        $asaas->shouldReceive('cancelSubscription')->once()->with('sub_cancelar_teste');
+        $this->app->instance(AsaasClient::class, $asaas);
+
+        Livewire::actingAs($usuario)->test(\App\Livewire\Subscription\SubscriptionIndex::class)
+            ->call('cancelar');
+
+        $assinatura->refresh();
+        self::assertSame(\App\Enums\SubscriptionStatus::Cancelled, $assinatura->status);
+        self::assertNotNull($assinatura->cancelled_at);
+        self::assertFalse($assinatura->isCurrent());
+    }
+
+    public function test_cancelar_sem_assinatura_ativa_nao_chama_a_asaas(): void
+    {
+        $usuario = User::factory()->create();
+
+        $asaas = Mockery::mock(AsaasClient::class);
+        $asaas->shouldNotReceive('cancelSubscription');
+        $this->app->instance(AsaasClient::class, $asaas);
+
+        Livewire::actingAs($usuario)->test(\App\Livewire\Subscription\SubscriptionIndex::class)
+            ->call('cancelar');
+    }
 }
