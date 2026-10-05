@@ -8,8 +8,13 @@ use App\Enums\SubscriptionStatus;
 use App\Models\Subscription;
 use App\Models\SubscriptionWebhookEvent;
 use App\Models\User;
+use App\Notifications\SubscriptionOverdue;
+use App\Notifications\SubscriptionPaymentFailed;
+use App\Services\AsaasClient;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Str;
+use Mockery;
 use Tests\TestCase;
 
 /**
@@ -49,19 +54,173 @@ class SubscriptionWebhookTest extends TestCase
 
         $assinatura->refresh();
         self::assertSame(SubscriptionStatus::Active, $assinatura->status);
-        self::assertSame('2026-11-01', $assinatura->current_period_ends_at->toDateString());
+        // dueDate do payload é o da cobrança paga: a próxima vence um mês depois.
+        self::assertSame('2026-12-01', $assinatura->current_period_ends_at->toDateString());
         self::assertTrue($assinatura->isCurrent());
     }
 
-    public function test_payment_overdue_marca_em_atraso(): void
+    public function test_pagamento_atrasado_mantem_o_dia_do_mes_do_ciclo(): void
     {
+        $assinatura = $this->criarAssinaturaPendente();
+
+        // Venceu dia 10 e foi paga dia 14: o ciclo seguinte continua dia 10.
+        $this->enviarWebhook('PAYMENT_RECEIVED', $assinatura->asaas_subscription_id, [
+            'payment' => ['subscription' => $assinatura->asaas_subscription_id, 'dueDate' => '2026-10-10'],
+        ])->assertNoContent();
+
+        self::assertSame('2026-11-10', $assinatura->fresh()->current_period_ends_at->toDateString());
+    }
+
+    public function test_evento_de_ciclo_antigo_nao_puxa_a_data_pra_tras(): void
+    {
+        $assinatura = $this->criarAssinaturaAtiva();
+        $depois = $assinatura->current_period_ends_at->toDateString();
+
+        $this->enviarWebhook('PAYMENT_RECEIVED', $assinatura->asaas_subscription_id, [
+            'payment' => ['subscription' => $assinatura->asaas_subscription_id, 'dueDate' => '2020-01-10'],
+        ])->assertNoContent();
+
+        self::assertSame($depois, $assinatura->fresh()->current_period_ends_at->toDateString());
+    }
+
+    public function test_payment_overdue_marca_em_atraso_e_avisa_por_email(): void
+    {
+        Notification::fake();
+        $assinatura = $this->criarAssinaturaAtiva();
+        $assinatura->update(['current_period_ends_at' => '2026-10-10']);
+
+        $this->enviarWebhook('PAYMENT_OVERDUE', $assinatura->asaas_subscription_id, [
+            'payment' => [
+                'subscription' => $assinatura->asaas_subscription_id,
+                'dueDate' => '2026-10-10',
+                'invoiceUrl' => 'https://sandbox.asaas.com/i/atrasada',
+            ],
+        ])->assertNoContent();
+
+        $assinatura->refresh();
+        self::assertSame(SubscriptionStatus::PastDue, $assinatura->status);
+        self::assertSame('2026-10-10', $assinatura->current_period_ends_at->toDateString());
+        Notification::assertSentTo($assinatura->user, SubscriptionOverdue::class, function (SubscriptionOverdue $n) {
+            return $n->dueDateFormatted === '10/10/2026'
+                && $n->accessUntilFormatted === '15/10/2026'
+                && $n->invoiceUrl === 'https://sandbox.asaas.com/i/atrasada';
+        });
+    }
+
+    public function test_atraso_que_perdeu_a_confirmacao_anterior_avanca_o_vencimento(): void
+    {
+        Notification::fake();
+        $assinatura = $this->criarAssinaturaAtiva();
+        $assinatura->update(['current_period_ends_at' => '2026-09-10']);
+
+        // O webhook do pagamento de setembro se perdeu: o atraso de outubro
+        // chega com vencimento mais novo que o registrado.
+        $this->enviarWebhook('PAYMENT_OVERDUE', $assinatura->asaas_subscription_id, [
+            'payment' => ['subscription' => $assinatura->asaas_subscription_id, 'dueDate' => '2026-10-10'],
+        ])->assertNoContent();
+
+        self::assertSame('2026-10-10', $assinatura->fresh()->current_period_ends_at->toDateString());
+        Notification::assertSentTo($assinatura->user, SubscriptionOverdue::class);
+    }
+
+    public function test_atraso_de_ciclo_antigo_e_ignorado(): void
+    {
+        Notification::fake();
         $assinatura = $this->criarAssinaturaAtiva();
 
         $this->enviarWebhook('PAYMENT_OVERDUE', $assinatura->asaas_subscription_id, [
-            'payment' => ['subscription' => $assinatura->asaas_subscription_id],
+            'payment' => ['subscription' => $assinatura->asaas_subscription_id, 'dueDate' => '2020-01-10'],
+        ])->assertNoContent();
+
+        self::assertSame(SubscriptionStatus::Active, $assinatura->fresh()->status);
+        Notification::assertNothingSent();
+    }
+
+    public function test_cartao_recusado_marca_em_atraso_e_avisa_por_email(): void
+    {
+        Notification::fake();
+        $assinatura = $this->criarAssinaturaAtiva();
+        $assinatura->update(['current_period_ends_at' => '2026-10-10']);
+
+        $this->enviarWebhook('PAYMENT_CREDIT_CARD_CAPTURE_REFUSED', $assinatura->asaas_subscription_id, [
+            'payment' => ['subscription' => $assinatura->asaas_subscription_id, 'dueDate' => '2026-10-10'],
         ])->assertNoContent();
 
         self::assertSame(SubscriptionStatus::PastDue, $assinatura->fresh()->status);
+        Notification::assertSentTo($assinatura->user, SubscriptionPaymentFailed::class);
+    }
+
+    public function test_cobranca_removida_e_ignorada(): void
+    {
+        Notification::fake();
+        $assinatura = $this->criarAssinaturaAtiva();
+
+        $this->enviarWebhook('PAYMENT_DELETED', $assinatura->asaas_subscription_id, [
+            'payment' => ['subscription' => $assinatura->asaas_subscription_id, 'dueDate' => '2026-10-10'],
+        ])->assertNoContent();
+
+        self::assertSame(SubscriptionStatus::Active, $assinatura->fresh()->status);
+        Notification::assertNothingSent();
+    }
+
+    /** @return array<string, array{0: string}> */
+    public static function eventosDeEstornoOuChargeback(): array
+    {
+        return [
+            'estorno' => ['PAYMENT_REFUNDED'],
+            'chargeback' => ['PAYMENT_CHARGEBACK_REQUESTED'],
+        ];
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('eventosDeEstornoOuChargeback')]
+    public function test_estorno_ou_chargeback_encerra_o_acesso_e_cancela_na_asaas(string $evento): void
+    {
+        $assinatura = $this->criarAssinaturaAtiva();
+
+        $asaas = Mockery::mock(AsaasClient::class);
+        $asaas->shouldReceive('cancelSubscription')->once()->with($assinatura->asaas_subscription_id);
+        $this->app->instance(AsaasClient::class, $asaas);
+
+        $this->enviarWebhook($evento, $assinatura->asaas_subscription_id, [
+            'payment' => ['subscription' => $assinatura->asaas_subscription_id],
+        ])->assertNoContent();
+
+        $assinatura->refresh();
+        self::assertSame(SubscriptionStatus::Cancelled, $assinatura->status);
+        self::assertNotNull($assinatura->cancelled_at);
+        self::assertFalse($assinatura->isCurrent());
+    }
+
+    public function test_falha_ao_cancelar_na_asaas_nao_impede_de_revogar_o_acesso(): void
+    {
+        $assinatura = $this->criarAssinaturaAtiva();
+
+        $asaas = Mockery::mock(AsaasClient::class);
+        $asaas->shouldReceive('cancelSubscription')->once()->andThrow(new \RuntimeException('Asaas fora do ar'));
+        $this->app->instance(AsaasClient::class, $asaas);
+
+        $this->enviarWebhook('PAYMENT_CHARGEBACK_REQUESTED', $assinatura->asaas_subscription_id, [
+            'payment' => ['subscription' => $assinatura->asaas_subscription_id],
+        ])->assertNoContent();
+
+        self::assertSame(SubscriptionStatus::Cancelled, $assinatura->fresh()->status);
+    }
+
+    public function test_assinatura_cancelada_nao_volta_por_pagamento_nem_atraso_posterior(): void
+    {
+        Notification::fake();
+        $assinatura = $this->criarAssinaturaAtiva();
+        $assinatura->update(['status' => SubscriptionStatus::Cancelled, 'cancelled_at' => now()]);
+
+        $this->enviarWebhook('PAYMENT_CONFIRMED', $assinatura->asaas_subscription_id, [
+            'payment' => ['subscription' => $assinatura->asaas_subscription_id, 'dueDate' => '2026-10-10'],
+        ])->assertNoContent();
+        $this->enviarWebhook('PAYMENT_OVERDUE', $assinatura->asaas_subscription_id, [
+            'payment' => ['subscription' => $assinatura->asaas_subscription_id, 'dueDate' => '2026-10-10'],
+        ])->assertNoContent();
+
+        self::assertSame(SubscriptionStatus::Cancelled, $assinatura->fresh()->status);
+        Notification::assertNothingSent();
     }
 
     public function test_subscription_deleted_cancela(): void

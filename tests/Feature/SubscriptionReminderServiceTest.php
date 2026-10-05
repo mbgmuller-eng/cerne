@@ -9,6 +9,7 @@ use App\Enums\SubscriptionStatus;
 use App\Models\Subscription;
 use App\Models\User;
 use App\Notifications\PixPaymentDueSoon;
+use App\Notifications\SubscriptionAccessEnding;
 use App\Services\AsaasClient;
 use App\Services\SubscriptionReminderService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -89,6 +90,47 @@ class SubscriptionReminderServiceTest extends TestCase
         $notificados = app(SubscriptionReminderService::class)->notifyUpcomingPixDueDates($this->fakeAsaas());
 
         self::assertSame(0, $notificados);
+        Notification::assertNothingSent();
+    }
+
+    public function test_avisa_no_ultimo_dia_da_carencia_que_o_acesso_acaba_amanha(): void
+    {
+        Notification::fake();
+        // Venceu há 4 dias: carência de 5 dias, corte amanhã.
+        $assinatura = $this->criarAssinatura(PaymentMethod::Pix, -4, SubscriptionStatus::PastDue);
+
+        $avisados = app(SubscriptionReminderService::class)->notifyAccessEndingTomorrow($this->fakeAsaas());
+
+        self::assertSame(1, $avisados);
+        Notification::assertSentTo($assinatura->user, SubscriptionAccessEnding::class, function (SubscriptionAccessEnding $n) {
+            return $n->cutoffFormatted === now()->addDay()->format('d/m/Y');
+        });
+    }
+
+    public function test_aviso_de_acesso_encerrando_nao_repete_se_o_cron_rodar_duas_vezes(): void
+    {
+        Notification::fake();
+        $this->criarAssinatura(PaymentMethod::CreditCard, -4, SubscriptionStatus::PastDue);
+
+        $primeira = app(SubscriptionReminderService::class)->notifyAccessEndingTomorrow($this->fakeAsaas());
+        $segunda = app(SubscriptionReminderService::class)->notifyAccessEndingTomorrow($this->fakeAsaas());
+
+        self::assertSame(1, $primeira);
+        self::assertSame(0, $segunda);
+        Notification::assertSentTimes(SubscriptionAccessEnding::class, 1);
+    }
+
+    public function test_nao_avisa_acesso_encerrando_fora_do_ultimo_dia_nem_quem_esta_em_dia(): void
+    {
+        Notification::fake();
+        $this->criarAssinatura(PaymentMethod::Pix, -3, SubscriptionStatus::PastDue);
+        $this->criarAssinatura(PaymentMethod::Pix, -5, SubscriptionStatus::PastDue);
+        $this->criarAssinatura(PaymentMethod::Pix, -4, SubscriptionStatus::Active);
+        $this->criarAssinatura(PaymentMethod::Pix, -4, SubscriptionStatus::Cancelled);
+
+        $avisados = app(SubscriptionReminderService::class)->notifyAccessEndingTomorrow($this->fakeAsaas());
+
+        self::assertSame(0, $avisados);
         Notification::assertNothingSent();
     }
 }

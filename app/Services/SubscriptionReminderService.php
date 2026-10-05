@@ -3,8 +3,12 @@
 namespace App\Services;
 
 use App\Enums\PaymentMethod;
+use App\Enums\SubscriptionStatus;
 use App\Models\Subscription;
+use App\Models\SubscriptionNotice;
 use App\Notifications\PixPaymentDueSoon;
+use App\Notifications\SubscriptionAccessEnding;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Carbon;
 
 /**
@@ -17,6 +21,8 @@ use Illuminate\Support\Carbon;
 class SubscriptionReminderService
 {
     private const DIAS_DE_ANTECEDENCIA = 3;
+
+    private const AVISO_ACESSO_ENCERRA = 'access_ending';
 
     public function notifyUpcomingPixDueDates(AsaasClient $asaas): int
     {
@@ -42,5 +48,53 @@ class SubscriptionReminderService
         }
 
         return $assinaturas->count();
+    }
+
+    /**
+     * Último dia da carência de quem está em atraso: o acesso é cortado
+     * amanhã (Subscription::accessCutoffDate()). Roda todo dia; o índice
+     * único em subscription_notices garante um aviso só mesmo se o cron
+     * disparar duas vezes no mesmo dia.
+     */
+    public function notifyAccessEndingTomorrow(AsaasClient $asaas): int
+    {
+        $amanha = Carbon::tomorrow();
+        $vencimento = $amanha->copy()->subDays(Subscription::PAST_DUE_GRACE_DAYS);
+
+        $assinaturas = Subscription::query()
+            ->where('status', SubscriptionStatus::PastDue)
+            ->whereDate('current_period_ends_at', $vencimento)
+            ->with('user')
+            ->get()
+            ->filter(fn (Subscription $assinatura) => $assinatura->isCurrent());
+
+        $avisados = 0;
+
+        foreach ($assinaturas as $assinatura) {
+            try {
+                SubscriptionNotice::create([
+                    'subscription_id' => $assinatura->id,
+                    'kind' => self::AVISO_ACESSO_ENCERRA,
+                    'reference_date' => $amanha,
+                    'sent_at' => now(),
+                ]);
+            } catch (UniqueConstraintViolationException) {
+                continue;
+            }
+
+            $invoiceUrl = $assinatura->asaas_subscription_id !== null
+                ? $asaas->currentInvoiceUrl($assinatura->asaas_subscription_id)
+                : null;
+
+            $assinatura->user->notify(new SubscriptionAccessEnding(
+                $assinatura->bundle->label(),
+                $amanha->format('d/m/Y'),
+                $invoiceUrl,
+            ));
+
+            $avisados++;
+        }
+
+        return $avisados;
     }
 }

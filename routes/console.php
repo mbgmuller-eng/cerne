@@ -100,6 +100,14 @@ Schedule::call(function (): void {
     logger()->info('Lembrete de Pix', ['notificados' => $notificados]);
 })->dailyAt('03:40')->name('lembrete-pix')->withoutOverlapping();
 
+// Assinatura em atraso: avisa no último dia da carência que o acesso é
+// cortado amanhã. Idempotente por índice único (subscription_notices).
+Schedule::call(function (): void {
+    $avisados = app(SubscriptionReminderService::class)->notifyAccessEndingTomorrow(app(AsaasClient::class));
+
+    logger()->info('Aviso de acesso encerrando', ['avisados' => $avisados]);
+})->dailyAt('03:45')->name('aviso-acesso-encerrando')->withoutOverlapping();
+
 // Documentos: os que ficaram "Na fila" porque a ANTHROPIC_API_KEY ainda
 // não estava configurada no envio. Idempotente pelo próprio estado — um
 // documento sai de Pending assim que o job o pega, então despachar de
