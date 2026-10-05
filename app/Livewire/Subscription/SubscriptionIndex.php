@@ -9,6 +9,7 @@ use App\Enums\SubscriptionStatus;
 use App\Models\Subscription;
 use App\Rules\CpfCnpj;
 use App\Services\AsaasClient;
+use App\Support\ProfessionalPricing;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Layout;
@@ -46,7 +47,7 @@ class SubscriptionIndex extends Component
         ];
 
         if ($this->kind() === SubscriptionKind::Professional) {
-            $regras['clientCap'] = ['required', Rule::in(array_keys(config('billing.client_tier_surcharge')))];
+            $regras['clientCap'] = ['required', Rule::in(ProfessionalPricing::validCaps())];
         }
 
         return $regras;
@@ -66,9 +67,13 @@ class SubscriptionIndex extends Component
         $usuario = Auth::user();
         $usuario->update(['cpf_cnpj' => $data['cpfCnpj']]);
 
-        $pacote = SubscriptionBundle::from($bundle);
+        // Profissional não escolhe pacote: os clientes dele recebem tudo e o
+        // preço depende só do teto de clientes (ver config/billing.php).
+        $pacote = $this->kind() === SubscriptionKind::Professional
+            ? SubscriptionBundle::Completo
+            : SubscriptionBundle::from($bundle);
         $metodo = PaymentMethod::from($data['metodoPagamento']);
-        // Só profissional escolhe faixa — ver rules(), cliente Direct nunca
+        // Só profissional escolhe teto — ver rules(), cliente Direct nunca
         // tem 'clientCap' no array validado.
         $teto = isset($data['clientCap']) ? (int) $data['clientCap'] : null;
         $customerId = $asaas->findOrCreateCustomer($usuario->fresh());
@@ -131,18 +136,16 @@ class SubscriptionIndex extends Component
     }
 
     /**
-     * Sobe de faixa — não existe endpoint de "mudar valor" na Asaas (só
-     * criar e cancelar, ver AsaasClient), então cancela a assinatura atual
-     * e cria uma nova, maior, com o MESMO pacote/forma de pagamento. Sem
-     * os 7 dias de teste: quem já paga não ganha outro trial só por
-     * precisar de mais clientes (ver AsaasClient::createSubscription(),
-     * diasAteprimeiraCobranca = 0) — a nova nasce PastDue, cobra na hora,
-     * mesma regra de sempre pra quem está em atraso.
+     * Compra mais clientes: sobe o teto da MESMA assinatura e muda o valor
+     * dela na Asaas (ver AsaasClient::updateSubscriptionValue()). O novo
+     * valor vale a partir da próxima cobrança, sem cobrar de novo o ciclo
+     * que já foi pago nem recomeçar teste grátis. O acesso aos clientes
+     * novos é imediato.
      */
     public function aumentarFaixa(int $novoTeto, AsaasClient $asaas)
     {
         abort_unless($this->kind() === SubscriptionKind::Professional, 403);
-        abort_unless(in_array($novoTeto, array_keys(config('billing.client_tier_surcharge')), true), 422);
+        abort_unless(ProfessionalPricing::isValidCap($novoTeto), 422);
 
         $atual = Subscription::query()
             ->where('user_id', Auth::id())
@@ -153,48 +156,19 @@ class SubscriptionIndex extends Component
         abort_if($atual === null || ! $atual->isCurrent() || $atual->client_cap === null, 404);
 
         if ($novoTeto <= $atual->client_cap) {
-            session()->flash('status', 'Essa já é sua faixa atual ou uma faixa menor.');
+            session()->flash('status', 'Esse já é o seu limite atual ou um limite menor.');
 
             return;
         }
 
-        $usuario = Auth::user();
-
         if ($atual->asaas_subscription_id !== null) {
-            $asaas->cancelSubscription($atual->asaas_subscription_id);
+            $asaas->updateSubscriptionValue($atual->asaas_subscription_id, ProfessionalPricing::priceFor($novoTeto));
         }
 
-        $atual->update(['status' => SubscriptionStatus::Cancelled, 'cancelled_at' => now()]);
+        $atual->update(['client_cap' => $novoTeto]);
 
-        $customerId = $asaas->findOrCreateCustomer($usuario->fresh());
-        $resultado = $asaas->createSubscription(
-            $customerId,
-            $atual->bundle,
-            $atual->billing_type,
-            "Cerne — {$atual->bundle->label()}",
-            $novoTeto,
-            diasAteprimeiraCobranca: 0,
-        );
-
-        Subscription::create([
-            'user_id' => $usuario->id,
-            'kind' => SubscriptionKind::Professional,
-            'bundle' => $atual->bundle,
-            'client_cap' => $novoTeto,
-            'billing_type' => $atual->billing_type,
-            'status' => SubscriptionStatus::PastDue,
-            'current_period_ends_at' => now(),
-            'asaas_subscription_id' => $resultado['id'],
-            'started_at' => now(),
-        ]);
-
-        if ($resultado['invoiceUrl'] !== null) {
-            return $this->redirect($resultado['invoiceUrl']);
-        }
-
-        session()->flash('status', 'Faixa aumentada. A cobrança já foi gerada — acompanhe pelo e-mail da Asaas.');
+        session()->flash('status', 'Limite aumentado para '.$novoTeto.' clientes. O novo valor vale a partir da próxima cobrança.');
     }
-
     public function render()
     {
         $assinaturaAtual = Subscription::query()
@@ -208,7 +182,7 @@ class SubscriptionIndex extends Component
             'assinaturaAtual' => $assinaturaAtual,
             'temAcessoAtivo' => $assinaturaAtual?->isCurrent() ?? false,
             'souProfissional' => $this->kind() === SubscriptionKind::Professional,
-            'faixasClientes' => config('billing.client_tier_surcharge'),
+            'tetosClientes' => ProfessionalPricing::validCaps(),
         ]);
     }
 

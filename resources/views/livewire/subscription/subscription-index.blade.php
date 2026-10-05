@@ -40,31 +40,31 @@
             </x-subscription-summary>
         </section>
 
-        {{-- Aumentar faixa: só quem já tem teto (cortesia e contrato
+        {{-- Aumentar limite: só quem já tem teto (cortesia e contrato
              especial têm client_cap nulo, não tem o que "aumentar"). --}}
         @if ($temAcessoAtivo && $souProfissional && $assinaturaAtual->client_cap !== null)
             <section class="card space-y-3 p-5">
                 <p class="text-sm font-semibold text-slate-900 dark:text-white">Aumentar limite de clientes</p>
                 <p class="text-xs text-slate-500 dark:text-slate-400">
-                    Cancela a faixa atual e já cria a nova — cobrada na hora, sem os 7 dias de teste.
+                    O acesso aos clientes novos é imediato. O novo valor passa a valer a partir da próxima cobrança.
                 </p>
 
-                <div class="grid gap-3 @sm:grid-cols-3">
-                    @foreach ($faixasClientes as $teto => $adicional)
+                <div class="grid gap-2 @sm:grid-cols-2">
+                    @foreach ($tetosClientes as $teto)
                         @continue($teto <= $assinaturaAtual->client_cap)
-                        <div class="rounded-lg border border-slate-200 p-3 text-center dark:border-slate-700" wire:key="faixa-upgrade-{{ $teto }}">
-                            <p class="text-sm font-medium text-slate-800 dark:text-slate-200">Até {{ $teto }} clientes</p>
-                            <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-                                {{ $adicional > 0 ? '+ '.\App\Support\Money::format($adicional).'/mês' : 'sem acréscimo' }}
-                            </p>
+                        <div class="flex items-center justify-between gap-3 rounded-lg border border-slate-200 p-3 dark:border-slate-700" wire:key="teto-upgrade-{{ $teto }}">
+                            <div>
+                                <p class="text-sm font-medium text-slate-800 dark:text-slate-200">Até {{ $teto }} clientes</p>
+                                <p class="text-xs text-slate-500 dark:text-slate-400">{{ \App\Support\Money::format(\App\Support\ProfessionalPricing::priceFor($teto)) }}/mês</p>
+                            </div>
                             <button
                                 type="button"
                                 wire:click="aumentarFaixa({{ $teto }})"
-                                wire:confirm="Subir pra até {{ $teto }} clientes? A faixa atual é cancelada e a nova já é cobrada na hora."
+                                wire:confirm="Aumentar para até {{ $teto }} clientes? A partir da próxima cobrança o valor passa a ser {{ \App\Support\Money::format(\App\Support\ProfessionalPricing::priceFor($teto)) }}/mês."
                                 wire:loading.attr="disabled"
-                                class="btn-secondary mt-2 w-full px-2 py-1.5 text-xs"
+                                class="btn-secondary shrink-0 px-3 py-1.5 text-xs"
                             >
-                                Assinar esta faixa
+                                Escolher
                             </button>
                         </div>
                     @endforeach
@@ -76,12 +76,12 @@
     @if (! $temAcessoAtivo)
         <div class="space-y-4">
             <p class="rounded-xl bg-emerald-50 px-4 py-3 text-sm text-emerald-900 ring-1 ring-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-300 dark:ring-emerald-500/20">
-                7 dias grátis em qualquer pacote. Você só é cobrado depois que o teste acabar.
+                7 dias grátis. Você só é cobrado depois que o teste acabar.
             </p>
 
             @if ($souProfissional)
                 <p class="text-xs text-slate-500 dark:text-slate-400">
-                    Isso libera o pacote pra você e pra todos os seus clientes vinculados e ativos.
+                    Seus clientes vinculados e ativos recebem todas as áreas do Cerne, sem pagar nada. O valor depende só de quantos clientes você vincula.
                 </p>
             @endif
 
@@ -110,45 +110,54 @@
                 @error('metodoPagamento') <p class="mt-1.5 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
 
                 @if ($souProfissional)
-                    <label class="mt-4 block text-xs font-medium text-slate-500 dark:text-slate-400">Até quantos clientes vinculados</label>
-                    <div class="mt-1.5 grid grid-cols-3 gap-2">
-                        @foreach ($faixasClientes as $teto => $adicional)
-                            <label @class([
-                                'cursor-pointer rounded-lg border px-3 py-2 text-center text-sm font-medium',
-                                'border-brand-700 bg-brand-50 text-brand-900 dark:border-brand-500 dark:bg-brand-500/10 dark:text-brand-200' => $clientCap === (string) $teto,
-                                'border-slate-200 text-slate-600 dark:border-slate-700 dark:text-slate-400' => $clientCap !== (string) $teto,
-                            ])>
-                                <input type="radio" wire:model="clientCap" value="{{ $teto }}" class="sr-only">
-                                Até {{ $teto }}
-                                <span class="block text-xs font-normal text-slate-400">{{ $adicional > 0 ? '+'.\App\Support\Money::format($adicional) : 'incluso' }}</span>
-                            </label>
+                    <label class="mt-4 block text-xs font-medium text-slate-500 dark:text-slate-400">Quantos clientes você vai vincular</label>
+                    <select wire:model.live="clientCap" class="input mt-1.5">
+                        <option value="">Escolha</option>
+                        @foreach ($tetosClientes as $teto)
+                            <option value="{{ $teto }}">Até {{ $teto }} clientes · {{ \App\Support\Money::format(\App\Support\ProfessionalPricing::priceFor($teto)) }}/mês</option>
                         @endforeach
-                    </div>
-                    <p class="mt-1.5 text-xs text-slate-400">Mais de 50 clientes? Fale com a gente pra um contrato sob medida.</p>
+                    </select>
+                    <p class="mt-1.5 text-xs text-slate-400">Precisa de mais que {{ max($tetosClientes) }}? Fale com a gente pra um contrato sob medida.</p>
                     @error('clientCap') <p class="mt-1.5 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
                 @endif
             </div>
 
-            <div class="grid gap-3 @sm:grid-cols-3">
-                @php
-                    $adicionalFaixa = ($souProfissional && $clientCap !== '') ? ($faixasClientes[(int) $clientCap] ?? 0) : 0;
-                @endphp
-                @foreach ($bundles as $pacote)
-                    <div class="card flex flex-col gap-2 p-5" wire:key="pacote-{{ $pacote->value }}">
-                        <p class="text-sm font-semibold text-slate-900 dark:text-white">{{ $pacote->label() }}</p>
-                        <p class="text-xs text-slate-500 dark:text-slate-400">
-                            {{ collect($pacote->modules())->map(fn ($m) => $m->label())->join(' · ') }}
+            @if ($souProfissional)
+                <div class="card flex items-center justify-between gap-4 p-5">
+                    <div>
+                        <p class="text-sm font-semibold text-slate-900 dark:text-white">Assinatura do profissional</p>
+                        <p class="mt-0.5 text-lg font-semibold text-slate-900 dark:text-white">
+                            @if ($clientCap !== '')
+                                {{ \App\Support\Money::format(\App\Support\ProfessionalPricing::priceFor((int) $clientCap)) }}
+                                <span class="text-xs font-normal text-slate-400">/mês, até {{ $clientCap }} clientes</span>
+                            @else
+                                <span class="text-sm font-normal text-slate-400">Escolha a quantidade de clientes acima.</span>
+                            @endif
                         </p>
-                        <p class="mt-auto text-lg font-semibold text-slate-900 dark:text-white">
-                            {{ \App\Support\Money::format(config('billing.prices.'.$pacote->value) + $adicionalFaixa) }}
-                            <span class="text-xs font-normal text-slate-400">/mês</span>
-                        </p>
-                        <button type="button" wire:click="assinar('{{ $pacote->value }}')" wire:loading.attr="disabled" class="btn-primary w-full">
-                            Assinar
-                        </button>
                     </div>
-                @endforeach
-            </div>
+                    <button type="button" wire:click="assinar('{{ \App\Enums\SubscriptionBundle::Completo->value }}')" wire:loading.attr="disabled" class="btn-primary shrink-0">
+                        Assinar
+                    </button>
+                </div>
+            @else
+                <div class="grid gap-3 @sm:grid-cols-3">
+                    @foreach ($bundles as $pacote)
+                        <div class="card flex flex-col gap-2 p-5" wire:key="pacote-{{ $pacote->value }}">
+                            <p class="text-sm font-semibold text-slate-900 dark:text-white">{{ $pacote->label() }}</p>
+                            <p class="text-xs text-slate-500 dark:text-slate-400">
+                                {{ collect($pacote->modules())->map(fn ($m) => $m->label())->join(' · ') }}
+                            </p>
+                            <p class="mt-auto text-lg font-semibold text-slate-900 dark:text-white">
+                                {{ \App\Support\Money::format(config('billing.prices.'.$pacote->value)) }}
+                                <span class="text-xs font-normal text-slate-400">/mês</span>
+                            </p>
+                            <button type="button" wire:click="assinar('{{ $pacote->value }}')" wire:loading.attr="disabled" class="btn-primary w-full">
+                                Assinar
+                            </button>
+                        </div>
+                    @endforeach
+                </div>
+            @endif
         </div>
     @endif
 </div>

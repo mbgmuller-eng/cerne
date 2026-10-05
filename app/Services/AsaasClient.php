@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Enums\PaymentMethod;
 use App\Enums\SubscriptionBundle;
 use App\Models\User;
+use App\Support\ProfessionalPricing;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
@@ -43,19 +44,16 @@ class AsaasClient
     }
 
     /**
-     * `nextDueDate` à frente é o teste grátis inteiro — não existe campo
-     * "trial" na Asaas, é só a primeira cobrança nascer mais tarde.
+     * `nextDueDate` 7 dias à frente é o teste grátis inteiro — não existe
+     * campo "trial" na Asaas, é só a primeira cobrança nascer mais tarde.
      * Cartão e Pix tratados igual (`asaasBillingType()`): nenhum dos dois
      * cobra sozinho hoje, os dois clicam a fatura — cobrança automática de
      * cartão de verdade exigiria tokenizar o cartão pelo nosso backend e
      * depende de aprovação da Asaas pra produção (ver o plano).
      *
-     * $clientCap soma o adicional da faixa (ver config/billing.php,
-     * client_tier_surcharge) ao preço do pacote — só relevante pra
-     * assinatura Professional, null em Direct. $diasAteprimeiraCobranca
-     * passa a 0 num upgrade de faixa (ConsultantCapacityService): quem já
-     * é cliente pagante não ganha outro teste grátis só por subir de
-     * faixa.
+     * $clientCap preenchido = assinatura de profissional: o valor vem só do
+     * teto de clientes (ProfessionalPricing), sem olhar o pacote. Nulo =
+     * assinatura direta, valor do pacote.
      *
      * @return array{id: string, invoiceUrl: ?string}
      */
@@ -65,15 +63,15 @@ class AsaasClient
         PaymentMethod $metodoPagamento,
         string $descricao,
         ?int $clientCap = null,
-        int $diasAteprimeiraCobranca = 7,
     ): array {
-        $valor = config("billing.prices.{$bundle->value}")
-            + ($clientCap !== null ? config("billing.client_tier_surcharge.{$clientCap}", 0) : 0);
+        $valor = $clientCap !== null
+            ? (float) ProfessionalPricing::priceFor($clientCap)
+            : config("billing.prices.{$bundle->value}");
 
         $resposta = $this->request()->post('/subscriptions', [
             'customer' => $customerId,
             'billingType' => $metodoPagamento->asaasBillingType(),
-            'nextDueDate' => now()->addDays($diasAteprimeiraCobranca)->toDateString(),
+            'nextDueDate' => now()->addDays(7)->toDateString(),
             'value' => $valor,
             'cycle' => 'MONTHLY',
             'description' => $descricao,
@@ -83,6 +81,21 @@ class AsaasClient
             'id' => $resposta->json('id'),
             'invoiceUrl' => $this->firstInvoiceUrl($resposta->json('id')),
         ];
+    }
+
+    /**
+     * Muda o valor das próximas cobranças de uma assinatura existente (a
+     * Asaas aceita PUT em /subscriptions/{id}). `updatePendingPayments`
+     * também atualiza a cobrança já gerada: a Asaas cria cada cobrança com
+     * até 40 dias de antecedência, então sem isso o novo valor só valeria
+     * um ciclo depois do esperado.
+     */
+    public function updateSubscriptionValue(string $asaasSubscriptionId, string $valor): void
+    {
+        $this->request()->put("/subscriptions/{$asaasSubscriptionId}", [
+            'value' => (float) $valor,
+            'updatePendingPayments' => true,
+        ])->throw();
     }
 
     public function cancelSubscription(string $asaasSubscriptionId): void

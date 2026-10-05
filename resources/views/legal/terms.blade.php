@@ -32,9 +32,10 @@
                     Toda assinatura começa com 7 dias grátis, em qualquer pacote. Depois disso, é mensal e recorrente,
                     processada pela Asaas (nossa processadora de pagamentos), só em cartão de crédito ou Pix. Você
                     pode cancelar a qualquer momento pela sua área de conta, sem falar com ninguém; o acesso é
-                    encerrado na hora do cancelamento, sem desconto proporcional do período já pago. Assinaturas de
-                    profissionais cobrem, sem custo adicional, os clientes vinculados e
-                    ativos à sua conta, no pacote escolhido pelo profissional.
+                    encerrado na hora do cancelamento, sem desconto proporcional do período já pago. A assinatura de
+                    um profissional (consultor ou corretor) tem valor definido pela quantidade de clientes que ele
+                    vincula e dá a esses clientes, sem custo adicional para eles, acesso a todas as áreas do Cerne
+                    enquanto o vínculo estiver ativo.
                 </p>
             </section>
 
