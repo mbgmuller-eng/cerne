@@ -2,10 +2,13 @@
 
 namespace Tests\Feature;
 
+use App\Enums\ConsultantClientStatus;
 use App\Enums\DocumentType;
 use App\Enums\MemberRole;
 use App\Enums\ProcessingStatus;
 use App\Livewire\Notifications\NotificationCenter;
+use App\Http\Middleware\SetProfileContext;
+use App\Models\ConsultantClient;
 use App\Models\DocumentUpload;
 use App\Models\FinancialProfile;
 use App\Models\ProfileMember;
@@ -156,6 +159,55 @@ class NotificationCenterTest extends TestCase
         self::assertStringNotContainsString('wire:click="open(', $html);
     }
 
+    public function test_importacao_feita_no_perfil_de_um_cliente_abre_esse_perfil_ao_clicar(): void
+    {
+        $cliente = User::factory()->create();
+        $documento = $this->criarDocumento($cliente, ProcessingStatus::Completed);
+        $consultor = User::factory()->consultant()->create();
+        ConsultantClient::factory()->create([
+            'consultant_id' => $consultor->id, 'client_id' => $cliente->id, 'status' => ConsultantClientStatus::Active,
+        ]);
+        $this->actingAs($consultor);
+        $id = $this->gravar($consultor, [
+            'kind' => 'document_processed', 'document_upload_id' => $documento->id, 'title' => 'Fatura.pdf', 'status' => 'completed',
+        ]);
+
+        Livewire::test(NotificationCenter::class)
+            ->call('abrirNotificacao', $id)
+            ->assertRedirect(route('documents.index'));
+
+        self::assertSame($documento->profile_id, session(SetProfileContext::SESSION_KEY));
+    }
+
+    public function test_sem_vinculo_ativo_o_clique_nao_abre_o_perfil_do_cliente(): void
+    {
+        $cliente = User::factory()->create();
+        $documento = $this->criarDocumento($cliente, ProcessingStatus::Completed);
+        $consultor = User::factory()->consultant()->create();
+        ConsultantClient::factory()->create([
+            'consultant_id' => $consultor->id, 'client_id' => $cliente->id, 'status' => ConsultantClientStatus::Inactive,
+        ]);
+        $this->actingAs($consultor);
+        $id = $this->gravar($consultor, [
+            'kind' => 'document_processed', 'document_upload_id' => $documento->id, 'title' => 'Fatura.pdf', 'status' => 'completed',
+        ]);
+
+        Livewire::test(NotificationCenter::class)->call('abrirNotificacao', $id);
+
+        self::assertNull(session(SetProfileContext::SESSION_KEY));
+    }
+
+    public function test_aviso_de_carteira_nao_troca_o_perfil_ativo(): void
+    {
+        $usuario = $this->criarUsuarioComPerfil();
+        $id = $this->gravar($usuario, [
+            'kind' => 'client_birthday_upcoming', 'title' => 'Helen Muller', 'occurrence_date' => '2026-10-14', 'turning_age' => 40,
+        ]);
+
+        Livewire::test(NotificationCenter::class)->call('abrirNotificacao', $id);
+
+        self::assertNull(session(SetProfileContext::SESSION_KEY));
+    }
     public function test_nao_abre_notificacao_de_outra_pessoa(): void
     {
         $usuario = $this->criarUsuarioComPerfil();

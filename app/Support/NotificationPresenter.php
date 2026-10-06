@@ -2,6 +2,10 @@
 
 namespace App\Support;
 
+use App\Models\CreditCardInvoice;
+use App\Models\DocumentUpload;
+use App\Models\FixedBillPayment;
+use App\Models\HealthAppointment;
 use Illuminate\Notifications\DatabaseNotification;
 use Illuminate\Support\Carbon;
 
@@ -71,6 +75,36 @@ final class NotificationPresenter
                 'url' => $d['url'] ?? null,
             ],
         };
+    }
+
+    /**
+     * Perfil financeiro dono do dado de que a notificação trata, quando ela
+     * trata de dado de UM perfil (importação, conta fixa, fatura, agenda de
+     * saúde). É o que o clique precisa abrir antes de ir pra tela: um
+     * consultor que importou um documento dentro do perfil de um cliente
+     * recebe o aviso sem nenhum cliente aberto, e a tela de destino o
+     * devolveria à carteira.
+     *
+     * Aviso de carteira (aniversário, vencimento de apólice ou de
+     * investimento) é do profissional como um todo, não de um perfil.
+     */
+    public static function profileId(DatabaseNotification $notificacao): ?string
+    {
+        $d = $notificacao->data;
+
+        [$modelo, $id] = match ($d['kind'] ?? null) {
+            'document_processed' => [DocumentUpload::class, $d['document_upload_id'] ?? null],
+            'fixed_bill_due_soon' => [FixedBillPayment::class, $d['fixed_bill_payment_id'] ?? null],
+            'credit_card_invoice_due_soon' => [CreditCardInvoice::class, $d['credit_card_invoice_id'] ?? null],
+            'health_appointment_upcoming' => [HealthAppointment::class, $d['health_appointment_id'] ?? null],
+            default => [null, null],
+        };
+
+        if ($modelo === null || $id === null) {
+            return null;
+        }
+
+        return $modelo::withoutProfileScope()->whereKey($id)->value('profile_id');
     }
 
     private static function dia(?string $data): string

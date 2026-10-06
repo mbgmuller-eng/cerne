@@ -2,6 +2,8 @@
 
 namespace App\Livewire\Notifications;
 
+use App\Http\Middleware\SetProfileContext;
+use App\Models\FinancialProfile;
 use App\Support\NotificationPresenter;
 use Livewire\Component;
 
@@ -46,6 +48,17 @@ class NotificationCenter extends Component
         }
 
         $notificacao->markAsRead();
+
+        // Aviso de dado de um perfil abre ESSE perfil antes de ir pra tela.
+        // Só com acesso a ele; a sessão não concede nada (o middleware
+        // reautoriza a cada requisição), é só pra escolher qual perfil abrir.
+        $perfilId = NotificationPresenter::profileId($notificacao);
+        $perfil = $perfilId !== null ? FinancialProfile::find($perfilId) : null;
+
+        if ($perfil !== null && auth()->user()->can('view', $perfil)) {
+            session()->put(SetProfileContext::SESSION_KEY, $perfil->id);
+        }
+
         $url = NotificationPresenter::present($notificacao)['url'];
 
         return $url !== null ? $this->redirect($url) : null;
