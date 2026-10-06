@@ -324,4 +324,20 @@ class SubscriptionIndexTest extends TestCase
         Livewire::actingAs($usuario)->test(\App\Livewire\Subscription\SubscriptionIndex::class)
             ->call('cancelar');
     }
+
+    /**
+     * Sem `.live` o wire:model só guarda o valor e o envia na próxima ação: ao
+     * tocar em Cartão ou Pix nada mudava na tela e a pessoa não via o que tinha
+     * escolhido (nem o texto de ajuda do Pix).
+     */
+    public function test_escolha_da_forma_de_pagamento_atualiza_a_tela_na_hora(): void
+    {
+        $usuario = User::factory()->create();
+
+        Livewire::actingAs($usuario)->test(\App\Livewire\Subscription\SubscriptionIndex::class)
+            ->assertSeeHtml('wire:model.live="metodoPagamento"')
+            ->assertDontSee('Avisamos por e-mail 3 dias antes')
+            ->set('metodoPagamento', 'pix')
+            ->assertSee('Avisamos por e-mail 3 dias antes');
+    }
 }

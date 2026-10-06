@@ -207,7 +207,7 @@
                             'border-brand-700 bg-brand-50 text-brand-900 dark:border-brand-500 dark:bg-brand-500/10 dark:text-brand-200' => $metodoPagamento === $metodo->value,
                             'border-slate-200 text-slate-600 dark:border-slate-700 dark:text-slate-400' => $metodoPagamento !== $metodo->value,
                         ])>
-                            <input type="radio" wire:model="metodoPagamento" value="{{ $metodo->value }}" class="sr-only">
+                            <input type="radio" wire:model.live="metodoPagamento" value="{{ $metodo->value }}" class="sr-only">
                             {{ $metodo->label() }}
                         </label>
                     @endforeach
