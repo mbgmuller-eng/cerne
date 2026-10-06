@@ -122,7 +122,7 @@ class NotificationCenterTest extends TestCase
         ]);
 
         Livewire::test(NotificationCenter::class)
-            ->call('open', $id)
+            ->call('abrirNotificacao', $id)
             ->assertRedirect(route('consultant.portfolio.important-dates'));
 
         self::assertNotNull($usuario->notifications()->find($id)->read_at);
@@ -133,9 +133,27 @@ class NotificationCenterTest extends TestCase
         $usuario = $this->criarUsuarioComPerfil();
         $id = $this->gravar($usuario, ['title' => 'Sem link']);
 
-        Livewire::test(NotificationCenter::class)->call('open', $id)->assertNoRedirect();
+        Livewire::test(NotificationCenter::class)->call('abrirNotificacao', $id)->assertNoRedirect();
 
         self::assertNotNull($usuario->notifications()->find($id)->read_at);
+    }
+
+    /**
+     * Regressão: o painel do sino tem `x-data="{ open: false }"`. Um
+     * wire:click="open(...)" resolve `open` nesse escopo do Alpine (um
+     * booleano) antes de chegar no método do Livewire e quebra em silêncio
+     * com "open is not a function" — o clique não faz nada e nenhum teste de
+     * servidor percebe. O método precisa ter outro nome.
+     */
+    public function test_acao_do_clique_nao_colide_com_a_variavel_open_do_alpine(): void
+    {
+        $usuario = $this->criarUsuarioComPerfil();
+        $this->gravar($usuario, ['kind' => 'fixed_bill_due_soon', 'title' => 'Internet', 'due_date' => '2026-10-10']);
+
+        $html = Livewire::test(NotificationCenter::class)->html();
+
+        self::assertStringContainsString('wire:click="abrirNotificacao(', $html);
+        self::assertStringNotContainsString('wire:click="open(', $html);
     }
 
     public function test_nao_abre_notificacao_de_outra_pessoa(): void
@@ -144,7 +162,7 @@ class NotificationCenterTest extends TestCase
         $outra = User::factory()->create();
         $id = $this->gravar($outra, ['kind' => 'fixed_bill_due_soon', 'title' => 'Internet', 'due_date' => '2026-10-10']);
 
-        Livewire::test(NotificationCenter::class)->call('open', $id)->assertNoRedirect();
+        Livewire::test(NotificationCenter::class)->call('abrirNotificacao', $id)->assertNoRedirect();
 
         self::assertNull($outra->notifications()->find($id)->read_at);
     }

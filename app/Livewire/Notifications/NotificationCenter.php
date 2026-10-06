@@ -37,7 +37,7 @@ class NotificationCenter extends Component
      * Clique na notificação: marca como lida e abre a tela de que ela trata.
      * Sem destino conhecido, só marca.
      */
-    public function open(string $id)
+    public function abrirNotificacao(string $id)
     {
         $notificacao = auth()->user()->notifications()->where('id', $id)->first();
 

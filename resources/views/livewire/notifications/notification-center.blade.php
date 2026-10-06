@@ -40,7 +40,7 @@
                 @foreach ($notifications as ['notificacao' => $n, 'dados' => $d])
                     <li
                         wire:key="notificacao-{{ $n->id }}"
-                        wire:click="open('{{ $n->id }}')"
+                        wire:click="abrirNotificacao('{{ $n->id }}')"
                         @class([
                             'cursor-pointer px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-white/5',
                             'bg-brand-50/60 dark:bg-brand-500/10' => $n->read_at === null,
