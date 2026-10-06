@@ -54,10 +54,6 @@
             $context->isConsultant() ? null : ['label' => 'Saúde', 'items' => $navSaude],
         ]));
 
-    // Achatado, na ordem das seções acima — usado pela barra inferior do
-    // celular (poucas abas, sem cabeçalho de seção nenhum).
-    $nav = collect($navSections)->flatMap(fn (array $s) => $s['items'])->all();
-
     // Cor da barra de dentro do perfil: a do SETOR que a pessoa está
     // vendo, não o tema claro/escuro (esse continua só no conteúdo — ver
     // memory: project_multi_product_branding). Corretor só tem Seguros,
@@ -106,28 +102,27 @@
         return $s + ['tint' => $tintPorSetor[$s['label']] ?? 'text-white/40'];
     })->all();
 
-    // Na barra inferior cabem 5; o resto vai para "Mais".
-    $tabsPrincipais = array_slice($nav, 0, 4);
-    $tabsMais = array_slice($nav, 4);
-    $emMais = collect($tabsMais)->contains(fn ($t) => request()->routeIs($t[0]));
+    // Barra inferior do celular: uma aba por CATEGORIA (Finanças, Seguros,
+    // Documentos, Saúde) mais "Minha conta" — 5 cabem. Categoria com várias
+    // telas abre uma gaveta com elas; com uma tela só vai direto, uma gaveta
+    // de um item só seria um toque a mais sem ganho nenhum. As categorias
+    // vêm de $navSections, então corretor (só Seguros) e consultor com
+    // cliente aberto (sem Saúde) ganham só as abas a que têm direito.
+    $iconesDasAbas = ['Finanças' => 'invest', 'Seguros' => 'shield', 'Documentos' => 'folder', 'Saúde' => 'heart'];
+    $naMinhaConta = request()->routeIs('my-account');
+    $abasInferiores = collect($navSections)->map(function (array $s) use ($iconesDasAbas, $moduloAtivo, $naMinhaConta) {
+        $chave = \Illuminate\Support\Str::slug($s['label']);
 
-    // Mesmo agrupamento por setor da barra lateral, só que sem repetir
-    // os 4 itens que já estão nas abas principais — a gaveta "Mais" tinha
-    // ficado uma lista só, sem separar Seguros de Finanças.
-    $rotasNasAbas = collect($tabsPrincipais)->pluck('0')->all();
-    $navSectionsMais = collect($navSections)
-        ->map(function (array $s) use ($rotasNasAbas) {
-            // $s + [...] NÃO sobrescreveria 'items' (o + de array mantém o
-            // valor do lado esquerdo quando a chave já existe) — por isso
-            // a atribuição direta aqui, não a união.
-            $s['items'] = collect($s['items'])->reject(fn (array $item) => in_array($item[0], $rotasNasAbas, true))->values()->all();
-
-            return $s;
-        })
-        ->filter(fn (array $s) => count($s['items']) > 0 || ($s['emBreve'] ?? false))
-        ->values()
-        ->all();
-
+        return [
+            'chave' => $chave,
+            'label' => $s['label'],
+            'icone' => $iconesDasAbas[$s['label']] ?? 'menu',
+            'tint' => $s['tint'],
+            'items' => $s['items'],
+            'ativa' => ! $naMinhaConta && $moduloAtivo === $chave,
+            'direta' => count($s['items']) === 1,
+        ];
+    })->all();
     // "Painel da carteira" e as telas irmãs não são telas DE um perfil —
     // são a área de gestão do consultor. Sem esta distinção, o perfil do
     // último cliente aberto (guardado na sessão) continuava ditando o menu
@@ -226,7 +221,7 @@
          página, e o navegador cai no fallback do sistema silenciosamente. --}}
     {{ \Illuminate\Support\Facades\Vite::fonts() }}
 </head>
-<body class="h-full bg-paper text-slate-800 antialiased dark:text-slate-200" x-data="{ mais: false }">
+<body class="h-full bg-paper text-slate-800 antialiased dark:text-slate-200" x-data="{ secao: null }">
 
 <div class="flex min-h-full">
 
@@ -490,7 +485,7 @@
                          têm bem mais botões aqui do que o cliente comum, e
                          sem isto eles simplesmente somiam pra fora da tela no
                          celular. --}}
-                    <div class="flex min-w-0 items-center gap-2 overflow-x-auto">
+                    <div class="relative flex min-w-0 items-center gap-2 overflow-x-auto">
                         @if ($context->isConsultant())
                             <span @class([
                                 'badge ring-1',
@@ -563,16 +558,17 @@
          a própria camada de composição evita isso; não muda nada visual
          nos aparelhos que já funcionavam. --}}
     <div class="fixed inset-x-0 bottom-0 z-30 lg:hidden transform-gpu will-change-transform">
-        {{-- Gaveta "Mais" --}}
+        {{-- Gaveta da categoria tocada: as telas dela, no mesmo desenho de
+             sempre. Fecha tocando fora ou na aba de novo. --}}
         <div
-            x-show="mais"
+            x-show="secao !== null"
             x-transition.opacity
             x-cloak
-            @click="mais = false"
+            @click="secao = null"
             class="fixed inset-0 bg-brand-950/30 backdrop-blur-sm"
         ></div>
         <div
-            x-show="mais"
+            x-show="secao !== null"
             x-transition:enter="transition ease-out duration-200"
             x-transition:enter-start="translate-y-full"
             x-transition:enter-end="translate-y-0"
@@ -584,48 +580,49 @@
         >
             <div class="mx-auto mb-3 h-1 w-10 rounded-full bg-white/20"></div>
             <div class="max-h-[60vh] overflow-y-auto">
-                @foreach ($navSectionsMais as $secao)
-                    <div @class(['pt-3' => ! $loop->first, 'pb-1'])>
-                        <p @class(['px-1 pb-1 text-[10px] font-semibold tracking-wide uppercase', $secao['tint']])>
-                            {{ $secao['label'] }}
-                            @if ($secao['emBreve'] ?? false)
-                                <span class="ml-1 rounded bg-white/10 px-1.5 py-0.5 text-[9px] font-normal tracking-normal text-white/50 normal-case">em breve</span>
-                            @endif
-                        </p>
-                        @if (count($secao['items']) > 0)
+                @foreach ($abasInferiores as $aba)
+                    @unless ($aba['direta'])
+                        <div x-show="secao === '{{ $aba['chave'] }}'" x-cloak class="pb-1">
+                            <p @class(['px-1 pb-2 text-[10px] font-semibold tracking-wide uppercase', $aba['tint']])>{{ $aba['label'] }}</p>
                             <div class="grid grid-cols-4 gap-1">
-                                @foreach ($secao['items'] as [$route, $label, $curto, $icone])
+                                @foreach ($aba['items'] as [$route, $label, $curto, $icone])
                                     <a href="{{ route($route) }}" @class(['tab-item-chrome rounded-xl py-3', 'tab-item-chrome-active bg-white/10' => request()->routeIs($route)])>
                                         <x-nav-icon :name="$icone" class="h-6 w-6" />
                                         <span>{{ $curto }}</span>
                                     </a>
                                 @endforeach
                             </div>
-                        @endif
-                    </div>
+                        </div>
+                    @endunless
                 @endforeach
-
-                <div class="mt-3 border-t border-white/10 pt-3">
-                    <a href="{{ route('my-account') }}" @class(['tab-item-chrome rounded-xl py-3', 'tab-item-chrome-active bg-white/10' => request()->routeIs('my-account')])>
-                        <x-nav-icon name="users" class="h-6 w-6" />
-                        <span>Minha conta</span>
-                    </a>
-                </div>
             </div>
         </div>
 
         {{-- Abas --}}
         <nav @class(['relative flex border-t border-white/10', $corBarraModulo]) style="padding-bottom: env(safe-area-inset-bottom)">
-            @foreach ($tabsPrincipais as [$route, $label, $curto, $icone])
-                <a href="{{ route($route) }}" @class(['tab-item-chrome', 'tab-item-chrome-active' => request()->routeIs($route)])>
-                    <x-nav-icon :name="$icone" class="h-6 w-6" />
-                    <span>{{ $curto }}</span>
-                </a>
+            @foreach ($abasInferiores as $aba)
+                @if ($aba['direta'])
+                    <a href="{{ route($aba['items'][0][0]) }}" @class(['tab-item-chrome', 'tab-item-chrome-active' => $aba['ativa']])>
+                        <x-nav-icon :name="$aba['icone']" class="h-6 w-6" />
+                        <span>{{ $aba['label'] }}</span>
+                    </a>
+                @else
+                    <button
+                        type="button"
+                        @click="secao = secao === '{{ $aba['chave'] }}' ? null : '{{ $aba['chave'] }}'"
+                        @class(['tab-item-chrome', 'tab-item-chrome-active' => $aba['ativa']])
+                        :class="secao === '{{ $aba['chave'] }}' ? 'text-white' : ''"
+                        :aria-expanded="secao === '{{ $aba['chave'] }}'"
+                    >
+                        <x-nav-icon :name="$aba['icone']" class="h-6 w-6" />
+                        <span>{{ $aba['label'] }}</span>
+                    </button>
+                @endif
             @endforeach
-            <button type="button" @click="mais = !mais" @class(['tab-item-chrome', 'tab-item-chrome-active' => $emMais])>
-                <x-nav-icon name="menu" class="h-6 w-6" />
-                <span>Mais</span>
-            </button>
+            <a href="{{ route('my-account') }}" @class(['tab-item-chrome', 'tab-item-chrome-active' => $naMinhaConta])>
+                <x-nav-icon name="users" class="h-6 w-6" />
+                <span>Minha conta</span>
+            </a>
         </nav>
     </div>
 @elseif ($areaConsultor)
