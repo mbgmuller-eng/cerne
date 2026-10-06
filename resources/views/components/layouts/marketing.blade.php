@@ -30,7 +30,7 @@
 
             <nav class="hidden items-center gap-6 text-sm font-medium text-slate-600 dark:text-slate-300 md:flex">
                 <a href="#modulos" class="hover:text-brand-800 dark:hover:text-white">Módulos</a>
-                <a href="#planos" class="hover:text-brand-800 dark:hover:text-white">Planos pra você</a>
+                <a href="#planos" class="hover:text-brand-800 dark:hover:text-white">Planos para você</a>
                 <a href="#planos-profissionais" class="hover:text-brand-800 dark:hover:text-white">Consultores e corretores</a>
             </nav>
 

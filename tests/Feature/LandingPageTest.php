@@ -25,7 +25,7 @@ class LandingPageTest extends TestCase
         $this->get('/')
             ->assertOk()
             ->assertSeeInOrder([
-                'Planos pra quem assina direto',
+                'Planos para quem assina direto',
                 Money::format(config('billing.prices.'.SubscriptionBundle::SaudeDocumentos->value)),
                 Money::format(config('billing.prices.'.SubscriptionBundle::FinancasSegurosDocumentos->value)),
                 Money::format(config('billing.prices.'.SubscriptionBundle::Completo->value)),
@@ -64,6 +64,14 @@ class LandingPageTest extends TestCase
         $this->get('/')
             ->assertOk()
             ->assertDontSee('cobre, de graça, todos os clientes');
+    }
+
+    public function test_titulo_usa_em_um_so_lugar_sem_o_tom_coloquial(): void
+    {
+        $this->get('/')
+            ->assertOk()
+            ->assertSee('tudo o que sustenta sua vida, em um só lugar.', false)
+            ->assertDontSee('num só lugar');
     }
 
     public function test_logado_e_redirecionado_pro_painel(): void
