@@ -3,10 +3,9 @@
 namespace App\Console\Commands;
 
 use App\Models\GymExerciseCatalog;
+use App\Services\GymCatalogImageService;
 use Illuminate\Console\Command;
 use Illuminate\Http\UploadedFile;
-use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Str;
 
 /**
  * Vincula fotos de referência ao CATÁLOGO COMPARTILHADO — mesma ideia de
@@ -23,7 +22,7 @@ class LinkGymCatalogImages extends Command
 
     protected $description = 'Vincula fotos de referência aos exercícios do catálogo compartilhado da Academia';
 
-    public function handle(): int
+    public function handle(GymCatalogImageService $imagens): int
     {
         $arquivo = (string) $this->argument('mapping');
 
@@ -86,7 +85,7 @@ class LinkGymCatalogImages extends Command
 
         if (! $dry) {
             foreach ($resolvidas as $r) {
-                $this->setImage($r['exercicio'], $this->uploadedFile($r['arquivo1']), $r['arquivo2'] !== null ? $this->uploadedFile($r['arquivo2']) : null);
+                $imagens->replacePair($r['exercicio'], $this->uploadedFile($r['arquivo1']), $r['arquivo2'] !== null ? $this->uploadedFile($r['arquivo2']) : null);
             }
         }
 
@@ -96,27 +95,6 @@ class LinkGymCatalogImages extends Command
         }
 
         return self::SUCCESS;
-    }
-
-    /** Mesma lógica de GymPlanService::setExerciseImage(), mas pro model do catálogo (sem member_id). */
-    private function setImage(GymExerciseCatalog $exercicio, UploadedFile $file, ?UploadedFile $file2): void
-    {
-        $disco = Storage::disk(config('cerne.gym_images.disk'));
-        $pasta = config('cerne.gym_images.path').'/catalogo';
-
-        if ($exercicio->image_path !== null) {
-            $disco->delete($exercicio->image_path);
-        }
-        if ($exercicio->image_path_2 !== null) {
-            $disco->delete($exercicio->image_path_2);
-        }
-
-        $caminho1 = $file->storeAs($pasta, Str::uuid().'.'.$file->extension(), config('cerne.gym_images.disk'));
-        $caminho2 = $file2 !== null
-            ? $file2->storeAs($pasta, Str::uuid().'.'.$file2->extension(), config('cerne.gym_images.disk'))
-            : null;
-
-        $exercicio->update(['image_path' => $caminho1, 'image_path_2' => $caminho2]);
     }
 
     private function uploadedFile(string $path): UploadedFile

@@ -6,6 +6,7 @@ use App\Enums\InsuranceType;
 use App\Enums\InviteStatus;
 use App\Models\ConsultantInvite;
 use App\Models\InsurancePolicy;
+use App\Models\Insurer;
 use App\Services\ClientInviteService;
 use App\Services\ConsultantCapacityService;
 use App\Services\ConsultantLinkService;
@@ -123,6 +124,7 @@ class PortfolioInsurance extends Component
             'grouped' => $this->group($linhas),
             'seguradoras' => $seguradoras,
             'totalGeral' => $todas->count(),
+            'insurerColors' => Insurer::colorMap(),
         ]);
     }
 

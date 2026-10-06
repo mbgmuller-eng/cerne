@@ -10,6 +10,7 @@ use App\Livewire\Concerns\HasPrivacyTabs;
 use App\Livewire\Concerns\RequiresActiveProfile;
 use App\Models\ConsultantClient;
 use App\Models\InsurancePolicy;
+use App\Models\Insurer;
 use App\Models\ProfileMember;
 use App\Models\User;
 use App\Support\Money;
@@ -143,6 +144,10 @@ class InsuranceIndex extends Component
             'policyStartDate' => 'início de vigência',
             'policyExpiryDate' => 'vencimento',
         ]);
+
+        // Nome novo vira sugestão pro admin aprovar; nunca bloqueia o cadastro, e
+        // a apólice segue guardando o texto digitado (ver Insurer).
+        Insurer::resolveOrSuggest($data['policyInsurerName']);
 
         $memberId = $this->resolveMembro($this->policyMemberId);
         // Corretor cadastrando apólice pro próprio cliente vinculado: já
@@ -409,6 +414,8 @@ class InsuranceIndex extends Component
             'totalMonthly' => $this->totalMonthly,
             'expiring' => $this->expiring,
             'insurersCount' => $this->insurersCount,
+            'knownInsurers' => Insurer::names(),
+            'insurerColors' => Insurer::colorMap(),
             'availableBrokers' => $this->availableBrokers,
             'members' => ProfileMember::query()
                 ->where('profile_id', $profileId)

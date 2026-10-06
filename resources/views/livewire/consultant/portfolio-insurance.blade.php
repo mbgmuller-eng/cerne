@@ -129,12 +129,12 @@
                                                 @foreach ($porMembro['seguradoras'] as $seguradoraNome => $linhasDaSeguradora)
                                                     <div>
                                                         <div class="flex items-center gap-2">
-                                                            <span @class([
-                                                                'flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-[10px] font-semibold text-white',
-                                                                $badgeColors[InsurancePolicy::colorIndexFor($seguradoraNome, count($badgeColors))],
-                                                            ])>
-                                                                {{ InsurancePolicy::initialsFor($seguradoraNome) }}
-                                                            </span>
+                                                            <x-insurer-badge
+                                                                :initials="InsurancePolicy::initialsFor($seguradoraNome)"
+                                                                :color="\App\Models\Insurer::colorIn($insurerColors, $seguradoraNome)"
+                                                                :fallback="$badgeColors[InsurancePolicy::colorIndexFor($seguradoraNome, count($badgeColors))]"
+                                                                class="h-6 w-6 rounded-md text-[10px] font-semibold"
+                                                            />
                                                             <span class="text-sm font-medium text-slate-700 dark:text-slate-300">{{ $seguradoraNome }}</span>
                                                         </div>
 

@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Concerns\BelongsToProfileOrShared;
+use App\Models\Concerns\NormalizesNames;
 use App\Support\ProfileContext;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
@@ -25,7 +26,7 @@ use Illuminate\Database\Eloquent\Model;
 #[Fillable(['profile_id', 'name', 'color_hex', 'dismissed_at'])]
 class Bank extends Model
 {
-    use BelongsToProfileOrShared, HasFactory, HasUuids;
+    use BelongsToProfileOrShared, HasFactory, HasUuids, NormalizesNames;
 
     protected function casts(): array
     {
@@ -127,15 +128,6 @@ class Bank extends Model
 
     private static function normalize(string $name): string
     {
-        $semAcento = strtr(mb_strtolower(trim($name)), [
-            'á' => 'a', 'à' => 'a', 'ã' => 'a', 'â' => 'a',
-            'é' => 'e', 'ê' => 'e',
-            'í' => 'i',
-            'ó' => 'o', 'ô' => 'o', 'õ' => 'o',
-            'ú' => 'u', 'ü' => 'u',
-            'ç' => 'c',
-        ]);
-
-        return $semAcento;
+        return self::normalizeName($name);
     }
 }

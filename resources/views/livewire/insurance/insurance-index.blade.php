@@ -68,7 +68,12 @@
 
                 <div>
                     <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Seguradora</label>
-                    <input type="text" wire:model="policyInsurerName" class="input mt-1.5" placeholder="Ex.: Icatu Seguros">
+                    <input type="text" wire:model="policyInsurerName" list="known-insurers" class="input mt-1.5" placeholder="Ex.: Icatu Seguros">
+                    <datalist id="known-insurers">
+                        @foreach ($knownInsurers as $nomeSeguradora)
+                            <option value="{{ $nomeSeguradora }}"></option>
+                        @endforeach
+                    </datalist>
                     @error('policyInsurerName') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
                 </div>
 
@@ -254,12 +259,12 @@
                                             <div class="overflow-hidden rounded-xl border border-slate-100 dark:border-white/10">
                                                 <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 bg-slate-50/60 px-4 py-2.5 dark:border-white/10 dark:bg-white/5">
                                                     <div class="flex items-center gap-3">
-                                                        <div @class([
-                                                            'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg font-display text-xs font-semibold text-white',
-                                                            $badgeColors[$apolicesDaSeguradora->first()->insurerColorIndex(count($badgeColors))],
-                                                        ])>
-                                                            {{ $apolicesDaSeguradora->first()->insurerInitials() }}
-                                                        </div>
+                                                        <x-insurer-badge
+                                                            :initials="$apolicesDaSeguradora->first()->insurerInitials()"
+                                                            :color="\App\Models\Insurer::colorIn($insurerColors, $seguradoraNome)"
+                                                            :fallback="$badgeColors[$apolicesDaSeguradora->first()->insurerColorIndex(count($badgeColors))]"
+                                                            class="h-8 w-8 rounded-lg font-display text-xs font-semibold"
+                                                        />
                                                         <p class="text-sm font-semibold text-slate-900 dark:text-white">{{ $seguradoraNome }}</p>
                                                     </div>
                                                 </div>

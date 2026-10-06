@@ -21,6 +21,8 @@ use App\Http\Controllers\PwaController;
 use App\Http\Controllers\ThemePreferenceController;
 use App\Livewire\Accounts\AccountsIndex;
 use App\Livewire\Admin\AdminBanks;
+use App\Livewire\Admin\AdminExercises;
+use App\Livewire\Admin\AdminInsurers;
 use App\Livewire\Admin\AdminUsers;
 use App\Livewire\Accounts\InvoiceShow;
 use App\Livewire\CashFlow\CashFlowIndex;
@@ -191,6 +193,8 @@ Route::middleware(['auth', 'verified'])->group(function (): void {
     // mount() do componente, mesmo padrão de PortfolioOverview::mount().
     Route::get('/admin', AdminUsers::class)->name('admin.users');
     Route::get('/admin/bancos', AdminBanks::class)->name('admin.banks');
+    Route::get('/admin/seguradoras', AdminInsurers::class)->name('admin.insurers');
+    Route::get('/admin/exercicios', AdminExercises::class)->name('admin.exercises');
 
     // "Entrar como" começa dentro do componente Livewire (AdminUsers::
     // entrarComo, Auth::login direto); só o "voltar" precisa de rota —

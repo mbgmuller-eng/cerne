@@ -157,9 +157,12 @@ class GymPlanEditor extends Component
         }
 
         $nome = trim($this->exName);
+        // Comparação sem caixa e sem acento ("agachamento" acha "Agachamento"),
+        // feita em PHP: não depende da collation do banco.
+        $procurado = GymExerciseCatalog::normalizeName($nome);
         $catalogo = $nome === ''
             ? null
-            : GymExerciseCatalog::query()->active()->whereRaw('LOWER(name) = ?', [mb_strtolower($nome)])->first();
+            : GymExerciseCatalog::query()->active()->get()->first(fn (GymExerciseCatalog $c): bool => GymExerciseCatalog::normalizeName($c->name) === $procurado);
 
         if ($catalogo === null) {
             $this->catalogMatchId = null;
@@ -226,6 +229,7 @@ class GymPlanEditor extends Component
                 $this->exName,
                 GymMuscleGroup::from($this->exGroup),
                 GymMeasureType::from($this->exType),
+                sugerirAoCatalogo: true,
             );
             $service->addExercise($workout, $exercise, $meta);
 

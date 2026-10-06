@@ -7,6 +7,7 @@ use App\Enums\GymMuscleGroup;
 use App\Models\GymEquipment;
 use App\Models\GymExercise;
 use App\Models\GymExerciseCatalog;
+use App\Models\GymExerciseSuggestion;
 use App\Models\GymPlan;
 use App\Models\GymSession;
 use App\Models\GymWorkout;
@@ -83,14 +84,30 @@ class GymPlanService
         $this->move($workout, GymWorkout::query()->where('plan_id', $workout->plan_id), $direction);
     }
 
-    public function findOrCreateExercise(string $name, GymMuscleGroup $group, GymMeasureType $type): GymExercise
+    /**
+     * `$sugerirAoCatalogo` só é ligado pela tela de montar o treino: exercício
+     * NOVO que não existe no catálogo compartilhado entra na fila anônima do
+     * admin (GymExerciseSuggestion). A importação de histórico não liga —
+     * uma planilha com dezenas de nomes soltos inundaria a fila.
+     */
+    public function findOrCreateExercise(string $name, GymMuscleGroup $group, GymMeasureType $type, bool $sugerirAoCatalogo = false): GymExercise
     {
         $name = trim($name);
 
         // O nome é único por pessoa (índice); reaproveitar em vez de falhar
         // faz "Supino reto" digitado de novo apontar pro mesmo exercício.
-        return GymExercise::query()->where('name', $name)->first()
-            ?? GymExercise::create(['name' => $name, 'muscle_group' => $group, 'measure_type' => $type]);
+        $existente = GymExercise::query()->where('name', $name)->first();
+        if ($existente !== null) {
+            return $existente;
+        }
+
+        $exercicio = GymExercise::create(['name' => $name, 'muscle_group' => $group, 'measure_type' => $type]);
+
+        if ($sugerirAoCatalogo) {
+            GymExerciseSuggestion::record($name, $group, $type);
+        }
+
+        return $exercicio;
     }
 
     public function findOrCreateEquipment(?string $name): ?GymEquipment

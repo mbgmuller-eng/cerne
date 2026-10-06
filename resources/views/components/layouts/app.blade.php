@@ -187,10 +187,6 @@
             'direta' => count($secao['items']) === 1,
         ])
         ->all();
-    $navAdmin = [
-        ['admin.users', 'Contas e perfis', 'Contas', 'admin'],
-        ['admin.banks', 'Bancos', 'Bancos', 'cards'],
-    ];
     // Quem é profissional E administrador precisa de um caminho de volta
     // óbvio pra área de trabalho dele: fica em destaque, fora da lista de
     // telas da plataforma (que são de outra natureza).
@@ -206,6 +202,17 @@
     // Só conta se for mesmo relevante — poupa uma query em toda página
     // pra quem não é admin.
     $bancosPendentes = $user?->isPlatformAdmin() ? \App\Models\Bank::withoutTaxonomyScope()->pending()->count() : 0;
+    $seguradorasPendentes = $user?->isPlatformAdmin() ? \App\Models\Insurer::withoutTaxonomyScope()->pending()->count() : 0;
+    $exerciciosPendentes = $user?->isPlatformAdmin() ? \App\Models\GymExerciseSuggestion::query()->pending()->count() : 0;
+    // Cadastros da plataforma (admin): catálogos compartilhados, cada um com a
+    // fila de sugestões dos usuários. Última posição = pendências.
+    $cadastrosAdmin = [
+        ['admin.banks', 'Bancos', 'Bancos', 'cards', $bancosPendentes],
+        ['admin.insurers', 'Seguradoras', 'Seguradoras', 'shield', $seguradorasPendentes],
+        ['admin.exercises', 'Exercícios', 'Exercícios', 'dumbbell', $exerciciosPendentes],
+    ];
+    $cadastrosPendentes = $bancosPendentes + $seguradorasPendentes + $exerciciosPendentes;
+    $cadastrosAtivo = collect($cadastrosAdmin)->contains(fn (array $item) => request()->routeIs($item[0]));
 
     // Preferência de tema da CONTA, não do navegador — ver
     // App\Enums\ThemePreference e resources/js/app.js.
@@ -447,13 +454,19 @@
                         <x-nav-icon name="admin" />
                         <span>Contas e perfis</span>
                     </a>
-                    <a href="{{ route('admin.banks') }}" @class(['nav-item', 'nav-item-active' => request()->routeIs('admin.banks')])>
-                        <x-nav-icon name="cards" />
-                        <span>Bancos</span>
-                        @if ($bancosPendentes > 0)
-                            <span class="badge ml-auto bg-amber-50 text-amber-900 ring-1 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-300 dark:ring-amber-500/20">{{ $bancosPendentes }}</span>
-                        @endif
-                    </a>
+                </div>
+
+                <p class="mt-5 px-3 pb-1 text-[10px] font-semibold tracking-wide text-slate-400 uppercase dark:text-slate-500">Cadastros</p>
+                <div class="space-y-0.5">
+                    @foreach ($cadastrosAdmin as [$route, $label, $curto, $icone, $pendentes])
+                        <a href="{{ route($route) }}" @class(['nav-item', 'nav-item-active' => request()->routeIs($route)])>
+                            <x-nav-icon :name="$icone" />
+                            <span>{{ $label }}</span>
+                            @if ($pendentes > 0)
+                                <span class="badge ml-auto bg-amber-50 text-amber-900 ring-1 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-300 dark:ring-amber-500/20">{{ $pendentes }}</span>
+                            @endif
+                        </a>
+                    @endforeach
                 </div>
             </nav>
 
@@ -747,28 +760,78 @@
         </nav>
     </div>
 @elseif ($areaAdmin)
-    <nav
-        class="fixed inset-x-0 bottom-0 z-30 flex border-t border-brand-950/5 bg-white/95 backdrop-blur transform-gpu will-change-transform lg:hidden dark:border-white/10 dark:bg-slate-900/95"
-        style="padding-bottom: env(safe-area-inset-bottom)"
-    >
-        @foreach ($navAdmin as [$route, $label, $curto, $icone])
-            <a href="{{ route($route) }}" @class(['tab-item', 'tab-item-active' => request()->routeIs($route)])>
-                <x-nav-icon :name="$icone" class="h-6 w-6" />
-                <span>{{ $curto }}</span>
+    <div class="fixed inset-x-0 bottom-0 z-30 lg:hidden transform-gpu will-change-transform">
+        {{-- Gaveta de Cadastros: mesmo desenho da barra do profissional. --}}
+        <div
+            x-show="secao !== null"
+            x-transition.opacity
+            x-cloak
+            @click="secao = null"
+            class="fixed inset-0 bg-brand-950/30 backdrop-blur-sm"
+        ></div>
+        <div
+            x-show="secao !== null"
+            x-transition:enter="transition ease-out duration-200"
+            x-transition:enter-start="translate-y-full"
+            x-transition:enter-end="translate-y-0"
+            x-transition:leave="transition ease-in duration-150"
+            x-transition:leave-start="translate-y-0"
+            x-transition:leave-end="translate-y-full"
+            x-cloak
+            class="relative rounded-t-3xl border-t border-brand-950/5 bg-white px-4 pt-3 pb-4 shadow-[0_-8px_32px_-8px_rgb(11_29_58_/_0.2)] dark:border-white/10 dark:bg-slate-900"
+        >
+            <div class="mx-auto mb-3 h-1 w-10 rounded-full bg-slate-200 dark:bg-white/20"></div>
+            <div x-show="secao === 'cadastros'" x-cloak class="pb-1">
+                <p class="px-1 pb-2 text-[10px] font-semibold tracking-wide text-slate-400 uppercase dark:text-slate-500">Cadastros</p>
+                <div class="grid grid-cols-3 gap-1">
+                    @foreach ($cadastrosAdmin as [$route, $label, $curto, $icone, $pendentes])
+                        <a href="{{ route($route) }}" @class(['tab-item relative rounded-xl py-3', 'tab-item-active bg-slate-100 dark:bg-white/10' => request()->routeIs($route)])>
+                            <x-nav-icon :name="$icone" class="h-6 w-6" />
+                            <span>{{ $curto }}</span>
+                            @if ($pendentes > 0)
+                                <span class="badge absolute top-1 right-3 bg-amber-50 text-amber-900 ring-1 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-300 dark:ring-amber-500/20">{{ $pendentes }}</span>
+                            @endif
+                        </a>
+                    @endforeach
+                </div>
+            </div>
+        </div>
+
+        <nav
+            data-barra-admin
+            class="relative flex border-t border-brand-950/5 bg-white/95 backdrop-blur dark:border-white/10 dark:bg-slate-900/95"
+            style="padding-bottom: env(safe-area-inset-bottom)"
+        >
+            <a href="{{ route('admin.users') }}" @class(['tab-item', 'tab-item-active' => request()->routeIs('admin.users')])>
+                <x-nav-icon name="admin" class="h-6 w-6" />
+                <span>Contas</span>
             </a>
-        @endforeach
-        {{-- Volta pra área de trabalho: separado das telas da plataforma. --}}
-        @if ($voltarAoPainel)
-            <a href="{{ route($voltarAoPainel['rota']) }}" class="tab-item border-l border-brand-950/10 dark:border-white/10">
-                <x-nav-icon name="back" class="h-6 w-6" />
-                <span>{{ $voltarAoPainel['curto'] }}</span>
+            <button
+                type="button"
+                @click="secao = secao === 'cadastros' ? null : 'cadastros'"
+                @class(['tab-item relative', 'tab-item-active' => $cadastrosAtivo])
+                :class="secao === 'cadastros' ? 'text-brand-700 dark:text-accent-400' : ''"
+                :aria-expanded="secao === 'cadastros'"
+            >
+                <x-nav-icon name="folder" class="h-6 w-6" />
+                <span>Cadastros</span>
+                @if ($cadastrosPendentes > 0)
+                    <span class="absolute top-1.5 right-1/4 h-2 w-2 rounded-full bg-amber-500" aria-label="Há sugestões pendentes"></span>
+                @endif
+            </button>
+            {{-- Volta pra área de trabalho: separado das telas da plataforma. --}}
+            @if ($voltarAoPainel)
+                <a href="{{ route($voltarAoPainel['rota']) }}" class="tab-item border-l border-brand-950/10 dark:border-white/10">
+                    <x-nav-icon name="back" class="h-6 w-6" />
+                    <span>{{ $voltarAoPainel['curto'] }}</span>
+                </a>
+            @endif
+            <a href="{{ route('my-account') }}" @class(['tab-item', 'tab-item-active' => request()->routeIs('my-account')])>
+                <x-nav-icon name="users" class="h-6 w-6" />
+                <span>Minha conta</span>
             </a>
-        @endif
-        <a href="{{ route('my-account') }}" @class(['tab-item', 'tab-item-active' => request()->routeIs('my-account')])>
-            <x-nav-icon name="users" class="h-6 w-6" />
-            <span>Minha conta</span>
-        </a>
-    </nav>
+        </nav>
+    </div>
 @endif
 
 <script>

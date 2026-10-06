@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Enums\GymMeasureType;
 use App\Enums\GymMuscleGroup;
 use App\Models\Concerns\BelongsToProfileOrShared;
+use App\Models\Concerns\NormalizesNames;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
@@ -25,7 +26,7 @@ use Illuminate\Database\Eloquent\Model;
 ])]
 class GymExerciseCatalog extends Model
 {
-    use BelongsToProfileOrShared, HasUuids;
+    use BelongsToProfileOrShared, HasUuids, NormalizesNames;
 
     // Eloquent pluralizaria pra "gym_exercise_catalogs" — é UM catálogo só,
     // não vários; mesmo raciocínio de GymEquipment::$table.

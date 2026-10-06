@@ -7,6 +7,7 @@ use App\Models\Concerns\BelongsToProfileOrShared;
 use App\Models\ConsultantClient;
 use App\Models\ConsultantInvite;
 use App\Models\FinancialProfile;
+use App\Models\GymExerciseSuggestion;
 use App\Models\InsurancePolicyRenewal;
 use App\Models\Lead;
 use App\Models\LeadActivity;
@@ -42,6 +43,9 @@ class TenancyCoverageTest extends TestCase
         Subscription::class => 'assinatura é do usuário (user_id) — não existe por perfil',
         SubscriptionNotice::class => 'registro de aviso de cobrança já enviado — sustenta um índice único (assinatura, tipo, data), pertence à assinatura do usuário, não a um perfil',
         SubscriptionWebhookEvent::class => 'log de idempotência do webhook da Asaas — só existe pra sustentar um índice único em asaas_event_id, nunca consultado por perfil nenhum',
+
+        // Treino é dado de Saúde: a fila de sugestões ao catálogo é anônima por desenho.
+        GymExerciseSuggestion::class => 'fila anônima de sugestões de exercício ao catálogo — de propósito NÃO guarda perfil, membro nem usuário (treino é dado de Saúde); só nome, grupo, tipo e contador',
 
         // Vínculos consultor-cliente: ligam dois usuários, sem profile_id.
         ConsultantClient::class => 'liga consultor e cliente por user_id — não tem profile_id',
