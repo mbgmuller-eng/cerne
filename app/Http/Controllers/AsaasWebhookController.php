@@ -16,8 +16,14 @@ class AsaasWebhookController extends Controller
 {
     public function handle(Request $request, SubscriptionWebhookService $webhooks): Response
     {
+        $esperado = (string) config('services.asaas.webhook_token');
+
+        // Token não configurado = webhook desligado. Sem esta guarda,
+        // hash_equals('', '') é verdadeiro e uma chamada SEM header passaria.
+        abort_if($esperado === '', 403);
+
         abort_unless(
-            hash_equals((string) config('services.asaas.webhook_token'), (string) $request->header('asaas-access-token')),
+            hash_equals($esperado, (string) $request->header('asaas-access-token')),
             403,
         );
 

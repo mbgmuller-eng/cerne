@@ -38,6 +38,15 @@ class SubscriptionWebhookTest extends TestCase
             ->assertForbidden();
     }
 
+    public function test_token_nao_configurado_no_servidor_fecha_o_webhook_mesmo_sem_header(): void
+    {
+        config(['services.asaas.webhook_token' => '']);
+
+        $this->postJson(route('webhooks.asaas'), ['event' => 'PAYMENT_CONFIRMED'])->assertForbidden();
+        $this->postJson(route('webhooks.asaas'), ['event' => 'PAYMENT_CONFIRMED'], ['asaas-access-token' => ''])->assertForbidden();
+        $this->postJson(route('webhooks.asaas'), ['event' => 'PAYMENT_CONFIRMED'], ['asaas-access-token' => 'qualquer'])->assertForbidden();
+    }
+
     public function test_sem_token_da_403(): void
     {
         $this->postJson(route('webhooks.asaas'), ['event' => 'PAYMENT_CONFIRMED'])

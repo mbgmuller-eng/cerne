@@ -73,6 +73,14 @@ class ProductionCheck extends Command
             'public'
         ), 'Extrato bancário em pasta pública é acessível por URL.');
 
+        $this->secao('Cobrança (Asaas)');
+        $this->item('ASAAS_API_KEY configurada', filled(config('services.asaas.api_key')),
+            'Sem ela ninguém consegue assinar: a criação do cliente e da assinatura na Asaas falha.', aviso: true);
+        $this->item('API da Asaas é a de produção', blank(config('services.asaas.api_key')) || ! str_contains((string) config('services.asaas.base_url'), 'sandbox'),
+            'A chave está preenchida mas a URL ainda é a do Sandbox: as cobranças seriam de teste, sem dinheiro real. Use https://api.asaas.com/v3.');
+        $this->item('Token do webhook definido', blank(config('services.asaas.api_key')) || filled(config('services.asaas.webhook_token')),
+            'Com a chave preenchida e sem token, o webhook recusa todos os avisos de pagamento e ninguém seria liberado.');
+
         $this->secao('Notificações');
         $this->item('Chaves VAPID configuradas', filled(config('webpush.vapid.public_key')) && filled(config('webpush.vapid.private_key')),
             'Sem elas, notificação push falha silenciosamente mesmo com o usuário inscrito.', aviso: true);
