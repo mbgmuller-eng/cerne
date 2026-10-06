@@ -139,27 +139,54 @@
     $dentroDoPerfil = $profile && ! $areaConsultor && ! $areaAdmin;
     $mostraAsideDesktop = $dentroDoPerfil || $areaConsultor || $areaAdmin;
 
-    // Nav da barra inferior nas áreas de consultor/admin — cabe tudo
-    // direto, sem gaveta "Mais" (são poucas telas, ao contrário do menu
-    // de dentro do perfil). Mesmos itens da <aside> de desktop de cada
-    // área, só que achatados pra caber embaixo.
-    // Corretor não tem Painel da carteira nem Investimentos — são telas
-    // financeiras. A dele é só Seguros da carteira + Leads.
-    $navConsultor = $user?->isBroker() ? [
-        ['consultant.portfolio.insurance', 'Seguros da carteira', 'Seguros', 'shield'],
-        ['consultant.portfolio.important-dates', 'Datas importantes', 'Datas', 'bell'],
-        ['consultant.leads', 'Leads', 'Leads', 'contact'],
-    ] : [
-        ['consultant.portfolio', 'Painel da carteira', 'Carteira', 'invest'],
-        ['consultant.portfolio.insurance', 'Seguros da carteira', 'Seguros', 'shield'],
-        ['consultant.portfolio.investments', 'Investimentos da carteira', 'Invest.', 'flow'],
-        ['consultant.portfolio.important-dates', 'Datas importantes', 'Datas', 'bell'],
-        ['consultant.leads', 'Leads', 'Leads', 'contact'],
-    ];
-    if ($user?->isPlatformAdmin()) {
-        $navConsultor[] = ['admin.users', 'Painel admin', 'Admin', 'admin'];
+    // Menu do profissional, em grupos por tipo de trabalho:
+    //  - Consultoria: carteira e investimentos, tela financeira (só consultor);
+    //  - Seguros: o corretor trabalha aqui e o consultor também enxerga;
+    //  - Gestão: datas importantes e leads, rotina comum a todo profissional
+    //    (inclusive os de saúde, quando chegarem);
+    //  - Plataforma: o painel admin, só pra conta de administrador, fora dos
+    //    grupos de propósito: não é parte do trabalho com clientes.
+    $secoesProfissional = array_values(array_filter([
+        $user?->isBroker() ? null : [
+            'chave' => 'consultoria', 'label' => 'Consultoria', 'icone' => 'invest',
+            'items' => [
+                ['consultant.portfolio', 'Painel da carteira', 'Carteira', 'invest'],
+                ['consultant.portfolio.investments', 'Investimentos da carteira', 'Invest.', 'flow'],
+            ],
+        ],
+        [
+            'chave' => 'seguros', 'label' => 'Seguros', 'icone' => 'shield',
+            'items' => [['consultant.portfolio.insurance', 'Seguros da carteira', 'Seguros', 'shield']],
+        ],
+        [
+            'chave' => 'gestao', 'label' => 'Gestão', 'icone' => 'calendar',
+            'items' => [
+                ['consultant.portfolio.important-dates', 'Datas importantes', 'Datas', 'bell'],
+                ['consultant.leads', 'Leads', 'Leads', 'contact'],
+            ],
+        ],
+    ]));
+    $secaoPlataforma = $user?->isPlatformAdmin() ? [
+        'chave' => 'plataforma', 'label' => 'Plataforma', 'icone' => 'admin',
+        'items' => [['admin.users', 'Painel admin', 'Admin', 'admin']],
+    ] : null;
+
+    // Lista achatada: o cabeçalho compacto e o rodapé do menu de dentro do
+    // perfil só precisam dos atalhos, sem agrupamento.
+    $navConsultor = collect($secoesProfissional)->flatMap(fn (array $secao) => $secao['items'])->all();
+    if ($secaoPlataforma) {
+        $navConsultor[] = $secaoPlataforma['items'][0];
     }
 
+    // Barra inferior do profissional no celular: uma aba por grupo, gaveta
+    // quando o grupo tem mais de uma tela (mesmo desenho da barra do
+    // cliente, ver $abasInferiores).
+    $abasProfissional = collect([...$secoesProfissional, ...($secaoPlataforma ? [$secaoPlataforma] : [])])
+        ->map(fn (array $secao) => $secao + [
+            'ativa' => collect($secao['items'])->contains(fn (array $item) => request()->routeIs($item[0])),
+            'direta' => count($secao['items']) === 1,
+        ])
+        ->all();
     $navAdmin = [
         ['admin.users', 'Contas e perfis', 'Contas', 'admin'],
         ['admin.banks', 'Bancos', 'Bancos', 'cards'],
@@ -331,21 +358,34 @@
                 <p class="mt-1 truncate text-xs text-slate-500 dark:text-slate-400">{{ $user?->isBroker() ? 'Painel do corretor' : 'Painel do consultor' }}</p>
             </div>
 
-            <nav class="flex-1 space-y-0.5 overflow-y-auto px-3">
-                @foreach ($navConsultor as [$route, $label, $curto, $icone])
-                    @if ($route !== 'admin.users')
-                        <a href="{{ route($route) }}" @class(['nav-item', 'nav-item-active' => request()->routeIs($route)])>
-                            <x-nav-icon :name="$icone" />
-                            <span>{{ $label }}</span>
-                        </a>
-                    @endif
+            <nav class="flex flex-1 flex-col overflow-y-auto px-3">
+                @foreach ($secoesProfissional as $secao)
+                    <div @class(['pt-5' => ! $loop->first])>
+                        <p class="px-3 pb-1 text-[10px] font-semibold tracking-wide text-slate-400 uppercase dark:text-slate-500">{{ $secao['label'] }}</p>
+                        <div class="space-y-0.5">
+                            @foreach ($secao['items'] as [$route, $label, $curto, $icone])
+                                <a href="{{ route($route) }}" @class(['nav-item', 'nav-item-active' => request()->routeIs($route)])>
+                                    <x-nav-icon :name="$icone" />
+                                    <span>{{ $label }}</span>
+                                </a>
+                            @endforeach
+                        </div>
+                    </div>
                 @endforeach
 
-                @if ($user->isPlatformAdmin())
-                    <a href="{{ route('admin.users') }}" class="nav-item mt-1">
-                        <x-nav-icon name="admin" />
-                        <span>Painel admin</span>
-                    </a>
+                {{-- Só a conta de administrador: separado dos grupos e no fim. --}}
+                @if ($secaoPlataforma)
+                    <div class="mt-auto pt-6">
+                        <div class="border-t border-brand-950/5 pt-4 dark:border-white/10">
+                            <p class="px-3 pb-1 text-[10px] font-semibold tracking-wide text-slate-400 uppercase dark:text-slate-500">{{ $secaoPlataforma['label'] }}</p>
+                            @foreach ($secaoPlataforma['items'] as [$route, $label, $curto, $icone])
+                                <a href="{{ route($route) }}" class="nav-item">
+                                    <x-nav-icon :name="$icone" />
+                                    <span>{{ $label }}</span>
+                                </a>
+                            @endforeach
+                        </div>
+                    </div>
                 @endif
             </nav>
 
@@ -626,22 +666,74 @@
         </nav>
     </div>
 @elseif ($areaConsultor)
-    {{-- Poucas telas nesta área — cabem direto, sem gaveta "Mais". --}}
-    <nav
-        class="fixed inset-x-0 bottom-0 z-30 flex overflow-x-auto border-t border-brand-950/5 bg-white/95 backdrop-blur transform-gpu will-change-transform lg:hidden dark:border-white/10 dark:bg-slate-900/95"
-        style="padding-bottom: env(safe-area-inset-bottom)"
-    >
-        @foreach ($navConsultor as [$route, $label, $curto, $icone])
-            <a href="{{ route($route) }}" @class(['tab-item', 'tab-item-active' => request()->routeIs($route)])>
-                <x-nav-icon :name="$icone" class="h-6 w-6" />
-                <span>{{ $curto }}</span>
+    <div class="fixed inset-x-0 bottom-0 z-30 lg:hidden transform-gpu will-change-transform">
+        {{-- Gaveta do grupo tocado --}}
+        <div
+            x-show="secao !== null"
+            x-transition.opacity
+            x-cloak
+            @click="secao = null"
+            class="fixed inset-0 bg-brand-950/30 backdrop-blur-sm"
+        ></div>
+        <div
+            x-show="secao !== null"
+            x-transition:enter="transition ease-out duration-200"
+            x-transition:enter-start="translate-y-full"
+            x-transition:enter-end="translate-y-0"
+            x-transition:leave="transition ease-in duration-150"
+            x-transition:leave-start="translate-y-0"
+            x-transition:leave-end="translate-y-full"
+            x-cloak
+            class="relative rounded-t-3xl border-t border-brand-950/5 bg-white px-4 pt-3 pb-4 shadow-[0_-8px_32px_-8px_rgb(11_29_58_/_0.2)] dark:border-white/10 dark:bg-slate-900"
+        >
+            <div class="mx-auto mb-3 h-1 w-10 rounded-full bg-slate-200 dark:bg-white/20"></div>
+            @foreach ($abasProfissional as $aba)
+                @unless ($aba['direta'])
+                    <div x-show="secao === '{{ $aba['chave'] }}'" x-cloak class="pb-1">
+                        <p class="px-1 pb-2 text-[10px] font-semibold tracking-wide text-slate-400 uppercase dark:text-slate-500">{{ $aba['label'] }}</p>
+                        <div class="grid grid-cols-4 gap-1">
+                            @foreach ($aba['items'] as [$route, $label, $curto, $icone])
+                                <a href="{{ route($route) }}" @class(['tab-item rounded-xl py-3', 'tab-item-active bg-slate-100 dark:bg-white/10' => request()->routeIs($route)])>
+                                    <x-nav-icon :name="$icone" class="h-6 w-6" />
+                                    <span>{{ $curto }}</span>
+                                </a>
+                            @endforeach
+                        </div>
+                    </div>
+                @endunless
+            @endforeach
+        </div>
+
+        {{-- Abas --}}
+        <nav
+            class="relative flex border-t border-brand-950/5 bg-white/95 backdrop-blur dark:border-white/10 dark:bg-slate-900/95"
+            style="padding-bottom: env(safe-area-inset-bottom)"
+        >
+            @foreach ($abasProfissional as $aba)
+                @if ($aba['direta'])
+                    <a href="{{ route($aba['items'][0][0]) }}" @class(['tab-item', 'tab-item-active' => $aba['ativa']])>
+                        <x-nav-icon :name="$aba['icone']" class="h-6 w-6" />
+                        <span>{{ $aba['label'] }}</span>
+                    </a>
+                @else
+                    <button
+                        type="button"
+                        @click="secao = secao === '{{ $aba['chave'] }}' ? null : '{{ $aba['chave'] }}'"
+                        @class(['tab-item', 'tab-item-active' => $aba['ativa']])
+                        :class="secao === '{{ $aba['chave'] }}' ? 'text-brand-700 dark:text-accent-400' : ''"
+                        :aria-expanded="secao === '{{ $aba['chave'] }}'"
+                    >
+                        <x-nav-icon :name="$aba['icone']" class="h-6 w-6" />
+                        <span>{{ $aba['label'] }}</span>
+                    </button>
+                @endif
+            @endforeach
+            <a href="{{ route('my-account') }}" @class(['tab-item', 'tab-item-active' => request()->routeIs('my-account')])>
+                <x-nav-icon name="users" class="h-6 w-6" />
+                <span>Minha conta</span>
             </a>
-        @endforeach
-        <a href="{{ route('my-account') }}" @class(['tab-item', 'tab-item-active' => request()->routeIs('my-account')])>
-            <x-nav-icon name="users" class="h-6 w-6" />
-            <span>Minha conta</span>
-        </a>
-    </nav>
+        </nav>
+    </div>
 @elseif ($areaAdmin)
     <nav
         class="fixed inset-x-0 bottom-0 z-30 flex overflow-x-auto border-t border-brand-950/5 bg-white/95 backdrop-blur transform-gpu will-change-transform lg:hidden dark:border-white/10 dark:bg-slate-900/95"
