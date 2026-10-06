@@ -218,4 +218,6 @@
 
     @include('livewire.profile.partials.notifications')
 
+    @include('livewire.profile.partials.logout-mobile')
+
 </div>

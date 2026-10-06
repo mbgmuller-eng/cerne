@@ -559,7 +559,11 @@
                             ])>{{ $user?->isBroker() ? 'corretor' : 'consultor' }}</span>
                         @endif
 
-                        @if ($user?->isLinkedProfessional())
+                        {{-- Os atalhos de tela só valem DENTRO do perfil de um cliente
+                             (único jeito de voltar à área do profissional no celular).
+                             Na área do profissional e no admin a barra inferior já
+                             traz todas essas telas — repetir aqui só duplicava. --}}
+                        @if ($user?->isLinkedProfessional() && ! $areaConsultor && ! $areaAdmin)
                             @foreach ($navConsultor as [$route, $label, $curto, $icone])
                                 @if ($route !== 'admin.users')
                                     <a href="{{ route($route) }}" @class(['btn-ghost', '!text-white/60' => $dentroDoPerfil]) title="{{ $label }}">
@@ -570,7 +574,7 @@
                             @endforeach
                         @endif
 
-                        @if ($user?->isPlatformAdmin())
+                        @if ($user?->isPlatformAdmin() && ! $areaConsultor && ! $areaAdmin)
                             <a href="{{ route('admin.users') }}" @class(['btn-ghost', '!text-white/60' => $dentroDoPerfil]) title="Painel admin">
                                 <x-nav-icon name="admin" class="h-4 w-4" />
                                 <span class="ml-1.5 hidden sm:inline">Admin</span>
@@ -579,13 +583,17 @@
 
                         <x-theme-switcher :current="$theme" />
 
-                        <form method="POST" action="{{ route('logout') }}">
-                            @csrf
-                            <button type="submit" @class(['btn-ghost', '!text-white/60' => $dentroDoPerfil]) title="Sair">
-                                <x-nav-icon name="logout" class="h-4 w-4" />
-                                <span class="ml-1.5 hidden sm:inline">Sair</span>
-                            </button>
-                        </form>
+                        {{-- Na área do profissional e no admin o Sair mora em Minha conta
+                             (no PC, na lateral): o cabeçalho fica só com o essencial. --}}
+                        @unless ($areaConsultor || $areaAdmin)
+                            <form method="POST" action="{{ route('logout') }}">
+                                @csrf
+                                <button type="submit" @class(['btn-ghost', '!text-white/60' => $dentroDoPerfil]) title="Sair">
+                                    <x-nav-icon name="logout" class="h-4 w-4" />
+                                    <span class="ml-1.5 hidden sm:inline">Sair</span>
+                                </button>
+                            </form>
+                        @endunless
                     </div>
 
                     @auth
