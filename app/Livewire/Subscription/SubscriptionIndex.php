@@ -6,6 +6,7 @@ use App\Enums\PaymentMethod;
 use App\Enums\SubscriptionBundle;
 use App\Enums\SubscriptionKind;
 use App\Enums\SubscriptionStatus;
+use App\Exceptions\AsaasBillingTypeMismatch;
 use App\Models\Subscription;
 use App\Rules\CpfCnpj;
 use App\Services\AsaasClient;
@@ -166,7 +167,18 @@ class SubscriptionIndex extends Component
             return;
         }
         $customerId = $asaas->findOrCreateCustomer($usuario->fresh());
-        $resultado = $asaas->createSubscription($customerId, $pacote, $metodo, "Cerne — {$pacote->label()}", $teto);
+
+        try {
+            $resultado = $asaas->createSubscription($customerId, $pacote, $metodo, "Cerne — {$pacote->label()}", $teto);
+        } catch (AsaasBillingTypeMismatch $e) {
+            // Já foi desfeita na Asaas: nenhuma cobrança fica de pé.
+            Log::error('Asaas: forma de pagamento diferente da pedida, assinatura desfeita', [
+                'user_id' => $usuario->id, 'pedido' => $e->pedido, 'recebido' => $e->recebido,
+            ]);
+            $this->addError('metodoPagamento', 'Não foi possível criar a assinatura com essa forma de pagamento agora. Nenhuma cobrança foi gerada. Tente novamente em instantes.');
+
+            return;
+        }
 
         Subscription::create([
             'user_id' => $usuario->id,
@@ -186,11 +198,9 @@ class SubscriptionIndex extends Component
 
         session()->forget('checkout');
 
-        if ($resultado['invoiceUrl'] !== null) {
-            return $this->redirect($resultado['invoiceUrl']);
-        }
-
-        session()->flash('status', 'Assinatura criada: 7 dias grátis para testar. Acompanhe o pagamento pelo e-mail da Asaas quando o teste acabar.');
+        // Sem redirecionar para a fatura: a primeira cobrança só vence no fim do
+        // teste, e abrir a fatura agora parecia cobrança imediata.
+        session()->flash('status', 'Assinatura criada: 7 dias grátis para testar. A primeira cobrança vence em '.now()->addDays(7)->format('d/m/Y').' e o link de pagamento chega por e-mail. Não há nada a pagar agora.');
     }
 
     /**

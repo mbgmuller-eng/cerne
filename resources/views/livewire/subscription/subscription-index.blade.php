@@ -234,9 +234,10 @@
 
             @if ($resumoDoPedido)
                 <button type="button" wire:click="assinar('{{ $souProfissional ? \App\Enums\SubscriptionBundle::Completo->value : $pacoteDoPedido->value }}')" wire:loading.attr="disabled" class="btn-primary w-full py-3 text-base">
-                    Confirmar e começar 7 dias grátis
+                    <span wire:loading.remove wire:target="assinar">Confirmar e começar 7 dias grátis</span>
+                    <span wire:loading wire:target="assinar">Criando a sua assinatura...</span>
                 </button>
-                <p class="text-center text-xs text-slate-400">Você será levado à fatura da Asaas. Nada é cobrado antes do fim do teste.</p>
+                <p class="text-center text-xs text-slate-400">Nada é cobrado agora. A primeira cobrança vence só no fim dos 7 dias grátis, e o link de pagamento chega por e-mail.</p>
                 <button type="button" wire:click="trocarPlano" class="mx-auto block text-xs text-brand-700 underline dark:text-brand-300">Escolher outro plano</button>
             @elseif ($souProfissional)
                 <div class="card flex items-center justify-between gap-4 p-5">
@@ -252,7 +253,8 @@
                         </p>
                     </div>
                     <button type="button" wire:click="assinar('{{ \App\Enums\SubscriptionBundle::Completo->value }}')" wire:loading.attr="disabled" class="btn-primary shrink-0">
-                        Assinar
+                        <span wire:loading.remove wire:target="assinar">Assinar</span>
+                        <span wire:loading wire:target="assinar">Criando...</span>
                     </button>
                 </div>
             @else
@@ -268,7 +270,8 @@
                                 <span class="text-xs font-normal text-slate-400">/mês</span>
                             </p>
                             <button type="button" wire:click="assinar('{{ $pacote->value }}')" wire:loading.attr="disabled" class="btn-primary w-full">
-                                Assinar
+                                <span wire:loading.remove wire:target="assinar">Assinar</span>
+                                <span wire:loading wire:target="assinar">Criando...</span>
                             </button>
                         </div>
                     @endforeach

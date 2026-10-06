@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Enums\PaymentMethod;
 use App\Enums\SubscriptionBundle;
+use App\Exceptions\AsaasBillingTypeMismatch;
 use App\Models\User;
 use App\Support\ProfessionalPricing;
 use Illuminate\Support\Facades\Http;
@@ -55,7 +56,20 @@ class AsaasClient
      * teto de clientes (ProfessionalPricing), sem olhar o pacote. Nulo =
      * assinatura direta, valor do pacote.
      *
-     * @return array{id: string, invoiceUrl: ?string}
+     * Devolve só o id: a pessoa NÃO é levada à fatura. A Asaas cria a primeira
+     * cobrança na hora, com vencimento em `nextDueDate` (confirmado em produção:
+     * mesmo com a data a 60 dias ela gera a cobrança já no ato), então abrir a
+     * fatura aqui parecia cobrança imediata. O link chega por e-mail (Asaas e
+     * lembretes do Cerne) perto do vencimento.
+     *
+     * Boleto NUNCA: a forma é sempre enviada explícita (PIX ou CREDIT_CARD) e a
+     * resposta é conferida. Se a Asaas devolver outra (aconteceu na primeira
+     * cobrança Pix da conta, enquanto a chave Pix ainda não estava ativa: saiu
+     * BOLETO), a assinatura é cancelada na hora, antes de qualquer cobrança
+     * ser paga, e a chamada falha.
+     *
+     * @return array{id: string}
+     * @throws AsaasBillingTypeMismatch
      */
     public function createSubscription(
         string $customerId,
@@ -77,10 +91,24 @@ class AsaasClient
             'description' => $descricao,
         ])->throw();
 
-        return [
-            'id' => $resposta->json('id'),
-            'invoiceUrl' => $this->firstInvoiceUrl($resposta->json('id')),
-        ];
+        $id = (string) $resposta->json('id');
+        $pedido = $metodoPagamento->asaasBillingType();
+        $recebido = (string) $resposta->json('billingType');
+
+        if ($recebido !== $pedido) {
+            try {
+                $this->cancelSubscription($id);
+            } catch (\Throwable $e) {
+                // Não dá pra seguir com uma assinatura de forma errada viva na Asaas: fica no log como crítico.
+                Log::critical('Asaas: assinatura criada com forma de pagamento errada e NÃO foi cancelada', [
+                    'subscription_id' => $id, 'pedido' => $pedido, 'recebido' => $recebido, 'erro' => $e->getMessage(),
+                ]);
+            }
+
+            throw new AsaasBillingTypeMismatch($pedido, $recebido);
+        }
+
+        return ['id' => $id];
     }
 
     /**
@@ -104,26 +132,8 @@ class AsaasClient
     }
 
     /**
-     * A assinatura em si não carrega invoiceUrl — é a primeira cobrança
-     * gerada por ela que tem. Busca a cobrança mais recente dessa
-     * assinatura pra mandar a pessoa direto pra fatura.
-     */
-    private function firstInvoiceUrl(string $asaasSubscriptionId): ?string
-    {
-        try {
-            $resposta = $this->request()->get("/subscriptions/{$asaasSubscriptionId}/payments")->throw();
-
-            return $resposta->json('data.0.invoiceUrl');
-        } catch (\Throwable $e) {
-            Log::warning('Asaas: não achou a fatura inicial da assinatura', ['subscription_id' => $asaasSubscriptionId, 'erro' => $e->getMessage()]);
-
-            return null;
-        }
-    }
-
-    /**
      * Link da cobrança PENDENTE mais recente — diferente de
-     * firstInvoiceUrl(), que sempre pega a primeira. Usado pelo lembrete
+     * o antigo link da primeira. Usado pelo lembrete
      * de Pix (SubscriptionReminderService), onde a cobrança relevante é a
      * do ciclo atual, não a do dia em que a assinatura nasceu.
      */
