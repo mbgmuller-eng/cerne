@@ -6,7 +6,6 @@ use App\Enums\PaymentMethod;
 use App\Enums\SubscriptionBundle;
 use App\Enums\SubscriptionKind;
 use App\Enums\SubscriptionStatus;
-use App\Exceptions\AsaasBillingTypeMismatch;
 use App\Models\Subscription;
 use App\Rules\CpfCnpj;
 use App\Services\AsaasClient;
@@ -123,14 +122,16 @@ class SubscriptionIndex extends Component
     }
 
     /**
-     * 7 dias grátis pra qualquer pacote, cartão ou Pix — ver
-     * AsaasClient::createSubscription(). Nenhum dos dois cobra sozinho
-     * hoje: a pessoa clica a fatura quando o teste acabar (ou antes, se
-     * quiser). Status nasce Trialing, não PastDue — isCurrent() já trata
-     * os dois igual, liberando acesso, mas Trialing é o que de fato
-     * aconteceu.
+     * 7 dias grátis pra qualquer pacote e forma de pagamento. NADA vai para a
+     * Asaas aqui: a Asaas cria a primeira cobrança no instante em que a
+     * assinatura nasce, então o cadastro só registra a escolha e o teste corre
+     * localmente. A assinatura é criada lá perto do fim do teste, com
+     * vencimento no último dia dele (SubscriptionBillingService), e no Pix
+     * Automático a pessoa gera o QR de autorização por esta tela
+     * (ativarDebitoAutomatico()). Status nasce Trialing e o acesso expira sozinho
+     * se ninguém pagar (Subscription::isCurrent()).
      */
-    public function assinar(string $bundle, AsaasClient $asaas)
+    public function assinar(string $bundle)
     {
         $data = $this->validate();
         $usuario = Auth::user();
@@ -145,40 +146,7 @@ class SubscriptionIndex extends Component
         // Só profissional escolhe teto — ver rules(), cliente Direct nunca
         // tem 'clientCap' no array validado.
         $teto = isset($data['clientCap']) ? (int) $data['clientCap'] : null;
-
-        // Pix Automático: o teste grátis corre só aqui. A autorização (cujo QR
-        // cobra o primeiro mês) é gerada quando a pessoa decide ativar, perto
-        // do fim do teste — ver ativarDebitoAutomatico().
-        if ($metodo === PaymentMethod::PixAutomatic) {
-            Subscription::create([
-                'user_id' => $usuario->id,
-                'kind' => $this->kind(),
-                'bundle' => $pacote,
-                'client_cap' => $teto,
-                'billing_type' => $metodo,
-                'status' => SubscriptionStatus::Trialing,
-                'current_period_ends_at' => now()->addDays(7),
-                'started_at' => now(),
-            ]);
-
-            session()->forget('checkout');
-            session()->flash('status', 'Assinatura criada: 7 dias grátis para testar. Perto do fim do teste, ative o débito automático por esta tela.');
-
-            return;
-        }
-        $customerId = $asaas->findOrCreateCustomer($usuario->fresh());
-
-        try {
-            $resultado = $asaas->createSubscription($customerId, $pacote, $metodo, "Cerne — {$pacote->label()}", $teto);
-        } catch (AsaasBillingTypeMismatch $e) {
-            // Já foi desfeita na Asaas: nenhuma cobrança fica de pé.
-            Log::error('Asaas: forma de pagamento diferente da pedida, assinatura desfeita', [
-                'user_id' => $usuario->id, 'pedido' => $e->pedido, 'recebido' => $e->recebido,
-            ]);
-            $this->addError('metodoPagamento', 'Não foi possível criar a assinatura com essa forma de pagamento agora. Nenhuma cobrança foi gerada. Tente novamente em instantes.');
-
-            return;
-        }
+        $fimDoTeste = now()->addDays(7);
 
         Subscription::create([
             'user_id' => $usuario->id,
@@ -187,22 +155,18 @@ class SubscriptionIndex extends Component
             'client_cap' => $teto,
             'billing_type' => $metodo,
             'status' => SubscriptionStatus::Trialing,
-            // Fim do teste grátis — mesmo campo que current_period_ends_at
-            // sempre teve, só que agora nasce preenchido em vez de nulo.
-            // O webhook de pagamento confirmado sobrescreve isso a cada
-            // ciclo normalmente.
-            'current_period_ends_at' => now()->addDays(7),
-            'asaas_subscription_id' => $resultado['id'],
+            // Último dia do teste grátis: é o vencimento da primeira cobrança.
+            // O webhook de pagamento confirmado sobrescreve isso a cada ciclo.
+            'current_period_ends_at' => $fimDoTeste,
             'started_at' => now(),
         ]);
 
         session()->forget('checkout');
 
-        // Sem redirecionar para a fatura: a primeira cobrança só vence no fim do
-        // teste, e abrir a fatura agora parecia cobrança imediata.
-        session()->flash('status', 'Assinatura criada: 7 dias grátis para testar. A primeira cobrança vence em '.now()->addDays(7)->format('d/m/Y').' e o link de pagamento chega por e-mail. Não há nada a pagar agora.');
+        session()->flash('status', $metodo === PaymentMethod::PixAutomatic
+            ? 'Assinatura criada: 7 dias grátis para testar. Perto do fim do teste, ative o débito automático por esta tela.'
+            : 'Assinatura criada: 7 dias grátis para testar. A cobrança é gerada perto do fim do teste e vence em '.$fimDoTeste->format('d/m/Y').'; o link de pagamento chega por e-mail. Não há nada a pagar agora.');
     }
-
     /**
      * Cancelamento é imediato — sem prorata, sem manter acesso até o fim
      * do período já pago. `isCurrent()` já nega acesso assim que o status

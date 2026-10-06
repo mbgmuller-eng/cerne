@@ -27,7 +27,7 @@ class SubscriptionIndexTest extends TestCase
     {
         $asaas = Mockery::mock(AsaasClient::class);
         $asaas->shouldReceive('findOrCreateCustomer')->andReturn('cus_teste');
-        $asaas->shouldReceive('createSubscription')->andReturn(['id' => 'sub_teste', 'invoiceUrl' => 'https://sandbox.asaas.com/i/teste']);
+        $asaas->shouldReceive('createSubscription')->andReturn(['id' => 'sub_teste']);
         $this->app->instance(AsaasClient::class, $asaas);
     }
 
@@ -95,11 +95,7 @@ class SubscriptionIndexTest extends TestCase
         $profissional = User::factory()->consultant()->create();
 
         $asaas = Mockery::mock(AsaasClient::class);
-        $asaas->shouldReceive('findOrCreateCustomer')->andReturn('cus_teste');
-        $asaas->shouldReceive('createSubscription')
-            ->once()
-            ->with('cus_teste', SubscriptionBundle::Completo, PaymentMethod::Pix, Mockery::type('string'), 30)
-            ->andReturn(['id' => 'sub_teste', 'invoiceUrl' => null]);
+        $asaas->shouldNotReceive('createSubscription');
         $this->app->instance(AsaasClient::class, $asaas);
 
         // Mesmo pedindo outro pacote, profissional sempre assina o Completo.

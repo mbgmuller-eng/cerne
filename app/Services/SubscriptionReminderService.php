@@ -92,7 +92,7 @@ class SubscriptionReminderService
         // por causa das retentativas), então pega a faixa possível de
         // vencimentos e confere o corte de cada assinatura.
         $assinaturas = Subscription::query()
-            ->where('status', SubscriptionStatus::PastDue)
+            ->whereIn('status', [SubscriptionStatus::PastDue, SubscriptionStatus::Trialing])
             ->whereBetween('current_period_ends_at', [
                 $amanha->copy()->subDays(Subscription::PIX_AUTOMATIC_GRACE_DAYS)->toDateString(),
                 $amanha->copy()->subDays(Subscription::PAST_DUE_GRACE_DAYS)->toDateString(),

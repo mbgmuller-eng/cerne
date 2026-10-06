@@ -45,12 +45,18 @@ class AsaasClient
     }
 
     /**
-     * `nextDueDate` 7 dias à frente é o teste grátis inteiro — não existe
-     * campo "trial" na Asaas, é só a primeira cobrança nascer mais tarde.
+     * Chamada só perto do fim do teste grátis (SubscriptionBillingService):
+     * a Asaas cria a primeira cobrança NA HORA da criação, com vencimento em
+     * `$primeiroVencimento`, então criar a assinatura no cadastro geraria a
+     * cobrança (e o aviso ao cliente) uma semana antes do necessário.
      * Cartão e Pix tratados igual (`asaasBillingType()`): nenhum dos dois
-     * cobra sozinho hoje, os dois clicam a fatura — cobrança automática de
+     * cobra sozinho, os dois clicam a fatura — cobrança automática de
      * cartão de verdade exigiria tokenizar o cartão pelo nosso backend e
      * depende de aprovação da Asaas pra produção (ver o plano).
+     *
+     * `$externalReference` é o id da assinatura do Cerne: permite achar de novo,
+     * sem duplicar, uma assinatura que a Asaas criou mas o Cerne não chegou a
+     * gravar (ver findSubscriptionIdByReference()).
      *
      * $clientCap preenchido = assinatura de profissional: o valor vem só do
      * teto de clientes (ProfessionalPricing), sem olhar o pacote. Nulo =
@@ -76,7 +82,9 @@ class AsaasClient
         SubscriptionBundle $bundle,
         PaymentMethod $metodoPagamento,
         string $descricao,
-        ?int $clientCap = null,
+        ?int $clientCap,
+        string $primeiroVencimento,
+        ?string $externalReference = null,
     ): array {
         $valor = $clientCap !== null
             ? (float) ProfessionalPricing::priceFor($clientCap)
@@ -85,10 +93,11 @@ class AsaasClient
         $resposta = $this->request()->post('/subscriptions', [
             'customer' => $customerId,
             'billingType' => $metodoPagamento->asaasBillingType(),
-            'nextDueDate' => now()->addDays(7)->toDateString(),
+            'nextDueDate' => $primeiroVencimento,
             'value' => $valor,
             'cycle' => 'MONTHLY',
             'description' => $descricao,
+            'externalReference' => $externalReference,
         ])->throw();
 
         $id = (string) $resposta->json('id');
@@ -109,6 +118,15 @@ class AsaasClient
         }
 
         return ['id' => $id];
+    }
+
+    /** Id da assinatura (não apagada) criada com esta referência, ou null. A Asaas ignora as apagadas. */
+    public function findSubscriptionIdByReference(string $externalReference): ?string
+    {
+        return $this->request()
+            ->get('/subscriptions', ['externalReference' => $externalReference, 'limit' => 1])
+            ->throw()
+            ->json('data.0.id');
     }
 
     /**

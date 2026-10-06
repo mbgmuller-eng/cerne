@@ -162,12 +162,11 @@ class CheckoutTest extends TestCase
     {
         $usuario = User::factory()->create();
 
+        // Nada vai para a Asaas no cadastro: a assinatura lá só nasce perto do
+        // fim do teste (SubscriptionBillingService).
         $asaas = Mockery::mock(AsaasClient::class);
-        $asaas->shouldReceive('findOrCreateCustomer')->andReturn('cus_teste');
-        $asaas->shouldReceive('createSubscription')
-            ->once()
-            ->with('cus_teste', SubscriptionBundle::SaudeDocumentos, PaymentMethod::Pix, Mockery::type('string'), null)
-            ->andReturn(['id' => 'sub_teste', 'invoiceUrl' => null]);
+        $asaas->shouldNotReceive('findOrCreateCustomer');
+        $asaas->shouldNotReceive('createSubscription');
         $this->app->instance(AsaasClient::class, $asaas);
 
         $this->actingAs($usuario)->withSession(['checkout' => ['tipo' => 'usuario', 'pacote' => 'saude_documentos', 'metodo' => 'pix']]);
@@ -180,6 +179,9 @@ class CheckoutTest extends TestCase
         $assinatura = Subscription::where('user_id', $usuario->id)->sole();
         self::assertSame(SubscriptionBundle::SaudeDocumentos, $assinatura->bundle);
         self::assertSame(SubscriptionKind::Direct, $assinatura->kind);
+        self::assertSame(PaymentMethod::Pix, $assinatura->billing_type);
+        self::assertNull($assinatura->asaas_subscription_id, 'a Asaas só é chamada perto do fim do teste');
+        self::assertSame(now()->addDays(7)->toDateString(), $assinatura->current_period_ends_at->toDateString());
         self::assertNull(session('checkout'));
     }
 

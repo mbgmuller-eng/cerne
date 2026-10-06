@@ -8,6 +8,7 @@ use App\Services\InvoiceService;
 use App\Services\AsaasClient;
 use App\Services\RecurringIncomeService;
 use App\Services\PixAutomaticBillingService;
+use App\Services\SubscriptionBillingService;
 use App\Services\SubscriptionReminderService;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Schedule;
@@ -91,6 +92,15 @@ Schedule::call(function (): void {
 
     logger()->info('Agenda de saúde', ['notificados' => $notificados]);
 })->dailyAt('03:35')->name('agenda-saude')->withoutOverlapping();
+
+// Cartão e Pix: cria a assinatura na Asaas perto do fim do teste grátis (no
+// cadastro nada vai para a Asaas, que gera a cobrança no ato). Roda ANTES do
+// lembrete de Pix (03:40) para o aviso já levar o link da fatura.
+Schedule::call(function (): void {
+    $criadas = app(SubscriptionBillingService::class)->createDueSubscriptions();
+
+    logger()->info('Assinaturas criadas na Asaas (fim do teste)', ['criadas' => $criadas]);
+})->dailyAt('03:30')->name('assinaturas-fim-do-teste')->withoutOverlapping();
 
 // Assinatura por Pix: sem débito automático, avisa 3 dias antes do
 // vencimento (fim do teste grátis ou qualquer ciclo seguinte — é o mesmo

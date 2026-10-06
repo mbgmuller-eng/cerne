@@ -19,7 +19,7 @@ use Carbon\CarbonInterface;
 /** Carência de PastDue antes de travar o acesso — ver isCurrent(). */
 #[Fillable([
     'user_id', 'kind', 'bundle', 'client_cap', 'status', 'billing_type', 'current_period_ends_at',
-    'asaas_subscription_id', 'asaas_pix_authorization_id', 'pix_authorization_status', 'started_at', 'cancelled_at',
+    'asaas_subscription_id', 'asaas_pix_authorization_id', 'pix_authorization_status', 'billing_claimed_at', 'started_at', 'cancelled_at',
 ])]
 class Subscription extends Model
 {
@@ -45,6 +45,7 @@ class Subscription extends Model
             'current_period_ends_at' => 'date',
             'started_at' => 'date',
             'cancelled_at' => 'datetime',
+            'billing_claimed_at' => 'datetime',
         ];
     }
 
@@ -77,14 +78,20 @@ class Subscription extends Model
     }
 
     /**
-     * Ativa/em teste: concede sempre. Em atraso: concede só dentro da
-     * carência, contada a partir da última cobrança confirmada. Cancelada:
-     * nunca.
+     * Ativa: concede sempre. Em teste e em atraso: concedem só dentro da
+     * carência, contada do fim do período (no teste, do fim dos 7 dias).
+     * Cancelada: nunca.
+     *
+     * O teste também expira: a cobrança na Asaas só nasce perto do fim dele, e
+     * no Pix Automático nada avisa o Cerne se a pessoa não autorizar o débito.
+     * Antes, `Trialing` concedia acesso para sempre e dependia do webhook de
+     * atraso para virar `PastDue`.
      */
     public function isCurrent(): bool
     {
         return match ($this->status) {
-            SubscriptionStatus::Active, SubscriptionStatus::Trialing => true,
+            SubscriptionStatus::Active => true,
+            SubscriptionStatus::Trialing => $this->accessCutoffDate()?->isFuture() ?? true,
             SubscriptionStatus::PastDue => $this->accessCutoffDate()?->isFuture() ?? false,
             SubscriptionStatus::Cancelled => false,
         };
