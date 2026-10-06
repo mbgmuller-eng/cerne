@@ -53,7 +53,7 @@ class ProductionCheck extends Command
         $this->item('Migrations aplicadas', $this->migrationsEmDia(),
             'Tabela faltando derruba a primeira tela que a use.');
         $this->item('Sem contas de demonstração', $this->semContasDemo(),
-            'ana@cerne.test com senha "password" num servidor real é porta aberta.');
+            'ana@cerne.test com senha "password" em um servidor real é porta aberta.');
 
         $this->secao('Filas e agendador');
         $this->item('Fila usa driver de banco', config('queue.default') === 'database',

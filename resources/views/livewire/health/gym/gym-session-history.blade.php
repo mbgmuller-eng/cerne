@@ -3,7 +3,7 @@
     <div>
         <a href="{{ route('health.gym.index') }}" wire:navigate class="text-xs text-slate-500 hover:underline dark:text-slate-400">← Academia</a>
         <h1 class="mt-1 font-display text-3xl font-semibold tracking-tight text-slate-900 dark:text-white">Histórico de treinos</h1>
-        <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Todo treino finalizado — toque num pra ver os exercícios e séries daquele dia.</p>
+        <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Todo treino finalizado — toque em um para ver os exercícios e séries daquele dia.</p>
     </div>
 
     @if ($sessoes->isEmpty())

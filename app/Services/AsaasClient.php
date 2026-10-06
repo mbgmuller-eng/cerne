@@ -26,7 +26,7 @@ class AsaasClient
         }
 
         if (blank($user->cpf_cnpj)) {
-            throw new RuntimeException('Usuário sem CPF/CNPJ cadastrado — obrigatório pra Asaas criar o cliente.');
+            throw new RuntimeException('Usuário sem CPF/CNPJ cadastrado — obrigatório para a Asaas criar o cliente.');
         }
 
         $resposta = $this->request()->post('/customers', [

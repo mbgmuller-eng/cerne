@@ -1,7 +1,7 @@
 <x-mail::message>
 # Olá, {{ $name }}
 
-Confirme seu e-mail pra ativar sua conta no Cerne e escolher seu pacote.
+Confirme seu e-mail para ativar sua conta no Cerne e escolher seu pacote.
 
 <x-mail::button :url="$url">
 Confirmar e-mail

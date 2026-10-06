@@ -111,7 +111,7 @@
                 <div>
                     <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Item segurado (opcional)</label>
                     <input type="text" wire:model="policyInsuredItem" class="input mt-1.5" placeholder="Ex.: Honda Civic 2022, iPhone 15">
-                    <p class="mt-1 text-xs text-slate-400">Pra carro, eletrônico ou imóvel — ajuda a separar quando há mais de um.</p>
+                    <p class="mt-1 text-xs text-slate-400">Para carro, eletrônico ou imóvel — ajuda a separar quando há mais de um.</p>
                 </div>
 
                 <div>
@@ -133,7 +133,7 @@
                     <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Mensalidade</label>
                     <input type="number" step="0.01" wire:model="policyMonthlyPremium" class="input mt-1.5" placeholder="0,00">
                     @error('policyMonthlyPremium') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
-                    <p class="mt-1 text-xs text-slate-400">Pra apólice anual, deixe 0 e preencha o prêmio anual ao lado.</p>
+                    <p class="mt-1 text-xs text-slate-400">Para apólice anual, deixe 0 e preencha o prêmio anual ao lado.</p>
                 </div>
 
                 <div>

@@ -6,7 +6,7 @@
 @elseif ($consultantName)
 **{{ $consultantName }}** convidou você para cuidar das suas finanças no Cerne.
 @else
-Você foi convidado pro Cerne: o centro da sua vida organizada.
+Você foi convidado para o Cerne: o centro da sua vida organizada.
 @endif
 
 Use o botão abaixo para definir sua senha e criar seu acesso.

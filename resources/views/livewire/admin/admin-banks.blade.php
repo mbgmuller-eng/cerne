@@ -11,7 +11,7 @@
         <h2 class="text-sm font-semibold text-slate-900 dark:text-white">Sugestões pendentes</h2>
         <p class="text-xs text-slate-500 dark:text-slate-400">
             Nomes que algum cliente digitou no cadastro de conta ou cartão e que não batem com nenhum banco aprovado.
-            Aprovar deixa visível pra todo mundo; dispensar só tira da fila — quem sugeriu continua usando normalmente.
+            Aprovar deixa visível para todos; dispensar só tira da fila — quem sugeriu continua usando normalmente.
         </p>
 
         <div class="card overflow-hidden p-0">

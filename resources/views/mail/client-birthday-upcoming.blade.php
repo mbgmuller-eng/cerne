@@ -7,7 +7,7 @@
 Ver datas importantes
 </x-mail::button>
 
-Boa oportunidade pra entrar em contato.
+Boa oportunidade para entrar em contato.
 
 Abraço,<br>
 Equipe Cerne

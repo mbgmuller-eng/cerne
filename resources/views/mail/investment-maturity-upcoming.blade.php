@@ -7,7 +7,7 @@ O investimento **{{ $displayName }}** vence em **{{ $maturityDateFormatted }}** 
 Ver datas importantes
 </x-mail::button>
 
-Bom momento pra conversar com o cliente sobre o que fazer com o resgate.
+Bom momento para conversar com o cliente sobre o que fazer com o resgate.
 
 Abraço,<br>
 Equipe Cerne

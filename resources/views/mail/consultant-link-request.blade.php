@@ -14,7 +14,7 @@ Ver pedido
 </x-mail::button>
 
 @if ($isBroker)
-Autorizando, você escolhe quais apólices de seguro já cadastradas liberar pra ele —
+Autorizando, você escolhe quais apólices de seguro já cadastradas liberar para ele —
 nada mais das suas informações financeiras fica visível.
 @else
 Autorizando, ele passa a enxergar suas informações financeiras, inclusive o que

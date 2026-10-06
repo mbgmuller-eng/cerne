@@ -5,7 +5,7 @@
     <div>
         <h1 class="font-display text-3xl font-semibold tracking-tight text-slate-900 dark:text-white">Ficha de Saúde</h1>
         <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
-            Tipo sanguíneo, alergias, doenças e remédios — visível pra você e seu cônjuge. Consultor e corretor não têm acesso.
+            Tipo sanguíneo, alergias, doenças e remédios — visível para você e seu cônjuge. Consultor e corretor não têm acesso.
         </p>
     </div>
 

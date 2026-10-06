@@ -43,7 +43,7 @@ trait IsCoupleHealthData
                 $profileId = app(ProfileContext::class)->profileId();
 
                 if ($profileId === null) {
-                    throw new LogicException('Sem perfil ativo — não dá pra gravar ficha de saúde nenhuma.');
+                    throw new LogicException('Sem perfil ativo — não é possível gravar a ficha de saúde.');
                 }
 
                 $model->setAttribute('profile_id', $profileId);

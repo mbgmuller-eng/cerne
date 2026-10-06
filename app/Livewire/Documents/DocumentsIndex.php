@@ -512,7 +512,7 @@ class DocumentsIndex extends Component
         );
 
         if ($semPatternDeRegra !== []) {
-            $this->addError('confirmar', 'Preencha o padrão da regra pros itens marcados para "criar regra também".');
+            $this->addError('confirmar', 'Preencha o padrão da regra para os itens marcados para "criar regra também".');
 
             return;
         }
@@ -555,7 +555,7 @@ class DocumentsIndex extends Component
             }
 
             $pendentes = count($documento->pendingItemIndices());
-            $mensagem .= ' '.$pendentes.' '.($pendentes === 1 ? 'item ainda falta categorizar' : 'itens ainda faltam categorizar').' — o documento continua aberto pra revisão.';
+            $mensagem .= ' '.$pendentes.' '.($pendentes === 1 ? 'item ainda falta categorizar' : 'itens ainda faltam categorizar').' — o documento continua aberto para revisão.';
             session()->flash('status', $mensagem);
             // Só tira do "selecionado" quem acabou de ser importado — o
             // resto (ainda pendente) mantém o que a pessoa já digitou,
@@ -598,13 +598,13 @@ class DocumentsIndex extends Component
         $this->confirmandoExclusaoItem = null;
 
         if ($finalizado) {
-            session()->flash('status', 'Item marcado pra não importar — documento totalmente resolvido e finalizado.');
+            session()->flash('status', 'Item marcado para não importar — documento totalmente resolvido e finalizado.');
             $this->fecharRevisao();
 
             return;
         }
 
-        session()->flash('status', 'Item marcado pra não ser importado.');
+        session()->flash('status', 'Item marcado para não ser importado.');
     }
 
     public function confirmarExclusaoItem(int $i): void
@@ -769,7 +769,7 @@ class DocumentsIndex extends Component
             ProcessDocumentJob::dispatch($documento->id);
         }
 
-        session()->flash('status', 'Documento na fila pra nova tentativa.');
+        session()->flash('status', 'Documento na fila para nova tentativa.');
     }
 
     /** @return Collection<int, DocumentUpload> */

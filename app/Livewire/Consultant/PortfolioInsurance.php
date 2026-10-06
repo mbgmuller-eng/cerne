@@ -72,7 +72,7 @@ class PortfolioInsurance extends Component
         ]);
 
         if (! $capacity->hasRoomForNewClient(auth()->user())) {
-            $this->addError('inviteEmail', 'Você atingiu o limite de clientes do seu plano atual. Assine uma faixa maior pra adicionar mais.');
+            $this->addError('inviteEmail', 'Você atingiu o limite de clientes do seu plano atual. Aumente o limite na página de assinatura para adicionar mais.');
 
             return;
         }

@@ -1,8 +1,8 @@
 <x-layouts.guest title="Confirme seu e-mail · Cerne">
     <h1 class="font-display text-2xl font-semibold text-slate-900 dark:text-white">Confirme seu e-mail</h1>
     <p class="mt-2 text-sm text-slate-600 dark:text-slate-300">
-        Enviamos um link de confirmação pra <strong>{{ auth()->user()->email }}</strong>.
-        Clique nele pra ativar sua conta e escolher seu pacote.
+        Enviamos um link de confirmação para <strong>{{ auth()->user()->email }}</strong>.
+        Clique nele para ativar sua conta e escolher seu pacote.
     </p>
 
     @if (session('status'))

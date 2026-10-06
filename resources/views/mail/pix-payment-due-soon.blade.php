@@ -1,7 +1,7 @@
 <x-mail::message>
 # Olá, {{ $name }}
 
-Sua assinatura **{{ $bundleLabel }}** vence em **{{ $dueDateFormatted }}**. Como é Pix, não existe débito automático: pague até lá pra manter o acesso.
+Sua assinatura **{{ $bundleLabel }}** vence em **{{ $dueDateFormatted }}**. Como é Pix, não existe débito automático: pague até lá para manter o acesso.
 
 @if ($invoiceUrl)
 <x-mail::button :url="$invoiceUrl">

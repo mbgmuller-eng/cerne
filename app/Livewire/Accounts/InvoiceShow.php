@@ -58,7 +58,7 @@ class InvoiceShow extends Component
         $this->invoice = $this->invoice->fresh(['creditCard', 'paidFromAccount']);
         $this->payAmount = $this->invoice->total_amount;
         $this->confirmingUnpay = false;
-        session()->flash('status', 'Pagamento estornado — a fatura voltou pra "fechada".');
+        session()->flash('status', 'Pagamento estornado — a fatura voltou para "fechada".');
     }
 
     public function render()

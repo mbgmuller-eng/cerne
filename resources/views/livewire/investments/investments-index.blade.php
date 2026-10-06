@@ -124,7 +124,7 @@
                     @endif
 
                     <div>
-                        <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Conta pra reserva</label>
+                        <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Conta para reserva</label>
                         <select wire:model="investmentReserveType" class="select mt-1.5 w-full">
                             <option value="">Nenhuma</option>
                             @foreach (ReserveType::options() as $valor => $rotulo)
@@ -518,7 +518,7 @@
                                 :width="640"
                             />
                         @else
-                            <p class="py-8 text-center text-xs text-slate-400">Nenhum grupo selecionado — clique num grupo abaixo pra mostrar de novo.</p>
+                            <p class="py-8 text-center text-xs text-slate-400">Nenhum grupo selecionado — clique em um grupo abaixo para mostrar de novo.</p>
                         @endif
                         <div class="mt-3 flex flex-wrap gap-x-4 gap-y-2">
                             @foreach ($evolutionChart['porGrupo'] as $grupoEvolucao)
@@ -530,7 +530,7 @@
                                         'text-slate-500 dark:text-slate-400' => $grupoEvolucao['visivel'],
                                         'text-slate-300 line-through dark:text-slate-600' => ! $grupoEvolucao['visivel'],
                                     ])
-                                    title="{{ $grupoEvolucao['visivel'] ? 'Clique pra esconder' : 'Clique pra mostrar' }}"
+                                    title="{{ $grupoEvolucao['visivel'] ? 'Clique para esconder' : 'Clique para mostrar' }}"
                                 >
                                     <span
                                         class="h-2.5 w-2.5 shrink-0 rounded-full"
@@ -551,7 +551,7 @@
                                 class="text-brand-700 dark:text-brand-300"
                             />
                         @else
-                            <p class="py-8 text-center text-xs text-slate-400">Selecione um ativo pra ver a evolução dele.</p>
+                            <p class="py-8 text-center text-xs text-slate-400">Selecione um ativo para ver a evolução dele.</p>
                         @endif
                     @else
                         <x-bar-chart

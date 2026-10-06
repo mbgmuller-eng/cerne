@@ -128,7 +128,7 @@ class PortfolioOverview extends Component
         $consultor = auth()->user();
 
         if (! $capacity->hasRoomForNewClient($consultor)) {
-            $this->addError('inviteEmail', 'Você atingiu o limite de clientes do seu plano atual. Assine uma faixa maior pra adicionar mais.');
+            $this->addError('inviteEmail', 'Você atingiu o limite de clientes do seu plano atual. Aumente o limite na página de assinatura para adicionar mais.');
 
             return;
         }
@@ -161,7 +161,7 @@ class PortfolioOverview extends Component
         }
 
         if ($vinculo?->status === ConsultantClientStatus::Pending) {
-            $this->addError('inviteEmail', 'Já existe uma autorização pendente pra esse e-mail.');
+            $this->addError('inviteEmail', 'Já existe uma autorização pendente para esse e-mail.');
 
             return;
         }
@@ -244,7 +244,7 @@ class PortfolioOverview extends Component
         $this->lastAccessInviteProfileId = $profileId;
         $this->lastAccessInviteLink = $invites->send(auth()->user(), $profile->owner->name, $profile->owner->email);
 
-        session()->flash('status', "Convite de acesso enviado pra {$profile->owner->email}.");
+        session()->flash('status', "Convite de acesso enviado para {$profile->owner->email}.");
     }
 
     /** @return Collection<int, ConsultantInvite> */

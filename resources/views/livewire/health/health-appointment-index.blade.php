@@ -4,7 +4,7 @@
         <div>
             <h1 class="font-display text-3xl font-semibold tracking-tight text-slate-900 dark:text-white">Agenda de Saúde</h1>
             <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                Consultas e exames — visível pra você e seu cônjuge. Avisamos por e-mail/push um dia antes.
+                Consultas e exames — visível para você e seu cônjuge. Avisamos por e-mail/push um dia antes.
             </p>
         </div>
         <button type="button" wire:click="newAppointment" class="btn-primary shrink-0 px-3 py-2 text-sm">+ Agendar</button>

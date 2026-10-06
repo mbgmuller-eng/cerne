@@ -130,7 +130,7 @@
                     @if ($catalogHint)
                         <p class="mt-1 text-xs text-saude-800 dark:text-saude-200">{{ $catalogHint }}</p>
                     @else
-                        <p class="mt-1 text-xs text-slate-400">Digite um nome do catálogo pra preencher grupo, tipo e foto sozinho.</p>
+                        <p class="mt-1 text-xs text-slate-400">Digite um nome do catálogo para preencher grupo, tipo e foto sozinho.</p>
                     @endif
                     @error('exName') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
                 </div>

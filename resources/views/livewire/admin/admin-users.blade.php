@@ -178,7 +178,7 @@
 
             <div>
                 <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">
-                    Pra confirmar, digite o e-mail exatamente: <span class="font-mono">{{ $this->exclusaoInfo['email'] }}</span>
+                    Para confirmar, digite o e-mail exatamente: <span class="font-mono">{{ $this->exclusaoInfo['email'] }}</span>
                 </label>
                 <input type="text" wire:model="confirmacaoExclusao" class="input mt-1.5" autocomplete="off">
                 @error('confirmacaoExclusao') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror

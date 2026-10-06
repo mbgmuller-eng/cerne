@@ -50,7 +50,7 @@
             </div>
         @elseif ($profissionaisVinculados->isNotEmpty())
             <p class="mt-1 text-sm text-slate-600 dark:text-slate-300">
-                Vinculada: o acesso vem da assinatura do profissional abaixo, sem custo pra você.
+                Vinculada: o acesso vem da assinatura do profissional abaixo, sem custo para você.
             </p>
         @else
             <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">Nenhuma assinatura ativa ainda.</p>
@@ -139,7 +139,7 @@
             @endif
         @elseif ($pendingInvite)
             <p class="mt-2 text-sm text-slate-600 dark:text-slate-300">
-                Convite enviado pra <strong>{{ $pendingInvite->partner_name }}</strong>
+                Convite enviado para <strong>{{ $pendingInvite->partner_name }}</strong>
                 ({{ $pendingInvite->partner_email }}), aguardando aceite.
             </p>
 
@@ -200,8 +200,8 @@
                 </div>
 
                 <p class="text-xs text-slate-500 dark:text-slate-400">
-                    Ele(a) não vai poder acessar a plataforma. Conta bancária, gastos e investimentos em nome
-                    dele(a) funcionam normal — só não vai dar pra marcar nada como privado, porque sem login
+                    Ele(a) não poderá acessar a plataforma. Conta bancária, gastos e investimentos em nome
+                    dele(a) funcionam normalmente, mas não será possível marcar nada como privado, porque sem login
                     ninguém veria esse dado, nem ele(a) mesmo(a).
                 </p>
 

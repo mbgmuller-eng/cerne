@@ -449,7 +449,7 @@
                 <span>Você está vendo como <strong>{{ $user->name }}</strong>.</span>
                 <form method="POST" action="{{ route('admin.impersonate.stop') }}">
                     @csrf
-                    <button type="submit" class="font-medium underline">Voltar pro admin</button>
+                    <button type="submit" class="font-medium underline">Voltar para o painel admin</button>
                 </form>
             </div>
         @endif

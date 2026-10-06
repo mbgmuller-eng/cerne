@@ -58,7 +58,7 @@
         </p>
         @if ($vagasRestantes === 0)
             <p class="mt-1 text-xs text-amber-700 dark:text-amber-400">
-                Limite da faixa atingido. <a href="{{ route('subscription.index') }}" class="underline">Aumente o limite</a> pra vincular mais clientes.
+                Limite da faixa atingido. <a href="{{ route('subscription.index') }}" class="underline">Aumente o limite</a> para vincular mais clientes.
             </p>
         @endif
 

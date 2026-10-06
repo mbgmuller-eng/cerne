@@ -3,7 +3,7 @@
 
 A cobrança da sua assinatura **{{ $bundleLabel }}** venceu em **{{ $dueDateFormatted }}** e ainda não identificamos o pagamento.
 
-Seu acesso segue ativo até **{{ $accessUntilFormatted }}**. Pague até lá pra não perder o acesso.
+Seu acesso segue ativo até **{{ $accessUntilFormatted }}**. Pague até lá para não perder o acesso.
 
 @if ($invoiceUrl)
 <x-mail::button :url="$invoiceUrl">

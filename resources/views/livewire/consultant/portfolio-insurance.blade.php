@@ -43,7 +43,7 @@
                 <p class="text-sm font-semibold text-slate-900 dark:text-white">Vincular um cliente</p>
                 <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
                     E-mail sem conta vira convite de cadastro; e-mail que já tem conta no Cerne vira um pedido —
-                    o cliente decide, na hora de autorizar, quais apólices já cadastradas liberar pra você.
+                    o cliente decide, na hora de autorizar, quais apólices já cadastradas liberar para você.
                 </p>
             </div>
 

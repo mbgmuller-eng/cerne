@@ -167,7 +167,7 @@
                     @endif
 
                     <div>
-                        <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Conta pra debitar (opcional)</label>
+                        <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Conta para debitar (opcional)</label>
                         <select wire:model="billBankAccountId" class="select mt-1.5 w-full">
                             <option value="">Nenhuma — só lembrete</option>
                             @foreach ($bankAccounts as $conta)
@@ -389,7 +389,7 @@
                     @endif
 
                     <div>
-                        <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Conta pra creditar (opcional)</label>
+                        <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Conta para creditar (opcional)</label>
                         <select wire:model="incomeBankAccountId" class="select mt-1.5 w-full">
                             <option value="">Nenhuma — só lembrete</option>
                             @foreach ($bankAccounts as $conta)

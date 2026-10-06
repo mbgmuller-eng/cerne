@@ -16,7 +16,7 @@
                 <p class="text-sm text-slate-600 dark:text-slate-300">
                     Autorizando, <strong>{{ $vinculo->consultant->name }}</strong> passa a ver a tela de
                     Seguros da sua conta — mas só as apólices que você escolher liberar abaixo. Nada mais
-                    das suas informações financeiras fica visível pra ele.
+                    das suas informações financeiras fica visível para ele.
                 </p>
             @else
                 <p class="text-sm text-slate-600 dark:text-slate-300">
@@ -32,7 +32,7 @@
                 @if ($vinculo->consultant->isBroker() && $apolices->isNotEmpty())
                     <div class="rounded-xl border border-slate-100 dark:border-white/10">
                         <p class="border-b border-slate-100 bg-slate-50/60 px-4 py-2.5 text-xs font-medium text-slate-500 dark:border-white/10 dark:bg-white/5 dark:text-slate-400">
-                            Apólices já cadastradas — marque as que quer liberar pra {{ $vinculo->consultant->name }}
+                            Apólices já cadastradas — marque as que quer liberar para {{ $vinculo->consultant->name }}
                         </p>
                         <ul class="divide-y divide-slate-100 px-4 dark:divide-white/10">
                             @foreach ($apolices as $apolice)
@@ -51,7 +51,7 @@
                                         @endif
                                         @if ($apolice->broker_id !== null && $apolice->broker_id !== $vinculo->consultant_id)
                                             <br><span class="text-xs text-amber-700 dark:text-amber-400">
-                                                Já compartilhada com {{ $apolice->broker->name }} — marcar aqui troca pra {{ $vinculo->consultant->name }}.
+                                                Já compartilhada com {{ $apolice->broker->name }} — marcar aqui troca para {{ $vinculo->consultant->name }}.
                                             </span>
                                         @endif
                                     </label>

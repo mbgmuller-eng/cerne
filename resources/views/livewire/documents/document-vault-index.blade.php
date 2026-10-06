@@ -6,7 +6,7 @@
         <div>
             <h1 class="font-display text-3xl font-semibold tracking-tight text-slate-900 dark:text-white">Documentos</h1>
             <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                CNH, passaporte, certificados, apólices e exames — guardados num lugar só.
+                CNH, passaporte, certificados, apólices e exames — guardados em um só lugar.
             </p>
         </div>
         @if ($podeGerenciar)

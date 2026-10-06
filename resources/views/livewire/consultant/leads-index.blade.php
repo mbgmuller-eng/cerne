@@ -28,7 +28,7 @@
                     <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">E-mail</label>
                     <input type="email" wire:model="leadEmail" class="input mt-1.5" placeholder="email@exemplo.com">
                     @error('leadEmail') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
-                    <p class="mt-1 text-xs text-slate-400">Necessário pra converter em cliente depois.</p>
+                    <p class="mt-1 text-xs text-slate-400">Necessário para converter em cliente depois.</p>
                 </div>
 
                 <div>

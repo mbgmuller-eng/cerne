@@ -88,7 +88,7 @@
             <div class="card p-5">
                 <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">CPF ou CNPJ</label>
                 <input type="text" wire:model="cpfCnpj" class="input mt-1.5" placeholder="Só números" maxlength="18">
-                <p class="mt-1 text-xs text-slate-400">Exigido pela Asaas (nossa processadora de pagamento) pra emitir a cobrança.</p>
+                <p class="mt-1 text-xs text-slate-400">Exigido pela Asaas (nossa processadora de pagamento) para emitir a cobrança.</p>
                 @error('cpfCnpj') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
 
                 <label class="mt-4 block text-xs font-medium text-slate-500 dark:text-slate-400">Forma de pagamento</label>
@@ -117,7 +117,7 @@
                             <option value="{{ $teto }}">Até {{ $teto }} clientes · {{ \App\Support\Money::format(\App\Support\ProfessionalPricing::priceFor($teto)) }}/mês</option>
                         @endforeach
                     </select>
-                    <p class="mt-1.5 text-xs text-slate-400">Precisa de mais que {{ max($tetosClientes) }}? Fale com a gente pra um contrato sob medida.</p>
+                    <p class="mt-1.5 text-xs text-slate-400">Precisa de mais que {{ max($tetosClientes) }}? Fale conosco para um contrato sob medida.</p>
                     @error('clientCap') <p class="mt-1.5 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
                 @endif
             </div>

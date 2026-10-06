@@ -94,7 +94,7 @@
                 @unless ($accountIsJoint)
                     <div class="flex items-center gap-2 pt-5">
                         <input type="checkbox" wire:model="accountVisibleToPartner" id="accountVisibleToPartner" class="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500">
-                        <label for="accountVisibleToPartner" class="text-sm text-slate-600 dark:text-slate-400">Visível pro cônjuge</label>
+                        <label for="accountVisibleToPartner" class="text-sm text-slate-600 dark:text-slate-400">Visível para o cônjuge</label>
                     </div>
 
                     @if ($accountVisibleToPartner)
@@ -200,7 +200,7 @@
                 @unless ($cardIsJoint)
                     <div class="flex items-center gap-2 pt-5">
                         <input type="checkbox" wire:model="cardVisibleToPartner" id="cardVisibleToPartner" class="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500">
-                        <label for="cardVisibleToPartner" class="text-sm text-slate-600 dark:text-slate-400">Visível pro cônjuge</label>
+                        <label for="cardVisibleToPartner" class="text-sm text-slate-600 dark:text-slate-400">Visível para o cônjuge</label>
                     </div>
 
                     @if ($cardVisibleToPartner)

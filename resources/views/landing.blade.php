@@ -340,7 +340,7 @@
                     'Posso cancelar quando quiser?' => 'Sim, pela sua área de conta, sem precisar falar com ninguém. O acesso é encerrado na hora do cancelamento, sem desconto proporcional do período já pago.',
                     'O consultor ou corretor vê meus dados de Saúde?' => 'Não, nunca, em nenhuma circunstância, mesmo vinculado e com acesso ativo ao resto do seu perfil.',
                     'Minha assinatura cobre meu cônjuge também?' => 'Sim. A assinatura é por perfil financeiro, não por pessoa: se vocês dividem o mesmo perfil de casal, uma assinatura libera o acesso para os dois.',
-                    'Qual a diferença entre assinar direto e ter um profissional vinculado?' => 'Se o seu consultor ou corretor já tem assinatura profissional ativa, seu acesso vem de graça por esse vínculo. Assinar direto só é necessário se você quiser usar o Cerne sozinho, sem nenhum profissional.',
+                    'Qual a diferença entre assinar direto e ter um profissional vinculado?' => 'Se o seu consultor ou corretor já tem assinatura profissional ativa, seu acesso vem sem custo por esse vínculo. Assinar direto só é necessário se você quiser usar o Cerne sozinho, sem nenhum profissional.',
                     'Meus dados são compartilhados com terceiros?' => 'Não, além do necessário para processar a cobrança (Asaas). Você decide o que fica privado entre você e seu cônjuge, e o que o seu consultor ou corretor vê.',
                 ] as $pergunta => $resposta)
                     <div class="card overflow-hidden" x-data="{ open: false }">

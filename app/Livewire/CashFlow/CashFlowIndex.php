@@ -389,7 +389,7 @@ class CashFlowIndex extends Component
         $despesa = ExpenseRecord::query()->findOrFail($id);
 
         if ($this->isLockedByPaidInvoice($despesa)) {
-            session()->flash('status', 'Essa despesa está numa fatura já paga — estorne o pagamento da fatura antes de editar.');
+            session()->flash('status', 'Essa despesa está em uma fatura já paga — estorne o pagamento da fatura antes de editar.');
 
             return;
         }
@@ -429,7 +429,7 @@ class CashFlowIndex extends Component
 
         if ($this->isLockedByPaidInvoice($despesa)) {
             $this->confirmingDeleteExpenseId = null;
-            session()->flash('status', 'Essa despesa está numa fatura já paga — estorne o pagamento da fatura antes de excluir.');
+            session()->flash('status', 'Essa despesa está em uma fatura já paga — estorne o pagamento da fatura antes de excluir.');
 
             return;
         }
@@ -590,7 +590,7 @@ class CashFlowIndex extends Component
         $despesa = ExpenseRecord::query()->findOrFail($this->editingExpenseId);
 
         if ($this->isLockedByPaidInvoice($despesa)) {
-            $this->addError('expenseAmount', 'Essa despesa está numa fatura já paga — estorne o pagamento da fatura antes de editar.');
+            $this->addError('expenseAmount', 'Essa despesa está em uma fatura já paga — estorne o pagamento da fatura antes de editar.');
 
             return;
         }

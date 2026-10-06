@@ -87,7 +87,7 @@ class AdminUsers extends Component
 
         $this->lastInviteLink = $invites->sendStandalone($this->inviteName, $this->inviteEmail);
         $this->reset('inviteName', 'inviteEmail');
-        session()->flash('status', 'Convite criado — copie o link abaixo e envie pro seu amigo.');
+        session()->flash('status', 'Convite criado — copie o link abaixo e envie para o seu amigo.');
     }
 
     public function toggleProfessionalInviteForm(): void
@@ -199,7 +199,7 @@ class AdminUsers extends Component
         }
 
         if ($this->confirmacaoExclusao !== $alvo->email) {
-            $this->addError('confirmacaoExclusao', 'Digite o e-mail exatamente como aparece na lista pra confirmar.');
+            $this->addError('confirmacaoExclusao', 'Digite o e-mail exatamente como aparece na lista para confirmar.');
 
             return;
         }

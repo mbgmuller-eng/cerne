@@ -99,7 +99,7 @@ class SubscriptionIndex extends Component
             return $this->redirect($resultado['invoiceUrl']);
         }
 
-        session()->flash('status', 'Assinatura criada: 7 dias grátis pra testar. Acompanhe o pagamento pelo e-mail da Asaas quando o teste acabar.');
+        session()->flash('status', 'Assinatura criada: 7 dias grátis para testar. Acompanhe o pagamento pelo e-mail da Asaas quando o teste acabar.');
     }
 
     /**

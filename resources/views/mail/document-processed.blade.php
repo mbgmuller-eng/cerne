@@ -2,7 +2,7 @@
 @if ($sucesso)
 # Olá, {{ $recipientName }}
 
-O arquivo **"{{ $filename }}"** foi processado e já está pronto pra revisão.
+O arquivo **"{{ $filename }}"** foi processado e já está pronto para revisão.
 
 <x-mail::button :url="$url">
 Revisar

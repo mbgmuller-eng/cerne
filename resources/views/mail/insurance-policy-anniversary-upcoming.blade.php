@@ -8,7 +8,7 @@ A apólice da **{{ $insurerName }}**@if($personLabel) ({{ $personLabel }})@endif
 Ver datas importantes
 </x-mail::button>
 
-Bom momento pra confirmar com a seguradora se o prêmio ou a cobertura mudam na renovação.
+Bom momento para confirmar com a seguradora se o prêmio ou a cobertura mudam na renovação.
 
 Abraço,<br>
 Equipe Cerne

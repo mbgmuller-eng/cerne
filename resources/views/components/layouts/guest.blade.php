@@ -35,7 +35,7 @@
 
             <div class="relative max-w-md">
                 <p class="font-display text-4xl leading-tight font-medium">
-                    Finanças, seguros, documentos, saúde: tudo o que sustenta sua vida, num só lugar.
+                    Finanças, seguros, documentos, saúde: tudo o que sustenta sua vida, em um só lugar.
                 </p>
                 <p class="mt-4 text-brand-100">
                     Sozinho, ou com quem te ajuda a cuidar dela.

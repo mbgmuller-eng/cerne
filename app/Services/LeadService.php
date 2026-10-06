@@ -82,7 +82,7 @@ class LeadService
     public function convert(Lead $lead, User $consultant): string
     {
         if (blank($lead->email)) {
-            throw new InvalidArgumentException('Lead sem e-mail não pode ser convertido — o convite precisa de um e-mail pra enviar.');
+            throw new InvalidArgumentException('Lead sem e-mail não pode ser convertido — o convite precisa de um e-mail para enviar.');
         }
 
         $link = $this->invites->send($consultant, $lead->name, $lead->email);

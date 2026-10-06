@@ -86,7 +86,7 @@ class ConsultantLinkService
 
         if ($vinculo?->status === ConsultantClientStatus::Pending) {
             throw ValidationException::withMessages([
-                'inviteEmail' => 'Já existe uma autorização pendente pra esse e-mail.',
+                'inviteEmail' => 'Já existe uma autorização pendente para esse e-mail.',
             ]);
         }
 
