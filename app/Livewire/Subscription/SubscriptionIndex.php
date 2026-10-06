@@ -34,9 +34,63 @@ class SubscriptionIndex extends Component
     /** Só preenchido/validado pra quem assina como profissional — ver rules(). */
     public string $clientCap = '';
 
+    /**
+     * Plano que a pessoa escolheu na página pública antes de criar a conta
+     * (ver CheckoutController). Preenche o resumo do pedido; vazio quando
+     * ela chegou aqui por outro caminho.
+     */
+    public string $pacoteEscolhido = '';
+
+    public bool $temIntencao = false;
+
+    public bool $trocandoPlano = false;
+
     public function mount(): void
     {
         $this->cpfCnpj = Auth::user()->cpf_cnpj ?? '';
+        $this->carregarIntencaoDoCheckout();
+    }
+
+    public function trocarPlano(): void
+    {
+        $this->trocandoPlano = true;
+    }
+
+    public function voltarAoPedido(): void
+    {
+        $this->trocandoPlano = false;
+    }
+
+    /** Valida tudo que veio da sessão: ela só guarda a intenção, nunca é confiável sozinha. */
+    private function carregarIntencaoDoCheckout(): void
+    {
+        $intencao = session('checkout');
+
+        if (! is_array($intencao)) {
+            return;
+        }
+
+        $metodo = PaymentMethod::tryFrom((string) ($intencao['metodo'] ?? ''));
+
+        if ($this->kind() === SubscriptionKind::Professional && ($intencao['tipo'] ?? null) === 'profissional') {
+            $teto = (int) ($intencao['clientes'] ?? 0);
+
+            if (ProfessionalPricing::isValidCap($teto)) {
+                $this->clientCap = (string) $teto;
+                $this->temIntencao = true;
+            }
+        } elseif ($this->kind() === SubscriptionKind::Direct && ($intencao['tipo'] ?? null) === 'usuario') {
+            $pacote = SubscriptionBundle::tryFrom((string) ($intencao['pacote'] ?? ''));
+
+            if ($pacote !== null) {
+                $this->pacoteEscolhido = $pacote->value;
+                $this->temIntencao = true;
+            }
+        }
+
+        if ($this->temIntencao && $metodo !== null) {
+            $this->metodoPagamento = $metodo->value;
+        }
     }
 
     public function rules(): array
@@ -94,6 +148,8 @@ class SubscriptionIndex extends Component
             'asaas_subscription_id' => $resultado['id'],
             'started_at' => now(),
         ]);
+
+        session()->forget('checkout');
 
         if ($resultado['invoiceUrl'] !== null) {
             return $this->redirect($resultado['invoiceUrl']);
@@ -183,6 +239,9 @@ class SubscriptionIndex extends Component
             'temAcessoAtivo' => $assinaturaAtual?->isCurrent() ?? false,
             'souProfissional' => $this->kind() === SubscriptionKind::Professional,
             'tetosClientes' => ProfessionalPricing::validCaps(),
+            'resumoDoPedido' => $this->temIntencao && ! $this->trocandoPlano && ! ($assinaturaAtual?->isCurrent() ?? false),
+            'pacoteDoPedido' => $this->pacoteEscolhido !== '' ? SubscriptionBundle::tryFrom($this->pacoteEscolhido) : null,
+            'primeiraCobranca' => now()->addDays(7),
         ]);
     }
 

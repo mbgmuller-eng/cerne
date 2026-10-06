@@ -27,4 +27,15 @@ enum PlatformModule: string
             self::Saude => 'Saúde',
         };
     }
+
+    /** Uma linha sobre o que o módulo entrega, usada nas páginas de plano e no resumo do pedido. */
+    public function summary(): string
+    {
+        return match ($this) {
+            self::Financas => 'fluxo de caixa, contas fixas, investimentos e objetivos',
+            self::Seguros => 'apólices, vencimentos e renovações',
+            self::Documentos => 'CNH, passaporte, apólices e exames em um cofre com controle de acesso',
+            self::Saude => 'treino com histórico, ficha de saúde e QR de emergência',
+        };
+    }
 }

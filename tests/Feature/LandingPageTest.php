@@ -17,7 +17,17 @@ class LandingPageTest extends TestCase
         $this->get('/')
             ->assertOk()
             ->assertSee('Assinar')
-            ->assertSee(Money::format(config('billing.prices.'.SubscriptionBundle::Completo->value)), false);
+            // O preço é desenhado em partes (R$, reais grandes, centavos), então
+            // checa as partes em ordem em vez do texto corrido.
+            ->assertSeeInOrder(['R$', '>29<', ',90'], false);
+    }
+
+    public function test_vitrine_tem_a_aba_de_investimentos(): void
+    {
+        $this->get('/')
+            ->assertOk()
+            ->assertSee('Investimentos')
+            ->assertSee('images/marketing/investimentos.jpg', false);
     }
 
     public function test_precos_do_usuario_final_aparecem_em_ordem_do_mais_barato_ao_mais_completo(): void
@@ -25,45 +35,38 @@ class LandingPageTest extends TestCase
         $this->get('/')
             ->assertOk()
             ->assertSeeInOrder([
-                'Planos para quem assina direto',
-                Money::format(config('billing.prices.'.SubscriptionBundle::SaudeDocumentos->value)),
-                Money::format(config('billing.prices.'.SubscriptionBundle::FinancasSegurosDocumentos->value)),
-                Money::format(config('billing.prices.'.SubscriptionBundle::Completo->value)),
+                'Escolha o seu plano',
+                '>15<',
+                '>19<',
+                '>29<',
             ], false);
     }
 
-    public function test_precos_de_consultor_e_corretor_ficam_numa_secao_propria(): void
+    public function test_plano_completo_tem_destaque_e_cada_plano_leva_ao_checkout(): void
     {
-        $html = $this->get('/')->assertOk()->getContent();
+        $resposta = $this->get('/')->assertOk()->assertSee('Mais completo');
 
-        self::assertStringContainsString('id="planos-profissionais"', $html);
-
-        $secao = substr($html, strpos($html, 'id="planos-profissionais"'));
-        $secao = substr($secao, 0, strpos($secao, 'Perguntas frequentes'));
-
-        foreach (['R$ 79,90', 'R$ 149,90', 'R$ 59,90', 'R$ 209,80', 'R$ 329,60', 'R$ 629,10'] as $valor) {
-            self::assertStringContainsString($valor, $secao, "Faltou {$valor} na seção de profissionais");
+        foreach (SubscriptionBundle::cases() as $pacote) {
+            $resposta->assertSee(route('checkout.show', $pacote->value), false);
         }
-
-        // Preço de profissional não vaza pra seção do usuário final e vice-versa.
-        $secaoUsuario = substr($html, strpos($html, 'id="planos"'), strpos($html, 'id="planos-profissionais"') - strpos($html, 'id="planos"'));
-        self::assertStringNotContainsString('R$ 79,90', $secaoUsuario);
-        self::assertStringNotContainsString('Quero ser consultor parceiro', $secaoUsuario);
     }
 
-    public function test_botoes_de_cadastro_do_profissional_ja_marcam_o_papel(): void
+    public function test_cada_plano_lista_o_que_inclui(): void
     {
         $this->get('/')
             ->assertOk()
-            ->assertSee(route('register', ['papel' => 'consultant']), false)
-            ->assertSee(route('register', ['papel' => 'broker']), false);
+            ->assertSee('7 dias grátis, sem cobrança hoje')
+            ->assertSee('Ficha de saúde', false);
     }
 
-    public function test_texto_nao_promete_mais_que_assinatura_de_graca_pra_profissional(): void
+    public function test_landing_e_so_do_usuario_e_aponta_pra_pagina_de_profissionais(): void
     {
         $this->get('/')
             ->assertOk()
-            ->assertDontSee('cobre, de graça, todos os clientes');
+            ->assertSee(route('professionals'), false)
+            ->assertDontSee('Quero ser consultor parceiro')
+            ->assertDontSee('Faça a sua conta')
+            ->assertDontSee('R$ 79,90');
     }
 
     public function test_titulo_usa_em_um_so_lugar_sem_o_tom_coloquial(): void

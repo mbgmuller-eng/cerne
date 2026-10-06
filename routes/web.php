@@ -5,6 +5,7 @@ use App\Http\Controllers\AsaasWebhookController;
 use App\Http\Controllers\Auth\AcceptInviteController;
 use App\Http\Controllers\Auth\AcceptPartnerInviteController;
 use App\Http\Controllers\Auth\AcceptProfessionalInviteController;
+use App\Http\Controllers\Auth\CheckoutController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\SelfRegistrationController;
 use App\Http\Controllers\Auth\VerifyEmailController;
@@ -59,6 +60,10 @@ Route::get('/', fn () => Auth::check() ? redirect()->route('dashboard') : view('
 
 Route::view('/termos', 'legal.terms')->name('legal.terms');
 
+// Página pública pra consultor, corretor e (em breve) profissional de saúde.
+// A landing em / é só pro usuário final.
+Route::view('/profissionais', 'professionals')->name('professionals');
+
 /*
 | Visitantes
 |
@@ -70,6 +75,12 @@ Route::view('/termos', 'legal.terms')->name('legal.terms');
 Route::middleware('guest')->group(function (): void {
     Route::get('/entrar', [LoginController::class, 'show'])->name('login');
     Route::post('/entrar', [LoginController::class, 'store'])->name('login.store');
+
+    // Compra: resumo do pedido + criação de conta. A rota fixa de profissional
+    // vem antes de /comprar/{pacote} pra "profissional" não ser lido como pacote.
+    Route::get('/comprar/profissional', [CheckoutController::class, 'showProfessional'])->name('checkout.professional');
+    Route::get('/comprar/{pacote}', [CheckoutController::class, 'show'])->name('checkout.show');
+    Route::post('/comprar', [CheckoutController::class, 'store'])->name('checkout.store');
 
     Route::get('/cadastro', [SelfRegistrationController::class, 'show'])->name('register');
     Route::post('/cadastro', [SelfRegistrationController::class, 'store'])->name('register.store');

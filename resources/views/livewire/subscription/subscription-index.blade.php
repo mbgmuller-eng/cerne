@@ -2,7 +2,7 @@
 
     <div>
         <h1 class="font-display text-3xl font-semibold tracking-tight text-slate-900 dark:text-white">Assinatura</h1>
-        <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Escolha o pacote que cobre o que você precisa.</p>
+        <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">{{ $resumoDoPedido ? 'Confira o seu pedido e confirme para começar o teste grátis.' : 'Escolha o pacote que cobre o que você precisa.' }}</p>
     </div>
 
     @if (session('status'))
@@ -79,12 +79,61 @@
                 7 dias grátis. Você só é cobrado depois que o teste acabar.
             </p>
 
-            @if ($souProfissional)
+            @if ($trocandoPlano && $temIntencao)
+                <button type="button" wire:click="voltarAoPedido" class="text-xs text-brand-700 underline dark:text-brand-300">Voltar ao pedido que eu escolhi</button>
+            @endif
+
+            @if ($souProfissional && ! $resumoDoPedido)
                 <p class="text-xs text-slate-500 dark:text-slate-400">
                     Seus clientes vinculados e ativos recebem todas as áreas do Cerne, sem pagar nada. O valor depende só de quantos clientes você vincula.
                 </p>
             @endif
 
+            @if ($resumoDoPedido)
+                @php
+                    $valorMensal = $souProfissional
+                        ? \App\Support\ProfessionalPricing::priceFor((int) $clientCap)
+                        : (string) config('billing.prices.'.$pacoteDoPedido->value);
+                @endphp
+                <section class="card p-5">
+                    <p class="eyebrow">Resumo do pedido</p>
+                    <div class="mt-3 flex items-start justify-between gap-4">
+                        <div>
+                            @if ($souProfissional)
+                                <p class="font-display text-lg font-semibold text-slate-900 dark:text-white">Cerne para profissionais</p>
+                                <p class="mt-0.5 text-sm text-slate-500 dark:text-slate-400">Até {{ $clientCap }} clientes vinculados</p>
+                            @else
+                                <p class="font-display text-lg font-semibold text-slate-900 dark:text-white">{{ $pacoteDoPedido->label() }}</p>
+                            @endif
+                        </div>
+                        <p class="shrink-0 text-right text-lg font-semibold text-slate-900 dark:text-white">
+                            {{ \App\Support\Money::format($valorMensal) }}<span class="text-xs font-normal text-slate-400">/mês</span>
+                        </p>
+                    </div>
+
+                    <ul class="mt-4 space-y-2 border-t border-slate-100 pt-4 text-sm text-slate-600 dark:border-white/10 dark:text-slate-300">
+                        @if ($souProfissional)
+                            <li class="flex gap-2"><span class="text-accent-600 dark:text-accent-400">✓</span> Todas as áreas do Cerne para os seus clientes, sem custo para eles</li>
+                        @else
+                            @foreach ($pacoteDoPedido->modules() as $modulo)
+                                <li class="flex gap-2"><span class="text-accent-600 dark:text-accent-400">✓</span> <span><strong class="text-slate-900 dark:text-white">{{ $modulo->label() }}:</strong> {{ $modulo->summary() }}</span></li>
+                            @endforeach
+                        @endif
+                    </ul>
+
+                    <dl class="mt-4 space-y-2 border-t border-slate-100 pt-4 text-sm dark:border-white/10">
+                        <div class="flex justify-between gap-4">
+                            <dt class="text-slate-600 dark:text-slate-300">Hoje <span class="text-xs text-slate-400">(7 dias grátis)</span></dt>
+                            <dd class="font-semibold text-slate-900 dark:text-white">{{ \App\Support\Money::format(0) }}</dd>
+                        </div>
+                        <div class="flex justify-between gap-4">
+                            <dt class="text-slate-600 dark:text-slate-300">A partir de {{ $primeiraCobranca->format('d/m/Y') }}</dt>
+                            <dd class="font-semibold text-slate-900 dark:text-white">{{ \App\Support\Money::format($valorMensal) }}/mês</dd>
+                        </div>
+                    </dl>
+                    <p class="mt-3 text-xs text-slate-400">Cancele quando quiser, sem fidelidade. O acesso é encerrado na hora do cancelamento.</p>
+                </section>
+            @endif
             <div class="card p-5">
                 <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">CPF ou CNPJ</label>
                 <input type="text" wire:model="cpfCnpj" class="input mt-1.5" placeholder="Só números" maxlength="18">
@@ -105,11 +154,11 @@
                     @endforeach
                 </div>
                 @if ($metodoPagamento === 'pix')
-                    <p class="mt-1.5 text-xs text-slate-400">A gente avisa por e-mail 3 dias antes de cada vencimento, já que o Pix não tem débito automático.</p>
+                    <p class="mt-1.5 text-xs text-slate-400">Avisamos por e-mail 3 dias antes de cada vencimento, já que o Pix não tem débito automático.</p>
                 @endif
                 @error('metodoPagamento') <p class="mt-1.5 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
 
-                @if ($souProfissional)
+                @if ($souProfissional && ! $resumoDoPedido)
                     <label class="mt-4 block text-xs font-medium text-slate-500 dark:text-slate-400">Quantos clientes você vai vincular</label>
                     <select wire:model.live="clientCap" class="input mt-1.5">
                         <option value="">Escolha</option>
@@ -122,7 +171,13 @@
                 @endif
             </div>
 
-            @if ($souProfissional)
+            @if ($resumoDoPedido)
+                <button type="button" wire:click="assinar('{{ $souProfissional ? \App\Enums\SubscriptionBundle::Completo->value : $pacoteDoPedido->value }}')" wire:loading.attr="disabled" class="btn-primary w-full py-3 text-base">
+                    Confirmar e começar 7 dias grátis
+                </button>
+                <p class="text-center text-xs text-slate-400">Você será levado à fatura da Asaas. Nada é cobrado antes do fim do teste.</p>
+                <button type="button" wire:click="trocarPlano" class="mx-auto block text-xs text-brand-700 underline dark:text-brand-300">Escolher outro plano</button>
+            @elseif ($souProfissional)
                 <div class="card flex items-center justify-between gap-4 p-5">
                     <div>
                         <p class="text-sm font-semibold text-slate-900 dark:text-white">Assinatura do profissional</p>
