@@ -191,12 +191,14 @@
         ['admin.users', 'Contas e perfis', 'Contas', 'admin'],
         ['admin.banks', 'Bancos', 'Bancos', 'cards'],
     ];
-    if ($user?->isLinkedProfessional()) {
-        $navAdmin[] = $user->isBroker()
-            ? ['consultant.portfolio.insurance', 'Seguros da carteira', 'Seguros', 'shield']
-            : ['consultant.portfolio', 'Painel da carteira', 'Carteira', 'invest'];
-    }
-
+    // Quem é profissional E administrador precisa de um caminho de volta
+    // óbvio pra área de trabalho dele: fica em destaque, fora da lista de
+    // telas da plataforma (que são de outra natureza).
+    $voltarAoPainel = $user?->isLinkedProfessional() ? [
+        'rota' => $user->isBroker() ? 'consultant.portfolio.insurance' : 'consultant.portfolio',
+        'nome' => $user->isBroker() ? 'Painel do corretor' : 'Painel do consultor',
+        'curto' => $user->isBroker() ? 'Seguros' : 'Consultoria',
+    ] : null;
     // "Página inicial" de cada profissional — corretor não tem Painel da
     // carteira (é tela financeira), a dele é Seguros da carteira.
     $homeRouteProfissional = $user?->isBroker() ? 'consultant.portfolio.insurance' : 'consultant.portfolio';
@@ -428,28 +430,38 @@
                 <p class="mt-1 truncate text-xs text-slate-500 dark:text-slate-400">Painel admin</p>
             </div>
 
-            <nav class="flex-1 space-y-0.5 overflow-y-auto px-3">
-                <a href="{{ route('admin.users') }}" @class(['nav-item', 'nav-item-active' => request()->routeIs('admin.users')])>
-                    <x-nav-icon name="admin" />
-                    <span>Contas e perfis</span>
-                </a>
-                <a href="{{ route('admin.banks') }}" @class(['nav-item', 'nav-item-active' => request()->routeIs('admin.banks')])>
-                    <x-nav-icon name="cards" />
-                    <span>Bancos</span>
-                    @if ($bancosPendentes > 0)
-                        <span class="badge ml-auto bg-amber-50 text-amber-900 ring-1 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-300 dark:ring-amber-500/20">{{ $bancosPendentes }}</span>
-                    @endif
-                </a>
-
-                @if ($user->isLinkedProfessional())
-                    <a href="{{ route($homeRouteProfissional) }}" class="nav-item mt-1">
-                        <x-nav-icon name="invest" />
-                        <span>{{ $user->isBroker() ? 'Seguros da carteira' : 'Painel da carteira' }}</span>
+            <nav class="flex flex-1 flex-col overflow-y-auto px-3">
+                @if ($voltarAoPainel)
+                    <a href="{{ route($voltarAoPainel['rota']) }}" class="mb-6 flex items-center gap-3 rounded-xl border border-brand-950/10 bg-slate-50 px-3 py-2.5 text-brand-800 transition hover:bg-slate-100 dark:border-white/10 dark:bg-white/5 dark:text-white dark:hover:bg-white/10">
+                        <x-nav-icon name="back" />
+                        <span class="min-w-0 leading-tight">
+                            <span class="block text-[10px] font-semibold tracking-wide text-slate-400 uppercase dark:text-slate-500">Voltar para</span>
+                            <span class="block truncate text-sm font-medium">{{ $voltarAoPainel['nome'] }}</span>
+                        </span>
                     </a>
                 @endif
+
+                <p class="px-3 pb-1 text-[10px] font-semibold tracking-wide text-slate-400 uppercase dark:text-slate-500">Plataforma</p>
+                <div class="space-y-0.5">
+                    <a href="{{ route('admin.users') }}" @class(['nav-item', 'nav-item-active' => request()->routeIs('admin.users')])>
+                        <x-nav-icon name="admin" />
+                        <span>Contas e perfis</span>
+                    </a>
+                    <a href="{{ route('admin.banks') }}" @class(['nav-item', 'nav-item-active' => request()->routeIs('admin.banks')])>
+                        <x-nav-icon name="cards" />
+                        <span>Bancos</span>
+                        @if ($bancosPendentes > 0)
+                            <span class="badge ml-auto bg-amber-50 text-amber-900 ring-1 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-300 dark:ring-amber-500/20">{{ $bancosPendentes }}</span>
+                        @endif
+                    </a>
+                </div>
             </nav>
 
             <div class="border-t border-brand-950/5 p-3 dark:border-white/10">
+                <a href="{{ route('my-account') }}" @class(['nav-item mb-1', 'nav-item-active' => request()->routeIs('my-account')])>
+                    <x-nav-icon name="users" />
+                    <span>Minha conta</span>
+                </a>
                 <div class="flex items-center gap-3 px-2 py-1.5">
                     <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-100 text-xs font-semibold text-brand-800 dark:bg-white/10 dark:text-white">
                         {{ mb_strtoupper(mb_substr($user->name, 0, 1)) }}
@@ -736,7 +748,7 @@
     </div>
 @elseif ($areaAdmin)
     <nav
-        class="fixed inset-x-0 bottom-0 z-30 flex overflow-x-auto border-t border-brand-950/5 bg-white/95 backdrop-blur transform-gpu will-change-transform lg:hidden dark:border-white/10 dark:bg-slate-900/95"
+        class="fixed inset-x-0 bottom-0 z-30 flex border-t border-brand-950/5 bg-white/95 backdrop-blur transform-gpu will-change-transform lg:hidden dark:border-white/10 dark:bg-slate-900/95"
         style="padding-bottom: env(safe-area-inset-bottom)"
     >
         @foreach ($navAdmin as [$route, $label, $curto, $icone])
@@ -745,6 +757,17 @@
                 <span>{{ $curto }}</span>
             </a>
         @endforeach
+        {{-- Volta pra área de trabalho: separado das telas da plataforma. --}}
+        @if ($voltarAoPainel)
+            <a href="{{ route($voltarAoPainel['rota']) }}" class="tab-item border-l border-brand-950/10 dark:border-white/10">
+                <x-nav-icon name="back" class="h-6 w-6" />
+                <span>{{ $voltarAoPainel['curto'] }}</span>
+            </a>
+        @endif
+        <a href="{{ route('my-account') }}" @class(['tab-item', 'tab-item-active' => request()->routeIs('my-account')])>
+            <x-nav-icon name="users" class="h-6 w-6" />
+            <span>Minha conta</span>
+        </a>
     </nav>
 @endif
 

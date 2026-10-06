@@ -7,6 +7,9 @@
 --}}
 <svg {{ $attributes->merge(['class' => 'h-5 w-5 shrink-0']) }} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
     @switch($name)
+        @case('back')
+            <path d="M19 12H5"/><path d="m12 19-7-7 7-7"/>
+            @break
         @case('home')
             <path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/><path d="M10 21v-6h4v6"/>
             @break
