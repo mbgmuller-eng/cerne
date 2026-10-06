@@ -82,8 +82,8 @@ class ProductionCheck extends Command
             'Com a chave preenchida e sem token, o webhook recusa todos os avisos de pagamento e ninguém seria liberado.');
 
         $this->secao('Notificações');
-        $this->item('Chaves VAPID configuradas', filled(config('webpush.vapid.public_key')) && filled(config('webpush.vapid.private_key')),
-            'Sem elas, notificação push falha silenciosamente mesmo com o usuário inscrito.', aviso: true);
+        $this->item('Chaves VAPID válidas', $this->vapidValida(),
+            'Faltam chaves ou o assunto, ou algum valor está malformado (ex.: duas linhas do .env coladas numa). A notificação push falha silenciosamente mesmo com a pessoa inscrita. Gere um par novo com php artisan webpush:vapid e confira VAPID_SUBJECT (mailto:).', aviso: true);
 
         $this->secao('Cache');
         $this->item('Configuração em cache', file_exists(base_path('bootstrap/cache/config.php')),
@@ -129,6 +129,27 @@ class ProductionCheck extends Command
         $this->falhas++;
         $this->line("    <fg=red>✗</> {$rotulo}");
         $this->line("      <fg=gray>{$porque}</>");
+    }
+
+    /**
+     * Não basta estar preenchida: a biblioteca de push só descobre uma chave
+     * malformada na hora de assinar o envio, e a falha some em silêncio. O
+     * validador dela confere o assunto e o tamanho das duas chaves
+     * (pública 65 bytes, privada 32 bytes, depois de decodificadas).
+     */
+    private function vapidValida(): bool
+    {
+        try {
+            \Minishlink\WebPush\VAPID::validate([
+                'subject' => (string) config('webpush.vapid.subject'),
+                'publicKey' => (string) config('webpush.vapid.public_key'),
+                'privateKey' => (string) config('webpush.vapid.private_key'),
+            ]);
+
+            return filled(config('webpush.vapid.subject'));
+        } catch (\Throwable) {
+            return false;
+        }
     }
 
     private function bancoResponde(): bool
