@@ -54,6 +54,101 @@ class NotificationCenterTest extends TestCase
             ->assertViewHas('unreadCount', 0);
     }
 
+    /** @param  array<string, mixed>  $dados */
+    private function gravar(User $usuario, array $dados, ?string $quando = null): string
+    {
+        $id = (string) \Illuminate\Support\Str::uuid();
+        \Illuminate\Notifications\DatabaseNotification::create([
+            'id' => $id,
+            'type' => 'App\Notifications\Qualquer',
+            'notifiable_type' => User::class,
+            'notifiable_id' => $usuario->id,
+            'data' => $dados,
+            'created_at' => $quando ?? now(),
+        ]);
+
+        return $id;
+    }
+
+    public function test_aniversario_mostra_quem_e_quando_em_vez_de_so_o_nome(): void
+    {
+        $usuario = $this->criarUsuarioComPerfil();
+        // Formato exato do registro antigo em produção: só kind e campos crus.
+        $this->gravar($usuario, [
+            'kind' => 'client_birthday_upcoming', 'member_id' => 'x', 'title' => 'Helen Muller',
+            'occurrence_date' => '2026-10-14', 'turning_age' => 40,
+        ]);
+
+        Livewire::test(NotificationCenter::class)
+            ->assertSee('Aniversário chegando')
+            ->assertSee('Helen Muller completa 40 anos em 14/10');
+    }
+
+    public function test_cada_tipo_diz_do_que_trata(): void
+    {
+        $usuario = $this->criarUsuarioComPerfil();
+        $casos = [
+            [['kind' => 'insurance_policy_expiring_upcoming', 'title' => 'Allianz', 'person_label' => 'Carolina', 'expiry_date' => '2026-10-20'], 'Apólice vencendo', 'Apólice Allianz (Carolina) vence em 20/10'],
+            [['kind' => 'insurance_policy_anniversary_upcoming', 'title' => 'Icatu', 'years_completing' => 3, 'occurrence_date' => '2026-10-09'], 'Aniversário de apólice', 'Apólice Icatu completa 3 ano(s) em 09/10'],
+            [['kind' => 'investment_maturity_upcoming', 'title' => 'CDB Inter 2028', 'maturity_date' => '2026-11-02'], 'Investimento vencendo', 'CDB Inter 2028 vence em 02/11'],
+            [['kind' => 'fixed_bill_due_soon', 'title' => 'Internet', 'due_date' => '2026-10-10', 'amount' => '129.90'], 'Conta a vencer', 'Internet vence em 10/10 (R$ 129,90)'],
+            [['kind' => 'document_processed', 'title' => 'Fatura_Itau.pdf', 'status' => 'completed'], 'Importação concluída', 'Fatura_Itau.pdf'],
+            [['kind' => 'document_processed', 'title' => 'Fatura_Itau.pdf', 'status' => 'failed'], 'Falha na importação', 'Fatura_Itau.pdf'],
+        ];
+
+        foreach ($casos as [$dados, $titulo, $mensagem]) {
+            $this->gravar($usuario, $dados);
+        }
+
+        $tela = Livewire::test(NotificationCenter::class);
+        foreach ($casos as [$dados, $titulo, $mensagem]) {
+            $tela->assertSee($titulo)->assertSee($mensagem);
+        }
+    }
+
+    public function test_tipo_desconhecido_cai_no_titulo_gravado(): void
+    {
+        $usuario = $this->criarUsuarioComPerfil();
+        $this->gravar($usuario, ['title' => 'Algo novo']);
+
+        Livewire::test(NotificationCenter::class)->assertSee('Algo novo');
+    }
+
+    public function test_clicar_marca_como_lida_e_abre_a_tela_do_assunto(): void
+    {
+        $usuario = $this->criarUsuarioComPerfil();
+        $id = $this->gravar($usuario, [
+            'kind' => 'client_birthday_upcoming', 'title' => 'Helen Muller', 'occurrence_date' => '2026-10-14', 'turning_age' => 40,
+        ]);
+
+        Livewire::test(NotificationCenter::class)
+            ->call('open', $id)
+            ->assertRedirect(route('consultant.portfolio.important-dates'));
+
+        self::assertNotNull($usuario->notifications()->find($id)->read_at);
+    }
+
+    public function test_clicar_em_notificacao_sem_destino_so_marca_como_lida(): void
+    {
+        $usuario = $this->criarUsuarioComPerfil();
+        $id = $this->gravar($usuario, ['title' => 'Sem link']);
+
+        Livewire::test(NotificationCenter::class)->call('open', $id)->assertNoRedirect();
+
+        self::assertNotNull($usuario->notifications()->find($id)->read_at);
+    }
+
+    public function test_nao_abre_notificacao_de_outra_pessoa(): void
+    {
+        $usuario = $this->criarUsuarioComPerfil();
+        $outra = User::factory()->create();
+        $id = $this->gravar($outra, ['kind' => 'fixed_bill_due_soon', 'title' => 'Internet', 'due_date' => '2026-10-10']);
+
+        Livewire::test(NotificationCenter::class)->call('open', $id)->assertNoRedirect();
+
+        self::assertNull($outra->notifications()->find($id)->read_at);
+    }
+
     private function criarUsuarioComPerfil(): User
     {
         $usuario = User::factory()->create();

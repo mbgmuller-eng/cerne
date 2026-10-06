@@ -76,6 +76,7 @@ class InsurancePolicyAnniversaryUpcoming extends Notification implements ShouldQ
             'kind' => 'insurance_policy_anniversary_upcoming',
             'insurance_policy_id' => $this->policyId,
             'title' => $this->insurerName,
+            'person_label' => $this->personLabel,
             'occurrence_date' => $this->occurrenceDate,
             'years_completing' => $this->yearsCompleting,
         ];

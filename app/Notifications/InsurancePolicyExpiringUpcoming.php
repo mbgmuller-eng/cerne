@@ -72,6 +72,7 @@ class InsurancePolicyExpiringUpcoming extends Notification implements ShouldQueu
             'kind' => 'insurance_policy_expiring_upcoming',
             'insurance_policy_id' => $this->policyId,
             'title' => $this->insurerName,
+            'person_label' => $this->personLabel,
             'expiry_date' => $this->expiryDate,
         ];
     }

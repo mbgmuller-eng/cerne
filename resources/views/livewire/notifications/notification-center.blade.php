@@ -37,16 +37,27 @@
             </p>
         @else
             <ul class="max-h-96 divide-y divide-slate-100 overflow-y-auto dark:divide-white/10">
-                @foreach ($notifications as $n)
+                @foreach ($notifications as ['notificacao' => $n, 'dados' => $d])
                     <li
-                        wire:click="markAsRead('{{ $n->id }}')"
+                        wire:key="notificacao-{{ $n->id }}"
+                        wire:click="open('{{ $n->id }}')"
                         @class([
                             'cursor-pointer px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-white/5',
                             'bg-brand-50/60 dark:bg-brand-500/10' => $n->read_at === null,
                         ])
                     >
-                        <p class="truncate text-sm text-slate-800 dark:text-slate-200">{{ $n->data['title'] ?? 'Notificação' }}</p>
-                        <p class="mt-0.5 text-xs text-slate-400">{{ $n->created_at->diffForHumans() }}</p>
+                        <div class="flex items-start gap-2">
+                            @if ($n->read_at === null)
+                                <span class="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-brand-700 dark:bg-brand-300" aria-label="Não lida"></span>
+                            @endif
+                            <div class="min-w-0 flex-1">
+                                <p class="truncate text-sm font-medium text-slate-900 dark:text-white">{{ $d['heading'] }}</p>
+                                @if ($d['message'])
+                                    <p class="mt-0.5 text-xs text-slate-600 dark:text-slate-300">{{ $d['message'] }}</p>
+                                @endif
+                                <p class="mt-0.5 text-xs text-slate-400">{{ $n->created_at->diffForHumans() }}</p>
+                            </div>
+                        </div>
                     </li>
                 @endforeach
             </ul>

@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Notifications;
 
+use App\Support\NotificationPresenter;
 use Livewire\Component;
 
 /**
@@ -32,6 +33,24 @@ class NotificationCenter extends Component
         auth()->user()->unreadNotifications()->where('id', $id)->first()?->markAsRead();
     }
 
+    /**
+     * Clique na notificação: marca como lida e abre a tela de que ela trata.
+     * Sem destino conhecido, só marca.
+     */
+    public function open(string $id)
+    {
+        $notificacao = auth()->user()->notifications()->where('id', $id)->first();
+
+        if ($notificacao === null) {
+            return null;
+        }
+
+        $notificacao->markAsRead();
+        $url = NotificationPresenter::present($notificacao)['url'];
+
+        return $url !== null ? $this->redirect($url) : null;
+    }
+
     public function markAllAsRead(): void
     {
         auth()->user()->unreadNotifications->markAsRead();
@@ -40,7 +59,8 @@ class NotificationCenter extends Component
     public function render()
     {
         return view('livewire.notifications.notification-center', [
-            'notifications' => auth()->user()->notifications()->latest()->limit(10)->get(),
+            'notifications' => auth()->user()->notifications()->latest()->limit(10)->get()
+                ->map(fn ($n) => ['notificacao' => $n, 'dados' => NotificationPresenter::present($n)]),
             'unreadCount' => auth()->user()->unreadNotifications()->count(),
         ]);
     }
