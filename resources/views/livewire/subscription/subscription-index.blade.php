@@ -16,6 +16,65 @@
             <p class="eyebrow">Sua assinatura</p>
             <x-subscription-summary :subscription="$assinaturaAtual">
                 <x-slot:actions>
+                    {{-- Pix Automático: autorização do débito mensal. Fica fora do
+                         @if de acesso de propósito: quem está com o teste acabando
+                         (ou já vencido) precisa conseguir ativar. --}}
+                    @if ($assinaturaAtual->billing_type === \App\Enums\PaymentMethod::PixAutomatic && $assinaturaAtual->status !== \App\Enums\SubscriptionStatus::Cancelled)
+                        <div class="mt-3 space-y-3 rounded-xl border border-slate-200 p-4 dark:border-white/10">
+                            @if ($assinaturaAtual->hasActivePixAuthorization())
+                                <p class="text-sm font-medium text-emerald-700 dark:text-emerald-400">Débito automático ativo</p>
+                                <p class="text-xs text-slate-500 dark:text-slate-400">
+                                    As cobranças mensais são debitadas da sua conta pelo Pix Automático, sem nenhuma ação sua.
+                                    Para interromper, cancele a assinatura aqui ou a autorização no aplicativo do seu banco.
+                                </p>
+                            @else
+                                <p class="text-sm font-semibold text-slate-900 dark:text-white">Débito automático por Pix</p>
+                                <p class="text-xs text-slate-500 dark:text-slate-400">
+                                    Você paga o primeiro mês ({{ \App\Support\Money::format($assinaturaAtual->monthlyPrice()) }}) por um QR Code.
+                                    Esse pagamento também autoriza o seu banco a debitar as cobranças seguintes sozinho.
+                                    Você pode cancelar a autorização quando quiser.
+                                </p>
+
+                                @if (in_array($assinaturaAtual->pix_authorization_status, ['REFUSED', 'CANCELLED', 'EXPIRED'], true))
+                                    <p class="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-900 ring-1 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-300 dark:ring-amber-500/20">
+                                        A autorização anterior não foi concluída. Gere um novo QR Code para tentar de novo.
+                                    </p>
+                                @endif
+
+                                <button type="button" wire:click="ativarDebitoAutomatico" wire:loading.attr="disabled" class="btn-primary">
+                                    {{ $pixQr ? 'Gerar um novo QR Code' : 'Pagar o primeiro mês e ativar' }}
+                                </button>
+
+                                @if ($pixQr)
+                                    {{-- Enquanto o QR está aberto, confere a ativação a cada 5 segundos. --}}
+                                    <div wire:poll.5s="atualizarAtivacao" class="space-y-3 border-t border-slate-100 pt-3 dark:border-white/10" x-data="{ copiado: false }">
+                                        @if ($pixQr['qrImage'])
+                                            <img src="data:image/png;base64,{{ $pixQr['qrImage'] }}" alt="QR Code do Pix Automático" class="mx-auto h-48 w-48 rounded-lg bg-white p-2 ring-1 ring-slate-200">
+                                        @endif
+
+                                        @if ($pixQr['payload'])
+                                            <div>
+                                                <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Pix copia e cola</label>
+                                                <textarea x-ref="codigo" readonly rows="3" class="input mt-1.5 text-xs">{{ $pixQr['payload'] }}</textarea>
+                                                <button type="button" class="btn-secondary mt-2 px-3 py-1.5 text-xs"
+                                                    @click="navigator.clipboard.writeText($refs.codigo.value); copiado = true; setTimeout(() => copiado = false, 2000)">
+                                                    <span x-show="!copiado">Copiar código</span>
+                                                    <span x-show="copiado" x-cloak>Código copiado</span>
+                                                </button>
+                                            </div>
+                                        @endif
+
+                                        <p class="text-xs text-slate-500 dark:text-slate-400">
+                                            @if ($pixQr['expiresAt'])
+                                                O QR Code vale até {{ \Illuminate\Support\Carbon::parse($pixQr['expiresAt'])->format('d/m/Y \à\s H:i') }}.
+                                            @endif
+                                            Abra o aplicativo do seu banco, pague e aceite o débito automático. Esta tela atualiza sozinha quando o banco confirmar.
+                                        </p>
+                                    </div>
+                                @endif
+                            @endif
+                        </div>
+                    @endif
                     @if ($temAcessoAtivo)
                         @if ($souProfissional)
                             <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
@@ -141,8 +200,8 @@
                 @error('cpfCnpj') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
 
                 <label class="mt-4 block text-xs font-medium text-slate-500 dark:text-slate-400">Forma de pagamento</label>
-                <div class="mt-1.5 grid grid-cols-2 gap-2">
-                    @foreach (\App\Enums\PaymentMethod::cases() as $metodo)
+                <div @class(['mt-1.5 grid gap-2', 'sm:grid-cols-3' => count(\App\Enums\PaymentMethod::available()) > 2, 'grid-cols-2' => count(\App\Enums\PaymentMethod::available()) <= 2])>
+                    @foreach (\App\Enums\PaymentMethod::available() as $metodo)
                         <label @class([
                             'cursor-pointer rounded-lg border px-3 py-2 text-center text-sm font-medium',
                             'border-brand-700 bg-brand-50 text-brand-900 dark:border-brand-500 dark:bg-brand-500/10 dark:text-brand-200' => $metodoPagamento === $metodo->value,
@@ -154,7 +213,9 @@
                     @endforeach
                 </div>
                 @if ($metodoPagamento === 'pix')
-                    <p class="mt-1.5 text-xs text-slate-400">Avisamos por e-mail 3 dias antes de cada vencimento, já que o Pix não tem débito automático.</p>
+                    <p class="mt-1.5 text-xs text-slate-400">Avisamos por e-mail 3 dias antes de cada vencimento, já que o Pix comum não tem débito automático.</p>
+                @elseif ($metodoPagamento === 'pix_automatic')
+                    <p class="mt-1.5 text-xs text-slate-400">Você usa os 7 dias grátis e, perto do fim, autoriza o débito no seu banco por um QR Code. O primeiro mês é pago nessa hora e as cobranças seguintes saem sozinhas.</p>
                 @endif
                 @error('metodoPagamento') <p class="mt-1.5 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
 

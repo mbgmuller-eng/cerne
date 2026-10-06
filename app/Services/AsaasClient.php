@@ -142,6 +142,92 @@ class AsaasClient
         }
     }
 
+    /**
+     * Pix Automático: cria a autorização, cujo QR Code cobra o primeiro mês e
+     * pede ao banco do cliente o consentimento para os débitos seguintes. Modo
+     * MANUAL de propósito: o valor de cada mês é calculado pelo Cerne na hora
+     * de cobrar, então um aumento de faixa vale no ciclo seguinte (no modo
+     * SUBSCRIPTION o valor ficaria fixo na autorização).
+     *
+     * `contractId` aceita no máximo 35 caracteres, e um UUID com hífens tem 36.
+     * A resposta traz o "copia e cola" e a imagem do QR enquanto a autorização
+     * está CREATED (depois de cancelada vêm nulos).
+     *
+     * @return array{id: string, status: string, payload: ?string, qrImage: ?string, expiresAt: ?string}
+     */
+    public function createPixAuthorization(string $customerId, string $subscriptionId, string $valorPrimeiraCobranca): array
+    {
+        $resposta = $this->request()->post('/pix/automatic/authorizations', [
+            'customerId' => $customerId,
+            'frequency' => 'MONTHLY',
+            'contractId' => str_replace('-', '', $subscriptionId),
+            'startDate' => now()->addDay()->toDateString(),
+            'description' => 'Assinatura Cerne',
+            'paymentCreationMode' => 'MANUAL',
+            // Até 3 retentativas em dias diferentes, dentro de 7 dias do vencimento.
+            'retryPolicy' => 'ALLOW_THREE_IN_SEVEN_DAYS',
+            'immediateQrCode' => [
+                'expirationSeconds' => 86400,
+                'originalValue' => (float) $valorPrimeiraCobranca,
+            ],
+        ])->throw();
+
+        return $this->pixAuthorizationData($resposta->json());
+    }
+
+    /** @return array{id: string, status: string, payload: ?string, qrImage: ?string, expiresAt: ?string} */
+    public function getPixAuthorization(string $authorizationId): array
+    {
+        return $this->pixAuthorizationData($this->request()->get("/pix/automatic/authorizations/{$authorizationId}")->throw()->json());
+    }
+
+    public function cancelPixAuthorization(string $authorizationId): void
+    {
+        $this->request()->delete("/pix/automatic/authorizations/{$authorizationId}")->throw();
+    }
+
+    /**
+     * Cobrança do ciclo vinculada à autorização. A Asaas exige a autorização
+     * ATIVA e a criação entre 2 e 10 dias úteis antes do vencimento.
+     * `externalReference` é como o webhook de pagamento volta até a assinatura
+     * (cobrança manual não traz o id de uma assinatura da Asaas).
+     */
+    public function createPixAutomaticCharge(string $customerId, string $authorizationId, string $valor, string $vencimento, string $externalReference): string
+    {
+        return (string) $this->request()->post('/payments', [
+            'customer' => $customerId,
+            'billingType' => 'PIX',
+            'value' => (float) $valor,
+            'dueDate' => $vencimento,
+            'description' => 'Assinatura Cerne',
+            'externalReference' => $externalReference,
+            'pixAutomaticAuthorizationId' => $authorizationId,
+        ])->throw()->json('id');
+    }
+
+    /** Nova tentativa de uma instrução recusada. A Asaas rejeita pedido feito no próprio dia da data pedida. */
+    public function retryPixInstruction(string $instructionId, string $novoVencimento): void
+    {
+        $this->request()->post("/pix/automatic/paymentInstructions/{$instructionId}/retries", [
+            'dueDate' => $novoVencimento,
+        ])->throw();
+    }
+
+    /**
+     * @param  array<string, mixed>  $dados
+     * @return array{id: string, status: string, payload: ?string, qrImage: ?string, expiresAt: ?string}
+     */
+    private function pixAuthorizationData(array $dados): array
+    {
+        return [
+            'id' => (string) $dados['id'],
+            'status' => (string) ($dados['status'] ?? ''),
+            'payload' => $dados['payload'] ?? null,
+            'qrImage' => $dados['encodedImage'] ?? null,
+            'expiresAt' => $dados['immediateQrCode']['expirationDate'] ?? null,
+        ];
+    }
+
     private function request()
     {
         return Http::baseUrl(config('services.asaas.base_url'))

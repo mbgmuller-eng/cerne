@@ -7,6 +7,7 @@ use App\Services\InvestmentSnapshotService;
 use App\Services\InvoiceService;
 use App\Services\AsaasClient;
 use App\Services\RecurringIncomeService;
+use App\Services\PixAutomaticBillingService;
 use App\Services\SubscriptionReminderService;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Schedule;
@@ -99,6 +100,32 @@ Schedule::call(function (): void {
 
     logger()->info('Lembrete de Pix', ['notificados' => $notificados]);
 })->dailyAt('03:40')->name('lembrete-pix')->withoutOverlapping();
+
+// Pix Automático: cria a cobrança do próximo vencimento de quem já autorizou o
+// débito (a Asaas pede de 2 a 10 dias úteis de antecedência; o serviço cobra
+// 7 dias antes). Idempotente pelo índice único de subscription_charges.
+Schedule::call(function (): void {
+    $criadas = app(PixAutomaticBillingService::class)->createUpcomingCharges();
+
+    logger()->info('Cobranças do Pix Automático', ['criadas' => $criadas]);
+})->dailyAt('03:50')->name('pix-automatico-cobrancas')->withoutOverlapping();
+
+// Pix Automático: pede à Asaas as retentativas das instruções recusadas
+// (dias 2, 4 e 6 após o vencimento). De manhã, porque a Asaas rejeita pedido
+// feito no próprio dia da data pedida.
+Schedule::call(function (): void {
+    $pedidas = app(PixAutomaticBillingService::class)->requestPendingRetries();
+
+    logger()->info('Retentativas do Pix Automático', ['pedidas' => $pedidas]);
+})->dailyAt('03:55')->name('pix-automatico-retentativas')->withoutOverlapping();
+
+// Pix Automático: lembra de ativar o débito automático 3 dias antes de o
+// teste grátis acabar.
+Schedule::call(function (): void {
+    $avisados = app(SubscriptionReminderService::class)->notifyPixAutomaticActivation();
+
+    logger()->info('Lembrete de ativação do Pix Automático', ['avisados' => $avisados]);
+})->dailyAt('03:42')->name('lembrete-pix-automatico')->withoutOverlapping();
 
 // Assinatura em atraso: avisa no último dia da carência que o acesso é
 // cortado amanhã. Idempotente por índice único (subscription_notices).

@@ -9,8 +9,12 @@ use App\Enums\SubscriptionStatus;
 use App\Models\Subscription;
 use App\Rules\CpfCnpj;
 use App\Services\AsaasClient;
+use App\Services\PixAutomaticBillingService;
 use App\Support\ProfessionalPricing;
+use DomainException;
+use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
@@ -45,6 +49,15 @@ class SubscriptionIndex extends Component
 
     public bool $trocandoPlano = false;
 
+    /**
+     * QR Code da autorização do Pix Automático, só enquanto a pessoa está
+     * nesta tela esperando pagar (a Asaas só devolve o QR junto com a criação
+     * ou enquanto a autorização está CREATED).
+     *
+     * @var array{payload: ?string, qrImage: ?string, expiresAt: ?string}|null
+     */
+    public ?array $pixQr = null;
+
     public function mount(): void
     {
         $this->cpfCnpj = Auth::user()->cpf_cnpj ?? '';
@@ -71,6 +84,7 @@ class SubscriptionIndex extends Component
         }
 
         $metodo = PaymentMethod::tryFrom((string) ($intencao['metodo'] ?? ''));
+        $metodo = in_array($metodo, PaymentMethod::available(), true) ? $metodo : null;
 
         if ($this->kind() === SubscriptionKind::Professional && ($intencao['tipo'] ?? null) === 'profissional') {
             $teto = (int) ($intencao['clientes'] ?? 0);
@@ -97,7 +111,7 @@ class SubscriptionIndex extends Component
     {
         $regras = [
             'cpfCnpj' => ['required', 'string', new CpfCnpj],
-            'metodoPagamento' => ['required', Rule::in(array_column(PaymentMethod::cases(), 'value'))],
+            'metodoPagamento' => ['required', Rule::in(array_column(PaymentMethod::available(), 'value'))],
         ];
 
         if ($this->kind() === SubscriptionKind::Professional) {
@@ -130,6 +144,27 @@ class SubscriptionIndex extends Component
         // Só profissional escolhe teto — ver rules(), cliente Direct nunca
         // tem 'clientCap' no array validado.
         $teto = isset($data['clientCap']) ? (int) $data['clientCap'] : null;
+
+        // Pix Automático: o teste grátis corre só aqui. A autorização (cujo QR
+        // cobra o primeiro mês) é gerada quando a pessoa decide ativar, perto
+        // do fim do teste — ver ativarDebitoAutomatico().
+        if ($metodo === PaymentMethod::PixAutomatic) {
+            Subscription::create([
+                'user_id' => $usuario->id,
+                'kind' => $this->kind(),
+                'bundle' => $pacote,
+                'client_cap' => $teto,
+                'billing_type' => $metodo,
+                'status' => SubscriptionStatus::Trialing,
+                'current_period_ends_at' => now()->addDays(7),
+                'started_at' => now(),
+            ]);
+
+            session()->forget('checkout');
+            session()->flash('status', 'Assinatura criada: 7 dias grátis para testar. Perto do fim do teste, ative o débito automático por esta tela.');
+
+            return;
+        }
         $customerId = $asaas->findOrCreateCustomer($usuario->fresh());
         $resultado = $asaas->createSubscription($customerId, $pacote, $metodo, "Cerne — {$pacote->label()}", $teto);
 
@@ -164,13 +199,9 @@ class SubscriptionIndex extends Component
      * vira Cancelled; manter acesso "até o fim do mês" exigiria rastrear
      * isso à parte (fora de escopo por ora, ver conversa com o Marcelo).
      */
-    public function cancelar(AsaasClient $asaas): void
+    public function cancelar(AsaasClient $asaas, PixAutomaticBillingService $pix): void
     {
-        $assinatura = Subscription::query()
-            ->where('user_id', Auth::id())
-            ->ofKind($this->kind())
-            ->latest('created_at')
-            ->first();
+        $assinatura = $this->assinaturaAtual();
 
         if ($assinatura === null || ! $assinatura->isCurrent()) {
             return;
@@ -183,12 +214,67 @@ class SubscriptionIndex extends Component
             $asaas->cancelSubscription($assinatura->asaas_subscription_id);
         }
 
+        // Sem isso o banco continuaria com a autorização de débito de pé.
+        $pix->cancelAuthorization($assinatura);
+
         $assinatura->update([
             'status' => SubscriptionStatus::Cancelled,
             'cancelled_at' => now(),
         ]);
+        $this->pixQr = null;
 
         session()->flash('status', 'Assinatura cancelada. O acesso foi encerrado agora.');
+    }
+
+    /**
+     * Gera o QR Code do Pix Automático: o primeiro mês é pago por ele e o
+     * pagamento é também o pedido de autorização ao banco. Pode ser refeito
+     * (QR expirado, autorização recusada ou cancelada): o serviço cancela a
+     * anterior não concluída.
+     */
+    public function ativarDebitoAutomatico(PixAutomaticBillingService $pix): void
+    {
+        $assinatura = $this->assinaturaAtual();
+
+        abort_if($assinatura === null, 404);
+
+        try {
+            $autorizacao = $pix->startAuthorization($assinatura);
+        } catch (DomainException $e) {
+            session()->flash('status', $e->getMessage());
+
+            return;
+        } catch (RequestException $e) {
+            Log::warning('Pix Automático: a Asaas recusou a criação da autorização', ['erro' => $e->getMessage(), 'user_id' => Auth::id()]);
+            session()->flash('status', 'Não foi possível gerar o QR Code agora. Tente novamente em instantes.');
+
+            return;
+        }
+
+        $this->pixQr = [
+            'payload' => $autorizacao['payload'],
+            'qrImage' => $autorizacao['qrImage'],
+            'expiresAt' => $autorizacao['expiresAt'],
+        ];
+    }
+
+    /** Chamado pelo polling da tela enquanto o QR está aberto: some quando a autorização ativa ou falha. */
+    public function atualizarAtivacao(): void
+    {
+        $assinatura = $this->assinaturaAtual();
+
+        if ($assinatura === null) {
+            $this->pixQr = null;
+
+            return;
+        }
+
+        if ($assinatura->hasActivePixAuthorization()) {
+            $this->pixQr = null;
+            session()->flash('status', 'Débito automático ativado. As próximas cobranças saem sozinhas.');
+        } elseif (in_array($assinatura->pix_authorization_status, ['REFUSED', 'CANCELLED', 'EXPIRED'], true)) {
+            $this->pixQr = null;
+        }
     }
 
     /**
@@ -227,11 +313,7 @@ class SubscriptionIndex extends Component
     }
     public function render()
     {
-        $assinaturaAtual = Subscription::query()
-            ->where('user_id', Auth::id())
-            ->ofKind($this->kind())
-            ->latest('created_at')
-            ->first();
+        $assinaturaAtual = $this->assinaturaAtual();
 
         return view('livewire.subscription.subscription-index', [
             'bundles' => SubscriptionBundle::cases(),
@@ -243,6 +325,15 @@ class SubscriptionIndex extends Component
             'pacoteDoPedido' => $this->pacoteEscolhido !== '' ? SubscriptionBundle::tryFrom($this->pacoteEscolhido) : null,
             'primeiraCobranca' => now()->addDays(7),
         ]);
+    }
+
+    private function assinaturaAtual(): ?Subscription
+    {
+        return Subscription::query()
+            ->where('user_id', Auth::id())
+            ->ofKind($this->kind())
+            ->latest('created_at')
+            ->first();
     }
 
     private function kind(): SubscriptionKind

@@ -40,6 +40,19 @@ return [
     | caminho que já criou a assinatura de cortesia do Marcelo.
     */
 
+    /*
+    |---------------------------------------------------------------------------
+    | Pix Automático
+    |---------------------------------------------------------------------------
+    | Chave de liberação: enquanto estiver desligada a opção nem aparece no
+    | checkout. Ligar só depois de conferir, na Asaas de PRODUÇÃO, que a conta
+    | está elegível e que o webhook recebe os eventos PIX_AUTOMATIC_RECURRING_*.
+    | Assinaturas que já usam o método continuam funcionando com a chave
+    | desligada (ela só esconde a opção para quem ainda vai assinar).
+    */
+
+    'pix_automatic_enabled' => (bool) env('BILLING_PIX_AUTOMATIC', false),
+
     'professional' => [
         'first_tier_clients' => 10,
         'first_tier_price' => '79.90',

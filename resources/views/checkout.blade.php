@@ -94,8 +94,8 @@
 
                 <div>
                     <h2 class="font-display text-lg font-semibold text-slate-900 dark:text-white">2. Forma de pagamento</h2>
-                    <div class="mt-3 grid grid-cols-2 gap-2">
-                        @foreach (\App\Enums\PaymentMethod::cases() as $metodo)
+                    <div @class(['mt-3 grid gap-2', 'sm:grid-cols-3' => count(\App\Enums\PaymentMethod::available()) > 2, 'grid-cols-2' => count(\App\Enums\PaymentMethod::available()) <= 2])>
+                        @foreach (\App\Enums\PaymentMethod::available() as $metodo)
                             <label
                                 :class="metodo === '{{ $metodo->value }}' ? 'border-brand-700 bg-brand-50 text-brand-900 dark:border-brand-500 dark:bg-brand-500/10 dark:text-brand-200' : 'border-slate-200 text-slate-600 dark:border-slate-700 dark:text-slate-400'"
                                 class="cursor-pointer rounded-lg border px-3 py-3 text-center text-sm font-medium"
@@ -108,7 +108,10 @@
                     <p class="mt-2 text-xs text-slate-500 dark:text-slate-400">
                         Você confirma o pedido depois de validar o e-mail. A primeira cobrança só acontece quando o teste acabar,
                         e você recebe o link de pagamento por e-mail.
-                        <span x-show="metodo === 'pix'" x-cloak>No Pix, avisamos 3 dias antes de cada vencimento, porque ele não tem débito automático.</span>
+                        <span x-show="metodo === 'pix'" x-cloak>No Pix comum, avisamos 3 dias antes de cada vencimento, porque ele não tem débito automático.</span>
+                        @if (in_array(\App\Enums\PaymentMethod::PixAutomatic, \App\Enums\PaymentMethod::available(), true))
+                        <span x-show="metodo === 'pix_automatic'" x-cloak>No Pix Automático, perto do fim do teste você autoriza o débito no seu banco por um QR Code. O primeiro mês é pago nessa hora e as cobranças seguintes saem sozinhas.</span>
+                        @endif
                     </p>
                     @error('metodo') <p class="mt-1.5 text-sm text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
                 </div>
@@ -167,7 +170,7 @@
                         </div>
                         <div class="flex justify-between gap-4">
                             <dt class="text-slate-600 dark:text-slate-300">Pagamento</dt>
-                            <dd class="font-medium text-slate-900 dark:text-white" x-text="metodo === 'pix' ? 'Pix' : 'Cartão de crédito'">Cartão de crédito</dd>
+                            <dd class="font-medium text-slate-900 dark:text-white" x-text="{ pix: 'Pix', pix_automatic: 'Pix Automático' }[metodo] ?? 'Cartão de crédito'">Cartão de crédito</dd>
                         </div>
                     </dl>
 

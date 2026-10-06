@@ -67,7 +67,7 @@ class CheckoutController extends Controller
             'pacote' => [Rule::requiredIf(! $profissional), Rule::enum(SubscriptionBundle::class)],
             'papel' => [Rule::requiredIf($profissional), Rule::in(['consultant', 'broker'])],
             'clientes' => [Rule::requiredIf($profissional), 'integer', Rule::in(ProfessionalPricing::validCaps())],
-            'metodo' => ['required', Rule::enum(PaymentMethod::class)],
+            'metodo' => ['required', Rule::in(array_column(PaymentMethod::available(), 'value'))],
             'nome' => ['required', 'string', 'max:100'],
             'email' => ['required', 'email', 'max:255', 'unique:users,email'],
             'nascimento' => ['required', 'date', 'before:today', 'after:1900-01-01'],

@@ -6,6 +6,7 @@ use App\Enums\PaymentMethod;
 use App\Enums\SubscriptionStatus;
 use App\Models\Subscription;
 use App\Models\SubscriptionNotice;
+use App\Notifications\PixAutomaticActivationDue;
 use App\Notifications\PixPaymentDueSoon;
 use App\Notifications\SubscriptionAccessEnding;
 use Illuminate\Database\UniqueConstraintViolationException;
@@ -51,6 +52,34 @@ class SubscriptionReminderService
     }
 
     /**
+     * Pix Automático: o teste grátis acaba em 3 dias e o débito ainda não foi
+     * autorizado. O QR de autorização cobra o primeiro mês, então sem esse
+     * passo a pessoa perde o acesso no fim do teste.
+     */
+    public function notifyPixAutomaticActivation(): int
+    {
+        $fimDoTeste = Carbon::today()->addDays(self::DIAS_DE_ANTECEDENCIA);
+
+        $assinaturas = Subscription::query()
+            ->where('billing_type', PaymentMethod::PixAutomatic)
+            ->where('status', SubscriptionStatus::Trialing)
+            ->whereDate('current_period_ends_at', $fimDoTeste)
+            ->where(fn ($q) => $q->whereNull('pix_authorization_status')->orWhere('pix_authorization_status', '!=', 'ACTIVE'))
+            ->with('user')
+            ->get();
+
+        foreach ($assinaturas as $assinatura) {
+            $assinatura->user->notify(new PixAutomaticActivationDue(
+                $assinatura->bundle->label(),
+                $fimDoTeste->translatedFormat('d \\d\\e F'),
+                \App\Support\Money::format($assinatura->monthlyPrice()),
+            ));
+        }
+
+        return $assinaturas->count();
+    }
+
+    /**
      * Último dia da carência de quem está em atraso: o acesso é cortado
      * amanhã (Subscription::accessCutoffDate()). Roda todo dia; o índice
      * único em subscription_notices garante um aviso só mesmo se o cron
@@ -59,14 +88,18 @@ class SubscriptionReminderService
     public function notifyAccessEndingTomorrow(AsaasClient $asaas): int
     {
         $amanha = Carbon::tomorrow();
-        $vencimento = $amanha->copy()->subDays(Subscription::PAST_DUE_GRACE_DAYS);
-
+        // A carência varia por forma de pagamento (Pix Automático tem mais dias
+        // por causa das retentativas), então pega a faixa possível de
+        // vencimentos e confere o corte de cada assinatura.
         $assinaturas = Subscription::query()
             ->where('status', SubscriptionStatus::PastDue)
-            ->whereDate('current_period_ends_at', $vencimento)
+            ->whereBetween('current_period_ends_at', [
+                $amanha->copy()->subDays(Subscription::PIX_AUTOMATIC_GRACE_DAYS)->toDateString(),
+                $amanha->copy()->subDays(Subscription::PAST_DUE_GRACE_DAYS)->toDateString(),
+            ])
             ->with('user')
             ->get()
-            ->filter(fn (Subscription $assinatura) => $assinatura->isCurrent());
+            ->filter(fn (Subscription $assinatura) => $assinatura->isCurrent() && $assinatura->accessCutoffDate()->isSameDay($amanha));
 
         $avisados = 0;
 

@@ -15,6 +15,7 @@ use App\Models\PartnerInvite;
 use App\Models\ProfessionalInvite;
 use App\Models\ProfileMember;
 use App\Models\Subscription;
+use App\Models\SubscriptionCharge;
 use App\Models\SubscriptionNotice;
 use App\Models\SubscriptionWebhookEvent;
 use App\Models\User;
@@ -41,6 +42,7 @@ class TenancyCoverageTest extends TestCase
         // Identidade do usuário, não dado de um perfil financeiro.
         User::class => 'é a conta que acessa perfis, não um dado que pertence a um perfil',
         Subscription::class => 'assinatura é do usuário (user_id) — não existe por perfil',
+        SubscriptionCharge::class => 'cobrança mensal do Pix Automático da assinatura do usuário (subscription_id) — não existe por perfil; sustenta o índice único por ciclo',
         SubscriptionNotice::class => 'registro de aviso de cobrança já enviado — sustenta um índice único (assinatura, tipo, data), pertence à assinatura do usuário, não a um perfil',
         SubscriptionWebhookEvent::class => 'log de idempotência do webhook da Asaas — só existe pra sustentar um índice único em asaas_event_id, nunca consultado por perfil nenhum',
 

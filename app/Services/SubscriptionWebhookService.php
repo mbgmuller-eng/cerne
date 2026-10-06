@@ -4,7 +4,9 @@ namespace App\Services;
 
 use App\Enums\SubscriptionStatus;
 use App\Models\Subscription;
+use App\Models\SubscriptionCharge;
 use App\Models\SubscriptionWebhookEvent;
+use App\Notifications\PixAutomaticAuthorizationFailed;
 use App\Notifications\SubscriptionOverdue;
 use App\Notifications\SubscriptionPaymentFailed;
 use Illuminate\Database\UniqueConstraintViolationException;
@@ -31,6 +33,7 @@ class SubscriptionWebhookService
     private const EVENTOS_CARTAO_RECUSADO = ['PAYMENT_CREDIT_CARD_CAPTURE_REFUSED'];
     private const EVENTOS_REVERTIDO = ['PAYMENT_REFUNDED', 'PAYMENT_CHARGEBACK_REQUESTED'];
     private const EVENTOS_CANCELADO = ['SUBSCRIPTION_DELETED'];
+    private const PREFIXO_PIX_AUTOMATICO = 'PIX_AUTOMATIC_RECURRING_';
 
     public function __construct(private readonly AsaasClient $asaas) {}
 
@@ -48,13 +51,13 @@ class SubscriptionWebhookService
             return; // já processado antes — reentrega da Asaas, ignora.
         }
 
-        $asaasSubscriptionId = $payload['payment']['subscription'] ?? $payload['subscription']['id'] ?? null;
+        if (str_starts_with($tipo, self::PREFIXO_PIX_AUTOMATICO)) {
+            $this->tratarPixAutomatico($tipo, $payload);
 
-        if ($asaasSubscriptionId === null) {
             return;
         }
 
-        $assinatura = Subscription::query()->where('asaas_subscription_id', $asaasSubscriptionId)->first();
+        $assinatura = $this->localizarAssinatura($payload);
 
         if ($assinatura === null) {
             return;
@@ -73,6 +76,7 @@ class SubscriptionWebhookService
         }
 
         if (in_array($tipo, self::EVENTOS_PAGO, true)) {
+            $this->marcarCobrancaPaga($payload);
             $assinatura->update([
                 'status' => SubscriptionStatus::Active,
                 'current_period_ends_at' => $this->proximoVencimento($payload, $assinatura),
@@ -103,6 +107,172 @@ class SubscriptionWebhookService
         } elseif (in_array($tipo, self::EVENTOS_REVERTIDO, true)) {
             $this->encerrarPorEstornoOuChargeback($assinatura);
         }
+    }
+
+    /**
+     * Assinatura da Asaas (cartão e Pix comum) vem em `payment.subscription` ou
+     * `subscription.id`. A cobrança mensal do Pix Automático é criada pelo
+     * Cerne, sem assinatura na Asaas, e volta pela `externalReference`
+     * (ver PixAutomaticBillingService::externalReference()).
+     *
+     * @param  array<string, mixed>  $payload
+     */
+    private function localizarAssinatura(array $payload): ?Subscription
+    {
+        $asaasSubscriptionId = $payload['payment']['subscription'] ?? $payload['subscription']['id'] ?? null;
+
+        if ($asaasSubscriptionId !== null) {
+            return Subscription::query()->where('asaas_subscription_id', $asaasSubscriptionId)->first();
+        }
+
+        $referencia = $payload['payment']['externalReference'] ?? null;
+
+        if (is_string($referencia) && preg_match('/^cerne:([0-9a-f-]{36}):\d{4}-\d{2}$/', $referencia, $partes) === 1) {
+            return Subscription::query()->find($partes[1]);
+        }
+
+        return null;
+    }
+
+    /** @param  array<string, mixed>  $payload */
+    private function marcarCobrancaPaga(array $payload): void
+    {
+        $paymentId = $payload['payment']['id'] ?? null;
+
+        if ($paymentId === null) {
+            return;
+        }
+
+        SubscriptionCharge::query()->where('asaas_payment_id', $paymentId)->update([
+            'paid_at' => now(),
+            'retry_due_date' => null,
+        ]);
+    }
+
+    /**
+     * Eventos do Pix Automático: ciclo de vida da autorização e das instruções
+     * de débito. As cobranças em si (recebida, vencida) chegam pelos eventos
+     * PAYMENT_* de sempre, tratados acima.
+     *
+     * @param  array<string, mixed>  $payload
+     */
+    private function tratarPixAutomatico(string $tipo, array $payload): void
+    {
+        $sufixo = substr($tipo, strlen(self::PREFIXO_PIX_AUTOMATICO));
+
+        if (str_starts_with($sufixo, 'AUTHORIZATION_')) {
+            $this->tratarAutorizacao(substr($sufixo, strlen('AUTHORIZATION_')), $payload);
+
+            return;
+        }
+
+        if (str_starts_with($sufixo, 'PAYMENT_INSTRUCTION_')) {
+            $this->tratarInstrucao(substr($sufixo, strlen('PAYMENT_INSTRUCTION_')), $payload);
+
+            return;
+        }
+
+        // ELIGIBILITY_UPDATED e afins: só registro. Perder a elegibilidade
+        // significa que novas autorizações vão falhar, e isso aparece no log.
+        Log::info('Asaas: evento de Pix Automático sem tratamento', ['evento' => $tipo, 'elegibilidade' => $payload['eligibility'] ?? null]);
+    }
+
+    /** @param  array<string, mixed>  $payload */
+    private function tratarAutorizacao(string $evento, array $payload): void
+    {
+        $authorizationId = $payload['authorization']['id'] ?? null;
+        $assinatura = $authorizationId === null
+            ? null
+            : Subscription::query()->where('asaas_pix_authorization_id', $authorizationId)->first();
+
+        if ($assinatura === null) {
+            return;
+        }
+
+        if ($evento === 'ACTIVATED') {
+            $assinatura->update(['pix_authorization_status' => 'ACTIVE']);
+
+            // O primeiro mês foi pago junto com a autorização (QR imediato).
+            // Quem paga durante o teste não perde os dias que sobravam: o
+            // próximo vencimento conta a partir do fim do teste.
+            if ($assinatura->status !== SubscriptionStatus::Cancelled) {
+                $base = $this->maisRecente($assinatura->current_period_ends_at, Carbon::today());
+
+                $assinatura->update([
+                    'status' => SubscriptionStatus::Active,
+                    'current_period_ends_at' => $base->copy()->addMonthNoOverflow(),
+                ]);
+            }
+
+            return;
+        }
+
+        $status = match ($evento) {
+            'CANCELLED' => 'CANCELLED',
+            'EXPIRED' => 'EXPIRED',
+            'REFUSED' => 'REFUSED',
+            default => null,
+        };
+
+        if ($status === null) {
+            return; // CREATED: nada a fazer, o status já nasceu CREATED aqui.
+        }
+
+        $jaCancelada = $assinatura->status === SubscriptionStatus::Cancelled;
+        $assinatura->update(['pix_authorization_status' => $status]);
+
+        // Assinatura que o próprio cliente cancelou aqui não precisa de aviso.
+        if (! $jaCancelada) {
+            $assinatura->user->notify(new PixAutomaticAuthorizationFailed($assinatura->bundle->label(), $status === 'REFUSED'));
+        }
+    }
+
+    /**
+     * Instrução recusada: agenda a retentativa (2, 4 ou 6 dias após o
+     * vencimento, no máximo 3) para o job pedir à Asaas — ver
+     * PixAutomaticBillingService::requestPendingRetries(). Esgotadas as
+     * tentativas, a Asaas deixa a cobrança vencida e o fluxo normal de atraso
+     * (PAYMENT_OVERDUE) assume.
+     *
+     * @param  array<string, mixed>  $payload
+     */
+    private function tratarInstrucao(string $evento, array $payload): void
+    {
+        $instrucao = $payload['paymentInstruction'] ?? [];
+        $instructionId = $instrucao['id'] ?? null;
+        $paymentId = $instrucao['paymentId'] ?? $instrucao['payment']['id'] ?? null;
+
+        if ($instructionId === null) {
+            return;
+        }
+
+        $cobranca = SubscriptionCharge::query()
+            ->when($paymentId !== null, fn ($q) => $q->where('asaas_payment_id', $paymentId), fn ($q) => $q->where('asaas_instruction_id', $instructionId))
+            ->first();
+
+        if ($cobranca === null) {
+            return; // instrução do primeiro mês (QR imediato) ou de outra origem
+        }
+
+        // Sempre o id MAIS RECENTE: a retentativa de uma instrução recusada
+        // usa o id da última recusa.
+        $cobranca->update(['asaas_instruction_id' => $instructionId]);
+
+        if ($evento !== 'REFUSED' || $cobranca->paid_at !== null) {
+            return;
+        }
+
+        if ($cobranca->retry_attempts >= PixAutomaticBillingService::MAX_RETENTATIVAS) {
+            return;
+        }
+
+        $tentativa = $cobranca->retry_attempts + 1;
+
+        $cobranca->update([
+            'retry_attempts' => $tentativa,
+            'retry_due_date' => $cobranca->due_date->copy()->addDays($tentativa * PixAutomaticBillingService::INTERVALO_RETENTATIVA_DIAS),
+            'retry_requested_at' => null,
+        ]);
     }
 
     /**
