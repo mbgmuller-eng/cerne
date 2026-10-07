@@ -308,7 +308,7 @@ class InsuranceIndex extends Component
     /** @return Collection<int, InsurancePolicy> */
     public function getPoliciesProperty(): Collection
     {
-        $query = InsurancePolicy::query()->active()->with('member', 'broker')->orderBy('insurance_type');
+        $query = InsurancePolicy::query()->active()->with('member', 'broker', 'documents')->orderBy('insurance_type');
 
         if ($this->showPrivacyTabs) {
             $query->where('member_id', $this->viewAs === '' ? null : $this->viewAs);

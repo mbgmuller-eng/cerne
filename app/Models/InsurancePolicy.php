@@ -59,6 +59,17 @@ class InsurancePolicy extends Model
         return $this->belongsTo(User::class, 'broker_id');
     }
 
+    /**
+     * PDFs da apólice guardados em Documentos (categoria "Apólice de seguro"). Quem enxerga
+     * cada um continua sendo decidido por DocumentVisibilityScope, não por esta relação.
+     *
+     * @return HasMany<Document>
+     */
+    public function documents(): HasMany
+    {
+        return $this->hasMany(Document::class)->oldest('created_at');
+    }
+
     /** @return HasMany<InsurancePolicyRenewal> */
     public function renewals(): HasMany
     {

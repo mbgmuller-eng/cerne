@@ -283,6 +283,13 @@
                                                                     @if ($apolice->broker)
                                                                         <p class="text-xs text-brand-700 dark:text-brand-300">Compartilhado com {{ $apolice->broker->name }}</p>
                                                                     @endif
+                                                                    @foreach ($apolice->documents as $documento)
+                                                                        {{-- O arquivo mora em Documentos; aqui só o atalho para abrir o PDF da apólice. --}}
+                                                                        <a href="{{ route('documents.vault.file', $documento) }}" target="_blank" rel="noopener" class="mt-1 inline-flex items-center gap-1 text-xs font-medium text-brand-700 hover:underline dark:text-brand-300">
+                                                                            <svg class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M4 2a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V8l-5-6H4Zm6 0 4 5h-3a1 1 0 0 1-1-1V2Z"/></svg>
+                                                                            {{ $apolice->documents->count() > 1 ? 'Ver apólice (PDF) '.($loop->iteration) : 'Ver apólice (PDF)' }}
+                                                                        </a>
+                                                                    @endforeach
                                                                 </div>
 
                                                                 <div class="flex items-center gap-2">

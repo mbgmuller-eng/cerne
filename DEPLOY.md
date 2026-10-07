@@ -242,6 +242,20 @@ ssh -p 65002 -i ~/.ssh/cerne_hostinger u165451165@89.117.7.59 "cd ~/cerne && php
 
 A conta precisa ter perfil próprio com membro (treino é pessoal). Validação acusa o arquivo inteiro antes de gravar; rodar de novo não duplica (sessão = treino + data). Apague o JSON do servidor depois.
 
+## Carga de apólices de vida a partir de certificados em PDF (consultor)
+
+Para o consultor que recebe os certificados dos clientes (hoje Icatu): `cerne:import-policies` acha o cliente na carteira do consultor, cria ou atualiza a apólice e guarda o PDF em **Documentos**, ligado à apólice (a tela Seguros mostra "Ver apólice (PDF)"). O JSON sai da leitura dos PDFs e carrega CPF: é arquivo de servidor, apague depois. Formato do JSON: comentário em `App\Console\Commands\ImportPolicyCertificates`.
+
+```bash
+scp -P 65002 -i ~/.ssh/cerne_hostinger -r pasta_com_pdfs u165451165@89.117.7.59:~/certificados
+scp -P 65002 -i ~/.ssh/cerne_hostinger apolices.json u165451165@89.117.7.59:~/apolices.json
+ssh -p 65002 -i ~/.ssh/cerne_hostinger u165451165@89.117.7.59 "cd ~/cerne && php artisan cerne:import-policies ~/apolices.json --consultant=EMAIL_DO_CONSULTOR --pdf-dir=../certificados"
+# conferiu o relatório (simulação, nada gravado)? repita com --apply, depois apague os arquivos:
+ssh -p 65002 -i ~/.ssh/cerne_hostinger u165451165@89.117.7.59 "cd ~/cerne && php artisan cerne:import-policies ~/apolices.json --consultant=EMAIL_DO_CONSULTOR --pdf-dir=../certificados --apply && rm -rf ~/certificados ~/apolices.json"
+```
+
+Só age em clientes **ativos** do consultor. Casamento por CPF, ou por nome (e nascimento quando o cadastro tem); nome só parecido, dois clientes com o mesmo nome ou apólice já cadastrada para outro cliente viram `revisar` e não são aplicados. Apólice existente (mesmo número) é atualizada, não duplicada; rodar de novo não repete apólice nem PDF.
+
 ## Catálogo compartilhado de exercícios (Academia)
 
 Referência genérica (nome, grupo muscular, foto) que qualquer cliente vê ao montar o plano — não é dado de saúde de ninguém, por isso não é por conta (ver `App\Models\GymExerciseCatalog`, padrão `BelongsToProfileOrShared` igual `ExpenseCategory`/`Bank`).
