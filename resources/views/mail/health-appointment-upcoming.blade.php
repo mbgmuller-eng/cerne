@@ -14,7 +14,10 @@ Endereço: {{ $address }}<br>
 Telefone: {{ $phone }}<br>
 @endif
 @if ($bookedWith)
-Agendado com: {{ $bookedWith }}
+Agendado com: {{ $bookedWith }}<br>
+@endif
+@if ($mapsUrl)
+Como chegar: [Google Maps]({{ $mapsUrl }}) ou [Waze]({{ $wazeUrl }})
 @endif
 @endif
 

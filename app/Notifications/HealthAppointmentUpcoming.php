@@ -3,6 +3,7 @@
 namespace App\Notifications;
 
 use App\Models\HealthAppointment;
+use App\Support\MapLinks;
 use Carbon\CarbonImmutable;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -66,6 +67,7 @@ class HealthAppointmentUpcoming extends Notification implements ShouldQueue
     public function toMail(object $notifiable): MailMessage
     {
         $quando = CarbonImmutable::parse($this->scheduledAt);
+        $destino = MapLinks::destination($this->location, $this->address);
 
         return (new MailMessage)
             ->subject("{$this->kindLabel} em breve: {$this->title}")
@@ -78,6 +80,8 @@ class HealthAppointmentUpcoming extends Notification implements ShouldQueue
                 'address' => $this->address,
                 'phone' => $this->phone,
                 'bookedWith' => $this->bookedWith,
+                'mapsUrl' => $destino ? MapLinks::googleMaps($destino) : null,
+                'wazeUrl' => $destino ? MapLinks::waze($destino) : null,
                 'dateFormatted' => $quando->format('d/m'),
                 'timeFormatted' => $quando->format('H:i'),
                 'url' => route('health.appointments.index'),

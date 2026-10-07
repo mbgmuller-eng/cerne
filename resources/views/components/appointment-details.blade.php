@@ -5,6 +5,7 @@
     $composto = implode(' · ', array_filter([$consulta->specialty, $consulta->professional_name]));
     $quemAtende = $composto !== '' && $composto !== $consulta->title ? $composto : null;
     $onde = implode(' · ', array_filter([$consulta->location, $consulta->address]));
+    $destino = \App\Support\MapLinks::destination($consulta->location, $consulta->address);
     $agendamento = implode(' · ', array_filter([
         $consulta->booked_by_name ? 'por '.$consulta->booked_by_name : null,
         $consulta->booked_with_name ? 'com '.$consulta->booked_with_name : null,
@@ -17,7 +18,17 @@
             <p>{{ $quemAtende }}</p>
         @endif
         @if ($onde !== '')
-            <p>{{ $onde }}</p>
+            <p>
+                @if ($destino)
+                    {{-- O endereço só sai do Cerne quando a pessoa toca: nada de mapa embutido na página. --}}
+                    <a href="{{ \App\Support\MapLinks::googleMaps($destino) }}" target="_blank" rel="noopener noreferrer" class="underline hover:text-slate-700 dark:hover:text-slate-200" title="Abrir no Google Maps">{{ $onde }}</a>
+                    <span class="whitespace-nowrap">
+                        · <a href="{{ \App\Support\MapLinks::waze($destino) }}" target="_blank" rel="noopener noreferrer" class="font-medium text-saude-800 hover:underline dark:text-saude-200">Waze</a>
+                    </span>
+                @else
+                    {{ $onde }}
+                @endif
+            </p>
         @endif
         @if ($consulta->phone)
             <p>Telefone: <a href="tel:{{ preg_replace('/[^\d+]/', '', $consulta->phone) }}" class="underline hover:text-slate-700 dark:hover:text-slate-200">{{ $consulta->phone }}</a></p>

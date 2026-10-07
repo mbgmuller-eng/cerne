@@ -195,4 +195,72 @@ class HealthAppointmentDetailsTest extends TestCase
         self::assertStringContainsString('Maria, secretária', $html);
         self::assertStringNotContainsString('Segredo médico detalhado', $html, 'anotações de saúde não vão por e-mail');
     }
+
+    // ---- endereço clicável (Google Maps e Waze)
+
+    public function test_endereco_abre_no_google_maps_e_no_waze_so_com_os_links_comuns(): void
+    {
+        $this->preencher(Livewire::test(HealthAppointmentIndex::class), ['location' => 'Clínica São José', 'address' => 'Rua das Flores, 100 - Curitiba'])->call('save');
+
+        $destino = rawurlencode('Clínica São José, Rua das Flores, 100 - Curitiba');
+
+        Livewire::test(HealthAppointmentIndex::class)
+            ->assertSeeHtml('href="https://www.google.com/maps/search/?api=1&amp;query='.$destino.'"')
+            ->assertSeeHtml('href="https://waze.com/ul?q='.$destino.'&amp;navigate=yes"')
+            ->assertSeeHtml('target="_blank" rel="noopener noreferrer"')
+            ->assertSee('Waze')
+            // Só links: nada de mapa, imagem ou script de terceiros embutido na página.
+            ->assertDontSeeHtml('<iframe')
+            ->assertDontSeeHtml('maps.googleapis.com')
+            ->assertDontSeeHtml('maps.gstatic.com');
+    }
+
+    public function test_sem_estabelecimento_nem_endereco_nao_ha_link_de_mapa(): void
+    {
+        $this->preencher(Livewire::test(HealthAppointmentIndex::class), ['location' => '', 'address' => ''])->call('save');
+
+        Livewire::test(HealthAppointmentIndex::class)
+            ->assertDontSeeHtml('google.com/maps')
+            ->assertDontSee('Waze');
+    }
+
+    public function test_so_o_nome_do_estabelecimento_ja_serve_de_busca_no_mapa(): void
+    {
+        $this->preencher(Livewire::test(HealthAppointmentIndex::class), ['location' => 'Hospital Sírio-Libanês', 'address' => ''])->call('save');
+
+        Livewire::test(HealthAppointmentIndex::class)
+            ->assertSeeHtml('query='.rawurlencode('Hospital Sírio-Libanês'));
+    }
+
+    public function test_endereco_com_caracteres_especiais_e_codificado_e_nao_injeta_html(): void
+    {
+        $this->preencher(Livewire::test(HealthAppointmentIndex::class), ['location' => '', 'address' => 'Rua A & B, 5 "fundos" <b>x</b>'])->call('save');
+
+        $html = Livewire::test(HealthAppointmentIndex::class)->html();
+
+        self::assertStringContainsString('query='.rawurlencode('Rua A & B, 5 "fundos" <b>x</b>'), $html);
+        self::assertStringNotContainsString('<b>x</b>', $html);
+    }
+
+    public function test_o_lembrete_por_email_traz_o_como_chegar(): void
+    {
+        $this->preencher(Livewire::test(HealthAppointmentIndex::class), ['location' => 'Clínica X', 'address' => 'Rua X, 100'])->call('save');
+        $consulta = HealthAppointment::query()->with('member')->sole();
+
+        $html = (string) HealthAppointmentUpcoming::forAppointment($consulta)->toMail($this->usuario)->render();
+
+        self::assertStringContainsString('Como chegar', $html);
+        self::assertStringContainsString('https://www.google.com/maps/search/?api=1&amp;query='.rawurlencode('Clínica X, Rua X, 100'), $html);
+        self::assertStringContainsString('https://waze.com/ul?q='.rawurlencode('Clínica X, Rua X, 100'), $html);
+    }
+
+    public function test_o_lembrete_sem_local_nao_tem_como_chegar(): void
+    {
+        $this->preencher(Livewire::test(HealthAppointmentIndex::class), ['location' => '', 'address' => ''])->call('save');
+        $consulta = HealthAppointment::query()->with('member')->sole();
+
+        $html = (string) HealthAppointmentUpcoming::forAppointment($consulta)->toMail($this->usuario)->render();
+
+        self::assertStringNotContainsString('Como chegar', $html);
+    }
 }
