@@ -19,7 +19,7 @@ use Carbon\CarbonInterface;
 /** Carência de PastDue antes de travar o acesso — ver isCurrent(). */
 #[Fillable([
     'user_id', 'kind', 'bundle', 'client_cap', 'status', 'billing_type', 'current_period_ends_at',
-    'asaas_subscription_id', 'asaas_pix_authorization_id', 'pix_authorization_status', 'started_at', 'cancelled_at',
+    'asaas_subscription_id', 'asaas_pix_authorization_id', 'pix_authorization_status', 'invoice_settings_at', 'started_at', 'cancelled_at',
 ])]
 class Subscription extends Model
 {
@@ -45,6 +45,7 @@ class Subscription extends Model
             'current_period_ends_at' => 'date',
             'started_at' => 'date',
             'cancelled_at' => 'datetime',
+            'invoice_settings_at' => 'datetime',
         ];
     }
 

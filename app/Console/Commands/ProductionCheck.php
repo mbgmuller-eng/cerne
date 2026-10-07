@@ -84,6 +84,11 @@ class ProductionCheck extends Command
         $this->item('Bloqueio por falta de assinatura ligado', (bool) config('billing.enforce_access'),
             'Com BILLING_ENFORCE_ACCESS desligado, o acesso não trava quando o teste acaba. Revise as contas existentes e ligue.', aviso: true);
 
+        $this->item('Emissão de nota fiscal ligada', (bool) config('billing.invoices.enabled'),
+            'Com BILLING_ISSUE_INVOICES desligado, as assinaturas pagas não geram nota fiscal. Ligue depois de configurar a parte fiscal na Asaas.', aviso: true);
+        $this->item('Nota fiscal com serviço e ISS definidos', ! config('billing.invoices.enabled') || \App\Services\InvoiceSettingsService::isConfigured(),
+            'A emissão está ligada, mas falta BILLING_NF_SERVICE_CODE (ou _ID) ou BILLING_NF_ISS: a Asaas recusa a configuração e nenhuma nota é emitida.');
+
         $this->secao('Notificações');
         $this->item('Chaves VAPID válidas', $this->vapidValida(),
             'Faltam chaves ou o assunto, ou algum valor está malformado (ex.: duas linhas do .env coladas numa). A notificação push falha silenciosamente mesmo com a pessoa inscrita. Gere um par novo com php artisan webpush:vapid e confira VAPID_SUBJECT (mailto:).', aviso: true);

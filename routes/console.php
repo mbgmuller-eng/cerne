@@ -7,6 +7,7 @@ use App\Services\InvestmentSnapshotService;
 use App\Services\InvoiceService;
 use App\Services\AsaasClient;
 use App\Services\RecurringIncomeService;
+use App\Services\InvoiceSettingsService;
 use App\Services\PixAutomaticBillingService;
 use App\Services\SubscriptionReminderService;
 use Illuminate\Support\Facades\Cache;
@@ -118,6 +119,15 @@ Schedule::call(function (): void {
 
     logger()->info('Retentativas do Pix Automático', ['pedidas' => $pedidas]);
 })->dailyAt('03:55')->name('pix-automatico-retentativas')->withoutOverlapping();
+
+// Nota fiscal: aplica a emissão automática nas assinaturas da Asaas que ficaram
+// sem ela (Asaas fora do ar na hora, ou a emissão foi ligada depois). Só age com
+// BILLING_ISSUE_INVOICES ligado.
+Schedule::call(function (): void {
+    $configuradas = app(InvoiceSettingsService::class)->configurePending();
+
+    logger()->info('Nota fiscal nas assinaturas', ['configuradas' => $configuradas]);
+})->dailyAt('04:00')->name('nota-fiscal-pendentes')->withoutOverlapping();
 
 // Fim do teste grátis: avisa 3 dias antes (e-mail e sino do Cerne). Depois do
 // último dia o acesso trava. Idempotente por índice único (subscription_notices).

@@ -28,6 +28,23 @@ class PixAutomaticScreenTest extends TestCase
         config(['billing.pix_automatic_enabled' => true]);
     }
 
+    /** @return array<string, string> */
+    private function dadosFiscais(): array
+    {
+        return [
+            'fiscalNome' => 'Maria da Silva',
+            'cpfCnpj' => '52998224725',
+            'fiscalNascimento' => '1990-05-12',
+            'cep' => '80230-010',
+            'rua' => 'Avenida Sete de Setembro',
+            'numero' => '2775',
+            'complemento' => 'Sala 1',
+            'bairro' => 'Rebouças',
+            'cidade' => 'Curitiba',
+            'uf' => 'PR',
+        ];
+    }
+
     private function asaas(): MockInterface
     {
         $asaas = Mockery::mock(AsaasClient::class);
@@ -75,7 +92,7 @@ class PixAutomaticScreenTest extends TestCase
             ->andReturn(['id' => 'auth-1', 'status' => 'CREATED', 'payload' => 'abc', 'qrImage' => null, 'expiresAt' => null]);
 
         Livewire::actingAs($usuario)->test(SubscriptionIndex::class)
-            ->set('cpfCnpj', '52998224725')
+            ->set($this->dadosFiscais())
             ->set('metodoPagamento', 'pix_automatic')
             ->call('iniciarPagamento')
             ->assertSet('pixQr.payload', 'abc');
@@ -181,7 +198,7 @@ class PixAutomaticScreenTest extends TestCase
 
         Livewire::actingAs($usuario)->test(SubscriptionIndex::class)
             ->assertDontSee('Pix Automático')
-            ->set('cpfCnpj', '52998224725')
+            ->set($this->dadosFiscais())
             ->set('metodoPagamento', 'pix_automatic')
             ->call('iniciarPagamento')
             ->assertHasErrors('metodoPagamento');

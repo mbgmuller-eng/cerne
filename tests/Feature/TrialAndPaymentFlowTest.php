@@ -47,6 +47,24 @@ class TrialAndPaymentFlowTest extends TestCase
         ]);
     }
 
+
+    /** @return array<string, string> */
+    private function dadosFiscais(): array
+    {
+        return [
+            'fiscalNome' => 'Maria da Silva',
+            'cpfCnpj' => '52998224725',
+            'fiscalNascimento' => '1990-05-12',
+            'cep' => '80230-010',
+            'rua' => 'Avenida Sete de Setembro',
+            'numero' => '2775',
+            'complemento' => 'Sala 1',
+            'bairro' => 'Rebouças',
+            'cidade' => 'Curitiba',
+            'uf' => 'PR',
+        ];
+    }
+
     // ---- etapa 1
 
     public function test_comecar_o_teste_nao_pede_cpf_nem_forma_de_pagamento_e_nao_chama_a_asaas(): void
@@ -135,7 +153,7 @@ class TrialAndPaymentFlowTest extends TestCase
         $asaas->shouldReceive('currentInvoiceUrl')->with('sub_1')->andReturn('https://www.asaas.com/i/abc');
 
         Livewire::actingAs($usuario)->test(SubscriptionIndex::class)
-            ->set('cpfCnpj', '52998224725')
+            ->set($this->dadosFiscais())
             ->set('metodoPagamento', 'pix')
             ->call('iniciarPagamento')
             ->assertRedirect('https://www.asaas.com/i/abc');
@@ -161,7 +179,7 @@ class TrialAndPaymentFlowTest extends TestCase
         $asaas->shouldReceive('currentInvoiceUrl')->andReturn('https://www.asaas.com/i/abc');
 
         Livewire::actingAs($usuario)->test(SubscriptionIndex::class)
-            ->set('cpfCnpj', '52998224725')
+            ->set($this->dadosFiscais())
             ->set('metodoPagamento', 'credit_card')
             ->call('iniciarPagamento')
             ->assertRedirect('https://www.asaas.com/i/abc');
@@ -175,13 +193,14 @@ class TrialAndPaymentFlowTest extends TestCase
         $asaas->shouldNotReceive('createSubscription');
 
         Livewire::actingAs($usuario)->test(SubscriptionIndex::class)
+            ->set($this->dadosFiscais())
             ->set('cpfCnpj', '11111111111')
             ->set('metodoPagamento', 'pix')
             ->call('iniciarPagamento')
             ->assertHasErrors('cpfCnpj');
 
         Livewire::actingAs($usuario)->test(SubscriptionIndex::class)
-            ->set('cpfCnpj', '52998224725')
+            ->set($this->dadosFiscais())
             ->set('metodoPagamento', 'boleto')
             ->call('iniciarPagamento')
             ->assertHasErrors('metodoPagamento');
@@ -198,7 +217,7 @@ class TrialAndPaymentFlowTest extends TestCase
         $asaas->shouldReceive('createSubscription')->andThrow(new AsaasBillingTypeMismatch('PIX', 'BOLETO'));
 
         Livewire::actingAs($usuario)->test(SubscriptionIndex::class)
-            ->set('cpfCnpj', '52998224725')
+            ->set($this->dadosFiscais())
             ->set('metodoPagamento', 'pix')
             ->call('iniciarPagamento')
             ->assertHasErrors('metodoPagamento')
@@ -215,11 +234,12 @@ class TrialAndPaymentFlowTest extends TestCase
         $asaas = $this->asaas();
         // A Asaas já tem uma assinatura com a referência: queda entre a criação e a gravação, ou duplo clique.
         $asaas->shouldReceive('findSubscriptionIdByReference')->with($assinatura->id)->andReturn('sub_existente');
+        $asaas->shouldReceive('findOrCreateCustomer')->andReturn('cus_1');
         $asaas->shouldNotReceive('createSubscription');
         $asaas->shouldReceive('currentInvoiceUrl')->andReturn('https://www.asaas.com/i/abc');
 
         Livewire::actingAs($usuario)->test(SubscriptionIndex::class)
-            ->set('cpfCnpj', '52998224725')
+            ->set($this->dadosFiscais())
             ->set('metodoPagamento', 'pix')
             ->call('iniciarPagamento');
 

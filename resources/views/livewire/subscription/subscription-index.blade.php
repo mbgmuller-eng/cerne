@@ -148,11 +148,81 @@
                         <button type="button" wire:click="trocarFormaDePagamento" wire:loading.attr="disabled" class="text-xs text-brand-700 underline dark:text-brand-300">Escolher outra forma de pagamento</button>
                     </div>
                 @else
-                    <div>
-                        <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">CPF ou CNPJ</label>
-                        <input type="text" wire:model="cpfCnpj" class="input mt-1.5" placeholder="Só números" maxlength="18">
-                        <p class="mt-1 text-xs text-slate-400">Exigido pela Asaas (nossa processadora de pagamento) para emitir a cobrança.</p>
-                        @error('cpfCnpj') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                    <div class="space-y-3 border-t border-slate-100 pt-4 dark:border-white/10">
+                        <div>
+                            <p class="text-sm font-semibold text-slate-900 dark:text-white">Dados para a nota fiscal</p>
+                            <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+                                Usamos estes dados para emitir a nota fiscal da sua assinatura. Eles ficam guardados no Cerne e são enviados
+                                à Asaas, nossa processadora de pagamento.
+                            </p>
+                        </div>
+
+                        <div class="grid gap-3 sm:grid-cols-2">
+                            <div class="sm:col-span-2">
+                                <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Nome completo ou razão social</label>
+                                <input type="text" wire:model="fiscalNome" autocomplete="name" class="input mt-1.5" maxlength="150">
+                                @error('fiscalNome') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">CPF ou CNPJ</label>
+                                <input type="text" wire:model="cpfCnpj" inputmode="numeric" class="input mt-1.5" placeholder="Só números" maxlength="18">
+                                @error('cpfCnpj') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Data de nascimento <span class="font-normal text-slate-400">(pessoa física)</span></label>
+                                <input type="date" wire:model="fiscalNascimento" autocomplete="bday" class="input mt-1.5">
+                                @error('fiscalNascimento') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">CEP</label>
+                                <input type="text" wire:model="cep" inputmode="numeric" autocomplete="postal-code" class="input mt-1.5" placeholder="00000-000" maxlength="9">
+                                @error('cep') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Número</label>
+                                <input type="text" wire:model="numero" class="input mt-1.5" placeholder="Ou S/N" maxlength="20">
+                                @error('numero') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                            </div>
+
+                            <div class="sm:col-span-2">
+                                <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Rua</label>
+                                <input type="text" wire:model="rua" autocomplete="address-line1" class="input mt-1.5" maxlength="120">
+                                @error('rua') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Complemento <span class="font-normal text-slate-400">(opcional)</span></label>
+                                <input type="text" wire:model="complemento" class="input mt-1.5" maxlength="60">
+                                @error('complemento') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Bairro</label>
+                                <input type="text" wire:model="bairro" class="input mt-1.5" maxlength="80">
+                                @error('bairro') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Cidade</label>
+                                <input type="text" wire:model="cidade" autocomplete="address-level2" class="input mt-1.5" maxlength="80">
+                                @error('cidade') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">UF</label>
+                                <select wire:model="uf" class="input mt-1.5">
+                                    <option value="">Escolha</option>
+                                    @foreach (\App\Models\BillingDetail::STATES as $sigla)
+                                        <option value="{{ $sigla }}">{{ $sigla }}</option>
+                                    @endforeach
+                                </select>
+                                @error('uf') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                            </div>
+                        </div>
                     </div>
 
                     <div>

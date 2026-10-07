@@ -45,8 +45,9 @@
                 <h2 class="font-display text-lg font-semibold text-slate-900 dark:text-white">4. Dados pessoais</h2>
                 <p class="mt-2">
                     Coletamos os dados necessários para prestar o serviço (identificação, dados financeiros e de saúde
-                    que você cadastra, CPF/CNPJ para emissão de cobrança). Esses dados não são compartilhados com
-                    terceiros além dos processadores necessários à operação (ex.: Asaas, para cobrança). Dados de saúde
+                    que você cadastra, e, para quem assina, nome completo, CPF/CNPJ, data de nascimento e endereço, usados
+                    para emitir a cobrança e a nota fiscal, como exige a lei). Esses dados não são compartilhados com
+                    terceiros além dos processadores necessários à operação (ex.: Asaas, para cobrança e emissão de nota fiscal). Dados de saúde
                     nunca são visíveis a consultores ou corretores vinculados.
                 </p>
             </section>

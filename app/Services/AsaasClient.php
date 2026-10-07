@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Enums\PaymentMethod;
 use App\Enums\SubscriptionBundle;
 use App\Exceptions\AsaasBillingTypeMismatch;
+use App\Models\BillingDetail;
 use App\Models\User;
 use App\Support\ProfessionalPricing;
 use Illuminate\Support\Facades\Http;
@@ -19,24 +20,37 @@ use RuntimeException;
  */
 class AsaasClient
 {
-    /** Cliente já existe (Asaas permite duplicado — por isso Cerne guarda o id, não cria de novo toda hora). */
-    public function findOrCreateCustomer(User $user): string
+    /**
+     * Cliente da Asaas (quem recebe a cobrança). Reaproveita o id guardado: a
+     * Asaas permite duplicado, por isso o Cerne guarda o id em vez de criar de novo.
+     *
+     * Com os dados fiscais (`$fiscal`), o cliente é criado, ou ATUALIZADO se já
+     * existe, com nome completo, CPF/CNPJ e endereço: é daí que a Asaas tira o
+     * tomador da nota fiscal.
+     */
+    public function findOrCreateCustomer(User $user, ?BillingDetail $fiscal = null): string
     {
         if ($user->asaas_customer_id !== null) {
+            if ($fiscal !== null) {
+                $this->request()->post("/customers/{$user->asaas_customer_id}", $fiscal->asaasCustomerFields())->throw();
+            }
+
             return $user->asaas_customer_id;
         }
 
-        if (blank($user->cpf_cnpj)) {
+        $documento = $fiscal?->document ?? preg_replace('/\D/', '', (string) $user->cpf_cnpj);
+
+        if (blank($documento)) {
             throw new RuntimeException('Usuário sem CPF/CNPJ cadastrado — obrigatório para a Asaas criar o cliente.');
         }
 
-        $resposta = $this->request()->post('/customers', [
+        $resposta = $this->request()->post('/customers', array_merge([
             'name' => $user->name,
             'email' => $user->email,
-            'cpfCnpj' => preg_replace('/\D/', '', $user->cpf_cnpj),
+            'cpfCnpj' => $documento,
             'phone' => $user->phone,
             'externalReference' => $user->id,
-        ])->throw();
+        ], $fiscal?->asaasCustomerFields() ?? []))->throw();
 
         $customerId = $resposta->json('id');
         $user->update(['asaas_customer_id' => $customerId]);
@@ -44,6 +58,36 @@ class AsaasClient
         return $customerId;
     }
 
+    /**
+     * Emissão automática de NFS-e na confirmação de cada pagamento da assinatura.
+     * A Asaas exige o bloco `taxes`; o serviço municipal vai por id OU por código.
+     *
+     * @param  array<string, mixed>  $config  config('billing.invoices')
+     */
+    public function configureSubscriptionInvoices(string $asaasSubscriptionId, array $config): void
+    {
+        $impostos = $config['taxes'];
+
+        $corpo = array_filter([
+            'municipalServiceId' => $config['municipal_service_id'] ?? null,
+            'municipalServiceCode' => $config['municipal_service_code'] ?? null,
+            'municipalServiceName' => $config['municipal_service_name'] ?? null,
+            'effectiveDatePeriod' => 'ON_PAYMENT_CONFIRMATION',
+            'observations' => $config['observations'] ?? null,
+        ], fn ($valor) => $valor !== null && $valor !== '');
+
+        $corpo['taxes'] = [
+            'retainIss' => (bool) $impostos['retain_iss'],
+            'iss' => (float) $impostos['iss'],
+            'cofins' => (float) $impostos['cofins'],
+            'csll' => (float) $impostos['csll'],
+            'inss' => (float) $impostos['inss'],
+            'ir' => (float) $impostos['ir'],
+            'pis' => (float) $impostos['pis'],
+        ];
+
+        $this->request()->post("/subscriptions/{$asaasSubscriptionId}/invoiceSettings", $corpo)->throw();
+    }
     /**
      * Chamada só perto do fim do teste grátis (SubscriptionBillingService):
      * a Asaas cria a primeira cobrança NA HORA da criação, com vencimento em

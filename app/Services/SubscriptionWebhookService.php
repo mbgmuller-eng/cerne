@@ -51,6 +51,12 @@ class SubscriptionWebhookService
             return; // já processado antes — reentrega da Asaas, ignora.
         }
 
+        if (str_starts_with($tipo, 'INVOICE_')) {
+            $this->tratarNotaFiscal($tipo, $payload);
+
+            return;
+        }
+
         if (str_starts_with($tipo, self::PREFIXO_PIX_AUTOMATICO)) {
             $this->tratarPixAutomatico($tipo, $payload);
 
@@ -147,6 +153,33 @@ class SubscriptionWebhookService
             'paid_at' => now(),
             'retry_due_date' => null,
         ]);
+    }
+
+    /**
+     * Notas fiscais (NFS-e) da Asaas. Nada muda na assinatura: só deixa rastro. Nota
+     * recusada pela prefeitura (INVOICE_ERROR) é erro de verdade, o contador precisa
+     * saber, então vai para o log como erro.
+     *
+     * @param  array<string, mixed>  $payload
+     */
+    private function tratarNotaFiscal(string $tipo, array $payload): void
+    {
+        $nota = $payload['invoice'] ?? [];
+        $contexto = [
+            'evento' => $tipo,
+            'invoice_id' => $nota['id'] ?? null,
+            'payment_id' => $nota['payment'] ?? null,
+            'status' => $nota['status'] ?? null,
+            'descricao' => $nota['statusDescription'] ?? null,
+        ];
+
+        if ($tipo === 'INVOICE_ERROR' || $tipo === 'INVOICE_CANCELLATION_DENIED') {
+            Log::error('Asaas: problema na nota fiscal', $contexto);
+
+            return;
+        }
+
+        Log::info('Asaas: evento de nota fiscal', $contexto);
     }
 
     /**

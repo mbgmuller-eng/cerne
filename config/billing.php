@@ -61,6 +61,38 @@ return [
     | acesso (cerne:check mostra o aviso enquanto estiver desligado em produção).
     */
 
+    /*
+    |---------------------------------------------------------------------------
+    | Nota fiscal de serviço (NFS-e) pela Asaas
+    |---------------------------------------------------------------------------
+    | Ligado, cada assinatura criada na Asaas já nasce com a emissão automática
+    | da nota na confirmação do pagamento (R$ 0,49 por nota). Desligado por
+    | padrão: antes de ligar, a conta da Asaas precisa ter a parte fiscal pronta
+    | (certificado digital, inscrição municipal, regime e serviço) — o contador
+    | define o serviço (lista em GET /v3/fiscalInfo/services) e as alíquotas.
+    |
+    | Informe o serviço por id (municipal_service_id) OU por código
+    | (municipal_service_code, ex.: 1.05). `iss` é a alíquota em % e é obrigatória
+    | (use 0 se o contador mandar); os demais impostos ficam em 0 salvo orientação.
+    */
+
+    'invoices' => [
+        'enabled' => (bool) env('BILLING_ISSUE_INVOICES', false),
+        'municipal_service_id' => env('BILLING_NF_SERVICE_ID'),
+        'municipal_service_code' => env('BILLING_NF_SERVICE_CODE'),
+        'municipal_service_name' => env('BILLING_NF_SERVICE_NAME', 'Licenciamento ou cessão de direito de uso de programas de computação'),
+        'observations' => 'Assinatura do Cerne',
+        'taxes' => [
+            'retain_iss' => (bool) env('BILLING_NF_RETAIN_ISS', false),
+            'iss' => env('BILLING_NF_ISS'),
+            'cofins' => env('BILLING_NF_COFINS', 0),
+            'csll' => env('BILLING_NF_CSLL', 0),
+            'inss' => env('BILLING_NF_INSS', 0),
+            'ir' => env('BILLING_NF_IR', 0),
+            'pis' => env('BILLING_NF_PIS', 0),
+        ],
+    ],
+
     'enforce_access' => (bool) env('BILLING_ENFORCE_ACCESS', false),
 
     'pix_automatic_enabled' => (bool) env('BILLING_PIX_AUTOMATIC', false),

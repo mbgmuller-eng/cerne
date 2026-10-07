@@ -7,9 +7,11 @@ use App\Enums\SubscriptionBundle;
 use App\Enums\SubscriptionKind;
 use App\Enums\SubscriptionStatus;
 use App\Exceptions\AsaasBillingTypeMismatch;
+use App\Models\BillingDetail;
 use App\Models\Subscription;
 use App\Rules\CpfCnpj;
 use App\Services\AsaasClient;
+use App\Services\InvoiceSettingsService;
 use App\Services\PixAutomaticBillingService;
 use App\Support\ProfessionalPricing;
 use DomainException;
@@ -40,6 +42,25 @@ class SubscriptionIndex extends Component
 
     public string $metodoPagamento = '';
 
+    // Dados fiscais de quem paga (nota fiscal de serviço). CPF/CNPJ fica em $cpfCnpj.
+    public string $fiscalNome = '';
+
+    public string $fiscalNascimento = '';
+
+    public string $cep = '';
+
+    public string $rua = '';
+
+    public string $numero = '';
+
+    public string $complemento = '';
+
+    public string $bairro = '';
+
+    public string $cidade = '';
+
+    public string $uf = '';
+
     /** Só preenchido/validado pra quem assina como profissional. */
     public string $clientCap = '';
 
@@ -65,7 +86,7 @@ class SubscriptionIndex extends Component
 
     public function mount(): void
     {
-        $this->cpfCnpj = Auth::user()->cpf_cnpj ?? '';
+        $this->preencherDadosFiscais();
         $this->carregarIntencaoDoCheckout();
     }
 
@@ -190,17 +211,38 @@ class SubscriptionIndex extends Component
      */
     public function iniciarPagamento(AsaasClient $asaas, PixAutomaticBillingService $pix)
     {
-        $dados = $this->validate([
-            'cpfCnpj' => ['required', 'string', new CpfCnpj],
-            'metodoPagamento' => ['required', Rule::in(array_column(PaymentMethod::available(), 'value'))],
+        $dados = $this->validate($this->regrasDoPagamento(), attributes: [
+            'fiscalNome' => 'nome completo',
+            'cpfCnpj' => 'CPF ou CNPJ',
+            'fiscalNascimento' => 'data de nascimento',
+            'cep' => 'CEP',
+            'rua' => 'rua',
+            'numero' => 'número',
+            'complemento' => 'complemento',
+            'bairro' => 'bairro',
+            'cidade' => 'cidade',
+            'uf' => 'UF',
+            'metodoPagamento' => 'forma de pagamento',
         ]);
 
         $assinatura = $this->assinaturaAtual();
 
         abort_if($assinatura === null || in_array($assinatura->status, [SubscriptionStatus::Cancelled, SubscriptionStatus::Active], true), 404);
 
-        Auth::user()->update(['cpf_cnpj' => $dados['cpfCnpj']]);
+        $usuario = Auth::user();
         $metodo = PaymentMethod::from($dados['metodoPagamento']);
+        $fiscal = $this->salvarDadosFiscais($usuario, $dados);
+
+        // O cliente da Asaas leva o nome, o documento e o endereço: é dele que sai o
+        // tomador da nota fiscal. Uma recusa (CEP ou CPF inválido) volta como erro na tela.
+        try {
+            $customerId = $asaas->findOrCreateCustomer($usuario->fresh(), $fiscal);
+        } catch (RequestException $e) {
+            Log::warning('Asaas: recusou os dados do cliente', ['user_id' => $usuario->id, 'erro' => $e->getMessage()]);
+            $this->addError('cpfCnpj', 'O serviço de pagamento recusou os dados informados: '.($e->response->json('errors.0.description') ?? 'confira o CPF/CNPJ e o CEP.'));
+
+            return;
+        }
 
         // Pix Automático tem fluxo próprio: autorização por QR Code, sem fatura.
         if ($metodo === PaymentMethod::PixAutomatic) {
@@ -213,7 +255,7 @@ class SubscriptionIndex extends Component
         }
 
         try {
-            $id = $this->garantirAssinaturaNaAsaas($assinatura, $metodo, $asaas);
+            $id = $this->garantirAssinaturaNaAsaas($assinatura, $metodo, $customerId, $asaas);
         } catch (AsaasBillingTypeMismatch $e) {
             // Já foi desfeita na Asaas: nenhuma cobrança fica de pé.
             Log::error('Asaas: forma de pagamento diferente da pedida, assinatura desfeita', [
@@ -232,6 +274,71 @@ class SubscriptionIndex extends Component
         $this->redirectParaFatura($asaas, $id);
     }
 
+    /** @return array<string, mixed> */
+    private function regrasDoPagamento(): array
+    {
+        $documento = preg_replace('/\D/', '', $this->cpfCnpj);
+        $pessoaFisica = strlen($documento) !== 14;
+
+        return [
+            'fiscalNome' => ['required', 'string', 'max:150', $pessoaFisica ? 'regex:/\S+\s+\S+/' : 'min:3'],
+            'cpfCnpj' => ['required', 'string', new CpfCnpj],
+            // A Asaas não usa a data de nascimento, mas guardamos do nosso lado para a nota (só de pessoa física).
+            'fiscalNascimento' => [Rule::requiredIf($pessoaFisica), 'nullable', 'date', 'before:today', 'after:1900-01-01'],
+            'cep' => ['required', 'regex:/^\d{5}-?\d{3}$/'],
+            'rua' => ['required', 'string', 'max:120'],
+            'numero' => ['required', 'string', 'max:20'],
+            'complemento' => ['nullable', 'string', 'max:60'],
+            'bairro' => ['required', 'string', 'max:80'],
+            'cidade' => ['required', 'string', 'max:80'],
+            'uf' => ['required', Rule::in(BillingDetail::STATES)],
+            'metodoPagamento' => ['required', Rule::in(array_column(PaymentMethod::available(), 'value'))],
+        ];
+    }
+
+    /**
+     * Guarda os dados fiscais (do lado do Cerne, não só na Asaas) e mantém o CPF/CNPJ
+     * da conta em sincronia, que é de onde a Asaas o recebia até aqui.
+     *
+     * @param  array<string, mixed>  $dados
+     */
+    private function salvarDadosFiscais($usuario, array $dados): BillingDetail
+    {
+        $documento = preg_replace('/\D/', '', $dados['cpfCnpj']);
+
+        $usuario->update(['cpf_cnpj' => $documento]);
+
+        return BillingDetail::updateOrCreate(['user_id' => $usuario->id], [
+            'full_name' => trim($dados['fiscalNome']),
+            'document' => $documento,
+            'birth_date' => ($dados['fiscalNascimento'] ?? '') !== '' ? $dados['fiscalNascimento'] : null,
+            'postal_code' => preg_replace('/\D/', '', $dados['cep']),
+            'street' => trim($dados['rua']),
+            'number' => trim($dados['numero']),
+            'complement' => ($dados['complemento'] ?? '') !== '' ? trim($dados['complemento']) : null,
+            'neighborhood' => trim($dados['bairro']),
+            'city' => trim($dados['cidade']),
+            'state' => $dados['uf'],
+        ]);
+    }
+
+    /** Pré-preenche com o que já temos: os dados fiscais salvos, ou o que veio do cadastro. */
+    private function preencherDadosFiscais(): void
+    {
+        $usuario = Auth::user();
+        $fiscal = $usuario->billingDetail;
+
+        $this->cpfCnpj = $fiscal?->document ?? ($usuario->cpf_cnpj ?? '');
+        $this->fiscalNome = $fiscal?->full_name ?? $usuario->name;
+        $this->fiscalNascimento = ($fiscal?->birth_date ?? $usuario->birthdate)?->toDateString() ?? '';
+        $this->cep = $fiscal?->postal_code ?? '';
+        $this->rua = $fiscal?->street ?? '';
+        $this->numero = $fiscal?->number ?? '';
+        $this->complemento = $fiscal?->complement ?? '';
+        $this->bairro = $fiscal?->neighborhood ?? '';
+        $this->cidade = $fiscal?->city ?? '';
+        $this->uf = $fiscal?->state ?? '';
+    }
     /** Reabre a fatura de quem já escolheu a forma de pagamento e saiu da página sem pagar. */
     public function abrirFatura(AsaasClient $asaas)
     {
@@ -421,7 +528,7 @@ class SubscriptionIndex extends Component
      * então um duplo clique ou uma queda entre a criação e a gravação nunca
      * gera duas assinaturas.
      */
-    private function garantirAssinaturaNaAsaas(Subscription $assinatura, PaymentMethod $metodo, AsaasClient $asaas): string
+    private function garantirAssinaturaNaAsaas(Subscription $assinatura, PaymentMethod $metodo, string $customerId, AsaasClient $asaas): string
     {
         if ($assinatura->asaas_subscription_id !== null) {
             if ($assinatura->billing_type === $metodo) {
@@ -441,7 +548,7 @@ class SubscriptionIndex extends Component
             $vencimento = $assinatura->current_period_ends_at->isFuture() ? $assinatura->current_period_ends_at : today();
 
             $id = $asaas->createSubscription(
-                $asaas->findOrCreateCustomer(Auth::user()->fresh()),
+                $customerId,
                 $assinatura->bundle,
                 $metodo,
                 "Cerne — {$assinatura->bundle->label()}",
@@ -452,6 +559,10 @@ class SubscriptionIndex extends Component
         }
 
         $assinatura->update(['billing_type' => $metodo, 'asaas_subscription_id' => $id]);
+
+        // Nota fiscal automática na confirmação de cada pagamento (se ligada). Falhar aqui nunca
+        // trava o pagamento: a tarefa diária tenta de novo.
+        app(InvoiceSettingsService::class)->configure($assinatura->fresh());
 
         return $id;
     }

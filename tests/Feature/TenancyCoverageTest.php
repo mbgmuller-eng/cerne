@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Concerns\BelongsToProfile;
 use App\Models\Concerns\BelongsToProfileOrShared;
+use App\Models\BillingDetail;
 use App\Models\ConsultantClient;
 use App\Models\ConsultantInvite;
 use App\Models\FinancialProfile;
@@ -42,6 +43,7 @@ class TenancyCoverageTest extends TestCase
         // Identidade do usuário, não dado de um perfil financeiro.
         User::class => 'é a conta que acessa perfis, não um dado que pertence a um perfil',
         Subscription::class => 'assinatura é do usuário (user_id) — não existe por perfil',
+        BillingDetail::class => 'dados fiscais de quem paga a assinatura (user_id) — o profissional paga sem ter perfil financeiro algum, então não existe por perfil',
         SubscriptionCharge::class => 'cobrança mensal do Pix Automático da assinatura do usuário (subscription_id) — não existe por perfil; sustenta o índice único por ciclo',
         SubscriptionNotice::class => 'registro de aviso de cobrança já enviado — sustenta um índice único (assinatura, tipo, data), pertence à assinatura do usuário, não a um perfil',
         SubscriptionWebhookEvent::class => 'log de idempotência do webhook da Asaas — só existe pra sustentar um índice único em asaas_event_id, nunca consultado por perfil nenhum',

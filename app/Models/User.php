@@ -13,6 +13,7 @@ use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use NotificationChannels\WebPush\HasPushSubscriptions;
@@ -122,6 +123,12 @@ class User extends Authenticatable implements MustVerifyEmail
     public function memberships(): HasMany
     {
         return $this->hasMany(ProfileMember::class);
+    }
+
+    /** Dados fiscais de quem paga (nota fiscal). */
+    public function billingDetail(): HasOne
+    {
+        return $this->hasOne(BillingDetail::class);
     }
 
     public function subscriptions(): HasMany
