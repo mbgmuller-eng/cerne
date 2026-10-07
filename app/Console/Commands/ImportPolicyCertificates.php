@@ -20,6 +20,7 @@ class ImportPolicyCertificates extends Command
         {json : Caminho do JSON com os certificados lidos}
         {--consultant= : E-mail do consultor dono da carteira}
         {--pdf-dir= : Pasta com os PDFs (nomes iguais ao campo "arquivo" do JSON)}
+        {--accept= : Apólices (separadas por vírgula) cujo casamento por nome parcial você já conferiu}
         {--apply : Grava de verdade (sem isto é só simulação)}';
 
     protected $description = 'Cria ou atualiza apólices de vida a partir de certificados e guarda o PDF em Documentos';
@@ -41,7 +42,13 @@ class ImportPolicyCertificates extends Command
         }
 
         $apply = (bool) $this->option('apply');
-        $linhas = $importador->run($consultor, $certificados, $this->option('pdf-dir'), $apply);
+        $linhas = $importador->run(
+            $consultor,
+            $certificados,
+            $this->option('pdf-dir'),
+            $apply,
+            array_filter(array_map('trim', explode(',', (string) $this->option('accept')))),
+        );
 
         $this->table(
             ['Status', 'Nome no PDF', 'Apólice', 'Cliente / pessoa', 'Ação', 'PDF', 'Observação'],

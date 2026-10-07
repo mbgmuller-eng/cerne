@@ -309,6 +309,59 @@ class PolicyCertificateImportTest extends TestCase
         self::assertSame(1, InsurancePolicy::withoutProfileScope()->count());
     }
 
+    public function test_duas_apolices_novas_nao_disputam_a_mesma_apolice_sem_numero(): void
+    {
+        app(ProfileContext::class)->set($this->perfil, $this->titular);
+        $semNumero = InsurancePolicy::create([
+            'member_id' => $this->titular->id, 'insurance_type' => InsuranceType::Vida, 'insurer_name' => 'Icatu',
+            'monthly_premium' => '0.00', 'payment_frequency' => 'monthly', 'start_date' => '2026-09-10', 'is_active' => true,
+        ]);
+        $this->semContexto();
+
+        $duas = [
+            $this->certificado(['arquivo' => 'a.PDF', 'apolice' => '91.646.967']),
+            $this->certificado(['arquivo' => 'b.PDF', 'apolice' => '91.646.720', 'certificado' => '2']),
+        ];
+
+        $simulacao = $this->rodar($duas, apply: false);
+        self::assertSame(['atualizar', 'criar'], array_column($simulacao, 'acao'), 'a simulação já mostra o que a gravação vai fazer');
+
+        $this->rodar($duas);
+
+        self::assertSame(2, InsurancePolicy::withoutProfileScope()->count());
+        self::assertSame('91.646.967', $semNumero->refresh()->policy_number);
+    }
+
+    public function test_accept_libera_o_casamento_por_nome_parcial_so_da_apolice_conferida(): void
+    {
+        $this->cliente->update(['cpf_cnpj' => null]);
+        $this->titular->update(['name' => 'Lissandra Amend']);
+        $parcial = ['cpf' => null, 'nascimento' => null];
+
+        self::assertSame('revisar', $this->rodar([$this->certificado($parcial)])[0]['status']);
+
+        $linhas = app(PolicyCertificateImporter::class)->run($this->consultor, [$this->certificado($parcial)], $this->pasta, true, ['91.999.999']);
+        self::assertSame('revisar', $linhas[0]['status'], 'liberar outra apólice não libera esta');
+
+        $linhas = app(PolicyCertificateImporter::class)->run($this->consultor, [$this->certificado($parcial)], $this->pasta, true, ['91100576']);
+        self::assertSame('ok', $linhas[0]['status']);
+        self::assertSame(1, InsurancePolicy::withoutProfileScope()->count());
+    }
+
+    public function test_accept_nao_libera_quando_ha_mais_de_um_cliente_possivel(): void
+    {
+        $this->cliente->update(['cpf_cnpj' => null]);
+        $outroCliente = User::factory()->create();
+        $outroPerfil = FinancialProfile::factory()->create(['owner_user_id' => $outroCliente->id]);
+        ProfileMember::factory()->create(['profile_id' => $outroPerfil->id, 'user_id' => $outroCliente->id, 'name' => 'Lissandra Simionato']);
+        ConsultantClient::factory()->create(['consultant_id' => $this->consultor->id, 'client_id' => $outroCliente->id, 'status' => ConsultantClientStatus::Active]);
+
+        $linhas = app(PolicyCertificateImporter::class)->run($this->consultor, [$this->certificado(['cpf' => null, 'nascimento' => null])], $this->pasta, true, ['91.100.576']);
+
+        self::assertSame('revisar', $linhas[0]['status']);
+        self::assertSame(0, InsurancePolicy::withoutProfileScope()->count());
+    }
+
     public function test_pdf_que_nao_esta_na_pasta_vira_erro_e_nada_e_gravado(): void
     {
         $cert = $this->certificado();

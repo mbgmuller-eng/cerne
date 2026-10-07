@@ -38,14 +38,20 @@ class PolicyCertificateImporter
     /** Abaixo disto nem entra como sugestão. */
     private const MIN_SUGGESTION = 60;
 
+    /** Apólices já "tomadas" por um certificado desta rodada, para dois certificados não disputarem a mesma apólice sem número. */
+    private array $reivindicadas = [];
+
     public function __construct(private DocumentService $documentos) {}
 
     /**
      * @param  list<array<string, mixed>>  $certificados  saída do leitor de PDFs (ver comando)
+     * @param  list<string>  $aceitar  números de apólice cujo casamento por nome parcial uma pessoa já conferiu
      * @return list<array<string, mixed>> uma linha por certificado
      */
-    public function run(User $consultor, array $certificados, ?string $pdfDir, bool $apply): array
+    public function run(User $consultor, array $certificados, ?string $pdfDir, bool $apply, array $aceitar = []): array
     {
+        $this->reivindicadas = [];
+        $aceitar = array_map(fn (string $n) => $this->digitos($n), $aceitar);
         $candidatos = $this->candidatos($consultor);
         $vistos = [];
         $linhas = [];
@@ -72,7 +78,7 @@ class PolicyCertificateImporter
             }
             $vistos[$chave] = $cert['arquivo'];
 
-            $achado = $this->casar($cert, $candidatos);
+            $achado = $this->casar($cert, $candidatos, in_array($chave, $aceitar, true));
 
             if ($achado['status'] !== 'ok') {
                 $linhas[] = ['status' => $achado['status'], 'motivo' => $achado['motivo']] + $linha;
@@ -254,15 +260,24 @@ class PolicyCertificateImporter
 
         $porNumero = $todas->first(fn (InsurancePolicy $p) => $p->policy_number !== null && $this->digitos($p->policy_number) === $alvo);
         if ($porNumero !== null) {
+            $this->reivindicadas[] = $porNumero->id;
+
             return $porNumero;
         }
 
         $semNumero = $todas->filter(fn (InsurancePolicy $p) => blank($p->policy_number)
+            && ! in_array($p->id, $this->reivindicadas, true)
             && $p->member_id === $membro->id
             && $p->insurance_type === InsuranceType::Vida
             && str_contains(Str::lower(Str::ascii($p->insurer_name)), 'icatu'));
 
-        return $semNumero->count() === 1 ? $semNumero->first() : null;
+        if ($semNumero->count() !== 1) {
+            return null;
+        }
+
+        $this->reivindicadas[] = $semNumero->first()->id;
+
+        return $semNumero->first();
     }
 
     /**
@@ -301,7 +316,7 @@ class PolicyCertificateImporter
      * @param  list<array<string, mixed>>  $candidatos
      * @return array{status: string, motivo?: string, candidato?: array<string, mixed>}
      */
-    private function casar(array $cert, array $candidatos): array
+    private function casar(array $cert, array $candidatos, bool $conferido = false): array
     {
         $pontuados = [];
         foreach ($candidatos as $candidato) {
@@ -326,7 +341,7 @@ class PolicyCertificateImporter
             ))];
         }
 
-        if ($melhor['nota'] < self::MIN_SCORE) {
+        if ($melhor['nota'] < self::MIN_SCORE && ! $conferido) {
             $c = $melhor['candidato'];
 
             return ['status' => 'revisar', 'motivo' => 'parece ser '.$c['membro']->name.' ('.$c['perfil']->owner->name.'), mas o nome não bate por inteiro'];
