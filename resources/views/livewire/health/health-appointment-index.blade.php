@@ -72,10 +72,10 @@
                 <button type="button" wire:click="closeForm" class="btn-ghost px-2 py-1 text-xs">Cancelar</button>
             </div>
 
-            <div class="grid gap-4 @sm:grid-cols-2">
+            <div class="grid gap-4 @sm:grid-cols-2 *:min-w-0">
                 <div>
                     <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Pessoa</label>
-                    <select wire:model="memberId" class="select mt-1.5">
+                    <select wire:model="memberId" class="select mt-1.5 w-full">
                         @foreach ($membros as $membro)
                             <option value="{{ $membro->id }}">{{ $membro->name }}</option>
                         @endforeach
@@ -84,7 +84,7 @@
                 </div>
                 <div>
                     <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Tipo</label>
-                    <select wire:model.live="kind" class="select mt-1.5">
+                    <select wire:model.live="kind" class="select mt-1.5 w-full">
                         <option value="consultation">Consulta</option>
                         <option value="exam">Exame</option>
                     </select>

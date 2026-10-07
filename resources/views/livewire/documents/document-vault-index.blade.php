@@ -166,7 +166,7 @@
                 <div class="grid gap-4">
                     <div>
                         <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Categoria</label>
-                        <select wire:model.live="category" class="select mt-1.5">
+                        <select wire:model.live="category" class="select mt-1.5 w-full">
                             <option value=""></option>
                             @foreach (DocumentCategory::options() as $valor => $rotulo)
                                 <option value="{{ $valor }}">{{ $rotulo }}</option>
@@ -183,7 +183,7 @@
 
                     <div>
                         <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Pessoa (opcional)</label>
-                        <select wire:model="memberId" class="select mt-1.5">
+                        <select wire:model="memberId" class="select mt-1.5 w-full">
                             <option value="">Documento da família</option>
                             @foreach ($membros as $membro)
                                 <option value="{{ $membro->id }}">{{ $membro->name }}</option>
@@ -193,7 +193,7 @@
 
                     <div>
                         <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Pasta (opcional)</label>
-                        <select wire:model="folderId" class="select mt-1.5">
+                        <select wire:model="folderId" class="select mt-1.5 w-full">
                             <option value="">Sem pasta (raiz)</option>
                             @foreach ($arvore as $linha)
                                 <option value="{{ $linha['pasta']->id }}">{{ str_repeat('— ', $linha['nivel']) }}{{ $linha['pasta']->name }}</option>
@@ -205,7 +205,7 @@
                     @if ($category === DocumentCategory::InsurancePolicy->value)
                         <div>
                             <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Apólice</label>
-                            <select wire:model="insurancePolicyId" class="select mt-1.5">
+                            <select wire:model="insurancePolicyId" class="select mt-1.5 w-full">
                                 <option value=""></option>
                                 @foreach ($policies as $apolice)
                                     <option value="{{ $apolice->id }}">{{ $apolice->insurer_name }} — {{ $apolice->personLabel() ?? 'seguro familiar' }}</option>
@@ -260,7 +260,7 @@
 
                 <div>
                     <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Dentro de</label>
-                    <select wire:model="folderParentId" class="select mt-1.5">
+                    <select wire:model="folderParentId" class="select mt-1.5 w-full">
                         <option value="">Documentos (raiz)</option>
                         @foreach ($arvoreParaMover as $linha)
                             <option value="{{ $linha['pasta']->id }}">{{ str_repeat('— ', $linha['nivel']) }}{{ $linha['pasta']->name }}</option>
