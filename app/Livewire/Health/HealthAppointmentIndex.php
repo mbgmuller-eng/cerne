@@ -9,6 +9,7 @@ use App\Models\ProfileMember;
 use App\Services\HealthAppointmentService;
 use App\Support\ProfileContext;
 use Illuminate\Support\Collection;
+use Illuminate\Validation\Rule;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 
@@ -26,7 +27,14 @@ class HealthAppointmentIndex extends Component
     public ?string $memberId = null;
     public string $kind = 'consultation';
     public string $title = '';
+    public string $professionalName = '';
+    public string $specialty = '';
+    /** Nome do estabelecimento (clínica, hospital, laboratório): a coluna `location`. */
     public string $location = '';
+    public string $address = '';
+    public string $phone = '';
+    public string $bookedByName = '';
+    public string $bookedWithName = '';
     public string $scheduledDate = '';
     public string $scheduledTime = '';
     public string $notes = '';
@@ -53,7 +61,13 @@ class HealthAppointmentIndex extends Component
         $this->memberId = $consulta->member_id;
         $this->kind = $consulta->kind->value;
         $this->title = $consulta->title;
+        $this->professionalName = (string) $consulta->professional_name;
+        $this->specialty = (string) $consulta->specialty;
         $this->location = (string) $consulta->location;
+        $this->address = (string) $consulta->address;
+        $this->phone = (string) $consulta->phone;
+        $this->bookedByName = (string) $consulta->booked_by_name;
+        $this->bookedWithName = (string) $consulta->booked_with_name;
         $this->scheduledDate = $consulta->scheduled_at->toDateString();
         $this->scheduledTime = $consulta->scheduled_at->format('H:i');
         $this->notes = (string) $consulta->notes;
@@ -70,24 +84,44 @@ class HealthAppointmentIndex extends Component
         $this->validate([
             'memberId' => ['required', 'string'],
             'kind' => ['required', 'in:consultation,exam'],
-            'title' => ['required', 'string', 'max:120'],
+            // Consulta com profissional ou especialidade ganha o título sozinha; nos demais casos ele é obrigatório.
+            'title' => [
+                Rule::requiredIf(fn () => $this->kind === 'exam' || ($this->professionalName === '' && $this->specialty === '')),
+                'nullable', 'string', 'max:120',
+            ],
+            'professionalName' => ['nullable', 'string', 'max:120'],
+            'specialty' => ['nullable', 'string', 'max:80'],
             'location' => ['nullable', 'string', 'max:160'],
+            'address' => ['nullable', 'string', 'max:200'],
+            'phone' => ['nullable', 'string', 'max:30', 'regex:/^[\d\s().+\-]{8,30}$/'],
+            'bookedByName' => ['nullable', 'string', 'max:120'],
+            'bookedWithName' => ['nullable', 'string', 'max:120'],
             'scheduledDate' => ['required', 'date'],
             'scheduledTime' => ['required', 'date_format:H:i'],
             'notes' => ['nullable', 'string', 'max:2000'],
         ], attributes: [
-            'memberId' => 'pessoa', 'kind' => 'tipo', 'title' => 'título',
-            'location' => 'local', 'scheduledDate' => 'data', 'scheduledTime' => 'hora', 'notes' => 'anotações',
+            'memberId' => 'pessoa', 'kind' => 'tipo', 'title' => 'título', 'professionalName' => 'profissional',
+            'specialty' => 'especialidade', 'location' => 'estabelecimento', 'address' => 'endereço', 'phone' => 'telefone',
+            'bookedByName' => 'quem agendou', 'bookedWithName' => 'agendado com', 'scheduledDate' => 'data',
+            'scheduledTime' => 'hora', 'notes' => 'observações',
         ]);
+
+        $consulta = $this->kind === 'consultation';
 
         $dados = [
             'kind' => $this->kind,
             'title' => $this->title,
+            // Profissional e especialidade só existem em consulta; em exame o título já diz o que é.
+            'professional_name' => $consulta ? $this->professionalName : null,
+            'specialty' => $consulta ? $this->specialty : null,
             'location' => $this->location,
+            'address' => $this->address,
+            'phone' => $this->phone,
+            'booked_by_name' => $this->bookedByName,
+            'booked_with_name' => $this->bookedWithName,
             'scheduled_at' => "{$this->scheduledDate} {$this->scheduledTime}",
             'notes' => $this->notes,
         ];
-
         if ($this->editingId !== null) {
             $service->update(HealthAppointment::query()->findOrFail($this->editingId), $dados);
         } else {
@@ -138,7 +172,10 @@ class HealthAppointmentIndex extends Component
 
     private function resetForm(): void
     {
-        $this->reset('editingId', 'memberId', 'kind', 'title', 'location', 'scheduledDate', 'scheduledTime', 'notes');
+        $this->reset(
+            'editingId', 'memberId', 'kind', 'title', 'professionalName', 'specialty', 'location', 'address', 'phone',
+            'bookedByName', 'bookedWithName', 'scheduledDate', 'scheduledTime', 'notes',
+        );
         $this->kind = 'consultation';
         $this->resetErrorBag();
     }

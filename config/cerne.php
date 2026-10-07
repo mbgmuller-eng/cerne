@@ -73,6 +73,10 @@ return [
         // — diferente de conta e apólice, marcar com muita antecedência
         // não muda nada que a pessoa precise FAZER antes da data.
         'days_before_appointment' => env('CERNE_NOTIFY_DAYS_BEFORE_APPOINTMENT', 1),
+
+        // Itens de saúde de troca periódica (filtro do aparelho auditivo, palmilha...): avisa
+        // este tanto de dias antes e também no próprio dia.
+        'days_before_care_item' => env('CERNE_NOTIFY_DAYS_BEFORE_CARE_ITEM', 1),
     ],
 
     /*

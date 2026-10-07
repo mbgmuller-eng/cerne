@@ -27,6 +27,9 @@ class HealthAppointmentUpcoming extends Notification implements ShouldQueue
         public ?string $location,
         public string $scheduledAt,
         public string $memberName,
+        public ?string $address = null,
+        public ?string $phone = null,
+        public ?string $bookedWith = null,
     ) {}
 
     public static function forAppointment(HealthAppointment $appointment): self
@@ -38,6 +41,9 @@ class HealthAppointmentUpcoming extends Notification implements ShouldQueue
             $appointment->location,
             $appointment->scheduled_at->toIso8601String(),
             $appointment->member->name,
+            $appointment->address,
+            $appointment->phone,
+            $appointment->booked_with_name,
         );
     }
 
@@ -69,6 +75,9 @@ class HealthAppointmentUpcoming extends Notification implements ShouldQueue
                 'kindLabel' => $this->kindLabel,
                 'title' => $this->title,
                 'location' => $this->location,
+                'address' => $this->address,
+                'phone' => $this->phone,
+                'bookedWith' => $this->bookedWith,
                 'dateFormatted' => $quando->format('d/m'),
                 'timeFormatted' => $quando->format('H:i'),
                 'url' => route('health.appointments.index'),

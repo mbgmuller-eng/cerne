@@ -18,6 +18,9 @@
         </include>
     </source>
     <php>
+        <!-- A suíte inteira roda em um processo só e passou dos 128M padrão do PHP: o estouro aparecia como
+             "Allowed memory size exhausted" num teste qualquer perto do limite, e sumia ao rodar de novo. -->
+        <ini name="memory_limit" value="512M"/>
         <env name="APP_ENV" value="testing"/>
         <env name="APP_MAINTENANCE_DRIVER" value="file"/>
         <env name="BCRYPT_ROUNDS" value="4"/>

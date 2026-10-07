@@ -6,7 +6,7 @@
         <div>
             <h1 class="font-display text-3xl font-semibold tracking-tight text-slate-900 dark:text-white">Documentos</h1>
             <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                CNH, passaporte, certificados, apólices e exames — guardados em um só lugar.
+                CNH, passaporte, certificados, apólices e exames, em pastas do seu jeito.
             </p>
         </div>
         @if ($podeGerenciar)
@@ -14,9 +14,78 @@
         @endif
     </div>
 
+    {{-- Caminho até a pasta aberta, subpastas e atalho para listar tudo. --}}
+    @if ($temPastas || $podeGerenciar)
+        <section class="space-y-3">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+                <nav aria-label="Caminho das pastas" class="flex min-w-0 flex-wrap items-center gap-1 text-sm">
+                    @if ($verTodos)
+                        <span class="font-medium text-slate-800 dark:text-slate-200">Todos os documentos</span>
+                    @else
+                        <button type="button" wire:click="abrirPasta('')" @class([
+                            'rounded px-1.5 py-0.5 hover:bg-slate-100 dark:hover:bg-white/10',
+                            'font-medium text-slate-800 dark:text-slate-200' => $pastaAtual === null,
+                            'text-documentos-800 dark:text-documentos-200' => $pastaAtual !== null,
+                        ])>Documentos</button>
+                        @foreach ($caminho as $nivel)
+                            <span class="text-slate-400" aria-hidden="true">›</span>
+                            <button type="button" wire:click="abrirPasta('{{ $nivel->id }}')" wire:key="caminho-{{ $nivel->id }}" @class([
+                                'rounded px-1.5 py-0.5 hover:bg-slate-100 dark:hover:bg-white/10',
+                                'font-medium text-slate-800 dark:text-slate-200' => $loop->last,
+                                'text-documentos-800 dark:text-documentos-200' => ! $loop->last,
+                            ])>{{ $nivel->name }}</button>
+                        @endforeach
+                    @endif
+                </nav>
+
+                <div class="flex shrink-0 items-center gap-3 text-xs">
+                    @if ($temPastas)
+                        <button type="button" wire:click="alternarVerTodos" class="text-slate-500 hover:underline dark:text-slate-400">
+                            {{ $verTodos ? 'Voltar às pastas' : 'Ver todos os documentos' }}
+                        </button>
+                    @endif
+                    @if ($podeGerenciar && ! $verTodos)
+                        @if ($pastaAtual)
+                            <button type="button" wire:click="editFolder('{{ $pastaAtual->id }}')" class="text-slate-500 hover:underline dark:text-slate-400">Editar pasta</button>
+                        @endif
+                        <button type="button" wire:click="newFolder" class="font-medium text-documentos-800 hover:underline dark:text-documentos-200">+ Nova pasta</button>
+                    @endif
+                </div>
+            </div>
+
+            @if (! $verTodos && $subpastas->isNotEmpty())
+                <ul class="grid gap-2 sm:grid-cols-2">
+                    @foreach ($subpastas as $item)
+                        <li wire:key="pasta-{{ $item['pasta']->id }}">
+                            <button type="button" wire:click="abrirPasta('{{ $item['pasta']->id }}')"
+                                class="card flex w-full items-center gap-3 p-3 text-left transition hover:bg-slate-50 dark:hover:bg-white/5">
+                                <x-nav-icon name="folder" class="h-6 w-6 text-documentos-800 dark:text-documentos-200" />
+                                <span class="min-w-0 flex-1">
+                                    <span class="block truncate text-sm font-medium text-slate-800 dark:text-slate-200">{{ $item['pasta']->name }}</span>
+                                    <span class="block text-xs text-slate-500 dark:text-slate-400">
+                                        {{ $item['documentos'] }} {{ $item['documentos'] === 1 ? 'documento' : 'documentos' }}
+                                        @if ($item['subpastas'] > 0)
+                                            · {{ $item['subpastas'] }} {{ $item['subpastas'] === 1 ? 'subpasta' : 'subpastas' }}
+                                        @endif
+                                    </span>
+                                </span>
+                            </button>
+                        </li>
+                    @endforeach
+                </ul>
+            @elseif (! $verTodos && ! $temPastas && $podeGerenciar)
+                <div class="card space-y-2 p-4">
+                    <p class="text-sm text-slate-700 dark:text-slate-300">Organize seus documentos em pastas e subpastas, do seu jeito.</p>
+                    <p class="text-xs text-slate-500 dark:text-slate-400">Exemplo: Propriedades › Fazenda Santa Maria › Escritura. Quem ainda não tem pasta pode começar pelas sugestões.</p>
+                    <button type="button" wire:click="criarPastasSugeridas" class="btn-secondary px-3 py-1.5 text-xs">Criar pastas sugeridas (Propriedades, Veículos, Família, Outros)</button>
+                </div>
+            @endif
+        </section>
+    @endif
+
     <section class="card space-y-3 p-5">
         @if ($documents->isEmpty())
-            <p class="text-xs text-slate-400">Nenhum documento guardado ainda.</p>
+            <p class="text-xs text-slate-400">{{ $verTodos || ($pastaAtual === null && ! $temPastas) ? 'Nenhum documento guardado ainda.' : 'Nenhum documento nesta pasta.' }}</p>
         @else
             <ul class="space-y-2">
                 @foreach ($documents as $documento)
@@ -29,6 +98,9 @@
                             <p class="text-sm font-medium text-slate-800 dark:text-slate-200">{{ $documento->title }}</p>
                             <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
                                 {{ $documento->category->label() }}
+                                @if ($verTodos && $documento->folder)
+                                    · Pasta: {{ $caminhoPorPasta[$documento->folder_id] ?? $documento->folder->name }}
+                                @endif
                                 @if ($documento->member)
                                     · {{ $documento->member->name }}
                                 @else
@@ -119,6 +191,17 @@
                         </select>
                     </div>
 
+                    <div>
+                        <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Pasta (opcional)</label>
+                        <select wire:model="folderId" class="select mt-1.5">
+                            <option value="">Sem pasta (raiz)</option>
+                            @foreach ($arvore as $linha)
+                                <option value="{{ $linha['pasta']->id }}">{{ str_repeat('— ', $linha['nivel']) }}{{ $linha['pasta']->name }}</option>
+                            @endforeach
+                        </select>
+                        @error('folderId') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                    </div>
+
                     @if ($category === DocumentCategory::InsurancePolicy->value)
                         <div>
                             <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Apólice</label>
@@ -157,6 +240,43 @@
                 </div>
 
                 <button type="submit" class="btn-primary w-full">Salvar</button>
+            </form>
+        </x-modal>
+    @endif
+
+    @if ($podeGerenciar)
+        <x-modal wire-model="showFolderForm" max-width="sm">
+            <form wire:submit="saveFolder" class="space-y-4">
+                <div class="flex items-baseline justify-between">
+                    <h2 class="text-sm font-semibold text-slate-900 dark:text-white">{{ $editingFolder ? 'Editar pasta' : 'Nova pasta' }}</h2>
+                    <button type="button" wire:click="closeFolderForm" class="btn-ghost px-2 py-1 text-xs">Cancelar</button>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Nome da pasta</label>
+                    <input type="text" wire:model="folderName" class="input mt-1.5" placeholder="Ex.: Fazenda Santa Maria" maxlength="80">
+                    @error('folderName') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                </div>
+
+                <div>
+                    <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Dentro de</label>
+                    <select wire:model="folderParentId" class="select mt-1.5">
+                        <option value="">Documentos (raiz)</option>
+                        @foreach ($arvoreParaMover as $linha)
+                            <option value="{{ $linha['pasta']->id }}">{{ str_repeat('— ', $linha['nivel']) }}{{ $linha['pasta']->name }}</option>
+                        @endforeach
+                    </select>
+                    @error('folderParentId') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                </div>
+
+                <div class="flex items-center gap-3">
+                    <button type="submit" class="btn-primary flex-1">Salvar</button>
+                    @if ($editingFolder)
+                        <button type="button" wire:click="deleteFolder('{{ $editingFolderId }}')"
+                            wire:confirm="Remover esta pasta? Os documentos e as subpastas dela não são apagados: sobem para a pasta de cima."
+                            class="text-xs text-slate-400 hover:text-red-700 dark:hover:text-red-400">remover pasta</button>
+                    @endif
+                </div>
             </form>
         </x-modal>
     @endif

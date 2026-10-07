@@ -33,6 +33,7 @@
         ['health.gym.index', 'Academia', 'Academia', 'dumbbell'],
         ['health.card.index', 'Ficha de Saúde', 'Ficha', 'heart'],
         ['health.appointments.index', 'Agenda de Saúde', 'Agenda', 'calendar'],
+        ['health.care.index', 'Cuidados e itens', 'Cuidados', 'tag'],
     ];
 
     $navDocumentos = [

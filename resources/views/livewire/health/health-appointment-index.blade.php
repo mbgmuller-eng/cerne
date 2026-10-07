@@ -4,7 +4,7 @@
         <div>
             <h1 class="font-display text-3xl font-semibold tracking-tight text-slate-900 dark:text-white">Agenda de Saúde</h1>
             <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                Consultas e exames — visível para você e seu cônjuge. Avisamos por e-mail/push um dia antes.
+                Consultas e exames, com quem atende, onde fica e como falar com o local. Visível para você e seu cônjuge. Avisamos um dia antes.
             </p>
         </div>
         <button type="button" wire:click="newAppointment" class="btn-primary shrink-0 px-3 py-2 text-sm">+ Agendar</button>
@@ -25,10 +25,8 @@
                             </p>
                             <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
                                 {{ $consulta->member->name }} · {{ $consulta->scheduled_at->format('d/m/Y \à\s H:i') }}
-                                @if ($consulta->location)
-                                    · {{ $consulta->location }}
-                                @endif
                             </p>
+                            <x-appointment-details :consulta="$consulta" />
                         </div>
                         <div class="flex shrink-0 items-center gap-2">
                             <button type="button" wire:click="editAppointment('{{ $consulta->id }}')" class="btn-ghost px-2 py-1 text-xs">Editar</button>
@@ -56,13 +54,8 @@
                                 </p>
                                 <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
                                     {{ $consulta->member->name }} · {{ $consulta->scheduled_at->format('d/m/Y') }}
-                                    @if ($consulta->location)
-                                        · {{ $consulta->location }}
-                                    @endif
                                 </p>
-                                @if ($consulta->notes)
-                                    <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">{{ $consulta->notes }}</p>
-                                @endif
+                                <x-appointment-details :consulta="$consulta" />
                             </div>
                             <button type="button" wire:click="editAppointment('{{ $consulta->id }}')" class="btn-ghost shrink-0 px-2 py-1 text-xs">Editar</button>
                         </div>
@@ -91,15 +84,30 @@
                 </div>
                 <div>
                     <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Tipo</label>
-                    <select wire:model="kind" class="select mt-1.5">
+                    <select wire:model.live="kind" class="select mt-1.5">
                         <option value="consultation">Consulta</option>
                         <option value="exam">Exame</option>
                     </select>
                     @error('kind') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
                 </div>
+                @if ($kind === 'consultation')
+                    <div>
+                        <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Profissional</label>
+                        <input type="text" wire:model="professionalName" class="input mt-1.5" placeholder="Ex.: Dr. João Silva" maxlength="120">
+                        @error('professionalName') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Especialidade</label>
+                        <input type="text" wire:model="specialty" class="input mt-1.5" placeholder="Ex.: Otorrinolaringologia" maxlength="80">
+                        @error('specialty') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                    </div>
+                @endif
                 <div class="@sm:col-span-2">
-                    <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Título</label>
-                    <input type="text" wire:model="title" class="input mt-1.5" placeholder="Ex.: Cardiologista — Dr. Souza" maxlength="120">
+                    <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">
+                        {{ $kind === 'consultation' ? 'Título' : 'Nome do exame' }}
+                        @if ($kind === 'consultation')<span class="font-normal text-slate-400">(opcional se informar profissional ou especialidade)</span>@endif
+                    </label>
+                    <input type="text" wire:model="title" class="input mt-1.5" placeholder="{{ $kind === 'consultation' ? 'Ex.: Retorno do aparelho auditivo' : 'Ex.: Hemograma completo' }}" maxlength="120">
                     @error('title') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
                 </div>
                 <div>
@@ -112,14 +120,42 @@
                     <input type="time" wire:model="scheduledTime" class="input mt-1.5">
                     @error('scheduledTime') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
                 </div>
+
+                <div class="@sm:col-span-2 border-t border-slate-100 pt-4 dark:border-white/10">
+                    <p class="text-xs font-semibold text-slate-700 dark:text-slate-300">Onde fica</p>
+                </div>
                 <div class="@sm:col-span-2">
-                    <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Local (opcional)</label>
-                    <input type="text" wire:model="location" class="input mt-1.5" placeholder="Ex.: Hospital Sírio-Libanês">
+                    <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Estabelecimento <span class="font-normal text-slate-400">(clínica, hospital, laboratório)</span></label>
+                    <input type="text" wire:model="location" class="input mt-1.5" placeholder="Ex.: Clínica Vida" maxlength="160">
                     @error('location') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
                 </div>
                 <div class="@sm:col-span-2">
-                    <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Anotações (opcional)</label>
-                    <textarea wire:model="notes" class="input mt-1.5" rows="2" placeholder="O que aconteceu, resultado, próximos passos..."></textarea>
+                    <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Endereço</label>
+                    <input type="text" wire:model="address" autocomplete="off" class="input mt-1.5" placeholder="Ex.: Rua das Flores, 100, sala 3" maxlength="200">
+                    @error('address') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                </div>
+                <div class="@sm:col-span-2">
+                    <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Telefone ou contato</label>
+                    <input type="tel" wire:model="phone" autocomplete="off" class="input mt-1.5" placeholder="(41) 3000-0000" maxlength="30">
+                    @error('phone') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                </div>
+
+                <div class="@sm:col-span-2 border-t border-slate-100 pt-4 dark:border-white/10">
+                    <p class="text-xs font-semibold text-slate-700 dark:text-slate-300">Agendamento</p>
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Agendado por</label>
+                    <input type="text" wire:model="bookedByName" class="input mt-1.5" placeholder="Quem da família marcou" maxlength="120">
+                    @error('bookedByName') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Agendado com <span class="font-normal text-slate-400">(secretária ou atendente)</span></label>
+                    <input type="text" wire:model="bookedWithName" class="input mt-1.5" placeholder="Ex.: Maria, secretária" maxlength="120">
+                    @error('bookedWithName') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                </div>
+                <div class="@sm:col-span-2">
+                    <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Observações</label>
+                    <textarea wire:model="notes" class="input mt-1.5" rows="2" placeholder="Antes: levar exames anteriores. Depois: o que aconteceu, resultado, próximos passos."></textarea>
                     @error('notes') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
                 </div>
             </div>

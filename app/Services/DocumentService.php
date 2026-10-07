@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Enums\DocumentCategory;
 use App\Models\Document;
+use App\Models\DocumentFolder;
 use App\Models\ProfileMember;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -26,6 +27,7 @@ class DocumentService
 
         return Document::create([
             'member_id' => $dados['member_id'] ?? null,
+            'folder_id' => $this->pastaDoPerfil($dados['folder_id'] ?? null),
             'category' => $categoria,
             // Só apólice usa o vínculo; toda outra categoria ignora o campo,
             // mesmo se vier preenchido por engano.
@@ -56,6 +58,7 @@ class DocumentService
 
         $documento->update([
             'member_id' => $dados['member_id'] ?? null,
+            'folder_id' => $this->pastaDoPerfil($dados['folder_id'] ?? null),
             'category' => $categoria,
             'insurance_policy_id' => $categoria === DocumentCategory::InsurancePolicy ? ($dados['insurance_policy_id'] ?? null) : null,
             'title' => trim($dados['title']),
@@ -64,6 +67,19 @@ class DocumentService
         ]);
 
         return $documento;
+    }
+
+    /**
+     * Só aceita uma pasta que exista NESTE perfil (BelongsToProfile filtra); qualquer outro id
+     * vira "sem pasta" em vez de gravar uma referência para a pasta de outra pessoa.
+     */
+    private function pastaDoPerfil(?string $folderId): ?string
+    {
+        if ($folderId === null || $folderId === '') {
+            return null;
+        }
+
+        return DocumentFolder::query()->whereKey($folderId)->value('id');
     }
 
     public function delete(Document $documento): void

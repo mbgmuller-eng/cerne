@@ -16,7 +16,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * enxerga o quê.
  */
 #[Fillable([
-    'profile_id', 'member_id', 'category', 'insurance_policy_id', 'title', 'original_filename',
+    'profile_id', 'member_id', 'folder_id', 'category', 'insurance_policy_id', 'title', 'original_filename',
     'storage_path', 'mime_type', 'size_bytes', 'expires_on', 'visible_to_professional', 'created_by_member_id',
 ])]
 class Document extends Model
@@ -36,6 +36,11 @@ class Document extends Model
     public function member(): BelongsTo
     {
         return $this->belongsTo(ProfileMember::class, 'member_id');
+    }
+
+    public function folder(): BelongsTo
+    {
+        return $this->belongsTo(DocumentFolder::class, 'folder_id');
     }
 
     public function insurancePolicy(): BelongsTo

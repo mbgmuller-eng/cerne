@@ -2,6 +2,7 @@
 
 use App\Services\FixedBillService;
 use App\Services\HealthAppointmentService;
+use App\Services\HealthCareItemService;
 use App\Services\ImportantDatesService;
 use App\Services\InvestmentSnapshotService;
 use App\Services\InvoiceService;
@@ -92,6 +93,14 @@ Schedule::call(function (): void {
 
     logger()->info('Agenda de saúde', ['notificados' => $notificados]);
 })->dailyAt('03:35')->name('agenda-saude')->withoutOverlapping();
+
+// Cuidados e itens de saúde (filtro do aparelho auditivo, palmilha...): avisa no dia
+// anterior e no dia da troca. Só os donos da conta, nunca o consultor.
+Schedule::call(function (): void {
+    $notificados = app(HealthCareItemService::class)->notifyDue();
+
+    logger()->info('Cuidados de saúde', ['notificados' => $notificados]);
+})->dailyAt('03:36')->name('cuidados-saude')->withoutOverlapping();
 
 // Assinatura por Pix: sem débito automático, avisa 3 dias antes do
 // vencimento (fim do teste grátis ou qualquer ciclo seguinte — é o mesmo

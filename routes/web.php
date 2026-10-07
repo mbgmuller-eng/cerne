@@ -45,6 +45,7 @@ use App\Livewire\Health\Gym\GymSessionHistory;
 use App\Livewire\Health\Gym\GymSessionRun;
 use App\Livewire\Health\Gym\GymWorkoutShow;
 use App\Livewire\Health\HealthAppointmentIndex;
+use App\Livewire\Health\HealthCareItemIndex;
 use App\Livewire\Health\HealthCardIndex;
 use App\Livewire\Insurance\InsuranceIndex;
 use App\Livewire\Investments\InvestmentsIndex;
@@ -194,6 +195,7 @@ Route::middleware(['auth', 'verified'])->group(function (): void {
         Route::get('/saude/ficha', HealthCardIndex::class)->name('health.card.index');
         Route::get('/saude/ficha/{memberId}/qrcode', [HealthQrCodeController::class, 'show'])->name('health.qrcode.show');
         Route::get('/saude/agenda', HealthAppointmentIndex::class)->name('health.appointments.index');
+        Route::get('/saude/cuidados', HealthCareItemIndex::class)->name('health.care.index');
         Route::get('/importar', DocumentsIndex::class)->name('documents.index');
         Route::get('/regras-de-categorizacao', CategorizationRulesIndex::class)->name('categorization-rules.index');
         Route::get('/contas', AccountsIndex::class)->name('accounts.index');

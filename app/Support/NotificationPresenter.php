@@ -69,6 +69,11 @@ final class NotificationPresenter
                 'message' => 'Seu acesso gratuito vai até '.self::dia($d['trial_last_day'] ?? null).'. Escolha como pagar para continuar.',
                 'url' => route('subscription.index'),
             ],
+            'health_care_item_due' => [
+                'heading' => 'Cuidado de saúde',
+                'message' => self::juntar($titulo, isset($d['member_name']) ? 'para '.$d['member_name'] : null, ($d['days_left'] ?? 0) <= 0 ? 'é hoje' : 'é amanhã'),
+                'url' => route('health.care.index'),
+            ],
             'document_processed' => [
                 'heading' => ($d['status'] ?? null) === 'completed' ? 'Importação concluída' : 'Falha na importação',
                 'message' => $titulo,

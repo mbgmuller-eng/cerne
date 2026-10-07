@@ -13,7 +13,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /** Uma consulta ou exame — passado (com anotação do que aconteceu) ou futuro (vira lembrete). */
 #[Fillable([
-    'profile_id', 'member_id', 'kind', 'title', 'location', 'scheduled_at', 'notes', 'created_by_member_id',
+    'profile_id', 'member_id', 'kind', 'title', 'professional_name', 'specialty', 'location', 'address', 'phone',
+    'booked_by_name', 'booked_with_name', 'scheduled_at', 'notes', 'created_by_member_id',
 ])]
 class HealthAppointment extends Model
 {

@@ -17,16 +17,22 @@ use Illuminate\Support\Collection;
  */
 class HealthAppointmentService
 {
-    /** @param  array<string, mixed>  $dados  kind, title, location, scheduled_at, notes */
+    /** Campos de texto opcionais da consulta; vazio vira nulo. */
+    private const CAMPOS_OPCIONAIS = ['professional_name', 'specialty', 'location', 'address', 'phone', 'booked_by_name', 'booked_with_name', 'notes'];
+
+    /**
+     * @param  array<string, mixed>  $dados  kind, title, scheduled_at e os campos opcionais (profissional, especialidade,
+     *                                       local, endereço, telefone, quem agendou e com quem, anotações)
+     */
     public function create(ProfileMember $membro, array $dados, ProfileMember $autor): HealthAppointment
     {
-        return HealthAppointment::create([
+        $opcionais = $this->opcionais($dados);
+
+        return HealthAppointment::create($opcionais + [
             'member_id' => $membro->id,
             'kind' => $dados['kind'],
-            'title' => trim($dados['title']),
-            'location' => $this->blankToNull($dados['location'] ?? null),
+            'title' => $this->titulo($dados['title'] ?? '', $opcionais),
             'scheduled_at' => $dados['scheduled_at'],
-            'notes' => $this->blankToNull($dados['notes'] ?? null),
             'created_by_member_id' => $autor->id,
         ]);
     }
@@ -34,17 +40,56 @@ class HealthAppointmentService
     /** @param  array<string, mixed>  $dados */
     public function update(HealthAppointment $consulta, array $dados): HealthAppointment
     {
-        $consulta->update([
+        $opcionais = $this->opcionais($dados, $consulta);
+
+        $consulta->update($opcionais + [
             'kind' => $dados['kind'] ?? $consulta->kind,
-            'title' => isset($dados['title']) ? trim($dados['title']) : $consulta->title,
-            'location' => array_key_exists('location', $dados) ? $this->blankToNull($dados['location']) : $consulta->location,
+            'title' => array_key_exists('title', $dados) ? $this->titulo($dados['title'], $opcionais) : $consulta->title,
             'scheduled_at' => $dados['scheduled_at'] ?? $consulta->scheduled_at,
-            'notes' => array_key_exists('notes', $dados) ? $this->blankToNull($dados['notes']) : $consulta->notes,
         ]);
 
         return $consulta;
     }
 
+    /**
+     * Consulta sem título digitado ganha um: "Especialidade · Profissional". O título
+     * continua obrigatório quando não há nem especialidade nem profissional (e em exame,
+     * que não tem esses campos).
+     *
+     * @param  array<string, mixed>  $opcionais
+     */
+    private function titulo(string $digitado, array $opcionais): string
+    {
+        $digitado = trim($digitado);
+
+        if ($digitado !== '') {
+            return $digitado;
+        }
+
+        return implode(' · ', array_filter([$opcionais['specialty'] ?? null, $opcionais['professional_name'] ?? null]));
+    }
+
+    /**
+     * Campos opcionais já normalizados (espaços cortados, vazio = nulo). Na edição só
+     * entram os que vieram em `$dados`; os demais ficam como estão.
+     *
+     * @param  array<string, mixed>  $dados
+     * @return array<string, ?string>
+     */
+    private function opcionais(array $dados, ?HealthAppointment $atual = null): array
+    {
+        $saida = [];
+
+        foreach (self::CAMPOS_OPCIONAIS as $campo) {
+            if (array_key_exists($campo, $dados)) {
+                $saida[$campo] = $this->blankToNull($dados[$campo]);
+            } elseif ($atual === null) {
+                $saida[$campo] = null;
+            }
+        }
+
+        return $saida;
+    }
     public function delete(HealthAppointment $consulta): void
     {
         $consulta->delete();
