@@ -6,8 +6,10 @@ use App\Enums\DocumentCategory;
 use App\Models\Document;
 use App\Models\DocumentFolder;
 use App\Models\ProfileMember;
+use App\Support\ProfileContext;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 /**
  * Área de Documentos — upload e remoção. Visibilidade não é decidida aqui
@@ -23,6 +25,37 @@ class DocumentService
             config('cerne.document_vault.disk'),
         );
 
+        return $this->registrar(
+            $dados,
+            $caminho,
+            $arquivo->getClientOriginalName(),
+            $arquivo->getMimeType() ?? $arquivo->getClientMimeType(),
+            $arquivo->getSize(),
+            $autor,
+        );
+    }
+
+    /**
+     * Guarda em Documentos um PDF que já está em disco (ex.: a leitura de apólice por IA, que sobe
+     * para a pasta de importação). Copia, não move: o mesmo arquivo pode ficar ligado a mais de uma
+     * apólice, cada uma com a sua cópia.
+     *
+     * @param  array<string, mixed>  $dados  category, title, member_id, insurance_policy_id, expires_on
+     */
+    public function adopt(string $disco, string $caminhoOrigem, string $nomeOriginal, array $dados, ?ProfileMember $autor = null): Document
+    {
+        $perfilId = app(ProfileContext::class)->profileId();
+        $cofre = Storage::disk(config('cerne.document_vault.disk'));
+        $destino = config('cerne.document_vault.path').'/'.$perfilId.'/'.Str::random(40).'.pdf';
+
+        $cofre->put($destino, Storage::disk($disco)->readStream($caminhoOrigem));
+
+        return $this->registrar($dados, $destino, $nomeOriginal, 'application/pdf', $cofre->size($destino), $autor);
+    }
+
+    /** @param  array<string, mixed>  $dados */
+    private function registrar(array $dados, string $caminho, string $nomeOriginal, ?string $mime, int $tamanho, ?ProfileMember $autor): Document
+    {
         $categoria = DocumentCategory::from($dados['category']);
 
         return Document::create([
@@ -33,15 +66,15 @@ class DocumentService
             // mesmo se vier preenchido por engano.
             'insurance_policy_id' => $categoria === DocumentCategory::InsurancePolicy ? ($dados['insurance_policy_id'] ?? null) : null,
             'title' => trim($dados['title']),
-            'original_filename' => $arquivo->getClientOriginalName(),
+            'original_filename' => $nomeOriginal,
             'storage_path' => $caminho,
-            'mime_type' => $arquivo->getMimeType() ?? $arquivo->getClientMimeType(),
-            'size_bytes' => $arquivo->getSize(),
+            'mime_type' => $mime,
+            'size_bytes' => $tamanho,
             'expires_on' => $dados['expires_on'] ?? null,
             // Só tem efeito pra category=other (ver DocumentVisibilityScope);
             // gravar mesmo assim não abre brecha nenhuma nas outras categorias.
             'visible_to_professional' => $categoria === DocumentCategory::Other && (bool) ($dados['visible_to_professional'] ?? false),
-            'created_by_member_id' => $autor->id,
+            'created_by_member_id' => $autor?->id,
         ]);
     }
 

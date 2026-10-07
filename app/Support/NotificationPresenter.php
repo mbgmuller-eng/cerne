@@ -77,7 +77,7 @@ final class NotificationPresenter
             'document_processed' => [
                 'heading' => ($d['status'] ?? null) === 'completed' ? 'Importação concluída' : 'Falha na importação',
                 'message' => $titulo,
-                'url' => route('documents.index'),
+                'url' => ($d['document_type'] ?? null) === 'insurance_policy' ? route('insurance.index') : route('documents.index'),
             ],
             default => [
                 'heading' => $titulo !== '' ? $titulo : 'Notificação',

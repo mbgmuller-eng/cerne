@@ -38,9 +38,13 @@
         </div>
     </div>
 
-    <div class="flex justify-end">
+    <div class="flex flex-wrap justify-end gap-2">
+        <button type="button" wire:click="$dispatch('open-insurance-import')" class="btn-secondary px-3 py-1.5">Importar apólice (PDF)</button>
         <button wire:click="togglePolicyForm" class="btn-primary px-3 py-1.5">+ Nova apólice</button>
     </div>
+
+    {{-- Leitura de PDF por IA, revisão e vínculo à apólice: tudo no componente filho. --}}
+    <livewire:insurance.insurance-import />
 
     {{-- Casal / cada membro — só quando há algo marcado como oculto ---- --}}
     @if ($showPrivacyTabs)
@@ -338,12 +342,25 @@
                                                             @if ($apolice->coverageList() !== [])
                                                                 <div class="mt-4 divide-y divide-slate-100 dark:divide-white/10">
                                                                     @foreach ($apolice->coverageList() as $cobertura)
-                                                                        <div class="flex items-center justify-between py-2 text-sm">
-                                                                            <span class="text-slate-600 dark:text-slate-300">{{ $cobertura['name'] }}</span>
-                                                                            <span class="font-semibold text-slate-900 dark:text-white">{{ Money::format($cobertura['value']) }}</span>
+                                                                        <div class="flex items-center justify-between gap-3 py-2 text-sm">
+                                                                            <span class="text-slate-600 dark:text-slate-300">
+                                                                                {{ $cobertura['name'] }}
+                                                                                @if (! empty($cobertura['deductible']))
+                                                                                    <span class="block text-xs text-slate-400">Franquia: {{ $cobertura['deductible'] }}</span>
+                                                                                @endif
+                                                                            </span>
+                                                                            @if (isset($cobertura['value']) && $cobertura['value'] !== null && $cobertura['value'] !== '')
+                                                                                <span class="shrink-0 font-semibold text-slate-900 dark:text-white">{{ Money::format($cobertura['value']) }}</span>
+                                                                            @endif
                                                                         </div>
                                                                     @endforeach
                                                                 </div>
+                                                                @if ($apolice->beneficiaryList() !== [])
+                                                                    <p class="mt-2 border-t border-slate-100 pt-2 text-xs text-slate-500 dark:border-white/10 dark:text-slate-400">
+                                                                        Beneficiários:
+                                                                        {{ collect($apolice->beneficiaryList())->map(fn ($b) => $b['name'].' ('.rtrim(rtrim(number_format((float) $b['percentage'], 2, ',', ''), '0'), ',').'%)')->implode(' · ') }}
+                                                                    </p>
+                                                                @endif
                                                             @elseif ($apolice->coverage_amount !== null)
                                                                 <div class="mt-4 flex items-center justify-between border-t border-slate-100 pt-3 text-sm dark:border-white/10">
                                                                     <span class="text-slate-600 dark:text-slate-300">Cobertura</span>

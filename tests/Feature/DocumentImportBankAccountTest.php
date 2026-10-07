@@ -51,7 +51,7 @@ class DocumentImportBankAccountTest extends TestCase
 
         Livewire::test(DocumentsIndex::class)
             ->set('arquivo', UploadedFile::fake()->create('apolice.pdf', 100, 'application/pdf'))
-            ->set('documentType', 'insurance_policy')
+            ->set('documentType', 'investment_statement')
             ->call('enviar')
             ->assertHasNoErrors();
     }

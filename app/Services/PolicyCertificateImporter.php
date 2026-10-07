@@ -12,6 +12,7 @@ use App\Models\Insurer;
 use App\Models\InsurancePolicy;
 use App\Models\ProfileMember;
 use App\Models\User;
+use App\Support\PersonName;
 use App\Support\ProfileContext;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\UploadedFile;
@@ -406,9 +407,7 @@ class PolicyCertificateImporter
     /** @return list<string> palavras do nome sem acento, sem "de/da/do..." e sem letras soltas (nome truncado no PDF) */
     private function tokens(string $nome): array
     {
-        $palavras = preg_split('/[^a-z]+/', Str::lower(Str::ascii($nome)), -1, PREG_SPLIT_NO_EMPTY);
-
-        return array_values(array_filter($palavras, fn (string $p) => strlen($p) > 1 && ! in_array($p, ['de', 'da', 'do', 'das', 'dos', 'e'], true)));
+        return PersonName::tokens($nome);
     }
 
     private function digitos(?string $valor): string

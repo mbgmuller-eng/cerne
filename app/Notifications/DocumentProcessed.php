@@ -28,11 +28,12 @@ class DocumentProcessed extends Notification implements ShouldQueue
         public string $filename,
         public ProcessingStatus $status,
         public ?string $errorMessage = null,
+        public ?string $documentType = null,
     ) {}
 
     public static function forDocument(DocumentUpload $documento): self
     {
-        return new self($documento->id, $documento->original_filename, $documento->processing_status, $documento->error_message);
+        return new self($documento->id, $documento->original_filename, $documento->processing_status, $documento->error_message, $documento->document_type->value);
     }
 
     /** @return array<int, string> */
@@ -62,7 +63,7 @@ class DocumentProcessed extends Notification implements ShouldQueue
                 'sucesso' => $sucesso,
                 'filename' => $this->filename,
                 'errorMessage' => $this->errorMessage,
-                'url' => route('documents.index'),
+                'url' => $this->destinationUrl(),
             ]);
     }
 
@@ -75,7 +76,14 @@ class DocumentProcessed extends Notification implements ShouldQueue
             'title' => $this->filename,
             'status' => $this->status->value,
             'error_message' => $this->errorMessage,
+            'document_type' => $this->documentType,
         ];
+    }
+
+    /** Leitura de apólice se revisa em Seguros; o resto, em Importar. */
+    private function destinationUrl(): string
+    {
+        return $this->documentType === 'insurance_policy' ? route('insurance.index') : route('documents.index');
     }
 
     public function toWebPush(object $notifiable, self $notification): WebPushMessage
@@ -85,6 +93,6 @@ class DocumentProcessed extends Notification implements ShouldQueue
         return (new WebPushMessage)
             ->title($sucesso ? 'Importação concluída' : 'Falha na importação')
             ->body($this->filename)
-            ->data(['url' => route('documents.index')]);
+            ->data(['url' => $this->destinationUrl()]);
     }
 }

@@ -75,8 +75,20 @@ class DocumentSchemas
                 'Extraia o retorno de cada período apresentado, com o benchmark comparado quando houver.',
             ]),
             DocumentType::InsurancePolicy => implode("\n", [
-                'Esta é uma APÓLICE DE SEGURO. Extraia os dados da cobertura.',
-                'Se houver, inclua a lista de beneficiários com seus percentuais.',
+                'Esta é uma APÓLICE (ou certificado, proposta ou endosso) de SEGURO. Devolva um item por apólice distinta que aparecer no documento; na maioria dos PDFs é um só.',
+                '',
+                '- tipo: vida (inclui prestamista e acidentes pessoais), carro (automóvel, moto), residencia (residencial, condomínio, empresarial), saude (plano de saúde ou odontológico), viagem, eletronicos (celular, notebook, equipamento portátil), civil (responsabilidade civil), outro.',
+                '- seguradora: o nome da seguradora que emite (não o corretor, o estipulante ou o banco que vendeu).',
+                '- segurado: nome da pessoa segurada ou titular; em apólice de bem, o proprietário/segurado nomeado.',
+                '- objeto_segurado: o que está coberto quando é um bem (modelo, ano e placa do veículo; endereço do imóvel; aparelho). Texto vazio para seguro de pessoa.',
+                '- valor_segurado: o valor principal coberto: capital de morte ou capital segurado em vida; valor do bem ou limite máximo de indenização nos demais. Nulo se o documento não trouxer um valor único.',
+                '- coberturas: cada proteção contratada com seu valor (limite máximo de indenização ou capital) e a franquia como está escrita no documento (ex.: "R$ 3.500,00" ou "10% dos prejuízos"). Inclua assistências (24h, guincho) com valor nulo quando não houver; franquia em texto vazio quando não houver.',
+                '- premio: o valor de CADA pagamento. periodicidade: monthly se paga todo mês (inclusive parcelado em 10x ou 12x), quarterly se trimestral, annual se à vista ou parcela anual única.',
+                '- premio_total_anual: o prêmio total da vigência quando o documento informar; senão nulo.',
+                '- inicio_vigencia e fim_vigencia: início e fim da vigência do seguro. Seguro vitalício, sem prazo final: fim_vigencia nulo.',
+                '- beneficiarios: nome, percentual e parentesco (texto vazio se não informado), quando houver; senão lista vazia.',
+                '- observacoes_item: carências, exclusões importantes ou condições especiais em poucas frases; texto vazio se não houver.',
+                '- campos_incertos: nomes dos campos acima que você leu com dúvida (ilegível, ambíguo ou conflitante no documento). Lista vazia se tem certeza de tudo.',
             ]),
             default => 'Extraia o que for financeiramente relevante.',
         };
@@ -188,27 +200,52 @@ class DocumentSchemas
 
     private static function insurancePolicy(): array
     {
+        $dinheiro = ['type' => ['string', 'null'], 'description' => 'Reais com ponto decimal, sem milhar: "1234.56"'];
+
         return self::envelope([
-            'tipo' => ['type' => 'string', 'enum' => ['vida', 'carro', 'residencia', 'saude', 'viagem', 'outro']],
+            'tipo' => ['type' => 'string', 'enum' => ['vida', 'carro', 'residencia', 'saude', 'viagem', 'eletronicos', 'civil', 'outro']],
+            'seguradora' => ['type' => ['string', 'null']],
             'numero_apolice' => ['type' => ['string', 'null']],
-            'cobertura' => ['type' => ['string', 'null']],
-            'premio' => ['type' => 'string'],
+            'segurado' => ['type' => ['string', 'null']],
+            'objeto_segurado' => ['type' => 'string', 'description' => 'Texto vazio quando não há bem segurado'],
+            'valor_segurado' => $dinheiro,
+            'coberturas' => [
+                'type' => 'array',
+                'items' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'nome' => ['type' => 'string'],
+                        'valor' => $dinheiro,
+                        'franquia' => ['type' => 'string', 'description' => 'Texto vazio quando não há franquia'],
+                    ],
+                    'required' => ['nome', 'valor', 'franquia'],
+                    'additionalProperties' => false,
+                ],
+            ],
+            'premio' => $dinheiro,
             'periodicidade' => ['type' => 'string', 'enum' => ['monthly', 'quarterly', 'annual']],
-            'inicio_vigencia' => ['type' => ['string', 'null']],
-            'fim_vigencia' => ['type' => ['string', 'null']],
+            'premio_total_anual' => $dinheiro,
+            'inicio_vigencia' => ['type' => ['string', 'null'], 'description' => 'ISO 8601'],
+            'fim_vigencia' => ['type' => ['string', 'null'], 'description' => 'ISO 8601'],
             'beneficiarios' => [
-                'type' => ['array', 'null'],
+                'type' => 'array',
                 'items' => [
                     'type' => 'object',
                     'properties' => [
                         'nome' => ['type' => 'string'],
                         'percentual' => ['type' => 'number'],
+                        'parentesco' => ['type' => 'string', 'description' => 'Texto vazio quando não informado'],
                     ],
-                    'required' => ['nome', 'percentual'],
+                    'required' => ['nome', 'percentual', 'parentesco'],
                     'additionalProperties' => false,
                 ],
             ],
-        ], ['tipo', 'numero_apolice', 'cobertura', 'premio', 'periodicidade', 'inicio_vigencia', 'fim_vigencia', 'beneficiarios']);
+            'observacoes_item' => ['type' => 'string', 'description' => 'Texto vazio quando não há'],
+            'campos_incertos' => ['type' => 'array', 'items' => ['type' => 'string']],
+        ], [
+            'tipo', 'seguradora', 'numero_apolice', 'segurado', 'objeto_segurado', 'valor_segurado', 'coberturas', 'premio',
+            'periodicidade', 'premio_total_anual', 'inicio_vigencia', 'fim_vigencia', 'beneficiarios', 'observacoes_item', 'campos_incertos',
+        ]);
     }
 
     private static function generic(): array

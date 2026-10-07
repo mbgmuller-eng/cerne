@@ -116,6 +116,10 @@ return [
         'max_pdf_pages' => 600,
         'require_review' => true,
         'job_tries' => 3,
+
+        // Cada leitura de apólice é uma chamada paga à API: teto por perfil e por dia, para um
+        // envio repetido por engano não virar conta. Tentativas que falharam também contam.
+        'insurance_imports_per_day' => (int) env('CERNE_INSURANCE_IMPORTS_PER_DAY', 10),
     ],
 
     /*

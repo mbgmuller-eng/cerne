@@ -19,6 +19,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\On;
 use Livewire\Component;
 
 /**
@@ -86,6 +87,10 @@ class InsuranceIndex extends Component
     // -----------------------------------------------------------------
     // Apólice — cadastrar / editar / excluir
     // -----------------------------------------------------------------
+
+    /** A importação por PDF (InsuranceImport) criou ou atualizou apólices: basta re-renderizar a lista. */
+    #[On('policies-imported')]
+    public function refreshAfterImport(): void {}
 
     public function togglePolicyForm(): void
     {

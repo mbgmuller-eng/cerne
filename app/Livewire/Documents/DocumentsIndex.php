@@ -24,6 +24,7 @@ use App\Support\ProfileContext;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\Rule;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 use Livewire\WithFileUploads;
@@ -131,7 +132,7 @@ class DocumentsIndex extends Component
                 'mimes:pdf',
                 'max:'.(config('cerne.ai.max_upload_mb') * 1024),
             ],
-            'documentType' => ['required', 'string'],
+            'documentType' => ['required', 'string', Rule::in(array_keys($this->tiposDisponiveis()))],
             // Sem isso, confirmar a importação não tem como debitar/creditar
             // o saldo certo — extrato sem conta é exatamente o bug que
             // deixava o saldo do BTG parado depois de importar.
@@ -772,10 +773,20 @@ class DocumentsIndex extends Component
         session()->flash('status', 'Documento na fila para nova tentativa.');
     }
 
+    /** @return array<string, string> valor => rótulo dos tipos que esta tela importa */
+    private function tiposDisponiveis(): array
+    {
+        return collect(DocumentType::cases())
+            ->filter(fn (DocumentType $t) => $t->availableInImportScreen())
+            ->mapWithKeys(fn (DocumentType $t) => [$t->value => $t->label()])
+            ->all();
+    }
+
     /** @return Collection<int, DocumentUpload> */
     public function getDocumentsProperty(): Collection
     {
         return DocumentUpload::query()
+            ->where('document_type', '!=', DocumentType::InsurancePolicy->value)
             ->with('uploadedBy', 'member')
             ->orderByDesc('created_at')
             ->limit(30)
@@ -794,7 +805,7 @@ class DocumentsIndex extends Component
         return view('livewire.documents.documents-index', [
             'documents' => $this->documents,
             'revisando' => $this->revisando,
-            'tipos' => DocumentType::options(),
+            'tipos' => $this->tiposDisponiveis(),
             'iaConfigurada' => filled(config('cerne.ai.api_key')),
             'bankAccounts' => BankAccount::query()->active()->orderBy('bank_name')->get(),
             'creditCards' => CreditCard::query()->active()->orderBy('card_name')->get(),

@@ -51,6 +51,15 @@ enum DocumentType: string
         };
     }
 
+    /**
+     * Apólice tem fluxo próprio dentro de Seguros (revisão com vínculo a apólice existente e PDF
+     * guardado em Documentos), então não aparece na tela Importar.
+     */
+    public function availableInImportScreen(): bool
+    {
+        return $this !== self::InsurancePolicy;
+    }
+
     /** Tipos que a IA sabe extrair hoje. */
     public function isExtractable(): bool
     {
