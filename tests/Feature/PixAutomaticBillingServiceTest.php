@@ -9,7 +9,6 @@ use App\Enums\SubscriptionStatus;
 use App\Models\Subscription;
 use App\Models\SubscriptionCharge;
 use App\Models\User;
-use App\Notifications\PixAutomaticActivationDue;
 use App\Notifications\SubscriptionAccessEnding;
 use App\Services\AsaasClient;
 use App\Services\PixAutomaticBillingService;
@@ -268,22 +267,6 @@ class PixAutomaticBillingServiceTest extends TestCase
         Notification::assertSentTo($automatico->user, SubscriptionAccessEnding::class);
         Notification::assertSentTo($comum->user, SubscriptionAccessEnding::class);
         Notification::assertNotSentTo($foraDoDia->user, SubscriptionAccessEnding::class);
-    }
-
-    public function test_lembrete_de_ativacao_so_vai_para_quem_ainda_nao_autorizou(): void
-    {
-        Notification::fake();
-        $semAutorizar = $this->assinatura(['status' => SubscriptionStatus::Trialing, 'pix_authorization_status' => null, 'asaas_pix_authorization_id' => null, 'current_period_ends_at' => Carbon::today()->addDays(3)]);
-        $jaAutorizou = $this->assinatura(['status' => SubscriptionStatus::Trialing, 'current_period_ends_at' => Carbon::today()->addDays(3)]);
-        $cartao = $this->assinatura(['status' => SubscriptionStatus::Trialing, 'billing_type' => PaymentMethod::CreditCard, 'pix_authorization_status' => null, 'current_period_ends_at' => Carbon::today()->addDays(3)]);
-        $outroDia = $this->assinatura(['status' => SubscriptionStatus::Trialing, 'pix_authorization_status' => null, 'current_period_ends_at' => Carbon::today()->addDays(5)]);
-
-        self::assertSame(1, app(SubscriptionReminderService::class)->notifyPixAutomaticActivation());
-
-        Notification::assertSentTo($semAutorizar->user, PixAutomaticActivationDue::class);
-        Notification::assertNotSentTo($jaAutorizou->user, PixAutomaticActivationDue::class);
-        Notification::assertNotSentTo($cartao->user, PixAutomaticActivationDue::class);
-        Notification::assertNotSentTo($outroDia->user, PixAutomaticActivationDue::class);
     }
 
     public function test_cancelar_a_assinatura_cancela_a_autorizacao_na_asaas(): void

@@ -51,6 +51,18 @@ return [
     | desligada (ela só esconde a opção para quem ainda vai assinar).
     */
 
+    /*
+    |---------------------------------------------------------------------------
+    | Bloqueio por falta de assinatura
+    |---------------------------------------------------------------------------
+    | Ligado, quem não tem assinatura em vigor (teste grátis acabou, pagamento
+    | não entrou) é levado à tela de assinatura em toda página. Desligado por
+    | padrão: ligar só depois de revisar quais contas existentes ficariam sem
+    | acesso (cerne:check mostra o aviso enquanto estiver desligado em produção).
+    */
+
+    'enforce_access' => (bool) env('BILLING_ENFORCE_ACCESS', false),
+
     'pix_automatic_enabled' => (bool) env('BILLING_PIX_AUTOMATIC', false),
 
     'professional' => [

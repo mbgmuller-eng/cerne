@@ -64,6 +64,11 @@ final class NotificationPresenter
                 'message' => self::juntar($titulo, isset($d['member_name']) ? 'para '.$d['member_name'] : null, isset($d['scheduled_at']) ? 'em '.Carbon::parse($d['scheduled_at'])->format('d/m \à\s H:i') : null),
                 'url' => route('health.appointments.index'),
             ],
+            'trial_ending_soon' => [
+                'heading' => 'Teste grátis terminando',
+                'message' => 'Seu acesso gratuito vai até '.self::dia($d['trial_last_day'] ?? null).'. Escolha como pagar para continuar.',
+                'url' => route('subscription.index'),
+            ],
             'document_processed' => [
                 'heading' => ($d['status'] ?? null) === 'completed' ? 'Importação concluída' : 'Falha na importação',
                 'message' => $titulo,

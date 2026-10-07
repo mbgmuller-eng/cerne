@@ -49,32 +49,39 @@ class PixAutomaticScreenTest extends TestCase
         ]);
     }
 
-    public function test_assinar_com_pix_automatico_so_abre_o_teste_e_nao_chama_a_asaas(): void
+    public function test_o_teste_comeca_sem_forma_de_pagamento_e_a_tela_oferece_os_tres_meios_no_pagamento(): void
     {
         $usuario = User::factory()->create();
         $this->asaas()->shouldNotReceive('createSubscription');
 
+        $tela = Livewire::actingAs($usuario)->test(SubscriptionIndex::class)->call('assinar', 'completo')->assertHasNoErrors();
+
+        $assinatura = Subscription::query()->sole();
+        self::assertNull($assinatura->billing_type);
+        self::assertSame(SubscriptionStatus::Trialing, $assinatura->status);
+
+        $tela->assertSee('Cartão de crédito')->assertSee('Pix Automático');
+    }
+
+    public function test_escolher_pix_automatico_no_pagamento_gera_o_qr_da_autorizacao(): void
+    {
+        $usuario = User::factory()->create();
+        $assinatura = $this->assinatura($usuario, ['billing_type' => null]);
+
+        $asaas = $this->asaas();
+        $asaas->shouldNotReceive('createSubscription');
+        $asaas->shouldReceive('findOrCreateCustomer')->andReturn('cus_1');
+        $asaas->shouldReceive('createPixAuthorization')->once()->with('cus_1', $assinatura->id, '29.90')
+            ->andReturn(['id' => 'auth-1', 'status' => 'CREATED', 'payload' => 'abc', 'qrImage' => null, 'expiresAt' => null]);
+
         Livewire::actingAs($usuario)->test(SubscriptionIndex::class)
             ->set('cpfCnpj', '52998224725')
             ->set('metodoPagamento', 'pix_automatic')
-            ->call('assinar', 'completo')
-            ->assertHasNoErrors();
+            ->call('iniciarPagamento')
+            ->assertSet('pixQr.payload', 'abc');
 
-        $assinatura = Subscription::query()->sole();
-        self::assertSame(PaymentMethod::PixAutomatic, $assinatura->billing_type);
-        self::assertSame(SubscriptionStatus::Trialing, $assinatura->status);
-        self::assertNull($assinatura->asaas_subscription_id);
-        self::assertSame(now()->addDays(7)->toDateString(), $assinatura->current_period_ends_at->toDateString());
-        self::assertTrue($assinatura->isCurrent());
+        self::assertSame(PaymentMethod::PixAutomatic, $assinatura->fresh()->billing_type);
     }
-
-    public function test_tela_oferece_os_tres_meios_de_pagamento(): void
-    {
-        Livewire::actingAs(User::factory()->create())->test(SubscriptionIndex::class)
-            ->assertSee('Cartão de crédito')
-            ->assertSee('Pix Automático');
-    }
-
     public function test_botao_de_ativar_aparece_e_gera_o_qr_com_copia_e_cola(): void
     {
         $usuario = User::factory()->create(['cpf_cnpj' => '52998224725']);
@@ -166,41 +173,20 @@ class PixAutomaticScreenTest extends TestCase
         self::assertSame('CANCELLED', $assinatura->pix_authorization_status);
     }
 
-    public function test_checkout_publico_aceita_pix_automatico(): void
-    {
-        $this->get(route('checkout.show', 'completo'))->assertOk()->assertSee('value="pix_automatic"', false)->assertSee('Pix Automático');
-    }
-
     public function test_com_a_chave_desligada_a_opcao_some_e_o_valor_e_recusado(): void
     {
         config(['billing.pix_automatic_enabled' => false]);
         $usuario = User::factory()->create();
+        $this->assinatura($usuario, ['billing_type' => null]);
 
         Livewire::actingAs($usuario)->test(SubscriptionIndex::class)
             ->assertDontSee('Pix Automático')
             ->set('cpfCnpj', '52998224725')
             ->set('metodoPagamento', 'pix_automatic')
-            ->call('assinar', 'completo')
+            ->call('iniciarPagamento')
             ->assertHasErrors('metodoPagamento');
 
-        self::assertSame(0, Subscription::query()->count());
+        self::assertNull(Subscription::query()->sole()->billing_type);
     }
 
-    public function test_checkout_publico_esconde_a_opcao_com_a_chave_desligada(): void
-    {
-        config(['billing.pix_automatic_enabled' => false]);
-
-        $this->get(route('checkout.show', 'completo'))->assertOk()->assertDontSee('value="pix_automatic"', false)->assertDontSee('No Pix Automático');
-    }
-
-    public function test_checkout_recusa_pix_automatico_com_a_chave_desligada(): void
-    {
-        config(['billing.pix_automatic_enabled' => false]);
-
-        $this->post(route('checkout.store'), [
-            'tipo' => 'usuario', 'pacote' => 'completo', 'nome' => 'Marina Alencar', 'email' => 'marina@exemplo.com',
-            'nascimento' => '1990-05-12', 'password' => 'Senha1234', 'password_confirmation' => 'Senha1234',
-            'termos' => '1', 'metodo' => 'pix_automatic',
-        ])->assertSessionHasErrors('metodo');
-    }
 }

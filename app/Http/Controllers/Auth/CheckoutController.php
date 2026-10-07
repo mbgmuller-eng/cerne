@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers\Auth;
 
-use App\Enums\PaymentMethod;
 use App\Enums\SubscriptionBundle;
 use App\Enums\UserRole;
 use App\Http\Controllers\Controller;
@@ -67,7 +66,6 @@ class CheckoutController extends Controller
             'pacote' => [Rule::requiredIf(! $profissional), Rule::enum(SubscriptionBundle::class)],
             'papel' => [Rule::requiredIf($profissional), Rule::in(['consultant', 'broker'])],
             'clientes' => [Rule::requiredIf($profissional), 'integer', Rule::in(ProfessionalPricing::validCaps())],
-            'metodo' => ['required', Rule::in(array_column(PaymentMethod::available(), 'value'))],
             'nome' => ['required', 'string', 'max:100'],
             'email' => ['required', 'email', 'max:255', 'unique:users,email'],
             'nascimento' => ['required', 'date', 'before:today', 'after:1900-01-01'],
@@ -79,7 +77,6 @@ class CheckoutController extends Controller
             'nascimento' => 'data de nascimento',
             'password' => 'senha',
             'termos' => 'termos de uso',
-            'metodo' => 'forma de pagamento',
             'clientes' => 'quantidade de clientes',
         ]);
 
@@ -92,8 +89,8 @@ class CheckoutController extends Controller
         Auth::login($user);
         $request->session()->regenerate();
         $request->session()->put('checkout', $profissional
-            ? ['tipo' => 'profissional', 'clientes' => (int) $data['clientes'], 'metodo' => $data['metodo']]
-            : ['tipo' => 'usuario', 'pacote' => $data['pacote'], 'metodo' => $data['metodo']]);
+            ? ['tipo' => 'profissional', 'clientes' => (int) $data['clientes']]
+            : ['tipo' => 'usuario', 'pacote' => $data['pacote']]);
 
         return redirect()->route('subscription.index');
     }

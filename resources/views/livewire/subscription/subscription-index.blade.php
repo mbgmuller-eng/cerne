@@ -1,8 +1,18 @@
-<div class="mx-auto max-w-2xl space-y-6">
+<div class="mx-auto max-w-2xl space-y-6" @if ($aguardandoPagamento) wire:poll.5s="atualizarPagamento" @endif>
 
     <div>
         <h1 class="font-display text-3xl font-semibold tracking-tight text-slate-900 dark:text-white">Assinatura</h1>
-        <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">{{ $resumoDoPedido ? 'Confira o seu pedido e confirme para começar o teste grátis.' : 'Escolha o pacote que cobre o que você precisa.' }}</p>
+        <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
+            @if ($precisaPagar && ! $temAcessoAtivo)
+                Seu acesso gratuito terminou. Escolha como pagar para continuar.
+            @elseif ($precisaPagar)
+                Você está no teste grátis. Escolha como pagar quando quiser.
+            @elseif ($resumoDoPedido)
+                Confira o seu pedido e confirme para começar o teste grátis.
+            @else
+                Escolha o pacote que cobre o que você precisa.
+            @endif
+        </p>
     </div>
 
     @if (session('status'))
@@ -16,9 +26,8 @@
             <p class="eyebrow">Sua assinatura</p>
             <x-subscription-summary :subscription="$assinaturaAtual">
                 <x-slot:actions>
-                    {{-- Pix Automático: autorização do débito mensal. Fica fora do
-                         @if de acesso de propósito: quem está com o teste acabando
-                         (ou já vencido) precisa conseguir ativar. --}}
+                    {{-- Pix Automático: autorização do débito mensal. O QR aparece aqui depois de a
+                         pessoa escolher essa forma no pagamento. --}}
                     @if ($assinaturaAtual->billing_type === \App\Enums\PaymentMethod::PixAutomatic && $assinaturaAtual->status !== \App\Enums\SubscriptionStatus::Cancelled)
                         <div class="mt-3 space-y-3 rounded-xl border border-slate-200 p-4 dark:border-white/10">
                             @if ($assinaturaAtual->hasActivePixAuthorization())
@@ -75,15 +84,12 @@
                             @endif
                         </div>
                     @endif
-                    @if ($temAcessoAtivo)
-                        @if ($souProfissional)
-                            <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                                @if ($assinaturaAtual->client_cap !== null)
-                                    Até {{ $assinaturaAtual->client_cap }} clientes vinculados.
-                                @else
-                                    Sem limite de clientes vinculados.
-                                @endif
-                            </p>
+
+                    @if ($assinaturaAtual->status !== \App\Enums\SubscriptionStatus::Cancelled)
+                        @if ($souProfissional && $assinaturaAtual->client_cap !== null && $temAcessoAtivo)
+                            <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Até {{ $assinaturaAtual->client_cap }} clientes vinculados.</p>
+                        @elseif ($souProfissional && $assinaturaAtual->client_cap === null && $temAcessoAtivo)
+                            <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Sem limite de clientes vinculados.</p>
                         @endif
                         <button
                             type="button"
@@ -98,6 +104,91 @@
                 </x-slot:actions>
             </x-subscription-summary>
         </section>
+
+        {{-- Pagamento: aparece enquanto a assinatura ainda não está paga, durante o teste ou
+             depois dele (quando o acesso já está travado). --}}
+        @if ($precisaPagar)
+            <section class="card space-y-4 p-5">
+                <p class="eyebrow">{{ $temAcessoAtivo ? 'Pagar agora' : 'Pagar para continuar' }}</p>
+
+                <div class="flex items-start justify-between gap-4">
+                    <div>
+                        <p class="font-display text-lg font-semibold text-slate-900 dark:text-white">
+                            {{ $souProfissional ? 'Cerne para profissionais' : $assinaturaAtual->bundle->label() }}
+                        </p>
+                        @if ($souProfissional && $assinaturaAtual->client_cap !== null)
+                            <p class="mt-0.5 text-sm text-slate-500 dark:text-slate-400">Até {{ $assinaturaAtual->client_cap }} clientes vinculados</p>
+                        @endif
+                    </div>
+                    <p class="shrink-0 text-right text-lg font-semibold text-slate-900 dark:text-white">
+                        {{ \App\Support\Money::format($assinaturaAtual->monthlyPrice()) }}<span class="text-xs font-normal text-slate-400">/mês</span>
+                    </p>
+                </div>
+
+                @if ($temAcessoAtivo)
+                    <p class="text-xs text-slate-500 dark:text-slate-400">
+                        Se você pagar agora, os dias de teste que sobram continuam valendo: o primeiro mês começa a contar em {{ $assinaturaAtual->current_period_ends_at->format('d/m/Y') }}.
+                    </p>
+                @endif
+
+                @if ($assinaturaAtual->billing_type === \App\Enums\PaymentMethod::PixAutomatic)
+                    <p class="text-sm text-slate-600 dark:text-slate-300">
+                        Você escolheu o débito automático por Pix. Gere o QR Code na caixa acima para autorizar.
+                    </p>
+                    <button type="button" wire:click="trocarFormaDePagamento" class="text-xs text-brand-700 underline dark:text-brand-300">Escolher outra forma de pagamento</button>
+                @elseif ($assinaturaAtual->asaas_subscription_id !== null)
+                    <p class="text-sm text-slate-600 dark:text-slate-300">
+                        Sua cobrança por {{ $assinaturaAtual->billing_type?->label() ?? 'forma escolhida' }} foi gerada. Pague pela fatura da Asaas; esta tela atualiza sozinha quando o pagamento for confirmado.
+                    </p>
+                    <div class="flex flex-wrap items-center gap-3">
+                        <button type="button" wire:click="abrirFatura" wire:loading.attr="disabled" class="btn-primary">
+                            <span wire:loading.remove wire:target="abrirFatura">Abrir fatura</span>
+                            <span wire:loading wire:target="abrirFatura">Abrindo...</span>
+                        </button>
+                        <button type="button" wire:click="trocarFormaDePagamento" wire:loading.attr="disabled" class="text-xs text-brand-700 underline dark:text-brand-300">Escolher outra forma de pagamento</button>
+                    </div>
+                @else
+                    <div>
+                        <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">CPF ou CNPJ</label>
+                        <input type="text" wire:model="cpfCnpj" class="input mt-1.5" placeholder="Só números" maxlength="18">
+                        <p class="mt-1 text-xs text-slate-400">Exigido pela Asaas (nossa processadora de pagamento) para emitir a cobrança.</p>
+                        @error('cpfCnpj') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Forma de pagamento</label>
+                        <div @class(['mt-1.5 grid gap-2', 'sm:grid-cols-3' => count($metodos) > 2, 'grid-cols-2' => count($metodos) <= 2])>
+                            @foreach ($metodos as $metodo)
+                                <label @class([
+                                    'cursor-pointer rounded-lg border px-3 py-2 text-center text-sm font-medium',
+                                    'border-brand-700 bg-brand-50 text-brand-900 dark:border-brand-500 dark:bg-brand-500/10 dark:text-brand-200' => $metodoPagamento === $metodo->value,
+                                    'border-slate-200 text-slate-600 dark:border-slate-700 dark:text-slate-400' => $metodoPagamento !== $metodo->value,
+                                ])>
+                                    <input type="radio" wire:model.live="metodoPagamento" value="{{ $metodo->value }}" class="sr-only">
+                                    {{ $metodo->label() }}
+                                </label>
+                            @endforeach
+                        </div>
+                        @if ($metodoPagamento === 'pix')
+                            <p class="mt-1.5 text-xs text-slate-400">Você paga a fatura de cada mês pelo Pix. Avisamos por e-mail 3 dias antes de cada vencimento.</p>
+                        @elseif ($metodoPagamento === 'credit_card')
+                            <p class="mt-1.5 text-xs text-slate-400">Você paga a fatura com o cartão na página da Asaas. Os dados do cartão não passam pelo Cerne.</p>
+                        @elseif ($metodoPagamento === 'pix_automatic')
+                            <p class="mt-1.5 text-xs text-slate-400">Você autoriza o débito no seu banco por um QR Code. O primeiro mês é pago nessa hora e as cobranças seguintes saem sozinhas.</p>
+                        @endif
+                        @error('metodoPagamento') <p class="mt-1.5 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                    </div>
+
+                    <button type="button" wire:click="iniciarPagamento" wire:loading.attr="disabled" class="btn-primary w-full py-3 text-base">
+                        <span wire:loading.remove wire:target="iniciarPagamento">Ir para o pagamento</span>
+                        <span wire:loading wire:target="iniciarPagamento">Gerando a cobrança...</span>
+                    </button>
+                    <p class="text-center text-xs text-slate-400">Cancele quando quiser, sem fidelidade. Pagamento processado pela Asaas.</p>
+
+                    <button type="button" wire:click="trocarPlano" class="mx-auto block text-xs text-brand-700 underline dark:text-brand-300">Trocar de plano</button>
+                @endif
+            </section>
+        @endif
 
         {{-- Aumentar limite: só quem já tem teto (cortesia e contrato
              especial têm client_cap nulo, não tem o que "aumentar"). --}}
@@ -132,14 +223,20 @@
         @endif
     @endif
 
-    @if (! $temAcessoAtivo)
+    @if ($mostrarPlanos)
         <div class="space-y-4">
-            <p class="rounded-xl bg-emerald-50 px-4 py-3 text-sm text-emerald-900 ring-1 ring-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-300 dark:ring-emerald-500/20">
-                7 dias grátis. Você só é cobrado depois que o teste acabar.
-            </p>
+            @if (! $assinaturaAtual)
+                <p class="rounded-xl bg-emerald-50 px-4 py-3 text-sm text-emerald-900 ring-1 ring-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-300 dark:ring-emerald-500/20">
+                    7 dias grátis, sem pedir forma de pagamento. Você escolhe como pagar só perto do fim do teste.
+                </p>
+            @else
+                <p class="rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-900 ring-1 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-300 dark:ring-amber-500/20">
+                    O teste grátis é um só por conta. Escolha o plano e depois como pagar para liberar o acesso.
+                </p>
+            @endif
 
-            @if ($trocandoPlano && $temIntencao)
-                <button type="button" wire:click="voltarAoPedido" class="text-xs text-brand-700 underline dark:text-brand-300">Voltar ao pedido que eu escolhi</button>
+            @if ($trocandoPlano && ($temIntencao || $precisaPagar))
+                <button type="button" wire:click="voltarAoPedido" class="text-xs text-brand-700 underline dark:text-brand-300">Voltar</button>
             @endif
 
             @if ($souProfissional && ! $resumoDoPedido)
@@ -148,7 +245,7 @@
                 </p>
             @endif
 
-            @if ($resumoDoPedido)
+            @if ($resumoDoPedido && ! $trocandoPlano)
                 @php
                     $valorMensal = $souProfissional
                         ? \App\Support\ProfessionalPricing::priceFor((int) $clientCap)
@@ -186,91 +283,54 @@
                             <dd class="font-semibold text-slate-900 dark:text-white">{{ \App\Support\Money::format(0) }}</dd>
                         </div>
                         <div class="flex justify-between gap-4">
-                            <dt class="text-slate-600 dark:text-slate-300">A partir de {{ $primeiraCobranca->format('d/m/Y') }}</dt>
+                            <dt class="text-slate-600 dark:text-slate-300">A partir de {{ $fimDoTeste->format('d/m/Y') }}</dt>
                             <dd class="font-semibold text-slate-900 dark:text-white">{{ \App\Support\Money::format($valorMensal) }}/mês</dd>
                         </div>
                     </dl>
                     <p class="mt-3 text-xs text-slate-400">Cancele quando quiser, sem fidelidade. O acesso é encerrado na hora do cancelamento.</p>
                 </section>
-            @endif
-            <div class="card p-5">
-                <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">CPF ou CNPJ</label>
-                <input type="text" wire:model="cpfCnpj" class="input mt-1.5" placeholder="Só números" maxlength="18">
-                <p class="mt-1 text-xs text-slate-400">Exigido pela Asaas (nossa processadora de pagamento) para emitir a cobrança.</p>
-                @error('cpfCnpj') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
 
-                <label class="mt-4 block text-xs font-medium text-slate-500 dark:text-slate-400">Forma de pagamento</label>
-                <div @class(['mt-1.5 grid gap-2', 'sm:grid-cols-3' => count(\App\Enums\PaymentMethod::available()) > 2, 'grid-cols-2' => count(\App\Enums\PaymentMethod::available()) <= 2])>
-                    @foreach (\App\Enums\PaymentMethod::available() as $metodo)
-                        <label @class([
-                            'cursor-pointer rounded-lg border px-3 py-2 text-center text-sm font-medium',
-                            'border-brand-700 bg-brand-50 text-brand-900 dark:border-brand-500 dark:bg-brand-500/10 dark:text-brand-200' => $metodoPagamento === $metodo->value,
-                            'border-slate-200 text-slate-600 dark:border-slate-700 dark:text-slate-400' => $metodoPagamento !== $metodo->value,
-                        ])>
-                            <input type="radio" wire:model.live="metodoPagamento" value="{{ $metodo->value }}" class="sr-only">
-                            {{ $metodo->label() }}
-                        </label>
-                    @endforeach
-                </div>
-                @if ($metodoPagamento === 'pix')
-                    <p class="mt-1.5 text-xs text-slate-400">Avisamos por e-mail 3 dias antes de cada vencimento, já que o Pix comum não tem débito automático.</p>
-                @elseif ($metodoPagamento === 'pix_automatic')
-                    <p class="mt-1.5 text-xs text-slate-400">Você usa os 7 dias grátis e, perto do fim, autoriza o débito no seu banco por um QR Code. O primeiro mês é pago nessa hora e as cobranças seguintes saem sozinhas.</p>
-                @endif
-                @error('metodoPagamento') <p class="mt-1.5 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
-
-                @if ($souProfissional && ! $resumoDoPedido)
-                    <label class="mt-4 block text-xs font-medium text-slate-500 dark:text-slate-400">Quantos clientes você vai vincular</label>
-                    <select wire:model.live="clientCap" class="input mt-1.5">
-                        <option value="">Escolha</option>
-                        @foreach ($tetosClientes as $teto)
-                            <option value="{{ $teto }}">Até {{ $teto }} clientes · {{ \App\Support\Money::format(\App\Support\ProfessionalPricing::priceFor($teto)) }}/mês</option>
-                        @endforeach
-                    </select>
-                    <p class="mt-1.5 text-xs text-slate-400">Precisa de mais que {{ max($tetosClientes) }}? Fale conosco para um contrato sob medida.</p>
-                    @error('clientCap') <p class="mt-1.5 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
-                @endif
-            </div>
-
-            @if ($resumoDoPedido)
                 <button type="button" wire:click="assinar('{{ $souProfissional ? \App\Enums\SubscriptionBundle::Completo->value : $pacoteDoPedido->value }}')" wire:loading.attr="disabled" class="btn-primary w-full py-3 text-base">
-                    <span wire:loading.remove wire:target="assinar">Confirmar e começar 7 dias grátis</span>
+                    <span wire:loading.remove wire:target="assinar">{{ $assinaturaAtual ? 'Confirmar o plano' : 'Confirmar e começar 7 dias grátis' }}</span>
                     <span wire:loading wire:target="assinar">Criando a sua assinatura...</span>
                 </button>
-                <p class="text-center text-xs text-slate-400">Nada é cobrado agora. A primeira cobrança vence só no fim dos 7 dias grátis, e o link de pagamento chega por e-mail.</p>
+                <p class="text-center text-xs text-slate-400">Nada é cobrado agora e você não precisa escolher a forma de pagamento ainda. Avisamos 3 dias antes de o teste acabar.</p>
                 <button type="button" wire:click="trocarPlano" class="mx-auto block text-xs text-brand-700 underline dark:text-brand-300">Escolher outro plano</button>
             @elseif ($souProfissional)
-                <div class="card flex items-center justify-between gap-4 p-5">
+                <div class="card space-y-4 p-5">
                     <div>
-                        <p class="text-sm font-semibold text-slate-900 dark:text-white">Assinatura do profissional</p>
-                        <p class="mt-0.5 text-lg font-semibold text-slate-900 dark:text-white">
-                            @if ($clientCap !== '')
-                                {{ \App\Support\Money::format(\App\Support\ProfessionalPricing::priceFor((int) $clientCap)) }}
-                                <span class="text-xs font-normal text-slate-400">/mês, até {{ $clientCap }} clientes</span>
-                            @else
-                                <span class="text-sm font-normal text-slate-400">Escolha a quantidade de clientes acima.</span>
-                            @endif
-                        </p>
+                        <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Quantos clientes você vai vincular</label>
+                        <select wire:model.live="clientCap" class="input mt-1.5">
+                            <option value="">Escolha</option>
+                            @foreach ($tetosClientes as $teto)
+                                <option value="{{ $teto }}">Até {{ $teto }} clientes · {{ \App\Support\Money::format(\App\Support\ProfessionalPricing::priceFor($teto)) }}/mês</option>
+                            @endforeach
+                        </select>
+                        @error('clientCap') <p class="mt-1.5 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
                     </div>
-                    <button type="button" wire:click="assinar('{{ \App\Enums\SubscriptionBundle::Completo->value }}')" wire:loading.attr="disabled" class="btn-primary shrink-0">
-                        <span wire:loading.remove wire:target="assinar">Assinar</span>
+                    <button type="button" wire:click="assinar('{{ \App\Enums\SubscriptionBundle::Completo->value }}')" wire:loading.attr="disabled" class="btn-primary w-full">
+                        <span wire:loading.remove wire:target="assinar">{{ $assinaturaAtual ? 'Confirmar o plano' : 'Começar 7 dias grátis' }}</span>
                         <span wire:loading wire:target="assinar">Criando...</span>
                     </button>
                 </div>
             @else
                 <div class="grid gap-3 @sm:grid-cols-3">
                     @foreach ($bundles as $pacote)
-                        <div class="card flex flex-col gap-2 p-5" wire:key="pacote-{{ $pacote->value }}">
-                            <p class="text-sm font-semibold text-slate-900 dark:text-white">{{ $pacote->label() }}</p>
-                            <p class="text-xs text-slate-500 dark:text-slate-400">
-                                {{ collect($pacote->modules())->map(fn ($m) => $m->label())->join(' · ') }}
-                            </p>
-                            <p class="mt-auto text-lg font-semibold text-slate-900 dark:text-white">
+                        <div class="card flex flex-col gap-3 p-5" wire:key="pacote-{{ $pacote->value }}">
+                            <div>
+                                <p class="font-display text-lg font-semibold text-slate-900 dark:text-white">{{ $pacote->label() }}</p>
+                                <ul class="mt-2 space-y-1 text-xs text-slate-500 dark:text-slate-400">
+                                    @foreach ($pacote->modules() as $modulo)
+                                        <li>{{ $modulo->label() }}</li>
+                                    @endforeach
+                                </ul>
+                            </div>
+                            <p class="mt-auto font-display text-2xl font-semibold text-slate-900 dark:text-white">
                                 {{ \App\Support\Money::format(config('billing.prices.'.$pacote->value)) }}
                                 <span class="text-xs font-normal text-slate-400">/mês</span>
                             </p>
                             <button type="button" wire:click="assinar('{{ $pacote->value }}')" wire:loading.attr="disabled" class="btn-primary w-full">
-                                <span wire:loading.remove wire:target="assinar">Assinar</span>
+                                <span wire:loading.remove wire:target="assinar">{{ $assinaturaAtual ? 'Escolher' : 'Começar 7 dias grátis' }}</span>
                                 <span wire:loading wire:target="assinar">Criando...</span>
                             </button>
                         </div>

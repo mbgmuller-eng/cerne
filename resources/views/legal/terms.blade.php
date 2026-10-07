@@ -30,7 +30,9 @@
                 <h2 class="font-display text-lg font-semibold text-slate-900 dark:text-white">3. Assinatura e cobrança</h2>
                 <p class="mt-2">
                     Toda assinatura começa com 7 dias grátis, em qualquer pacote. Depois disso, é mensal e recorrente,
-                    processada pela Asaas (nossa processadora de pagamentos), só em cartão de crédito ou Pix. Você
+                    processada pela Asaas (nossa processadora de pagamentos), só em cartão de crédito ou Pix. A forma
+                    de pagamento é escolhida perto do fim do teste; terminado o último dia, o acesso fica bloqueado até a
+                    confirmação do pagamento. Você
                     pode cancelar a qualquer momento pela sua área de conta, sem falar com ninguém; o acesso é
                     encerrado na hora do cancelamento, sem desconto proporcional do período já pago. A assinatura de
                     um profissional (consultor ou corretor) tem valor definido pela quantidade de clientes que ele

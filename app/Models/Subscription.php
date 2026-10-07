@@ -19,7 +19,7 @@ use Carbon\CarbonInterface;
 /** Carência de PastDue antes de travar o acesso — ver isCurrent(). */
 #[Fillable([
     'user_id', 'kind', 'bundle', 'client_cap', 'status', 'billing_type', 'current_period_ends_at',
-    'asaas_subscription_id', 'asaas_pix_authorization_id', 'pix_authorization_status', 'billing_claimed_at', 'started_at', 'cancelled_at',
+    'asaas_subscription_id', 'asaas_pix_authorization_id', 'pix_authorization_status', 'started_at', 'cancelled_at',
 ])]
 class Subscription extends Model
 {
@@ -45,7 +45,6 @@ class Subscription extends Model
             'current_period_ends_at' => 'date',
             'started_at' => 'date',
             'cancelled_at' => 'datetime',
-            'billing_claimed_at' => 'datetime',
         ];
     }
 
@@ -59,8 +58,18 @@ class Subscription extends Model
         return $this->hasMany(SubscriptionCharge::class);
     }
 
+    /**
+     * Teste grátis: SEM carência. O acesso termina junto com o último dia, e a
+     * pessoa cai na tela de assinatura para pagar, sem dias extras de espera.
+     * Nos ciclos pagos, a carência de atraso (5 dias, 7 no Pix Automático)
+     * continua valendo para quem só esqueceu de pagar.
+     */
     public function graceDays(): int
     {
+        if ($this->status === SubscriptionStatus::Trialing) {
+            return 0;
+        }
+
         return $this->billing_type === PaymentMethod::PixAutomatic ? self::PIX_AUTOMATIC_GRACE_DAYS : self::PAST_DUE_GRACE_DAYS;
     }
 
@@ -78,9 +87,8 @@ class Subscription extends Model
     }
 
     /**
-     * Ativa: concede sempre. Em teste e em atraso: concedem só dentro da
-     * carência, contada do fim do período (no teste, do fim dos 7 dias).
-     * Cancelada: nunca.
+     * Ativa: concede sempre. Em teste: até o fim dos 7 dias, sem carência. Em
+     * atraso: dentro da carência, contada do vencimento. Cancelada: nunca.
      *
      * O teste também expira: a cobrança na Asaas só nasce perto do fim dele, e
      * no Pix Automático nada avisa o Cerne se a pessoa não autorizar o débito.
@@ -95,6 +103,12 @@ class Subscription extends Model
             SubscriptionStatus::PastDue => $this->accessCutoffDate()?->isFuture() ?? false,
             SubscriptionStatus::Cancelled => false,
         };
+    }
+
+    /** Último dia de acesso do teste grátis (o acesso trava na virada para `current_period_ends_at`). */
+    public function trialLastDay(): ?CarbonInterface
+    {
+        return $this->current_period_ends_at?->copy()->subDay();
     }
 
     /** Dia em que o acesso de uma assinatura em atraso é cortado (carência contada do vencimento). */

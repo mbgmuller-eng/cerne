@@ -1,6 +1,5 @@
 <?php
     $ehProfissional = $tipo === 'profissional';
-    $metodoInicial = old('metodo', \App\Enums\PaymentMethod::CreditCard->value);
     $tetoSelecionado = (string) old('clientes', $tetoInicial);
     $papelSelecionado = old('papel', $papel);
     $moneyFmt = fn ($valor) => \App\Support\Money::format($valor);
@@ -14,7 +13,6 @@
     <div
         class="mx-auto max-w-6xl px-4 py-10 sm:px-6 sm:py-14"
         x-data="{
-            metodo: @js($metodoInicial),
             teto: @js($tetoSelecionado),
             precos: @js($precosPorTeto),
             precoFixo: @js($ehProfissional ? null : $moneyFmt($precoMensal)),
@@ -25,7 +23,7 @@
         <h1 class="mt-2 font-display text-3xl font-semibold tracking-tight text-slate-900 sm:text-4xl dark:text-white">
             {{ $ehProfissional ? 'Cerne para profissionais' : $pacote->label() }}
         </h1>
-        <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">Crie sua conta e comece o teste de 7 dias. Nada é cobrado hoje.</p>
+        <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">Crie sua conta e comece o teste de 7 dias. Nada é cobrado e nenhuma forma de pagamento é pedida agora.</p>
 
         <div class="mt-8 grid gap-6 lg:grid-cols-5">
             {{-- Conta --}}
@@ -92,29 +90,10 @@
                     </div>
                 </div>
 
-                <div>
-                    <h2 class="font-display text-lg font-semibold text-slate-900 dark:text-white">2. Forma de pagamento</h2>
-                    <div @class(['mt-3 grid gap-2', 'sm:grid-cols-3' => count(\App\Enums\PaymentMethod::available()) > 2, 'grid-cols-2' => count(\App\Enums\PaymentMethod::available()) <= 2])>
-                        @foreach (\App\Enums\PaymentMethod::available() as $metodo)
-                            <label
-                                :class="metodo === '{{ $metodo->value }}' ? 'border-brand-700 bg-brand-50 text-brand-900 dark:border-brand-500 dark:bg-brand-500/10 dark:text-brand-200' : 'border-slate-200 text-slate-600 dark:border-slate-700 dark:text-slate-400'"
-                                class="cursor-pointer rounded-lg border px-3 py-3 text-center text-sm font-medium"
-                            >
-                                <input type="radio" name="metodo" value="{{ $metodo->value }}" x-model="metodo" class="sr-only">
-                                {{ $metodo->label() }}
-                            </label>
-                        @endforeach
-                    </div>
-                    <p class="mt-2 text-xs text-slate-500 dark:text-slate-400">
-                        Você confirma o pedido depois de validar o e-mail. A primeira cobrança só acontece quando o teste acabar,
-                        e você recebe o link de pagamento por e-mail.
-                        <span x-show="metodo === 'pix'" x-cloak>No Pix comum, avisamos 3 dias antes de cada vencimento, porque ele não tem débito automático.</span>
-                        @if (in_array(\App\Enums\PaymentMethod::PixAutomatic, \App\Enums\PaymentMethod::available(), true))
-                        <span x-show="metodo === 'pix_automatic'" x-cloak>No Pix Automático, perto do fim do teste você autoriza o débito no seu banco por um QR Code. O primeiro mês é pago nessa hora e as cobranças seguintes saem sozinhas.</span>
-                        @endif
-                    </p>
-                    @error('metodo') <p class="mt-1.5 text-sm text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
-                </div>
+                <p class="rounded-lg bg-emerald-50 px-4 py-3 text-sm text-emerald-900 ring-1 ring-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-300 dark:ring-emerald-500/20">
+                    7 dias grátis, sem pedir CPF nem forma de pagamento. Você escolhe como pagar (Pix ou cartão de crédito)
+                    só perto do fim do teste, e avisamos 3 dias antes. Depois do último dia o acesso fica bloqueado até o pagamento.
+                </p>
 
                 <label class="flex items-start gap-2.5 text-sm text-slate-600 dark:text-slate-400">
                     <input name="termos" type="checkbox" value="1" class="mt-0.5 h-4 w-4 rounded border-slate-300 text-brand-700 focus:ring-brand-500 dark:border-slate-600 dark:bg-slate-800">
@@ -168,10 +147,6 @@
                             <dt class="text-slate-600 dark:text-slate-300">A partir de {{ $primeiraCobranca->format('d/m/Y') }}</dt>
                             <dd class="font-semibold text-slate-900 dark:text-white"><span x-text="preco">{{ $ehProfissional ? ($precosPorTeto[$tetoSelecionado] ?? '') : $moneyFmt($precoMensal) }}</span>/mês</dd>
                         </div>
-                        <div class="flex justify-between gap-4">
-                            <dt class="text-slate-600 dark:text-slate-300">Pagamento</dt>
-                            <dd class="font-medium text-slate-900 dark:text-white" x-text="{ pix: 'Pix', pix_automatic: 'Pix Automático' }[metodo] ?? 'Cartão de crédito'">Cartão de crédito</dd>
-                        </div>
                     </dl>
 
                     <p class="mt-4 border-t border-slate-100 pt-4 text-xs text-slate-500 dark:border-white/10 dark:text-slate-400">
@@ -181,7 +156,8 @@
                     <ol class="mt-4 space-y-1 text-xs text-slate-500 dark:text-slate-400">
                         <li><strong class="text-slate-700 dark:text-slate-200">1.</strong> Crie sua conta aqui</li>
                         <li><strong class="text-slate-700 dark:text-slate-200">2.</strong> Confirme seu e-mail</li>
-                        <li><strong class="text-slate-700 dark:text-slate-200">3.</strong> Informe o CPF e confirme o pedido</li>
+                        <li><strong class="text-slate-700 dark:text-slate-200">3.</strong> Confirme o pedido e comece o teste</li>
+                        <li><strong class="text-slate-700 dark:text-slate-200">4.</strong> Perto do fim, escolha Pix ou cartão</li>
                     </ol>
                 </div>
             </aside>

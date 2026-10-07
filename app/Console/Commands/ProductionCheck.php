@@ -81,8 +81,8 @@ class ProductionCheck extends Command
         $this->item('Token do webhook definido', blank(config('services.asaas.api_key')) || filled(config('services.asaas.webhook_token')),
             'Com a chave preenchida e sem token, o webhook recusa todos os avisos de pagamento e ninguém seria liberado.');
 
-        $this->item('Assinaturas com a cobrança por criar na Asaas', $this->cobrancasAtrasadas() === 0,
-            $this->cobrancasAtrasadas().' assinatura(s) de cartão/Pix já passaram do fim do teste sem a assinatura criada na Asaas. Veja o log ("Asaas: não conseguiu criar a assinatura do fim do teste"): costuma ser CPF inválido ou a Asaas fora do ar.', aviso: true);
+        $this->item('Bloqueio por falta de assinatura ligado', (bool) config('billing.enforce_access'),
+            'Com BILLING_ENFORCE_ACCESS desligado, o acesso não trava quando o teste acaba. Revise as contas existentes e ligue.', aviso: true);
 
         $this->secao('Notificações');
         $this->item('Chaves VAPID válidas', $this->vapidValida(),
@@ -152,21 +152,6 @@ class ProductionCheck extends Command
             return filled(config('webpush.vapid.subject'));
         } catch (\Throwable) {
             return false;
-        }
-    }
-
-    /** Teste de cartão/Pix já vencido e ainda sem assinatura na Asaas: o job diário não conseguiu criá-la. */
-    private function cobrancasAtrasadas(): int
-    {
-        try {
-            return DB::table('subscriptions')
-                ->whereIn('billing_type', ['credit_card', 'pix'])
-                ->where('status', 'trialing')
-                ->whereNull('asaas_subscription_id')
-                ->whereDate('current_period_ends_at', '<', now()->toDateString())
-                ->count();
-        } catch (\Throwable) {
-            return 0;
         }
     }
 

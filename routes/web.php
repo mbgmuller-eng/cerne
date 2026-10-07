@@ -140,61 +140,12 @@ Route::middleware('auth')->group(function (): void {
 | muda de comportamento pra ela.
 */
 Route::middleware(['auth', 'verified'])->group(function (): void {
-    Route::get('/painel', Dashboard::class)->name('dashboard');
+    // Fora do bloqueio por assinatura: o necessário para pagar e para sair
+    // (ver RequiresActiveSubscription).
     Route::get('/minha-conta', MyAccount::class)->name('my-account');
     Route::get('/assinatura', SubscriptionIndex::class)->name('subscription.index');
     Route::post('/preferencias/tema', [ThemePreferenceController::class, 'store'])->name('theme.update');
     Route::post('/preferencias/push', [PushSubscriptionController::class, 'store'])->name('push.subscribe');
-
-    Route::get('/fluxo-de-caixa', CashFlowIndex::class)->name('cashflow.index');
-    Route::get('/contas-fixas', FixedBillsIndex::class)->name('fixedbills.index');
-    Route::get('/investimentos', InvestmentsIndex::class)->name('investments.index');
-    Route::get('/seguros', InsuranceIndex::class)->name('insurance.index');
-    Route::get('/objetivos', GoalsIndex::class)->name('goals.index');
-
-    // Documentos: visível ao consultor/corretor também (ao contrário de
-    // Saúde) — só que filtrado por categoria (DocumentVisibilityScope).
-    Route::get('/documentos', DocumentVaultIndex::class)->name('documents.vault.index');
-    Route::get('/documentos/{document}/arquivo', [DocumentFileController::class, 'show'])->name('documents.vault.file');
-
-    // Saúde pessoal: só o dono abre (RequiresPersonalHealth) — consultor
-    // e corretor levam 403 mesmo com o cliente aberto.
-    Route::get('/saude/academia', GymHome::class)->name('health.gym.index');
-    Route::get('/saude/academia/plano', GymPlanEditor::class)->name('health.gym.plan');
-    // Plural de propósito: "treino/{session}" (abaixo) é a SESSÃO em andamento;
-    // "treinos/{workout}" é o treino do PLANO, só pra consultar antes de começar.
-    Route::get('/saude/academia/treinos/{workout}', GymWorkoutShow::class)->name('health.gym.workout');
-    Route::get('/saude/academia/treino/{session}', GymSessionRun::class)->name('health.gym.session');
-    Route::get('/saude/academia/historico', GymSessionHistory::class)->name('health.gym.history');
-    Route::get('/saude/academia/progresso', GymProgress::class)->name('health.gym.progress');
-    Route::get('/saude/academia/exercicio/{exercise}', GymExerciseHistory::class)->name('health.gym.exercise');
-    Route::get('/saude/academia/exercicios/{exercise}/imagem', [GymExerciseImageController::class, 'show'])->name('health.gym.exercise-image');
-    // Catálogo compartilhado: não é dado pessoal, não passa por RequiresPersonalHealth — qualquer autenticado pode ver.
-    Route::get('/saude/academia/catalogo/{exercise}/imagem', [GymExerciseCatalogImageController::class, 'show'])->name('health.gym.catalog-image');
-
-    // Ficha de saúde: visível aos DOIS do casal (CoupleHealthScope) —
-    // diferente da Academia, mas com o mesmo bloqueio a consultor/corretor.
-    Route::get('/saude/ficha', HealthCardIndex::class)->name('health.card.index');
-    Route::get('/saude/ficha/{memberId}/qrcode', [HealthQrCodeController::class, 'show'])->name('health.qrcode.show');
-    Route::get('/saude/agenda', HealthAppointmentIndex::class)->name('health.appointments.index');
-    Route::get('/importar', DocumentsIndex::class)->name('documents.index');
-    Route::get('/regras-de-categorizacao', CategorizationRulesIndex::class)->name('categorization-rules.index');
-    Route::get('/contas', AccountsIndex::class)->name('accounts.index');
-    Route::get('/faturas/{invoice}', InvoiceShow::class)->name('invoices.show');
-
-    Route::get('/carteira', PortfolioOverview::class)->name('consultant.portfolio');
-    Route::get('/carteira/seguros', PortfolioInsurance::class)->name('consultant.portfolio.insurance');
-    Route::get('/carteira/investimentos', PortfolioInvestments::class)->name('consultant.portfolio.investments');
-    Route::get('/carteira/datas-importantes', ImportantDates::class)->name('consultant.portfolio.important-dates');
-    Route::get('/leads', LeadsIndex::class)->name('consultant.leads');
-    Route::post('/clientes/{profile}/abrir', [ProfileSwitchController::class, 'store'])->name('profile.switch');
-
-    // Gestão de toda a plataforma — gate é isPlatformAdmin() dentro do
-    // mount() do componente, mesmo padrão de PortfolioOverview::mount().
-    Route::get('/admin', AdminUsers::class)->name('admin.users');
-    Route::get('/admin/bancos', AdminBanks::class)->name('admin.banks');
-    Route::get('/admin/seguradoras', AdminInsurers::class)->name('admin.insurers');
-    Route::get('/admin/exercicios', AdminExercises::class)->name('admin.exercises');
 
     // "Entrar como" começa dentro do componente Livewire (AdminUsers::
     // entrarComo, Auth::login direto); só o "voltar" precisa de rota —
@@ -208,4 +159,58 @@ Route::middleware(['auth', 'verified'])->group(function (): void {
     Route::get('/vinculo/{consultantClient}', [ConsultantLinkController::class, 'show'])->name('link.show')->middleware('signed');
     Route::post('/vinculo/{consultantClient}/autorizar', [ConsultantLinkController::class, 'accept'])->name('link.accept');
     Route::post('/vinculo/{consultantClient}/recusar', [ConsultantLinkController::class, 'decline'])->name('link.decline');
+
+    Route::middleware('assinatura')->group(function (): void {
+        Route::get('/painel', Dashboard::class)->name('dashboard');
+
+        Route::get('/fluxo-de-caixa', CashFlowIndex::class)->name('cashflow.index');
+        Route::get('/contas-fixas', FixedBillsIndex::class)->name('fixedbills.index');
+        Route::get('/investimentos', InvestmentsIndex::class)->name('investments.index');
+        Route::get('/seguros', InsuranceIndex::class)->name('insurance.index');
+        Route::get('/objetivos', GoalsIndex::class)->name('goals.index');
+
+        // Documentos: visível ao consultor/corretor também (ao contrário de
+        // Saúde) — só que filtrado por categoria (DocumentVisibilityScope).
+        Route::get('/documentos', DocumentVaultIndex::class)->name('documents.vault.index');
+        Route::get('/documentos/{document}/arquivo', [DocumentFileController::class, 'show'])->name('documents.vault.file');
+
+        // Saúde pessoal: só o dono abre (RequiresPersonalHealth) — consultor
+        // e corretor levam 403 mesmo com o cliente aberto.
+        Route::get('/saude/academia', GymHome::class)->name('health.gym.index');
+        Route::get('/saude/academia/plano', GymPlanEditor::class)->name('health.gym.plan');
+        // Plural de propósito: "treino/{session}" (abaixo) é a SESSÃO em andamento;
+        // "treinos/{workout}" é o treino do PLANO, só pra consultar antes de começar.
+        Route::get('/saude/academia/treinos/{workout}', GymWorkoutShow::class)->name('health.gym.workout');
+        Route::get('/saude/academia/treino/{session}', GymSessionRun::class)->name('health.gym.session');
+        Route::get('/saude/academia/historico', GymSessionHistory::class)->name('health.gym.history');
+        Route::get('/saude/academia/progresso', GymProgress::class)->name('health.gym.progress');
+        Route::get('/saude/academia/exercicio/{exercise}', GymExerciseHistory::class)->name('health.gym.exercise');
+        Route::get('/saude/academia/exercicios/{exercise}/imagem', [GymExerciseImageController::class, 'show'])->name('health.gym.exercise-image');
+        // Catálogo compartilhado: não é dado pessoal, não passa por RequiresPersonalHealth — qualquer autenticado pode ver.
+        Route::get('/saude/academia/catalogo/{exercise}/imagem', [GymExerciseCatalogImageController::class, 'show'])->name('health.gym.catalog-image');
+
+        // Ficha de saúde: visível aos DOIS do casal (CoupleHealthScope) —
+        // diferente da Academia, mas com o mesmo bloqueio a consultor/corretor.
+        Route::get('/saude/ficha', HealthCardIndex::class)->name('health.card.index');
+        Route::get('/saude/ficha/{memberId}/qrcode', [HealthQrCodeController::class, 'show'])->name('health.qrcode.show');
+        Route::get('/saude/agenda', HealthAppointmentIndex::class)->name('health.appointments.index');
+        Route::get('/importar', DocumentsIndex::class)->name('documents.index');
+        Route::get('/regras-de-categorizacao', CategorizationRulesIndex::class)->name('categorization-rules.index');
+        Route::get('/contas', AccountsIndex::class)->name('accounts.index');
+        Route::get('/faturas/{invoice}', InvoiceShow::class)->name('invoices.show');
+
+        Route::get('/carteira', PortfolioOverview::class)->name('consultant.portfolio');
+        Route::get('/carteira/seguros', PortfolioInsurance::class)->name('consultant.portfolio.insurance');
+        Route::get('/carteira/investimentos', PortfolioInvestments::class)->name('consultant.portfolio.investments');
+        Route::get('/carteira/datas-importantes', ImportantDates::class)->name('consultant.portfolio.important-dates');
+        Route::get('/leads', LeadsIndex::class)->name('consultant.leads');
+        Route::post('/clientes/{profile}/abrir', [ProfileSwitchController::class, 'store'])->name('profile.switch');
+
+        // Gestão de toda a plataforma — gate é isPlatformAdmin() dentro do
+        // mount() do componente, mesmo padrão de PortfolioOverview::mount().
+        Route::get('/admin', AdminUsers::class)->name('admin.users');
+        Route::get('/admin/bancos', AdminBanks::class)->name('admin.banks');
+        Route::get('/admin/seguradoras', AdminInsurers::class)->name('admin.insurers');
+        Route::get('/admin/exercicios', AdminExercises::class)->name('admin.exercises');
+    });
 });

@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\RequiresActiveSubscription;
 use App\Http\Middleware\SecurityHeaders;
 use App\Http\Middleware\SetProfileContext;
 use Illuminate\Foundation\Application;
@@ -32,6 +33,8 @@ return Application::configure(basePath: dirname(__DIR__))
                 SubstituteBindings::class,
             ],
         );
+
+        $middleware->alias(['assinatura' => RequiresActiveSubscription::class]);
 
         // Em toda resposta, inclusive as de erro. A hospedagem compartilhada
         // não dá acesso à configuração do Nginx, então os cabeçalhos saem

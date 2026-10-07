@@ -8,7 +8,6 @@ use App\Services\InvoiceService;
 use App\Services\AsaasClient;
 use App\Services\RecurringIncomeService;
 use App\Services\PixAutomaticBillingService;
-use App\Services\SubscriptionBillingService;
 use App\Services\SubscriptionReminderService;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Schedule;
@@ -93,15 +92,6 @@ Schedule::call(function (): void {
     logger()->info('Agenda de saúde', ['notificados' => $notificados]);
 })->dailyAt('03:35')->name('agenda-saude')->withoutOverlapping();
 
-// Cartão e Pix: cria a assinatura na Asaas perto do fim do teste grátis (no
-// cadastro nada vai para a Asaas, que gera a cobrança no ato). Roda ANTES do
-// lembrete de Pix (03:40) para o aviso já levar o link da fatura.
-Schedule::call(function (): void {
-    $criadas = app(SubscriptionBillingService::class)->createDueSubscriptions();
-
-    logger()->info('Assinaturas criadas na Asaas (fim do teste)', ['criadas' => $criadas]);
-})->dailyAt('03:30')->name('assinaturas-fim-do-teste')->withoutOverlapping();
-
 // Assinatura por Pix: sem débito automático, avisa 3 dias antes do
 // vencimento (fim do teste grátis ou qualquer ciclo seguinte — é o mesmo
 // problema se repetindo todo mês).
@@ -129,13 +119,13 @@ Schedule::call(function (): void {
     logger()->info('Retentativas do Pix Automático', ['pedidas' => $pedidas]);
 })->dailyAt('03:55')->name('pix-automatico-retentativas')->withoutOverlapping();
 
-// Pix Automático: lembra de ativar o débito automático 3 dias antes de o
-// teste grátis acabar.
+// Fim do teste grátis: avisa 3 dias antes (e-mail e sino do Cerne). Depois do
+// último dia o acesso trava. Idempotente por índice único (subscription_notices).
 Schedule::call(function (): void {
-    $avisados = app(SubscriptionReminderService::class)->notifyPixAutomaticActivation();
+    $avisados = app(SubscriptionReminderService::class)->notifyTrialEnding();
 
-    logger()->info('Lembrete de ativação do Pix Automático', ['avisados' => $avisados]);
-})->dailyAt('03:42')->name('lembrete-pix-automatico')->withoutOverlapping();
+    logger()->info('Aviso de fim do teste', ['avisados' => $avisados]);
+})->dailyAt('03:35')->name('lembrete-fim-do-teste')->withoutOverlapping();
 
 // Assinatura em atraso: avisa no último dia da carência que o acesso é
 // cortado amanhã. Idempotente por índice único (subscription_notices).

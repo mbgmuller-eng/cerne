@@ -6,6 +6,7 @@ use App\Enums\PaymentMethod;
 use App\Enums\SubscriptionBundle;
 use App\Enums\SubscriptionKind;
 use App\Enums\SubscriptionStatus;
+use App\Exceptions\AsaasBillingTypeMismatch;
 use App\Models\Subscription;
 use App\Rules\CpfCnpj;
 use App\Services\AsaasClient;
@@ -20,13 +21,17 @@ use Livewire\Attributes\Layout;
 use Livewire\Component;
 
 /**
- * Assinar um dos 3 pacotes — direto (usuário final) ou profissional
- * (consultor/corretor, cobre os clientes vinculados e ativos dele, ver
- * EntitlementService). $kind() decide sozinho qual dos dois com base em
- * quem está logado — não é uma escolha que aparece na tela.
+ * Assinatura em duas etapas, de propósito separadas:
  *
- * Quem já tem assinatura ATIVA/em teste não vê o formulário, só o status;
- * quem tem PastDue/Cancelled pode assinar de novo (ex.: trocar de pacote).
+ * 1. Começar o teste: escolhe o plano e ganha 7 dias grátis. Sem CPF e sem
+ *    forma de pagamento: nada vai para a Asaas.
+ * 2. Pagar: a pessoa (a qualquer momento do teste, ou quando ele acaba e o
+ *    app trava) escolhe Pix ou cartão e vai para a fatura. Só aqui a
+ *    assinatura nasce na Asaas, que cria a primeira cobrança no mesmo instante.
+ *
+ * Direto (usuário final) ou profissional (consultor/corretor, cobre os
+ * clientes vinculados e ativos dele, ver EntitlementService): $kind() decide
+ * sozinho com base em quem está logado.
  */
 #[Layout('components.layouts.app')]
 class SubscriptionIndex extends Component
@@ -35,7 +40,7 @@ class SubscriptionIndex extends Component
 
     public string $metodoPagamento = '';
 
-    /** Só preenchido/validado pra quem assina como profissional — ver rules(). */
+    /** Só preenchido/validado pra quem assina como profissional. */
     public string $clientCap = '';
 
     /**
@@ -83,9 +88,6 @@ class SubscriptionIndex extends Component
             return;
         }
 
-        $metodo = PaymentMethod::tryFrom((string) ($intencao['metodo'] ?? ''));
-        $metodo = in_array($metodo, PaymentMethod::available(), true) ? $metodo : null;
-
         if ($this->kind() === SubscriptionKind::Professional && ($intencao['tipo'] ?? null) === 'profissional') {
             $teto = (int) ($intencao['clientes'] ?? 0);
 
@@ -101,72 +103,178 @@ class SubscriptionIndex extends Component
                 $this->temIntencao = true;
             }
         }
-
-        if ($this->temIntencao && $metodo !== null) {
-            $this->metodoPagamento = $metodo->value;
-        }
-    }
-
-    public function rules(): array
-    {
-        $regras = [
-            'cpfCnpj' => ['required', 'string', new CpfCnpj],
-            'metodoPagamento' => ['required', Rule::in(array_column(PaymentMethod::available(), 'value'))],
-        ];
-
-        if ($this->kind() === SubscriptionKind::Professional) {
-            $regras['clientCap'] = ['required', Rule::in(ProfessionalPricing::validCaps())];
-        }
-
-        return $regras;
     }
 
     /**
-     * 7 dias grátis pra qualquer pacote e forma de pagamento. NADA vai para a
-     * Asaas aqui: a Asaas cria a primeira cobrança no instante em que a
-     * assinatura nasce, então o cadastro só registra a escolha e o teste corre
-     * localmente. A assinatura é criada lá perto do fim do teste, com
-     * vencimento no último dia dele (SubscriptionBillingService), e no Pix
-     * Automático a pessoa gera o QR de autorização por esta tela
-     * (ativarDebitoAutomatico()). Status nasce Trialing e o acesso expira sozinho
-     * se ninguém pagar (Subscription::isCurrent()).
+     * Etapa 1: começa o teste grátis (ou, se a pessoa já tem um teste que ainda
+     * não virou pagamento, só troca o plano dele).
+     *
+     * Nada vai para a Asaas. Quem já teve uma assinatura deste tipo não ganha
+     * um segundo teste: a nova nasce com o teste já vencido e a pessoa vai
+     * direto ao pagamento. O acesso termina sozinho no fim do período
+     * (Subscription::isCurrent()).
      */
-    public function assinar(string $bundle)
+    public function assinar(string $bundle, AsaasClient $asaas)
     {
-        $data = $this->validate();
         $usuario = Auth::user();
-        $usuario->update(['cpf_cnpj' => $data['cpfCnpj']]);
+        $kind = $this->kind();
+
+        // Só o profissional escolhe o limite de clientes; o cliente direto não tem o que validar.
+        $dados = $kind === SubscriptionKind::Professional
+            ? $this->validate(['clientCap' => ['required', Rule::in(ProfessionalPricing::validCaps())]])
+            : [];
 
         // Profissional não escolhe pacote: os clientes dele recebem tudo e o
         // preço depende só do teto de clientes (ver config/billing.php).
-        $pacote = $this->kind() === SubscriptionKind::Professional
+        $pacote = $kind === SubscriptionKind::Professional
             ? SubscriptionBundle::Completo
             : SubscriptionBundle::from($bundle);
-        $metodo = PaymentMethod::from($data['metodoPagamento']);
-        // Só profissional escolhe teto — ver rules(), cliente Direct nunca
-        // tem 'clientCap' no array validado.
-        $teto = isset($data['clientCap']) ? (int) $data['clientCap'] : null;
-        $fimDoTeste = now()->addDays(7);
+        $teto = isset($dados['clientCap']) ? (int) $dados['clientCap'] : null;
+
+        $atual = $this->assinaturaAtual();
+
+        // Quem já paga não usa este caminho: troca de limite é aumentarFaixa().
+        abort_if($atual !== null && $atual->status === SubscriptionStatus::Active, 422);
+
+        if ($atual !== null && $atual->status !== SubscriptionStatus::Cancelled) {
+            $this->trocarDePlano($atual, $pacote, $teto, $asaas);
+            $this->trocandoPlano = false;
+            session()->flash('status', 'Plano alterado.');
+
+            return;
+        }
+
+        $primeiroTeste = ! Subscription::query()->where('user_id', $usuario->id)->ofKind($kind)->exists();
+        $fimDoTeste = $primeiroTeste ? now()->addDays(7) : now();
 
         Subscription::create([
             'user_id' => $usuario->id,
-            'kind' => $this->kind(),
+            'kind' => $kind,
             'bundle' => $pacote,
             'client_cap' => $teto,
-            'billing_type' => $metodo,
             'status' => SubscriptionStatus::Trialing,
-            // Último dia do teste grátis: é o vencimento da primeira cobrança.
-            // O webhook de pagamento confirmado sobrescreve isso a cada ciclo.
+            // Dia em que o acesso trava e a primeira cobrança vence. O webhook
+            // de pagamento confirmado sobrescreve isso a cada ciclo.
             'current_period_ends_at' => $fimDoTeste,
             'started_at' => now(),
         ]);
 
         session()->forget('checkout');
+        $this->trocandoPlano = false;
 
-        session()->flash('status', $metodo === PaymentMethod::PixAutomatic
-            ? 'Assinatura criada: 7 dias grátis para testar. Perto do fim do teste, ative o débito automático por esta tela.'
-            : 'Assinatura criada: 7 dias grátis para testar. A cobrança é gerada perto do fim do teste e vence em '.$fimDoTeste->format('d/m/Y').'; o link de pagamento chega por e-mail. Não há nada a pagar agora.');
+        session()->flash('status', $primeiroTeste
+            ? 'Teste grátis iniciado: você tem acesso até '.$fimDoTeste->copy()->subDay()->format('d/m/Y').'. Avisamos 3 dias antes de acabar, e você escolhe como pagar quando quiser.'
+            : 'Plano escolhido. Como o seu teste grátis já foi usado, escolha abaixo como pagar para liberar o acesso.');
     }
+
+    /** Troca o plano de um teste/assinatura ainda não paga. A fatura antiga, se existir, é cancelada na Asaas. */
+    private function trocarDePlano(Subscription $assinatura, SubscriptionBundle $pacote, ?int $teto, AsaasClient $asaas): void
+    {
+        if ($assinatura->asaas_subscription_id !== null) {
+            $this->cancelarNaAsaas($asaas, $assinatura->asaas_subscription_id);
+        }
+
+        $assinatura->update([
+            'bundle' => $pacote,
+            'client_cap' => $teto,
+            'billing_type' => null,
+            'asaas_subscription_id' => null,
+        ]);
+    }
+
+    /**
+     * Etapa 2: a pessoa escolheu Pix ou cartão. Só agora a assinatura nasce na
+     * Asaas, com vencimento no último dia do teste (ou hoje, se ele já acabou),
+     * e a pessoa é levada à fatura para pagar. O acesso volta quando a Asaas
+     * confirmar o pagamento (webhook).
+     */
+    public function iniciarPagamento(AsaasClient $asaas, PixAutomaticBillingService $pix)
+    {
+        $dados = $this->validate([
+            'cpfCnpj' => ['required', 'string', new CpfCnpj],
+            'metodoPagamento' => ['required', Rule::in(array_column(PaymentMethod::available(), 'value'))],
+        ]);
+
+        $assinatura = $this->assinaturaAtual();
+
+        abort_if($assinatura === null || in_array($assinatura->status, [SubscriptionStatus::Cancelled, SubscriptionStatus::Active], true), 404);
+
+        Auth::user()->update(['cpf_cnpj' => $dados['cpfCnpj']]);
+        $metodo = PaymentMethod::from($dados['metodoPagamento']);
+
+        // Pix Automático tem fluxo próprio: autorização por QR Code, sem fatura.
+        if ($metodo === PaymentMethod::PixAutomatic) {
+            if ($assinatura->asaas_subscription_id !== null) {
+                $this->cancelarNaAsaas($asaas, $assinatura->asaas_subscription_id);
+            }
+            $assinatura->update(['billing_type' => $metodo, 'asaas_subscription_id' => null]);
+
+            return $this->ativarDebitoAutomatico($pix);
+        }
+
+        try {
+            $id = $this->garantirAssinaturaNaAsaas($assinatura, $metodo, $asaas);
+        } catch (AsaasBillingTypeMismatch $e) {
+            // Já foi desfeita na Asaas: nenhuma cobrança fica de pé.
+            Log::error('Asaas: forma de pagamento diferente da pedida, assinatura desfeita', [
+                'user_id' => Auth::id(), 'pedido' => $e->pedido, 'recebido' => $e->recebido,
+            ]);
+            $this->addError('metodoPagamento', 'Não foi possível criar a cobrança com essa forma de pagamento agora. Nenhuma cobrança foi gerada. Tente novamente em instantes.');
+
+            return;
+        } catch (RequestException $e) {
+            Log::warning('Asaas: falha ao criar a assinatura', ['user_id' => Auth::id(), 'erro' => $e->getMessage()]);
+            $this->addError('metodoPagamento', 'Não foi possível falar com o serviço de pagamento agora. Tente novamente em instantes.');
+
+            return;
+        }
+
+        $this->redirectParaFatura($asaas, $id);
+    }
+
+    /** Reabre a fatura de quem já escolheu a forma de pagamento e saiu da página sem pagar. */
+    public function abrirFatura(AsaasClient $asaas)
+    {
+        $assinatura = $this->assinaturaAtual();
+
+        abort_if($assinatura === null || $assinatura->asaas_subscription_id === null, 404);
+
+        $this->redirectParaFatura($asaas, $assinatura->asaas_subscription_id);
+    }
+
+    /** Solta a fatura já gerada para a pessoa escolher outra forma de pagamento. */
+    public function trocarFormaDePagamento(AsaasClient $asaas, PixAutomaticBillingService $pix): void
+    {
+        $assinatura = $this->assinaturaAtual();
+
+        abort_if($assinatura === null || $assinatura->status === SubscriptionStatus::Active, 404);
+
+        if ($assinatura->asaas_subscription_id !== null) {
+            $this->cancelarNaAsaas($asaas, $assinatura->asaas_subscription_id);
+        }
+
+        // Autorização de Pix Automático ainda não concluída: cancela, para não sobrar solta na Asaas.
+        $pix->cancelAuthorization($assinatura);
+
+        $assinatura->update([
+            'billing_type' => null,
+            'asaas_subscription_id' => null,
+            'asaas_pix_authorization_id' => null,
+            'pix_authorization_status' => null,
+        ]);
+        $this->reset('metodoPagamento', 'pixQr');
+    }
+
+    /** Chamado pelo polling da tela enquanto espera a Asaas confirmar o pagamento. */
+    public function atualizarPagamento(): void
+    {
+        $assinatura = $this->assinaturaAtual();
+
+        if ($assinatura !== null && $assinatura->status === SubscriptionStatus::Active) {
+            session()->flash('status', 'Pagamento confirmado. Seu acesso está liberado.');
+        }
+    }
+
     /**
      * Cancelamento é imediato — sem prorata, sem manter acesso até o fim
      * do período já pago. `isCurrent()` já nega acesso assim que o status
@@ -177,7 +285,7 @@ class SubscriptionIndex extends Component
     {
         $assinatura = $this->assinaturaAtual();
 
-        if ($assinatura === null || ! $assinatura->isCurrent()) {
+        if ($assinatura === null || $assinatura->status === SubscriptionStatus::Cancelled) {
             return;
         }
 
@@ -263,11 +371,7 @@ class SubscriptionIndex extends Component
         abort_unless($this->kind() === SubscriptionKind::Professional, 403);
         abort_unless(ProfessionalPricing::isValidCap($novoTeto), 422);
 
-        $atual = Subscription::query()
-            ->where('user_id', Auth::id())
-            ->ofKind(SubscriptionKind::Professional)
-            ->latest('created_at')
-            ->first();
+        $atual = $this->assinaturaAtual();
 
         abort_if($atual === null || ! $atual->isCurrent() || $atual->client_cap === null, 404);
 
@@ -285,9 +389,12 @@ class SubscriptionIndex extends Component
 
         session()->flash('status', 'Limite aumentado para '.$novoTeto.' clientes. O novo valor vale a partir da próxima cobrança.');
     }
+
     public function render()
     {
         $assinaturaAtual = $this->assinaturaAtual();
+        $vigente = $assinaturaAtual !== null && $assinaturaAtual->status !== SubscriptionStatus::Cancelled;
+        $precisaPagar = $vigente && $assinaturaAtual->status !== SubscriptionStatus::Active;
 
         return view('livewire.subscription.subscription-index', [
             'bundles' => SubscriptionBundle::cases(),
@@ -295,10 +402,80 @@ class SubscriptionIndex extends Component
             'temAcessoAtivo' => $assinaturaAtual?->isCurrent() ?? false,
             'souProfissional' => $this->kind() === SubscriptionKind::Professional,
             'tetosClientes' => ProfessionalPricing::validCaps(),
-            'resumoDoPedido' => $this->temIntencao && ! $this->trocandoPlano && ! ($assinaturaAtual?->isCurrent() ?? false),
+            'metodos' => PaymentMethod::available(),
+            // Mostra o pagamento enquanto a assinatura ainda não está paga; o
+            // seletor de plano só aparece sem assinatura, depois de cancelar
+            // ou quando a pessoa pediu para trocar.
+            'precisaPagar' => $precisaPagar,
+            'mostrarPlanos' => ! $vigente || ($this->trocandoPlano && $precisaPagar),
+            'aguardandoPagamento' => $precisaPagar && $assinaturaAtual->asaas_subscription_id !== null,
+            'resumoDoPedido' => $this->temIntencao && ! $vigente,
             'pacoteDoPedido' => $this->pacoteEscolhido !== '' ? SubscriptionBundle::tryFrom($this->pacoteEscolhido) : null,
-            'primeiraCobranca' => now()->addDays(7),
+            'fimDoTeste' => now()->addDays(7),
         ]);
+    }
+
+    /**
+     * Cria (ou reaproveita) a assinatura na Asaas para a forma escolhida e
+     * grava o id. Idempotente: busca primeiro pela referência (o id do Cerne),
+     * então um duplo clique ou uma queda entre a criação e a gravação nunca
+     * gera duas assinaturas.
+     */
+    private function garantirAssinaturaNaAsaas(Subscription $assinatura, PaymentMethod $metodo, AsaasClient $asaas): string
+    {
+        if ($assinatura->asaas_subscription_id !== null) {
+            if ($assinatura->billing_type === $metodo) {
+                return $assinatura->asaas_subscription_id;
+            }
+
+            // Mudou de ideia sobre a forma de pagamento: solta a fatura antiga.
+            $this->cancelarNaAsaas($asaas, $assinatura->asaas_subscription_id);
+            $assinatura->update(['asaas_subscription_id' => null]);
+        }
+
+        $id = $asaas->findSubscriptionIdByReference($assinatura->id);
+
+        if ($id === null) {
+            // Vencimento no último dia do teste (a pessoa pode pagar antes sem perder
+            // os dias que sobram) ou hoje, se o teste já acabou.
+            $vencimento = $assinatura->current_period_ends_at->isFuture() ? $assinatura->current_period_ends_at : today();
+
+            $id = $asaas->createSubscription(
+                $asaas->findOrCreateCustomer(Auth::user()->fresh()),
+                $assinatura->bundle,
+                $metodo,
+                "Cerne — {$assinatura->bundle->label()}",
+                $assinatura->client_cap,
+                $vencimento->toDateString(),
+                $assinatura->id,
+            )['id'];
+        }
+
+        $assinatura->update(['billing_type' => $metodo, 'asaas_subscription_id' => $id]);
+
+        return $id;
+    }
+
+    private function redirectParaFatura(AsaasClient $asaas, string $asaasSubscriptionId)
+    {
+        $url = $asaas->currentInvoiceUrl($asaasSubscriptionId);
+
+        if ($url !== null) {
+            return $this->redirect($url);
+        }
+
+        session()->flash('status', 'Cobrança gerada. O link de pagamento chega por e-mail em instantes, ou volte aqui e toque em "Abrir fatura".');
+
+        return null;
+    }
+
+    private function cancelarNaAsaas(AsaasClient $asaas, string $asaasSubscriptionId): void
+    {
+        try {
+            $asaas->cancelSubscription($asaasSubscriptionId);
+        } catch (\Throwable $e) {
+            Log::warning('Asaas: não conseguiu cancelar a assinatura anterior', ['subscription_id' => $asaasSubscriptionId, 'erro' => $e->getMessage()]);
+        }
     }
 
     private function assinaturaAtual(): ?Subscription

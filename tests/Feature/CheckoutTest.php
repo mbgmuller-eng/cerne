@@ -34,7 +34,6 @@ class CheckoutTest extends TestCase
             'password' => 'Senha1234',
             'password_confirmation' => 'Senha1234',
             'termos' => '1',
-            'metodo' => PaymentMethod::Pix->value,
         ], $extra);
     }
 
@@ -107,7 +106,7 @@ class CheckoutTest extends TestCase
         self::assertAuthenticatedAs($usuario);
         Notification::assertSentTo($usuario, VerifyEmailAddress::class);
         self::assertSame(
-            ['tipo' => 'usuario', 'pacote' => 'saude_documentos', 'metodo' => 'pix'],
+            ['tipo' => 'usuario', 'pacote' => 'saude_documentos'],
             session('checkout'),
         );
     }
@@ -124,15 +123,13 @@ class CheckoutTest extends TestCase
 
         $usuario = User::where('email', 'marina@exemplo.com')->sole();
         self::assertSame(UserRole::Broker, $usuario->role);
-        self::assertSame(['tipo' => 'profissional', 'clientes' => 30, 'metodo' => 'pix'], session('checkout'));
+        self::assertSame(['tipo' => 'profissional', 'clientes' => 30], session('checkout'));
     }
 
     public function test_rejeita_pedido_invalido_sem_criar_conta(): void
     {
         $casos = [
             'pacote inexistente' => ['tipo' => 'usuario', 'pacote' => 'plano-falso'],
-            'sem forma de pagamento' => ['tipo' => 'usuario', 'pacote' => 'completo', 'metodo' => ''],
-            'forma de pagamento inválida' => ['tipo' => 'usuario', 'pacote' => 'completo', 'metodo' => 'boleto'],
             'sem aceitar os termos' => ['tipo' => 'usuario', 'pacote' => 'completo', 'termos' => ''],
             'teto fora da escala' => ['tipo' => 'profissional', 'papel' => 'consultant', 'clientes' => 25],
             'papel inválido' => ['tipo' => 'profissional', 'papel' => 'admin', 'clientes' => 10],
@@ -148,13 +145,12 @@ class CheckoutTest extends TestCase
     {
         $usuario = User::factory()->create();
 
-        $this->actingAs($usuario)->withSession(['checkout' => ['tipo' => 'usuario', 'pacote' => 'completo', 'metodo' => 'pix']]);
+        $this->actingAs($usuario)->withSession(['checkout' => ['tipo' => 'usuario', 'pacote' => 'completo']]);
 
         Livewire::test(SubscriptionIndex::class)
             ->assertSee('Resumo do pedido')
             ->assertSee('Completo')
             ->assertSee('Confirmar e começar 7 dias grátis')
-            ->assertSet('metodoPagamento', 'pix')
             ->assertSee('Escolher outro plano');
     }
 
@@ -169,7 +165,7 @@ class CheckoutTest extends TestCase
         $asaas->shouldNotReceive('createSubscription');
         $this->app->instance(AsaasClient::class, $asaas);
 
-        $this->actingAs($usuario)->withSession(['checkout' => ['tipo' => 'usuario', 'pacote' => 'saude_documentos', 'metodo' => 'pix']]);
+        $this->actingAs($usuario)->withSession(['checkout' => ['tipo' => 'usuario', 'pacote' => 'saude_documentos']]);
 
         Livewire::test(SubscriptionIndex::class)
             ->set('cpfCnpj', '52998224725')
@@ -179,7 +175,7 @@ class CheckoutTest extends TestCase
         $assinatura = Subscription::where('user_id', $usuario->id)->sole();
         self::assertSame(SubscriptionBundle::SaudeDocumentos, $assinatura->bundle);
         self::assertSame(SubscriptionKind::Direct, $assinatura->kind);
-        self::assertSame(PaymentMethod::Pix, $assinatura->billing_type);
+        self::assertNull($assinatura->billing_type, 'a forma de pagamento só é escolhida perto do fim do teste');
         self::assertNull($assinatura->asaas_subscription_id, 'a Asaas só é chamada perto do fim do teste');
         self::assertSame(now()->addDays(7)->toDateString(), $assinatura->current_period_ends_at->toDateString());
         self::assertNull(session('checkout'));
@@ -189,27 +185,26 @@ class CheckoutTest extends TestCase
     {
         $profissional = User::factory()->consultant()->create();
 
-        $this->actingAs($profissional)->withSession(['checkout' => ['tipo' => 'profissional', 'clientes' => 30, 'metodo' => 'credit_card']]);
+        $this->actingAs($profissional)->withSession(['checkout' => ['tipo' => 'profissional', 'clientes' => 30]]);
 
         Livewire::test(SubscriptionIndex::class)
             ->assertSee('Cerne para profissionais')
             ->assertSee('Até 30 clientes')
             ->assertSee('R$ 209,80', false)
-            ->assertSet('clientCap', '30')
-            ->assertSet('metodoPagamento', 'credit_card');
+            ->assertSet('clientCap', '30');
     }
 
     public function test_trocar_de_plano_mostra_a_lista_completa(): void
     {
         $usuario = User::factory()->create();
 
-        $this->actingAs($usuario)->withSession(['checkout' => ['tipo' => 'usuario', 'pacote' => 'completo', 'metodo' => 'pix']]);
+        $this->actingAs($usuario)->withSession(['checkout' => ['tipo' => 'usuario', 'pacote' => 'completo']]);
 
         Livewire::test(SubscriptionIndex::class)
             ->call('trocarPlano')
             ->assertDontSee('Resumo do pedido')
             ->assertSee('Finanças + Seguros + Documentos')
-            ->assertSee('Voltar ao pedido que eu escolhi')
+            ->assertSee('Voltar')
             ->call('voltarAoPedido')
             ->assertSee('Resumo do pedido');
     }
@@ -218,7 +213,7 @@ class CheckoutTest extends TestCase
     {
         $profissional = User::factory()->consultant()->create();
 
-        $this->actingAs($profissional)->withSession(['checkout' => ['tipo' => 'usuario', 'pacote' => 'completo', 'metodo' => 'pix']]);
+        $this->actingAs($profissional)->withSession(['checkout' => ['tipo' => 'usuario', 'pacote' => 'completo']]);
 
         Livewire::test(SubscriptionIndex::class)
             ->assertDontSee('Resumo do pedido')

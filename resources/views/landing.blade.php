@@ -216,7 +216,7 @@
             <div class="mt-8 space-y-3">
                 @foreach ([
                     'Tem período de teste?' => 'Sim, 7 dias grátis em qualquer plano, para usar e decidir com calma. Você só é cobrado depois que o teste termina.',
-                    'Como funciona a cobrança?' => 'Mensal, processada pela Asaas, só em cartão de crédito ou Pix. Nenhum dos dois cobra sozinho hoje: você recebe o link de pagamento quando o teste acaba (ou a cada mês seguinte) e paga com um clique. Quem escolhe Pix recebe um aviso por e-mail 3 dias antes de cada vencimento.',
+                    'Como funciona a cobrança?' => 'Mensal, processada pela Asaas, só em cartão de crédito ou Pix. Você escolhe a forma de pagamento perto do fim do teste, e avisamos 3 dias antes por e-mail e dentro do Cerne. Depois do último dia de teste, o acesso fica bloqueado até o pagamento ser confirmado. Nos meses seguintes você recebe o link de pagamento e paga com um clique; quem escolhe Pix recebe um aviso por e-mail 3 dias antes de cada vencimento.',
                     'Posso cancelar quando quiser?' => 'Sim, pela sua área de conta, sem precisar falar com ninguém. O acesso é encerrado na hora do cancelamento, sem desconto proporcional do período já pago.',
                     'O consultor ou corretor vê meus dados de Saúde?' => 'Não, nunca, em nenhuma circunstância, mesmo vinculado e com acesso ativo ao resto do seu perfil.',
                     'Minha assinatura cobre meu cônjuge também?' => 'Sim. A assinatura é por perfil financeiro, não por pessoa: se vocês dividem o mesmo perfil de casal, uma assinatura libera o acesso para os dois.',

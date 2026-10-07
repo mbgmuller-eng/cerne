@@ -24,7 +24,12 @@
                 <dd class="mt-0.5 text-sm text-slate-800 dark:text-slate-200">{{ $subscription->billing_type->label() }}</dd>
             </div>
         @endif
-        @if ($subscription->current_period_ends_at && $subscription->status !== \App\Enums\SubscriptionStatus::Cancelled)
+        @if ($subscription->status === \App\Enums\SubscriptionStatus::Trialing && $subscription->trialLastDay())
+            <div>
+                <dt class="text-xs text-slate-500 dark:text-slate-400">{{ $temAcessoAtivo ? 'Teste grátis até' : 'Teste grátis terminou em' }}</dt>
+                <dd class="mt-0.5 text-sm text-slate-800 dark:text-slate-200">{{ $subscription->trialLastDay()->format('d/m/Y') }}</dd>
+            </div>
+        @elseif ($subscription->current_period_ends_at && $subscription->status !== \App\Enums\SubscriptionStatus::Cancelled)
             <div>
                 <dt class="text-xs text-slate-500 dark:text-slate-400">Próxima cobrança</dt>
                 <dd class="mt-0.5 text-sm text-slate-800 dark:text-slate-200">{{ $subscription->current_period_ends_at->format('d/m/Y') }}</dd>

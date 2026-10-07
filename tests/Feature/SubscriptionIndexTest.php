@@ -123,7 +123,7 @@ class SubscriptionIndexTest extends TestCase
             ->assertHasErrors('clientCap');
     }
 
-    public function test_assinatura_nasce_em_teste_gratis_com_metodo_de_pagamento_gravado(): void
+    public function test_assinatura_nasce_em_teste_gratis_sem_forma_de_pagamento(): void
     {
         $this->fakeAsaas();
         $usuario = User::factory()->create();
@@ -135,7 +135,8 @@ class SubscriptionIndexTest extends TestCase
 
         $assinatura = Subscription::query()->where('user_id', $usuario->id)->sole();
         self::assertSame(SubscriptionStatus::Trialing, $assinatura->status);
-        self::assertSame(PaymentMethod::Pix, $assinatura->billing_type);
+        self::assertNull($assinatura->billing_type);
+        self::assertNull($assinatura->asaas_subscription_id);
         self::assertSame(now()->addDays(7)->toDateString(), $assinatura->current_period_ends_at->toDateString());
         self::assertTrue($assinatura->isCurrent());
     }
@@ -329,6 +330,10 @@ class SubscriptionIndexTest extends TestCase
     public function test_escolha_da_forma_de_pagamento_atualiza_a_tela_na_hora(): void
     {
         $usuario = User::factory()->create();
+        Subscription::create([
+            'user_id' => $usuario->id, 'kind' => SubscriptionKind::Direct, 'bundle' => SubscriptionBundle::Completo,
+            'status' => \App\Enums\SubscriptionStatus::Trialing, 'current_period_ends_at' => now()->addDays(3), 'started_at' => now(),
+        ]);
 
         Livewire::actingAs($usuario)->test(\App\Livewire\Subscription\SubscriptionIndex::class)
             ->assertSeeHtml('wire:model.live="metodoPagamento"')
