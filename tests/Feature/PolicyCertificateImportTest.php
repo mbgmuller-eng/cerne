@@ -362,6 +362,45 @@ class PolicyCertificateImportTest extends TestCase
         self::assertSame(0, InsurancePolicy::withoutProfileScope()->count());
     }
 
+    public function test_email_informado_acha_o_cliente_mesmo_com_o_nome_bem_diferente(): void
+    {
+        $this->cliente->update(['email' => 'cliente@exemplo.com']);
+
+        $linhas = $this->rodar([$this->certificado(['nome' => 'NOME COMPLETO NADA A VER', 'cpf' => '000.000.000-00', 'nascimento' => '01/01/1950', 'email' => 'Cliente@Exemplo.com'])]);
+
+        self::assertSame('ok', $linhas[0]['status']);
+        self::assertSame($this->titular->id, InsurancePolicy::withoutProfileScope()->sole()->member_id);
+    }
+
+    public function test_email_que_nao_e_de_nenhum_cliente_do_consultor_nao_casa_nem_pelo_nome(): void
+    {
+        $linhas = $this->rodar([$this->certificado(['email' => 'outra.pessoa@exemplo.com'])]);
+
+        self::assertSame('sem_cliente', $linhas[0]['status']);
+        self::assertSame(0, InsurancePolicy::withoutProfileScope()->count());
+    }
+
+    public function test_nome_cortado_em_40_letras_no_certificado_casa_com_o_nome_do_cadastro(): void
+    {
+        $this->cliente->update(['cpf_cnpj' => null]);
+        $this->titular->update(['name' => 'Glauce Oliveira']);
+        $cortado = 'GLAUCE ALESSANDRA SILVA BENTO DE OLIVEIR';
+
+        self::assertSame(40, strlen($cortado));
+        self::assertSame('ok', $this->rodar([$this->certificado(['cpf' => null, 'nascimento' => null, 'nome' => $cortado])])[0]['status']);
+    }
+
+    public function test_nome_curto_com_prefixo_igual_nao_e_tratado_como_cortado(): void
+    {
+        $this->cliente->update(['cpf_cnpj' => null]);
+        $this->titular->update(['name' => 'Glauce Oliveira']);
+
+        // Nome completo (abaixo de 40 letras) que só começa parecido: não pode virar "Oliveira".
+        $linhas = $this->rodar([$this->certificado(['cpf' => null, 'nascimento' => null, 'nome' => 'GLAUCE ALESSANDRA OLIVEIR'])]);
+
+        self::assertNotSame('ok', $linhas[0]['status']);
+    }
+
     public function test_pdf_que_nao_esta_na_pasta_vira_erro_e_nada_e_gravado(): void
     {
         $cert = $this->certificado();

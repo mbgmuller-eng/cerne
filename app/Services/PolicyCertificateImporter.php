@@ -281,7 +281,7 @@ class PolicyCertificateImporter
     }
 
     /**
-     * @return list<array{perfil: FinancialProfile, membro: ProfileMember, tokens: list<string>, nascimento: ?string, cpf: ?string}>
+     * @return list<array{perfil: FinancialProfile, membro: ProfileMember, tokens: list<string>, nascimento: ?string, cpf: ?string, email: ?string}>
      */
     private function candidatos(User $consultor): array
     {
@@ -305,6 +305,7 @@ class PolicyCertificateImporter
                     'tokens' => $this->tokens($membro->name),
                     'nascimento' => ($membro->birthdate ?? $usuario?->birthdate)?->toDateString(),
                     'cpf' => $usuario?->cpf_cnpj ? $this->digitos($usuario->cpf_cnpj) : null,
+                    'email' => $usuario?->email ? Str::lower($usuario->email) : null,
                 ];
             }
         }
@@ -350,9 +351,14 @@ class PolicyCertificateImporter
         return ['status' => 'ok', 'candidato' => $melhor['candidato']];
     }
 
-    /** 0 = não é a pessoa; 100 = CPF igual ou nome e nascimento iguais. */
+    /** 0 = não é a pessoa; 100 = e-mail ou CPF igual, ou nome e nascimento iguais. */
     private function nota(array $cert, array $candidato): int
     {
+        // E-mail informado na carga (o PDF não traz; vem de quem conferiu): quem tem login com esse e-mail, e só ele.
+        if (! empty($cert['email'])) {
+            return $candidato['email'] === Str::lower(trim($cert['email'])) ? 100 : 0;
+        }
+
         $cpf = ! empty($cert['cpf']) ? $this->digitos($cert['cpf']) : null;
         if ($cpf !== null && $candidato['cpf'] !== null) {
             return $cpf === $candidato['cpf'] ? 100 : 0;
@@ -370,6 +376,18 @@ class PolicyCertificateImporter
         $b = $candidato['tokens'];
         if ($a === [] || $b === []) {
             return 0;
+        }
+
+        // O certificado corta o nome em 40 letras ("…DE OLIVEIR"): a última palavra cortada vale
+        // como a palavra inteira do cadastro que começa com ela.
+        if (mb_strlen(trim($cert['nome'])) >= 39 && strlen(end($a)) >= 4) {
+            $corte = end($a);
+            foreach ($b as $palavra) {
+                if ($palavra !== $corte && str_starts_with($palavra, $corte)) {
+                    $a[array_key_last($a)] = $palavra;
+                    break;
+                }
+            }
         }
 
         if ($a === $b) {
