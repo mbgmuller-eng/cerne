@@ -164,6 +164,12 @@ class InsurancePolicy extends Model
         return abs($soma - 100) < 0.01;
     }
 
+    /** Cadastrada sem o custo (R$ 0,00): quase sempre é apólice criada às pressas, faltando completar. */
+    public function isMissingCost(): bool
+    {
+        return bccomp($this->normalizedMonthlyCost(), '0', 2) === 0;
+    }
+
     public function isExpiring(int $dias = 30): bool
     {
         return $this->expiry_date !== null

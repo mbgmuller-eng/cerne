@@ -103,6 +103,27 @@ class Insurer extends Model
         return $mapa[$chave] ?? ($canonico !== null ? ($mapa[self::normalizeName($canonico)] ?? null) : null);
     }
 
+    /**
+     * Devolve o nome oficial de uma seguradora a partir de qualquer grafia ("ICATU", "Icatu", "icatu seguros"),
+     * para as telas que juntam vários clientes não tratarem a mesma seguradora como duas. Nome que não bate com
+     * nenhuma aprovada nem apelido conhecido volta como veio (só sem espaços nas pontas). Não mexe em dado
+     * gravado: a apólice continua com o texto que foi digitado.
+     *
+     * @return \Closure(string): string
+     */
+    public static function canonicalizer(): \Closure
+    {
+        $oficiais = self::query()->whereNull('profile_id')->get()
+            ->mapWithKeys(fn (self $i) => [self::normalizeName($i->name) => $i->name])
+            ->all();
+
+        return function (string $nome) use ($oficiais): string {
+            $chave = self::normalizeName($nome);
+
+            return $oficiais[$chave] ?? self::ALIASES[$chave] ?? trim($nome);
+        };
+    }
+
     /** Nomes pro <datalist> do formulário, em ordem alfabética. */
     public static function names(): array
     {
