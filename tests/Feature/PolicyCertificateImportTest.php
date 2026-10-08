@@ -401,7 +401,7 @@ class PolicyCertificateImportTest extends TestCase
         self::assertNotSame('ok', $linhas[0]['status']);
     }
 
-    public function test_a_carga_grava_a_versao_desde_a_data_do_certificado_e_reajuste_vira_porcentagem(): void
+    public function test_a_carga_grava_a_versao_desde_a_data_do_certificado(): void
     {
         $this->rodar([$this->certificado(['informacoes_vigentes' => '10/08/2025'])]);
         $this->rodar([$this->certificado(['informacoes_vigentes' => '10/08/2026', 'premio_total' => '327.25'])]);
@@ -412,7 +412,6 @@ class PolicyCertificateImportTest extends TestCase
         self::assertSame(['297.50', '327.25'], $versoes->pluck('monthly_premium')->all());
         self::assertSame(\App\Enums\PolicyRevisionSource::Import, $versoes->last()->source);
         self::assertNotNull($versoes->last()->document_id);
-        self::assertSame(10.0, $versoes->last()->premiumChangePercent($versoes->first()));
     }
 
     public function test_pdf_que_nao_esta_na_pasta_vira_erro_e_nada_e_gravado(): void

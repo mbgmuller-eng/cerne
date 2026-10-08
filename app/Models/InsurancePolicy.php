@@ -10,6 +10,7 @@ use App\Models\Concerns\HasBadgeInitials;
 use App\Models\Concerns\InvalidatesDashboard;
 use App\Models\Concerns\RespectsBrokerVisibility;
 use App\Models\Concerns\RespectsMemberPrivacy;
+use App\Support\LifeCoverage;
 use App\Support\Money;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
@@ -200,6 +201,50 @@ class InsurancePolicy extends Model
     public function coverageList(): array
     {
         return $this->coverages ?? [];
+    }
+
+    /**
+     * As proteções como aparecem na tela. Seguro de vida segue o padrão do Cerne (mesma lista, mesmos nomes, mesma
+     * ordem — ver LifeCoverage); os demais tipos mostram o que foi gravado.
+     *
+     * @return list<array{name: string, value: ?string, note: ?string}>
+     */
+    public function displayCoverages(): array
+    {
+        if ($this->insurance_type === InsuranceType::Vida) {
+            return LifeCoverage::present($this->coverageList());
+        }
+
+        return array_map(fn (array $c): array => [
+            'name' => (string) ($c['name'] ?? ''),
+            'value' => isset($c['value']) && $c['value'] !== '' ? (string) $c['value'] : null,
+            'note' => isset($c['deductible']) && trim((string) $c['deductible']) !== '' ? 'Franquia: '.trim((string) $c['deductible']) : null,
+        ], $this->coverageList());
+    }
+
+    /**
+     * O valor que representa a apólice nos totais. Vida: capital de "morte qualquer causa". Os demais tipos: o valor
+     * segurado informado. Não é um "total de cobertura": somar invalidez, doenças graves e morte seria contar a mesma
+     * pessoa várias vezes.
+     */
+    public function principalCapital(): ?string
+    {
+        return $this->insurance_type === InsuranceType::Vida
+            ? LifeCoverage::deathCapital($this->coverageList(), $this->coverage_amount)
+            : $this->coverage_amount;
+    }
+
+    /**
+     * Como a vigência aparece: a data de vencimento ou, sem ela, "Vitalícia" (seguro de vida que segue enquanto o
+     * prêmio estiver em dia). Nos outros tipos, sem data quer dizer que ninguém informou.
+     */
+    public function validityLabel(): string
+    {
+        if ($this->expiry_date !== null) {
+            return $this->expiry_date->format('d/m/Y');
+        }
+
+        return $this->insurance_type === InsuranceType::Vida ? 'Vitalícia' : 'Sem vencimento';
     }
 
     /**

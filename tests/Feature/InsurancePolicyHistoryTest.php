@@ -143,37 +143,6 @@ class InsurancePolicyHistoryTest extends TestCase
         self::assertSame(3, InsurancePolicyRevision::count());
     }
 
-    public function test_reajuste_em_porcentagem_e_comparado_pelo_custo_mensal_equivalente(): void
-    {
-        $apolice = $this->apolice(['payment_frequency' => 'annual', 'monthly_premium' => '1200.00', 'annual_premium' => '1200.00']);
-        $this->historico()->recordCreated($apolice);
-        $this->historico()->apply($apolice, ['monthly_premium' => '1320.00', 'annual_premium' => '1320.00'], PolicyRevisionSource::Manual);
-
-        $linha = $this->historico()->timeline($apolice->revisions()->get());
-
-        self::assertSame(10.0, $linha[0]['premio_pct'], 'anual de 1.200 para 1.320 = +10%');
-        self::assertNull($linha[1]['premio_pct'], 'a primeira versão não tem com o que comparar');
-        self::assertSame('110.00', $linha[0]['versao']->normalizedMonthlyCost());
-    }
-
-    public function test_custo_anterior_zerado_nao_vira_reajuste_infinito(): void
-    {
-        $apolice = $this->apolice(['monthly_premium' => '0.00']);
-        $this->historico()->recordCreated($apolice);
-        $this->historico()->apply($apolice, ['monthly_premium' => '80.00'], PolicyRevisionSource::Manual);
-
-        self::assertNull($this->historico()->timeline($apolice->revisions()->get())[0]['premio_pct']);
-    }
-
-    public function test_queda_de_custo_tem_percentual_negativo(): void
-    {
-        $apolice = $this->apolice();
-        $this->historico()->recordCreated($apolice);
-        $this->historico()->apply($apolice, ['monthly_premium' => '90.00'], PolicyRevisionSource::Manual);
-
-        self::assertSame(-10.0, $this->historico()->timeline($apolice->revisions()->get())[0]['premio_pct']);
-    }
-
     // ---- renovação do profissional
 
     public function test_renovacao_registrada_pelo_profissional_entra_na_linha_do_tempo_com_a_nota(): void
@@ -257,11 +226,9 @@ class InsurancePolicyHistoryTest extends TestCase
         self::assertSame('110000.00', $apolice->coverage_amount);
         self::assertSame([['2025-01-10', '100.00'], ['2026-01-10', '112.00']], $this->linhaDoTempo($apolice));
 
-        $linha = $this->historico()->timeline($apolice->revisions()->with('document')->get());
-        self::assertSame(12.0, $linha[0]['premio_pct'], '100,00 para 112,00 = +12%');
-        self::assertSame(10.0, $linha[0]['capital_pct']);
-        self::assertSame('cert-2026.pdf', $linha[0]['versao']->document->original_filename);
-        self::assertSame('cert-2025.pdf', $linha[1]['versao']->document->original_filename);
+        $versoes = $apolice->revisions()->with('document')->get();
+        self::assertSame('cert-2026.pdf', $versoes[0]->document->original_filename);
+        self::assertSame('cert-2025.pdf', $versoes[1]->document->original_filename);
         self::assertSame(2, Document::count());
     }
 
@@ -306,7 +273,6 @@ class InsurancePolicyHistoryTest extends TestCase
         $apolice = InsurancePolicy::sole();
         self::assertSame('112.00', $apolice->monthly_premium, 'o custo de hoje não é trocado pelo de um papel velho');
         self::assertSame([['2025-01-10', '100.00'], ['2026-01-10', '112.00']], $this->linhaDoTempo($apolice));
-        self::assertSame(12.0, $this->historico()->timeline($apolice->revisions()->get())[0]['premio_pct']);
     }
 
     public function test_so_historico_desmarcado_faz_o_papel_valer_como_atual(): void
@@ -361,17 +327,25 @@ class InsurancePolicyHistoryTest extends TestCase
 
     // ---- tela
 
-    public function test_o_cartao_da_apolice_mostra_o_historico_com_o_reajuste_destacado(): void
+    public function test_o_cartao_da_apolice_mostra_o_historico_so_com_data_custo_e_capital_por_morte(): void
     {
         $this->importar($this->itemDoPdf(['vigente_desde' => '2025-01-10', 'premio' => '100.00']), 'cert-2025.pdf', 101);
         $this->importar($this->itemDoPdf(['vigente_desde' => '2026-01-10', 'premio' => '112.00']), 'cert-2026.pdf', 102);
 
         $versaoNova = InsurancePolicyRevision::where('effective_on', '2026-01-10')->sole();
 
-        Livewire::test(InsuranceIndex::class)
+        $tela = Livewire::test(InsuranceIndex::class);
+        $texto = preg_replace('/\s+/', ' ', strip_tags($tela->html()));
+
+        self::assertStringContainsString('Custo: R$ 112,00/mês · Capital por morte qualquer causa: R$ 100.000,00', $texto);
+        self::assertStringContainsString('Custo: R$ 100,00/mês · Capital por morte qualquer causa: R$ 100.000,00', $texto);
+        // O comparativo (% de reajuste e "antes") não aparece: as duas versões lado a lado já mostram a evolução.
+        self::assertStringNotContainsString('Reajuste', $texto);
+        self::assertStringNotContainsString('+12,0%', $texto);
+        self::assertStringNotContainsString('antes R$', $texto);
+
+        $tela
             ->assertSee('Histórico da apólice · 2 registros')
-            ->assertSee('Último reajuste +12,0%')
-            ->assertSee('Reajuste +12,0%')
             ->assertSee('10/01/2026')
             ->assertSee('10/01/2025')
             ->assertSee('Ver o PDF desta versão')

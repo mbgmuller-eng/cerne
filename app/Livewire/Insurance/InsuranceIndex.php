@@ -17,6 +17,8 @@ use App\Services\InsurancePolicyHistoryService;
 use App\Models\User;
 use App\Support\Money;
 use App\Support\ProfileContext;
+use Carbon\CarbonInterface;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -328,19 +330,56 @@ class InsuranceIndex extends Component
     }
 
     /**
-     * Cobertura somada por tipo de risco — o card de resumo da spec.
+     * As apólices que contam nos totais. Atualizar uma apólice (renovação, novo PDF) mexe na MESMA apólice e nunca
+     * a duplica; se mesmo assim houver dois cadastros do mesmo número na mesma seguradora e tipo, conta só o mais
+     * recente. Seguradoras ou números diferentes são apólices diferentes e somam.
+     *
+     * @return Collection<int, InsurancePolicy>
+     */
+    public function getDistinctPoliciesProperty(): Collection
+    {
+        $nomeOficial = Insurer::canonicalizer();
+
+        return $this->policies
+            ->sortByDesc(fn (InsurancePolicy $p) => $p->updated_at->getTimestamp().'-'.$p->created_at->getTimestamp())
+            ->unique(function (InsurancePolicy $p) use ($nomeOficial): string {
+                $numero = preg_replace('/\D/', '', (string) $p->policy_number);
+
+                return $numero === ''
+                    ? 'id:'.$p->id
+                    : implode('|', [$p->insurance_type->value, $nomeOficial($p->insurer_name), $numero]);
+            })
+            ->values();
+    }
+
+    /**
+     * Resumo por tipo de risco. O valor de cada tipo é o "valor principal" da apólice (ver
+     * InsurancePolicy::principalCapital): no seguro de vida, o capital de morte qualquer causa.
      *
      * @return Collection<string, array{cobertura: string, mensal: string, quantidade: int}>
      */
     public function getByTypeProperty(): Collection
     {
-        return $this->policies
+        return $this->distinctPolicies
             ->groupBy(fn (InsurancePolicy $p) => $p->insurance_type->value)
             ->map(fn (Collection $grupo) => [
-                'cobertura' => Money::sum($grupo->pluck('coverage_amount')),
+                'cobertura' => Money::sum($grupo->map(fn (InsurancePolicy $p) => $p->principalCapital())),
                 'mensal' => Money::sum($grupo->map(fn (InsurancePolicy $p) => $p->normalizedMonthlyCost())),
                 'quantidade' => $grupo->count(),
             ]);
+    }
+
+    /**
+     * "Cliente desde": o início da vigência da apólice mais antiga cadastrada, não o dia em que a pessoa entrou no
+     * Cerne. Sem apólice nenhuma, a data de entrada.
+     */
+    public function getClientSinceProperty(): CarbonInterface
+    {
+        $inicio = InsurancePolicy::query()->active()->min('start_date');
+
+        return $inicio !== null
+            ? Carbon::parse($inicio)
+            : app(ProfileContext::class)->profile()->created_at;
     }
 
     /**
@@ -382,15 +421,10 @@ class InsuranceIndex extends Component
             ->values();
     }
 
-    public function getTotalCoverageProperty(): string
-    {
-        return Money::sum($this->policies->pluck('coverage_amount'));
-    }
-
     /** Custo mensal normalizado: apólice anual dividida por 12. */
     public function getTotalMonthlyProperty(): string
     {
-        return Money::sum($this->policies->map(fn (InsurancePolicy $p) => $p->normalizedMonthlyCost()));
+        return Money::sum($this->distinctPolicies->map(fn (InsurancePolicy $p) => $p->normalizedMonthlyCost()));
     }
 
     /** @return Collection<int, InsurancePolicy> */
@@ -420,7 +454,8 @@ class InsuranceIndex extends Component
             'policies' => $this->policies,
             'byType' => $this->byType,
             'grouped' => $this->grouped,
-            'totalCoverage' => $this->totalCoverage,
+            'clientSince' => $this->clientSince,
+            'activeCount' => $this->distinctPolicies->count(),
             'totalMonthly' => $this->totalMonthly,
             'expiring' => $this->expiring,
             'insurersCount' => $this->insurersCount,

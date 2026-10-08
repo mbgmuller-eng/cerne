@@ -272,7 +272,7 @@
                                                     </td>
                                                     <td class="py-2 pl-3 align-top whitespace-nowrap">
                                                         @if ($apolice->expiry_date === null)
-                                                            <span class="text-xs text-slate-400">Sem vencimento</span>
+                                                            <span class="text-xs text-slate-400">{{ $apolice->validityLabel() }}</span>
                                                         @elseif ($apolice->isExpiring(30))
                                                             <span class="badge bg-amber-50 text-amber-900 ring-1 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-300 dark:ring-amber-500/20">
                                                                 {{ $apolice->expiry_date->format('d/m/Y') }}

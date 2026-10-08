@@ -2,9 +2,11 @@
 
 namespace App\Models;
 
+use App\Enums\InsuranceType;
 use App\Enums\PaymentFrequency;
 use App\Enums\PolicyRevisionSource;
 use App\Models\Concerns\BelongsToProfile;
+use App\Support\LifeCoverage;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
@@ -55,28 +57,11 @@ class InsurancePolicyRevision extends Model
         return InsurancePolicy::monthlyCostOf($this->payment_frequency, $this->monthly_premium, $this->annual_premium);
     }
 
-    /**
-     * Quanto o custo mensal mudou em relação à versão anterior, em %. Nulo quando não há como comparar
-     * (primeira versão ou custo anterior zerado: uma apólice cadastrada com R$ 0,00 não "subiu infinito").
-     */
-    public function premiumChangePercent(?self $anterior): ?float
+    /** O capital desta versão que representa a apólice: "morte qualquer causa" no seguro de vida, o valor segurado nos demais. */
+    public function principalCapital(InsuranceType $tipo): ?string
     {
-        return self::percentChange($anterior?->normalizedMonthlyCost(), $this->normalizedMonthlyCost());
-    }
-
-    public function coverageChangePercent(?self $anterior): ?float
-    {
-        return self::percentChange($anterior?->coverage_amount, $this->coverage_amount);
-    }
-
-    private static function percentChange(?string $antes, ?string $depois): ?float
-    {
-        if ($antes === null || $depois === null || bccomp($antes, '0', 2) <= 0) {
-            return null;
-        }
-
-        $variacao = bcdiv(bcmul(bcsub($depois, $antes, 6), '100', 6), $antes, 6);
-
-        return round((float) $variacao, 1);
+        return $tipo === InsuranceType::Vida
+            ? LifeCoverage::deathCapital($this->coverages, $this->coverage_amount)
+            : $this->coverage_amount;
     }
 }

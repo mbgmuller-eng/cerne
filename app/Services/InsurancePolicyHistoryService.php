@@ -7,7 +7,6 @@ use App\Enums\PolicyRevisionSource;
 use App\Models\InsurancePolicy;
 use App\Models\InsurancePolicyRevision;
 use Carbon\CarbonImmutable;
-use Illuminate\Support\Collection;
 
 /**
  * Linha do tempo da apólice: cada mudança relevante (prêmio, capital, proteções, forma de pagamento,
@@ -85,24 +84,6 @@ class InsurancePolicyHistoryService
         $data = $this->versoes($policy)->value('effective_on');
 
         return $data === null ? null : CarbonImmutable::parse($data)->toDateString();
-    }
-
-    /**
-     * Cada versão com o reajuste em relação à anterior. Recebe as versões da mais recente para a mais antiga
-     * (como `InsurancePolicy::revisions()` devolve).
-     *
-     * @param  Collection<int, InsurancePolicyRevision>  $versoes
-     * @return Collection<int, array{versao: InsurancePolicyRevision, premio_pct: ?float, capital_pct: ?float}>
-     */
-    public function timeline(Collection $versoes): Collection
-    {
-        $lista = $versoes->values();
-
-        return $lista->map(fn (InsurancePolicyRevision $versao, int $i) => [
-            'versao' => $versao,
-            'premio_pct' => $versao->premiumChangePercent($lista->get($i + 1)),
-            'capital_pct' => $versao->coverageChangePercent($lista->get($i + 1)),
-        ]);
     }
 
     // -----------------------------------------------------------------

@@ -12,6 +12,7 @@ use App\Models\DocumentUpload;
 use App\Models\InsurancePolicy;
 use App\Models\Insurer;
 use App\Models\ProfileMember;
+use App\Support\LifeCoverage;
 use App\Support\PersonName;
 use App\Support\ProfileContext;
 use Carbon\CarbonImmutable;
@@ -84,16 +85,19 @@ class InsuranceImportService
             $ultimaVersao = $existente ? $this->historico->latestEffectiveOn($existente) : null;
             $versaoAntiga = $existente !== null && $vigenteDesde !== '' && $ultimaVersao !== null && $vigenteDesde < $ultimaVersao;
 
+            $tipoDaLinha = in_array($item['tipo'] ?? null, array_column(InsuranceType::cases(), 'value'), true) ? $item['tipo'] : InsuranceType::Outro->value;
+            [$coberturasDaLinha, $valorSegurado] = $this->coberturasDaLinha($item, $tipoDaLinha);
+
             $linhas[$i] = [
                 'import' => true,
                 'target' => $existente?->id ?? 'new',
-                'tipo' => in_array($item['tipo'] ?? null, array_column(InsuranceType::cases(), 'value'), true) ? $item['tipo'] : InsuranceType::Outro->value,
+                'tipo' => $tipoDaLinha,
                 'seguradora' => trim((string) ($item['seguradora'] ?? '')),
                 'numero' => trim((string) ($item['numero_apolice'] ?? '')),
                 'member_id' => $membro?->id ?? '',
                 'pessoa' => $membro === null ? $segurado : '',
                 'objeto' => trim((string) ($item['objeto_segurado'] ?? '')),
-                'valor_segurado' => $this->numero($item['valor_segurado'] ?? null),
+                'valor_segurado' => $valorSegurado,
                 'premio' => $this->numero($item['premio'] ?? null),
                 'periodicidade' => in_array($item['periodicidade'] ?? null, array_column(PaymentFrequency::cases(), 'value'), true) ? $item['periodicidade'] : PaymentFrequency::Monthly->value,
                 'premio_anual' => $this->numero($item['premio_total_anual'] ?? null),
@@ -103,11 +107,7 @@ class InsuranceImportService
                 'somente_historico' => $versaoAntiga,
                 'notas' => trim((string) ($item['observacoes_item'] ?? '')),
                 'privado' => false,
-                'coberturas' => array_values(array_map(fn (array $c) => [
-                    'nome' => (string) ($c['nome'] ?? ''),
-                    'valor' => $this->numero($c['valor'] ?? null),
-                    'franquia' => trim((string) ($c['franquia'] ?? '')),
-                ], $item['coberturas'] ?? [])),
+                'coberturas' => $coberturasDaLinha,
                 'beneficiarios' => array_values(array_map(fn (array $b) => [
                     'nome' => (string) ($b['nome'] ?? ''),
                     'percentual' => (string) ($b['percentual'] ?? ''),
@@ -197,6 +197,11 @@ class InsuranceImportService
                 'deductible' => trim((string) ($c['franquia'] ?? '')) !== '' ? trim($c['franquia']) : null,
             ])->values()->all();
 
+        // Seguro de vida segue o padrão de proteções mesmo se a lista foi mexida na revisão (idempotente).
+        if ($linha['tipo'] === InsuranceType::Vida->value) {
+            $coberturas = LifeCoverage::standardize($coberturas);
+        }
+
         $beneficiarios = collect($linha['beneficiarios'] ?? [])
             ->filter(fn (array $b) => trim((string) $b['nome']) !== '')
             ->map(fn (array $b) => [
@@ -210,7 +215,10 @@ class InsuranceImportService
             'insurer_name' => trim($linha['seguradora']),
             'policy_number' => trim((string) $linha['numero']) !== '' ? trim($linha['numero']) : null,
             'insured_item' => trim((string) $linha['objeto']) !== '' ? trim($linha['objeto']) : null,
-            'coverage_amount' => ($linha['valor_segurado'] ?? '') !== '' ? $linha['valor_segurado'] : null,
+            // Vida sem valor digitado: o capital principal é o de morte qualquer causa.
+            'coverage_amount' => ($linha['valor_segurado'] ?? '') !== ''
+                ? $linha['valor_segurado']
+                : ($linha['tipo'] === InsuranceType::Vida->value ? LifeCoverage::deathCapital($coberturas, null) : null),
             'monthly_premium' => $linha['premio'],
             'annual_premium' => ($linha['premio_anual'] ?? '') !== '' ? $linha['premio_anual'] : null,
             'payment_frequency' => $linha['periodicidade'],
@@ -301,6 +309,38 @@ class InsuranceImportService
             'member_id' => $apolice->member_id,
             'insurance_policy_id' => $apolice->id,
         ], $autor);
+    }
+
+    /**
+     * As proteções da linha de revisão e o valor segurado. No seguro de vida a lista já vem no padrão do Cerne
+     * (ver LifeCoverage) e o valor segurado é o capital de morte qualquer causa.
+     *
+     * @return array{0: list<array{nome: string, valor: string, franquia: string}>, 1: string}
+     */
+    private function coberturasDaLinha(array $item, string $tipo): array
+    {
+        $lista = array_values(array_map(fn (array $c) => [
+            'nome' => (string) ($c['nome'] ?? ''),
+            'valor' => $this->numero($c['valor'] ?? null),
+            'franquia' => trim((string) ($c['franquia'] ?? '')),
+        ], $item['coberturas'] ?? []));
+
+        $valor = $this->numero($item['valor_segurado'] ?? null);
+
+        if ($tipo !== InsuranceType::Vida->value) {
+            return [$lista, $valor];
+        }
+
+        $padrao = LifeCoverage::standardize(array_map(fn (array $c) => [
+            'name' => $c['nome'],
+            'value' => $c['valor'] !== '' ? $c['valor'] : null,
+            'deductible' => $c['franquia'] !== '' ? $c['franquia'] : null,
+        ], $lista));
+
+        return [
+            array_map(fn (array $c) => ['nome' => $c['name'], 'valor' => $c['value'] ?? '', 'franquia' => $c['deductible'] ?? ''], $padrao),
+            LifeCoverage::deathCapital($padrao, $valor !== '' ? $valor : null) ?? '',
+        ];
     }
 
     private function apolicePorNumero($existentes, ?string $numero): ?InsurancePolicy

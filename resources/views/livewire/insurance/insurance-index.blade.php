@@ -20,16 +20,12 @@
                 <p class="eyebrow text-brand-200">Seguros</p>
                 <h1 class="mt-1 font-display text-3xl font-semibold tracking-tight">{{ $profile->profile_name }}</h1>
                 <p class="mt-1 text-sm text-brand-200">
-                    cliente desde {{ $profile->created_at->translatedFormat('M/Y') }}
-                    · {{ $policies->count() }} {{ $policies->count() === 1 ? 'apólice ativa' : 'apólices ativas' }}
+                    cliente desde {{ $clientSince->translatedFormat('M/Y') }}
+                    · {{ $activeCount }} {{ $activeCount === 1 ? 'apólice ativa' : 'apólices ativas' }}
                 </p>
             </div>
 
             <div class="flex gap-8">
-                <div class="text-right">
-                    <p class="figure text-2xl font-medium">{{ Money::compact($totalCoverage) }}</p>
-                    <p class="mt-0.5 text-xs text-brand-200">Cobertura total</p>
-                </div>
                 <div class="text-right">
                     <p class="figure text-2xl font-medium">{{ Money::format($totalMonthly) }}</p>
                     <p class="mt-0.5 text-xs text-brand-200">Custo mensal</p>
@@ -124,8 +120,9 @@
                 </div>
 
                 <div>
-                    <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Cobertura total (opcional)</label>
+                    <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Valor segurado (opcional)</label>
                     <input type="number" step="0.01" wire:model="policyCoverageAmount" class="input mt-1.5" placeholder="0,00">
+                    <p class="mt-1 text-xs text-slate-400">Seguro de vida: o capital de morte qualquer causa.</p>
                     @error('policyCoverageAmount') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
                 </div>
 
@@ -206,6 +203,9 @@
                 @foreach ($byType as $tipo => $resumo)
                     <div class="card p-4">
                         <p class="text-sm font-medium text-slate-800 dark:text-slate-200">{{ InsuranceType::from($tipo)->label() }}</p>
+                        @if ($tipo === InsuranceType::Vida->value)
+                            <p class="text-xs text-slate-400">Morte qualquer causa</p>
+                        @endif
                         <p class="mt-1 text-lg font-semibold tabular-nums text-slate-900 dark:text-white">
                             {{ Money::format($resumo['cobertura']) }}
                         </p>
@@ -322,7 +322,7 @@
                                                                         'mt-0.5 text-sm font-semibold text-slate-900 dark:text-white',
                                                                         'text-amber-700 dark:text-amber-400' => $apolice->isExpiring(30),
                                                                     ])>
-                                                                        {{ $apolice->expiry_date?->format('d/m/Y') ?? 'Sem vencimento' }}
+                                                                        {{ $apolice->validityLabel() }}
                                                                     </p>
                                                                 </div>
                                                                 <div class="border-l-2 border-slate-200 pl-3 dark:border-white/10">
@@ -339,17 +339,17 @@
                                                                 </div>
                                                             </div>
 
-                                                            @if ($apolice->coverageList() !== [])
+                                                            @if ($apolice->displayCoverages() !== [])
                                                                 <div class="mt-4 divide-y divide-slate-100 dark:divide-white/10">
-                                                                    @foreach ($apolice->coverageList() as $cobertura)
+                                                                    @foreach ($apolice->displayCoverages() as $cobertura)
                                                                         <div class="flex items-center justify-between gap-3 py-2 text-sm">
                                                                             <span class="text-slate-600 dark:text-slate-300">
                                                                                 {{ $cobertura['name'] }}
-                                                                                @if (! empty($cobertura['deductible']))
-                                                                                    <span class="block text-xs text-slate-400">Franquia: {{ $cobertura['deductible'] }}</span>
+                                                                                @if ($cobertura['note'])
+                                                                                    <span class="block text-xs text-slate-400">{{ $cobertura['note'] }}</span>
                                                                                 @endif
                                                                             </span>
-                                                                            @if (isset($cobertura['value']) && $cobertura['value'] !== null && $cobertura['value'] !== '')
+                                                                            @if ($cobertura['value'] !== null)
                                                                                 <span class="shrink-0 font-semibold text-slate-900 dark:text-white">{{ Money::format($cobertura['value']) }}</span>
                                                                             @endif
                                                                         </div>
@@ -363,62 +363,32 @@
                                                                 @endif
                                                             @elseif ($apolice->coverage_amount !== null)
                                                                 <div class="mt-4 flex items-center justify-between border-t border-slate-100 pt-3 text-sm dark:border-white/10">
-                                                                    <span class="text-slate-600 dark:text-slate-300">Cobertura</span>
+                                                                    <span class="text-slate-600 dark:text-slate-300">{{ $apolice->insurance_type === InsuranceType::Vida ? 'Morte qualquer causa' : 'Cobertura' }}</span>
                                                                     <span class="font-semibold text-slate-900 dark:text-white">{{ Money::format($apolice->coverage_amount) }}</span>
                                                                 </div>
                                                             @endif
 
-                                                            {{-- Linha do tempo: desde quando começou e como cada reajuste mexeu no custo. --}}
+                                                            {{-- Linha do tempo: desde quando começou e o que valia em cada versão. --}}
                                                             @if ($apolice->revisions->isNotEmpty())
-                                                                @php
-                                                                    $linhaDoTempo = app(\App\Services\InsurancePolicyHistoryService::class)->timeline($apolice->revisions);
-                                                                    $ultimoReajuste = $linhaDoTempo->first(fn ($e) => $e['premio_pct'] !== null && $e['premio_pct'] != 0.0);
-                                                                    $pct = fn (?float $v) => ($v > 0 ? '+' : ($v < 0 ? '−' : '')).number_format(abs($v), 1, ',', '.').'%';
-                                                                @endphp
+                                                                @php $ehVida = $apolice->insurance_type === InsuranceType::Vida; @endphp
                                                                 <details class="mt-4 rounded-lg border border-slate-100 dark:border-white/10">
-                                                                    <summary class="flex cursor-pointer flex-wrap items-center justify-between gap-2 px-3 py-2 text-sm font-medium text-slate-700 dark:text-slate-200">
-                                                                        <span>Histórico da apólice · {{ $apolice->revisions->count() }} {{ $apolice->revisions->count() === 1 ? 'registro' : 'registros' }}</span>
-                                                                        @if ($ultimoReajuste)
-                                                                            <span @class([
-                                                                                'badge',
-                                                                                'bg-amber-50 text-amber-900 ring-1 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-300 dark:ring-amber-500/20' => $ultimoReajuste['premio_pct'] > 0,
-                                                                                'bg-accent-50 text-accent-700 dark:bg-accent-500/15 dark:text-accent-300' => $ultimoReajuste['premio_pct'] < 0,
-                                                                            ])>Último reajuste {{ $pct($ultimoReajuste['premio_pct']) }}</span>
-                                                                        @endif
+                                                                    <summary class="cursor-pointer px-3 py-2 text-sm font-medium text-slate-700 dark:text-slate-200">
+                                                                        Histórico da apólice · {{ $apolice->revisions->count() }} {{ $apolice->revisions->count() === 1 ? 'registro' : 'registros' }}
                                                                     </summary>
 
                                                                     <ol class="divide-y divide-slate-100 border-t border-slate-100 dark:divide-white/10 dark:border-white/10">
-                                                                        @foreach ($linhaDoTempo as $entrada)
-                                                                            @php
-                                                                                $versao = $entrada['versao'];
-                                                                                $anterior = $linhaDoTempo->get($loop->index + 1)['versao'] ?? null;
-                                                                            @endphp
+                                                                        @foreach ($apolice->revisions as $versao)
+                                                                            @php $capital = $versao->principalCapital($apolice->insurance_type); @endphp
                                                                             <li class="px-3 py-3 text-sm" wire:key="rev-{{ $versao->id }}">
-                                                                                <div class="flex flex-wrap items-center justify-between gap-2">
-                                                                                    <p class="font-medium text-slate-900 dark:text-white">
-                                                                                        {{ $versao->source === \App\Enums\PolicyRevisionSource::Baseline ? 'Valores anteriores' : $versao->effective_on->format('d/m/Y') }}
-                                                                                        <span class="text-xs font-normal text-slate-400">· {{ $versao->source->label() }}</span>
-                                                                                    </p>
-                                                                                    @if ($entrada['premio_pct'] !== null)
-                                                                                        <span @class([
-                                                                                            'badge',
-                                                                                            'bg-amber-50 text-amber-900 ring-1 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-300 dark:ring-amber-500/20' => $entrada['premio_pct'] > 0,
-                                                                                            'bg-accent-50 text-accent-700 dark:bg-accent-500/15 dark:text-accent-300' => $entrada['premio_pct'] < 0,
-                                                                                            'bg-slate-100 text-slate-600 dark:bg-white/10 dark:text-slate-300' => $entrada['premio_pct'] == 0.0,
-                                                                                        ])>{{ $entrada['premio_pct'] == 0.0 ? 'Sem reajuste' : 'Reajuste '.$pct($entrada['premio_pct']) }}</span>
-                                                                                    @endif
-                                                                                </div>
+                                                                                <p class="font-medium text-slate-900 dark:text-white">
+                                                                                    {{ $versao->source === \App\Enums\PolicyRevisionSource::Baseline ? 'Valores anteriores' : $versao->effective_on->format('d/m/Y') }}
+                                                                                    <span class="text-xs font-normal text-slate-400">· {{ $versao->source->label() }}</span>
+                                                                                </p>
 
                                                                                 <p class="mt-1 text-slate-600 dark:text-slate-300">
                                                                                     Custo: <strong class="text-slate-900 dark:text-white">{{ Money::format($versao->normalizedMonthlyCost()) }}</strong>/mês
-                                                                                    @if ($anterior && $anterior->normalizedMonthlyCost() !== $versao->normalizedMonthlyCost())
-                                                                                        <span class="text-xs text-slate-400">(antes {{ Money::format($anterior->normalizedMonthlyCost()) }})</span>
-                                                                                    @endif
-                                                                                    @if ($versao->coverage_amount !== null)
-                                                                                        · Capital: <strong class="text-slate-900 dark:text-white">{{ Money::format($versao->coverage_amount) }}</strong>
-                                                                                        @if ($entrada['capital_pct'] !== null && $entrada['capital_pct'] != 0.0)
-                                                                                            <span class="text-xs text-slate-400">({{ $pct($entrada['capital_pct']) }})</span>
-                                                                                        @endif
+                                                                                    @if ($capital !== null)
+                                                                                        · {{ $ehVida ? 'Capital por morte qualquer causa' : 'Capital' }}: <strong class="text-slate-900 dark:text-white">{{ Money::format($capital) }}</strong>
                                                                                     @endif
                                                                                 </p>
 
