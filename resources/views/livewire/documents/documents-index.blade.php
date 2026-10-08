@@ -1,4 +1,5 @@
 @use('App\Support\Money')
+@use('Illuminate\Support\Arr')
 @use('App\Enums\DocumentType')
 @use('App\Enums\Necessity')
 @use('App\Enums\ProcessingStatus')
@@ -8,7 +9,7 @@
     <div>
         <h1 class="font-display text-3xl font-semibold tracking-tight text-slate-900 dark:text-white">Importar PDF</h1>
         <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
-            Extrato, fatura ou apólice — a leitura é automática, mas nada é gravado sem sua revisão.
+            Extrato, fatura ou relatório de outro aplicativo financeiro — a leitura é automática, mas nada é gravado sem sua revisão.
         </p>
     </div>
 
@@ -50,9 +51,9 @@
                 </select>
             </div>
 
-            @if ($documentType === 'bank_statement')
+            @if (in_array($documentType, ['bank_statement', 'external_report'], true))
                 <div>
-                    <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Conta do extrato</label>
+                    <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">{{ $documentType === 'external_report' ? 'Conta dos lançamentos' : 'Conta do extrato' }}</label>
                     <select wire:model="uploadBankAccountId" class="select mt-1.5">
                         <option value="">Selecione a conta</option>
                         @foreach ($bankAccounts as $conta)
@@ -88,6 +89,25 @@
             </button>
         </div>
 
+        @if ($documentType === 'external_report')
+            <div class="mt-4 space-y-2 rounded-lg bg-slate-50 p-3 dark:bg-white/5">
+                <label class="flex items-start gap-2 text-sm text-slate-700 dark:text-slate-300">
+                    <input type="checkbox" wire:model="updateBalance" class="mt-0.5 h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500">
+                    <span>
+                        Atualizar o saldo da conta com estes lançamentos
+                        <span class="block text-xs text-slate-500 dark:text-slate-400">
+                            Deixe desmarcado se o relatório é de um período que o saldo atual da conta já reflete (o caso mais comum).
+                            Marcado, cada despesa baixa o saldo e cada receita soma.
+                        </span>
+                    </span>
+                </label>
+                <p class="text-xs text-slate-500 dark:text-slate-400">
+                    O arquivo é enviado a um serviço de inteligência artificial (Anthropic) apenas para a leitura, e você revisa tudo antes de gravar.
+                    Leituras de relatório restantes hoje neste perfil: <strong>{{ $restantesHoje }}</strong> de {{ config('cerne.ai.external_imports_per_day') }}.
+                </p>
+            </div>
+        @endif
+
         <p class="mt-3 text-xs text-slate-400">
             Até {{ config('cerne.ai.max_upload_mb') }} MB e {{ config('cerne.ai.max_pdf_pages') }} páginas por arquivo.
         </p>
@@ -117,13 +137,65 @@
                 </div>
             @endif
 
+            @if ($externo && $reconciliacao)
+                @if ($reconciliacao['confere'])
+                    <div class="mt-3 rounded-lg border border-accent-200 bg-accent-50 px-3 py-2 text-xs text-accent-800 dark:border-accent-500/30 dark:bg-accent-500/10 dark:text-accent-200">
+                        A soma dos lançamentos lidos ({{ Money::format($reconciliacao['soma']) }}) confere com o total que o relatório declara.
+                    </div>
+                @else
+                    <div class="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-900 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-200">
+                        <span class="font-medium">A soma não confere com o total do relatório.</span>
+                        Lidos: {{ Money::format($reconciliacao['soma']) }} · declarado: {{ Money::format($reconciliacao['declarado']) }}
+                        (diferença de {{ Money::format(ltrim($reconciliacao['diferenca'], '-')) }}).
+                        Pode haver linha que não foi lida, ou lida a mais: confira com o relatório antes de importar.
+                    </div>
+                @endif
+            @endif
+
+            @if ($externo && $gruposExterno->isNotEmpty())
+                <div class="mt-3 rounded-lg border border-slate-200 p-3 dark:border-slate-700">
+                    <p class="text-sm font-medium text-slate-800 dark:text-slate-200">Resumo por categoria do outro aplicativo</p>
+                    <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+                        Escolha a categoria e a necessidade do Cerne para cada grupo e aplique de uma vez; depois ajuste só as linhas que fugirem à regra.
+                        Linhas já categorizadas por uma regra sua não são alteradas.
+                    </p>
+                    <div class="mt-2 divide-y divide-slate-100 dark:divide-white/10">
+                        @foreach ($gruposExterno as $gi => $grupo)
+                            <div class="grid items-center gap-2 py-2 sm:grid-cols-[1.4fr_1fr_1fr_auto]" wire:key="grupo-{{ $gi }}">
+                                <div class="min-w-0">
+                                    <p class="truncate text-sm text-slate-800 dark:text-slate-200">{{ $grupo['rotulo'] }}</p>
+                                    <p class="text-xs text-slate-500 dark:text-slate-400">{{ $grupo['quantidade'] }} {{ $grupo['quantidade'] === 1 ? 'lançamento' : 'lançamentos' }} · {{ Money::format($grupo['total']) }}</p>
+                                </div>
+                                <select wire:model="grupoCategoria.{{ $gi }}" class="select w-full text-xs">
+                                    <option value="">Categoria do Cerne</option>
+                                    @foreach ($expenseCategories->filter(fn ($c) => $c->necessity === null) as $categoria)
+                                        <option value="{{ $categoria->id }}">{{ $categoria->name }}</option>
+                                    @endforeach
+                                </select>
+                                <select wire:model="grupoNecessidade.{{ $gi }}" class="select w-full text-xs">
+                                    <option value="">Necessidade</option>
+                                    @foreach (Necessity::options() as $valorNecessidade => $rotulo)
+                                        @unless ($valorNecessidade === Necessity::Investment->value)
+                                            <option value="{{ $valorNecessidade }}">{{ $rotulo }}</option>
+                                        @endunless
+                                    @endforeach
+                                </select>
+                                <button type="button" wire:click="aplicarGrupo({{ $gi }})" class="btn-secondary px-3 py-1 text-xs">Aplicar ao grupo</button>
+                            </div>
+                        @endforeach
+                    </div>
+                </div>
+            @endif
+
             @error('confirmar')
                 <p class="mt-3 text-sm text-red-700 dark:text-red-400">{{ $message }}</p>
             @enderror
 
             @php
                 $itens = $revisando->extractedItems();
-                $temCategorizacao = in_array($revisando->document_type, [DocumentType::BankStatement, DocumentType::CreditCardInvoice], true);
+                $temCategorizacao = in_array($revisando->document_type, [DocumentType::BankStatement, DocumentType::CreditCardInvoice, DocumentType::ExternalReport], true);
+                // Relatório de outro app traz muitos campos de origem; a tabela mostra o essencial e o resto vira pista na linha.
+                $colunas = $externo ? ['data', 'descricao', 'valor'] : ($itens === [] ? [] : array_keys($itens[0]));
             @endphp
 
             @if ($itens === [])
@@ -134,8 +206,8 @@
                         <thead class="sticky top-0 bg-slate-50 dark:bg-slate-800 text-xs text-slate-500 dark:text-slate-400">
                             <tr>
                                 <th class="w-10 px-3 py-2"></th>
-                                @foreach (array_keys($itens[0]) as $coluna)
-                                    <th class="px-3 py-2 text-left font-medium">{{ str_replace('_', ' ', $coluna) }}</th>
+                                @foreach ($colunas as $coluna)
+                                    <th class="px-3 py-2 {{ $coluna === 'valor' ? 'text-right' : 'text-left' }} font-medium">{{ $coluna === 'descricao' ? 'descrição' : str_replace('_', ' ', $coluna) }}</th>
                                 @endforeach
                                 @if ($temCategorizacao)
                                     <th class="px-3 py-2 text-left font-medium">necessidade</th>
@@ -164,10 +236,14 @@
                                          — não volta a ser oferecido, só mostrado como referência. --}}
                                     <tr class="opacity-50">
                                         <td class="px-3 py-2"></td>
-                                        @foreach ($item as $chave => $valor)
+                                        @foreach (collect($colunas)->mapWithKeys(fn ($c) => [$c => $item[$c] ?? null]) as $chave => $valor)
                                             <td class="px-3 py-2 text-slate-500 dark:text-slate-500 {{ in_array($chave, ['valor', 'valor_atual', 'valor_bruto', 'premio']) ? 'text-right tabular-nums' : '' }}">
                                                 @if (is_array($valor))
                                                     {{ collect($valor)->map(fn ($v) => is_array($v) ? implode(' ', $v) : $v)->implode(', ') }}
+                                                @elseif ($externo && $chave === 'data' && $valor)
+                                                    <span class="whitespace-nowrap">{{ \Carbon\CarbonImmutable::parse($valor)->format('d/m/Y') }}</span>
+                                                @elseif ($externo && $chave === 'valor' && $valor !== null)
+                                                    <span class="whitespace-nowrap">{{ Money::format($valor) }}</span>
                                                 @else
                                                     {{ $valor ?? '—' }}
                                                 @endif
@@ -191,10 +267,14 @@
                                     <td class="px-3 py-2">
                                         <input type="checkbox" wire:model.live="aceitos" value="{{ $i }}" class="rounded border-slate-300 dark:border-slate-600 text-brand-700 dark:text-brand-400 focus:ring-brand-500">
                                     </td>
-                                    @foreach ($item as $chave => $valor)
+                                    @foreach (collect($colunas)->mapWithKeys(fn ($c) => [$c => $item[$c] ?? null]) as $chave => $valor)
                                         <td class="px-3 py-2 text-slate-700 dark:text-slate-300 {{ in_array($chave, ['valor', 'valor_atual', 'valor_bruto', 'premio']) ? 'text-right tabular-nums' : '' }}">
                                             @if (is_array($valor))
                                                 {{ collect($valor)->map(fn ($v) => is_array($v) ? implode(' ', $v) : $v)->implode(', ') }}
+                                            @elseif ($externo && $chave === 'data' && $valor)
+                                                <span class="whitespace-nowrap">{{ \Carbon\CarbonImmutable::parse($valor)->format('d/m/Y') }}</span>
+                                            @elseif ($externo && $chave === 'valor' && $valor !== null)
+                                                <span class="whitespace-nowrap">{{ Money::format($valor) }}</span>
                                             @else
                                                 {{ $valor ?? '—' }}
                                             @endif
@@ -249,7 +329,39 @@
                                 @if ($temCategorizacao)
                                     <tr class="{{ in_array($i, $aceitos) ? '' : 'opacity-40' }}">
                                         <td></td>
-                                        <td colspan="{{ count($item) + 3 }}" class="px-3 pb-2 text-xs">
+                                        <td colspan="{{ count($colunas) + 3 }}" class="px-3 pb-2 text-xs">
+                                            @if ($externo)
+                                                @php $dica = $dicasPorItem[$i] ?? []; @endphp
+                                                <div class="mb-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-slate-500 dark:text-slate-400">
+                                                    @if (($item['categoria_origem'] ?? '') !== '')
+                                                        <span>Origem: {{ implode(' / ', array_filter([$item['categoria_origem'], $item['subcategoria_origem'] ?? ''])) }}</span>
+                                                    @endif
+                                                    @if ($dica['parcela'] ?? null)
+                                                        <span class="badge bg-slate-100 text-slate-700 dark:bg-white/10 dark:text-slate-300">Parcela {{ $dica['parcela'] }}</span>
+                                                    @endif
+                                                    @if ($dica['recorrente'] ?? false)
+                                                        <span class="badge bg-slate-100 text-slate-700 dark:bg-white/10 dark:text-slate-300" title="Cadastrada no outro aplicativo em um mês anterior ao do gasto">Provável recorrente</span>
+                                                    @endif
+                                                    @if ($dica['cartao'] ?? null)
+                                                        <span class="font-medium text-red-700 dark:text-red-400">Compra no cartão {{ $dica['cartao'] }}: veio desmarcada, pois o Cerne registra compras de cartão pela fatura. Se marcar, entra como saída da conta escolhida</span>
+                                                    @endif
+                                                    @if ($dica['fatura'] ?? false)
+                                                        <span class="font-medium text-red-700 dark:text-red-400">Parece pagamento de fatura de cartão: veio desmarcado para não contar em dobro com as compras da fatura</span>
+                                                    @endif
+                                                    @if (array_key_exists($i, $contaPorItem))
+                                                        <label class="inline-flex items-center gap-1.5">
+                                                            Conta de origem: <strong class="text-slate-700 dark:text-slate-200">{{ $dica['outra_conta'] }}</strong>. Lançar em:
+                                                            <select wire:model="contaPorItem.{{ $i }}" class="select py-1 text-xs">
+                                                                <option value="">Conta do envio</option>
+                                                                @foreach ($bankAccounts as $contaDaLista)
+                                                                    <option value="{{ $contaDaLista->id }}">{{ $contaDaLista->displayName() }}</option>
+                                                                @endforeach
+                                                            </select>
+                                                        </label>
+                                                    @endif
+                                                </div>
+                                            @endif
+
                                             @if ($faltaCategorizar || ($duplicataPorItem[$i] ?? null) || ($regraAplicadaPorItem[$i] ?? null) || ($notaPorItem[$i] ?? null))
                                                 <div class="flex flex-wrap gap-x-3 gap-y-1">
                                                     @if ($faltaCategorizar)
@@ -373,6 +485,7 @@
                                 · {{ $doc->created_at->format('d/m/Y H:i') }}
                                 @if ($doc->institution_name) · {{ $doc->institution_name }} @endif
                                 @if ($doc->records_extracted !== null) · {{ $doc->records_extracted }} itens @endif
+                                @if ($doc->document_type === DocumentType::ExternalReport) · {{ $doc->applies_to_balance ? 'atualiza o saldo' : 'sem alterar o saldo' }} @endif
                             </p>
                             @if ($doc->error_message)
                                 <p class="mt-0.5 text-xs text-red-700 dark:text-red-400">{{ $doc->error_message }}</p>

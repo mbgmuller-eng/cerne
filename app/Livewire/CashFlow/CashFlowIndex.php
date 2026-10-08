@@ -435,7 +435,8 @@ class CashFlowIndex extends Component
         }
 
         DB::transaction(function () use ($despesa): void {
-            if ($despesa->bank_account_id !== null) {
+            // Lançamento importado "sem mexer no saldo" também não devolve nada ao apagar.
+            if ($despesa->bank_account_id !== null && $despesa->affects_balance) {
                 BankAccount::withoutProfileScope()->find($despesa->bank_account_id)?->applyToBalance($despesa->amount);
             }
 
@@ -655,7 +656,9 @@ class CashFlowIndex extends Component
             // o valor antigo já carrega o sinal certo pra desfazer (débito
             // positivo, estorno negativo), então somar ele de volta reverte
             // os dois casos sem precisar saber qual era antes.
-            if ($despesa->bank_account_id !== null) {
+            $mexeNoSaldo = $despesa->affects_balance;
+
+            if ($despesa->bank_account_id !== null && $mexeNoSaldo) {
                 BankAccount::withoutProfileScope()->find($despesa->bank_account_id)?->applyToBalance($despesa->amount);
             }
 
@@ -665,7 +668,9 @@ class CashFlowIndex extends Component
 
             $despesa->update($camposComuns + ['bank_account_id' => $contaNova?->id]);
 
-            $contaNova?->applyToBalance(bcmul($valorComSinal, '-1', 2));
+            if ($mexeNoSaldo) {
+                $contaNova?->applyToBalance(bcmul($valorComSinal, '-1', 2));
+            }
         });
 
         $this->detectarDuplicatas('despesa', $despesa);
@@ -919,7 +924,7 @@ class CashFlowIndex extends Component
         $receita = IncomeRecord::query()->findOrFail($id);
 
         DB::transaction(function () use ($receita): void {
-            if ($receita->bank_account_id !== null) {
+            if ($receita->bank_account_id !== null && $receita->affects_balance) {
                 BankAccount::withoutProfileScope()->find($receita->bank_account_id)?->applyToBalance('-'.$receita->amount);
             }
 
@@ -1001,7 +1006,9 @@ class CashFlowIndex extends Component
         DB::transaction(function () use ($receita, $data, $categoria, $memberId): void {
             // Mesma ordem do updateExpense: desfaz o crédito antigo antes
             // de aplicar o novo, senão a mesma conta recebe o delta errado.
-            if ($receita->bank_account_id !== null) {
+            $mexeNoSaldo = $receita->affects_balance;
+
+            if ($receita->bank_account_id !== null && $mexeNoSaldo) {
                 BankAccount::withoutProfileScope()->find($receita->bank_account_id)?->applyToBalance('-'.$receita->amount);
             }
 
@@ -1021,7 +1028,9 @@ class CashFlowIndex extends Component
                 'is_private' => $memberId !== null && $this->incomeIsPrivate,
             ]);
 
-            $contaNova?->applyToBalance($data['incomeAmount']);
+            if ($mexeNoSaldo) {
+                $contaNova?->applyToBalance($data['incomeAmount']);
+            }
         });
 
         $this->detectarDuplicatas('receita', $receita);

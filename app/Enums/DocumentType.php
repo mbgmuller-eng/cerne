@@ -20,6 +20,8 @@ enum DocumentType: string
     case BrokerageNote = 'brokerage_note';
     case PerformanceReport = 'performance_report';
     case InsurancePolicy = 'insurance_policy';
+    /** Relatório ou exportação de lançamentos de outro aplicativo financeiro (Minhas Finanças etc.). */
+    case ExternalReport = 'external_report';
     case IncomeTax = 'income_tax';
     case Other = 'other';
 
@@ -32,6 +34,7 @@ enum DocumentType: string
             self::BrokerageNote => 'Nota de corretagem',
             self::PerformanceReport => 'Relatório de rentabilidade',
             self::InsurancePolicy => 'Apólice de seguro',
+            self::ExternalReport => 'Relatório de outro aplicativo',
             self::IncomeTax => 'Declaração de IR',
             self::Other => 'Outro',
         };
@@ -47,6 +50,7 @@ enum DocumentType: string
             self::BrokerageNote => 'transações de investimento',
             self::PerformanceReport => 'rentabilidade',
             self::InsurancePolicy => 'apólices',
+            self::ExternalReport => 'receitas e despesas',
             self::IncomeTax, self::Other => 'nenhum registro automático',
         };
     }

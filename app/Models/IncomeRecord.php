@@ -15,7 +15,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 #[Fillable([
     'profile_id', 'member_id', 'category_id', 'description', 'amount', 'received_date',
-    'bank_account_id', 'is_recurring', 'notes', 'source_document_id', 'created_by_user_id',
+    'bank_account_id', 'affects_balance', 'is_recurring', 'notes', 'source_document_id', 'created_by_user_id',
     'is_private',
 ])]
 class IncomeRecord extends Model
@@ -24,9 +24,14 @@ class IncomeRecord extends Model
 
     protected static string $competenceDate = 'received_date';
 
+    /** Padrão do sistema inteiro: lançamento com conta mexe no saldo. Só importação de relatório antigo desliga. */
+    protected $attributes = ['affects_balance' => true];
+
     protected function casts(): array
     {
         return [
+            // Falso: lançamento importado sem mexer no saldo da conta; editar ou apagar também não mexe.
+            'affects_balance' => 'boolean',
             'amount' => 'decimal:2',
             'received_date' => 'date',
             'year' => 'integer',

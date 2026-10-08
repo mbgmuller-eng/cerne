@@ -15,15 +15,18 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Facades\Storage;
 
 #[Fillable([
-    'profile_id', 'uploaded_by_user_id', 'member_id', 'bank_account_id', 'credit_card_id', 'document_type',
+    'profile_id', 'uploaded_by_user_id', 'member_id', 'bank_account_id', 'credit_card_id', 'applies_to_balance', 'document_type',
     'original_filename', 'storage_path', 'size_bytes', 'institution_name',
     'reference_month', 'reference_year', 'processing_status',
     'records_extracted', 'extraction_summary', 'imported_item_indices',
-    'excluded_item_indices', 'error_message', 'processed_at', 'committed_at',
+    'excluded_item_indices', 'error_message', 'processed_at', 'committed_at', 'dismissed_at',
 ])]
 class DocumentUpload extends Model
 {
     use Auditable, BelongsToProfile, HasFactory, HasUuids;
+
+    /** Sem dizer nada, importar atualiza o saldo (extrato sempre foi assim); só relatório de outro app pode optar por não. */
+    protected $attributes = ['applies_to_balance' => true];
 
     protected function casts(): array
     {
@@ -39,6 +42,8 @@ class DocumentUpload extends Model
             'size_bytes' => 'integer',
             'processed_at' => 'datetime',
             'committed_at' => 'datetime',
+            'dismissed_at' => 'datetime',
+            'applies_to_balance' => 'boolean',
         ];
     }
 

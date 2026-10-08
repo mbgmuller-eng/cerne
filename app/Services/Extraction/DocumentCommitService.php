@@ -5,6 +5,7 @@ namespace App\Services\Extraction;
 use App\Enums\DocumentType;
 use App\Enums\Necessity;
 use App\Enums\ProcessingStatus;
+use App\Models\BankAccount;
 use App\Models\CreditCard;
 use App\Models\DocumentUpload;
 use App\Models\ExpenseCategory;
@@ -70,7 +71,9 @@ class DocumentCommitService
 
         return DB::transaction(function () use ($documento, $aceitos, $overrides, $userId, $itens): int {
             $criados = match ($documento->document_type) {
-                DocumentType::BankStatement => $this->bankStatement($documento, $aceitos, $overrides, $userId),
+                // Relatório de outro app segue o caminho do extrato (receita/despesa numa conta); o que muda é só
+                // se o saldo da conta é atualizado e qual conta vale em cada linha (ver bankStatement()).
+                DocumentType::BankStatement, DocumentType::ExternalReport => $this->bankStatement($documento, $aceitos, $overrides, $userId),
                 DocumentType::CreditCardInvoice => $this->creditCardInvoice($documento, $aceitos, $overrides, $userId),
                 default => throw new RuntimeException(
                     'A confirmação automática ainda não cobre '.$documento->document_type->label().'.'
@@ -101,7 +104,9 @@ class DocumentCommitService
     private function bankStatement(DocumentUpload $documento, array $itens, array $overrides, string $userId): int
     {
         $criados = 0;
-        $conta = $documento->bankAccount;
+        $contaDoDocumento = $documento->bankAccount;
+        // Extrato sempre atualiza o saldo; relatório de outro app só quando a pessoa pediu no envio.
+        $mexeNoSaldo = (bool) $documento->applies_to_balance;
 
         foreach ($itens as $i => $item) {
             $data = $this->parseDate($item['data'] ?? null);
@@ -111,6 +116,8 @@ class DocumentCommitService
             }
 
             $valor = Money::parse($item['valor'] ?? 0);
+            // Linha de outra conta de origem pode ter sido apontada para uma conta do Cerne na revisão.
+            $conta = $this->contaDaLinha($overrides, $i) ?? $contaDoDocumento;
 
             if (($item['tipo'] ?? null) === 'receita') {
                 // Confere o status de novo aqui — não confia no que a
@@ -143,11 +150,13 @@ class DocumentCommitService
                     'amount' => $valor,
                     'received_date' => $data,
                     'bank_account_id' => $jaContabilizada ? null : $conta?->id,
+                    'affects_balance' => $mexeNoSaldo,
+                    'notes' => $this->notaDeOrigem($documento, $item),
                     'source_document_id' => $documento->id,
                     'created_by_user_id' => $userId,
                 ]);
 
-                if (! $jaContabilizada) {
+                if (! $jaContabilizada && $mexeNoSaldo) {
                     $conta?->applyToBalance($valor);
                 }
             } else {
@@ -190,11 +199,13 @@ class DocumentCommitService
                     'amount' => $valorComSinal,
                     'expense_date' => $data,
                     'bank_account_id' => $jaContabilizada ? null : $conta?->id,
+                    'affects_balance' => $mexeNoSaldo,
+                    'notes' => $this->notaDeOrigem($documento, $item),
                     'source_document_id' => $documento->id,
                     'created_by_user_id' => $userId,
                 ]);
 
-                if (! $jaContabilizada) {
+                if (! $jaContabilizada && $mexeNoSaldo) {
                     // Delta de saldo: despesa debita, estorno credita de
                     // volta — a negação numérica de $valorComSinal cobre os
                     // dois casos com a mesma fórmula (ver CashFlowIndex).
@@ -289,6 +300,30 @@ class DocumentCommitService
     }
 
     /** @param array<string, array<int, string>> $overrides */
+    /** Conta escolhida na revisão para esta linha, quando difere da do envio (só relatório de outro app). */
+    private function contaDaLinha(array $overrides, int $i): ?BankAccount
+    {
+        $id = $overrides['conta'][$i] ?? '';
+
+        return $id !== '' ? BankAccount::query()->find($id) : null;
+    }
+
+    /** De onde veio o lançamento, para a pessoa saber depois (só relatório de outro app). */
+    private function notaDeOrigem(DocumentUpload $documento, array $item): ?string
+    {
+        if ($documento->document_type !== DocumentType::ExternalReport) {
+            return null;
+        }
+
+        $categoria = implode(' / ', array_filter([trim((string) ($item['categoria_origem'] ?? '')), trim((string) ($item['subcategoria_origem'] ?? ''))]));
+
+        return implode(' · ', array_filter([
+            'Importado de '.($documento->institution_name ?: 'outro aplicativo'),
+            $categoria !== '' ? 'categoria de origem: '.$categoria : null,
+            isset($item['parcela_atual'], $item['parcela_total']) ? 'parcela '.$item['parcela_atual'].'/'.$item['parcela_total'] : null,
+        ]));
+    }
+
     private function overrideOr(array $overrides, string $chave, int $i, \Closure $default): string
     {
         $valor = $overrides[$chave][$i] ?? '';

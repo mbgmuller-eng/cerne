@@ -2,10 +2,12 @@
 
 namespace App\Services\Extraction;
 
+use App\Enums\DocumentType;
 use App\Enums\ProcessingStatus;
 use App\Models\DocumentUpload;
 use App\Notifications\DocumentProcessed;
 use Anthropic\Client;
+use Illuminate\Support\Arr;
 use RuntimeException;
 
 /**
@@ -46,6 +48,10 @@ class DocumentExtractionService
             return $this->fail($documento, 'Falha ao processar: '.$e->getMessage());
         }
 
+        if ($documento->document_type === DocumentType::ExternalReport) {
+            $dados = ExternalReportReview::normalize($dados);
+        }
+
         $itens = $dados['itens'] ?? [];
 
         $documento->update([
@@ -57,6 +63,8 @@ class DocumentExtractionService
             'extraction_summary' => [
                 'itens' => $itens,
                 'observacoes' => $dados['observacoes'] ?? null,
+                // Relatório de outro app: o total que ele mesmo declara, para a revisão conferir com a soma lida.
+                ...array_filter(Arr::only($dados, ['total_declarado', 'periodo_inicio', 'periodo_fim']), fn ($v) => $v !== null),
                 'extraido_em' => now()->toIso8601String(),
                 'modelo' => config('cerne.ai.model'),
             ],

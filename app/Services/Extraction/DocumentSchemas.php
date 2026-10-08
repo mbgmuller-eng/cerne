@@ -26,6 +26,7 @@ class DocumentSchemas
             DocumentType::BrokerageNote => self::brokerageNote(),
             DocumentType::PerformanceReport => self::performanceReport(),
             DocumentType::InsurancePolicy => self::insurancePolicy(),
+            DocumentType::ExternalReport => self::externalReport(),
             default => self::generic(),
         };
     }
@@ -90,6 +91,18 @@ class DocumentSchemas
                 '- beneficiarios: nome, percentual e parentesco (texto vazio se não informado), quando houver; senão lista vazia.',
                 '- observacoes_item: carências, exclusões importantes ou condições especiais em poucas frases; texto vazio se não houver.',
                 '- campos_incertos: nomes dos campos acima que você leu com dúvida (ilegível, ambíguo ou conflitante no documento). Lista vazia se tem certeza de tudo.',
+            ]),
+            DocumentType::ExternalReport => implode("\n", [
+                'Este documento é um RELATÓRIO ou EXPORTAÇÃO DE LANÇAMENTOS de outro aplicativo financeiro (ou um extrato). Extraia CADA lançamento: uma linha do documento = um item, sem agrupar nem pular nenhum.',
+                '- instituicao: o nome do aplicativo, banco ou instituição que gerou o documento, se aparecer.',
+                '- data: a data do gasto ou recebimento (a coluna de referência ou de data do lançamento financeiro), NÃO a data em que foi digitado no aplicativo. data_cadastro: a data em que o lançamento foi cadastrado no aplicativo, quando houver uma coluna para isso; senão nulo.',
+                '- valor: sempre positivo. Estorno, crédito de volta ou devolução vem com sinal negativo.',
+                '- tipo: "despesa" para saída de dinheiro, "receita" para entrada. Um relatório só de despesas tem tudo "despesa".',
+                '- Preserve categoria, subcategoria, conta e cartão exatamente como estão escritos no documento (texto vazio quando não houver; um traço "-" também é vazio).',
+                '- Se uma descrição ocupa duas linhas na tabela, junte-a numa só.',
+                '- parcela_atual e parcela_total: só quando a descrição ou uma coluna indicar parcelamento ("14/48"). Senão, nulos.',
+                '- total_declarado: o total geral impresso no documento (soma de todos os lançamentos), se houver. A soma dos itens será conferida com ele.',
+                '- Ignore linhas de totais, subtotais, cabeçalhos e rodapés: elas não são lançamentos.',
             ]),
             default => 'Extraia o que for financeiramente relevante.',
         };
@@ -248,6 +261,53 @@ class DocumentSchemas
             'tipo', 'seguradora', 'numero_apolice', 'segurado', 'objeto_segurado', 'valor_segurado', 'coberturas', 'premio',
             'periodicidade', 'premio_total_anual', 'inicio_vigencia', 'fim_vigencia', 'vigente_desde', 'beneficiarios', 'observacoes_item', 'campos_incertos',
         ]);
+    }
+
+    /**
+     * Relatório de qualquer aplicativo: categoria, subcategoria, conta e cartão voltam como estão no documento, para a
+     * revisão decidir o que fazer com cada um. Texto sem valor vem "" em vez de nulo: a API recusa esquema com mais de
+     * 16 campos "valor ou nulo".
+     */
+    private static function externalReport(): array
+    {
+        $dinheiro = ['type' => 'string', 'description' => 'Reais com ponto decimal, sem separador de milhar: "1234.56"'];
+        $vazio = fn (string $o) => ['type' => 'string', 'description' => $o.'; texto vazio se não houver'];
+
+        return [
+            'type' => 'object',
+            'properties' => [
+                'instituicao' => ['type' => ['string', 'null'], 'description' => 'Nome do aplicativo, banco ou instituição que gerou o documento'],
+                'competencia_mes' => ['type' => ['integer', 'null'], 'description' => '1 a 12, só quando o relatório cobre um mês inteiro'],
+                'competencia_ano' => ['type' => ['integer', 'null']],
+                'periodo_inicio' => ['type' => ['string', 'null'], 'description' => 'ISO 8601'],
+                'periodo_fim' => ['type' => ['string', 'null'], 'description' => 'ISO 8601'],
+                'total_declarado' => ['type' => ['string', 'null'], 'description' => 'O total geral impresso no documento, em reais com ponto decimal'],
+                'itens' => [
+                    'type' => 'array',
+                    'items' => [
+                        'type' => 'object',
+                        'properties' => [
+                            'data' => ['type' => 'string', 'description' => 'ISO 8601: quando o gasto ou recebimento aconteceu'],
+                            'data_cadastro' => ['type' => ['string', 'null'], 'description' => 'ISO 8601: quando foi cadastrado no aplicativo, se o documento mostrar'],
+                            'descricao' => ['type' => 'string'],
+                            'valor' => $dinheiro,
+                            'tipo' => ['type' => 'string', 'enum' => ['receita', 'despesa']],
+                            'categoria_origem' => $vazio('Categoria como está no documento'),
+                            'subcategoria_origem' => $vazio('Subcategoria como está no documento'),
+                            'conta_origem' => $vazio('Conta bancária ou carteira como está no documento'),
+                            'cartao_origem' => $vazio('Cartão de crédito como está no documento'),
+                            'parcela_atual' => ['type' => ['integer', 'null']],
+                            'parcela_total' => ['type' => ['integer', 'null']],
+                        ],
+                        'required' => ['data', 'data_cadastro', 'descricao', 'valor', 'tipo', 'categoria_origem', 'subcategoria_origem', 'conta_origem', 'cartao_origem', 'parcela_atual', 'parcela_total'],
+                        'additionalProperties' => false,
+                    ],
+                ],
+                'observacoes' => ['type' => ['string', 'null'], 'description' => 'O que não foi possível ler com certeza'],
+            ],
+            'required' => ['instituicao', 'competencia_mes', 'competencia_ano', 'periodo_inicio', 'periodo_fim', 'total_declarado', 'itens', 'observacoes'],
+            'additionalProperties' => false,
+        ];
     }
 
     private static function generic(): array

@@ -120,6 +120,9 @@ return [
         // Cada leitura de apólice é uma chamada paga à API: teto por perfil e por dia, para um
         // envio repetido por engano não virar conta. Tentativas que falharam também contam.
         'insurance_imports_per_day' => (int) env('CERNE_INSURANCE_IMPORTS_PER_DAY', 10),
+
+        // Idem para relatório de outro aplicativo (ver DocumentsIndex::enviar).
+        'external_imports_per_day' => (int) env('CERNE_EXTERNAL_IMPORTS_PER_DAY', 10),
     ],
 
     /*

@@ -19,6 +19,7 @@ use App\Models\IncomeCategory;
 use App\Models\IncomeRecord;
 use App\Services\Extraction\CategorizationRuleMatcher;
 use App\Services\Extraction\DocumentCommitService;
+use App\Services\Extraction\ExternalReportReview;
 use App\Support\Money;
 use App\Support\ProfileContext;
 use Carbon\CarbonImmutable;
@@ -50,6 +51,22 @@ class DocumentsIndex extends Component
 
     public string $uploadCreditCardId = '';
 
+    /**
+     * Relatório de outro app: atualizar o saldo da conta com os lançamentos? Desligado por padrão — o que vem de um
+     * relatório antigo costuma já estar refletido no saldo de hoje; ligar baixaria o saldo de novo.
+     */
+    public bool $updateBalance = false;
+
+    /** Relatório de outro app: conta do Cerne para uma linha de OUTRA conta de origem ('' = a conta do envio). */
+    public array $contaPorItem = [];
+
+    /** Pistas por linha (parcela, provável recorrente, pagamento de fatura, outra conta) — ver ExternalReportReview::hints(). */
+    public array $dicasPorItem = [];
+
+    /** Resumo por categoria de origem: o que aplicar ao grupo inteiro de uma vez (índice = posição do grupo). */
+    public array $grupoCategoria = [];
+
+    public array $grupoNecessidade = [];
     /** Documento aberto para revisão. */
     public ?string $revisandoId = null;
 
@@ -136,7 +153,8 @@ class DocumentsIndex extends Component
             // Sem isso, confirmar a importação não tem como debitar/creditar
             // o saldo certo — extrato sem conta é exatamente o bug que
             // deixava o saldo do BTG parado depois de importar.
-            'uploadBankAccountId' => ['required_if:documentType,bank_statement'],
+            'uploadBankAccountId' => ['required_if:documentType,bank_statement,external_report'],
+            'updateBalance' => ['boolean'],
             // Sem isto, uma fatura importada não tinha como saber qual
             // cartão vincular — o total da fatura de verdade nunca batia
             // com o que acabou de ser importado.
@@ -147,6 +165,15 @@ class DocumentsIndex extends Component
     public function enviar(): void
     {
         $data = $this->validate();
+
+        $externo = $this->documentType === DocumentType::ExternalReport->value;
+
+        // Cada leitura é uma chamada paga à API: teto por perfil e por dia (descartar não devolve a leitura).
+        if ($externo && $this->limiteDiarioAtingido()) {
+            $this->addError('arquivo', 'Limite de '.config('cerne.ai.external_imports_per_day').' leituras de relatório por dia atingido neste perfil. Tente amanhã.');
+
+            return;
+        }
 
         $context = app(ProfileContext::class);
 
@@ -169,6 +196,8 @@ class DocumentsIndex extends Component
             'member_id' => $context->memberId(),
             'bank_account_id' => $conta?->id,
             'credit_card_id' => $cartao?->id,
+            // Extrato sempre atualiza o saldo; relatório de outro app só se a pessoa marcou.
+            'applies_to_balance' => $externo ? $this->updateBalance : true,
             'document_type' => $this->documentType,
             'original_filename' => $this->arquivo->getClientOriginalName(),
             'storage_path' => $caminho,
@@ -183,7 +212,7 @@ class DocumentsIndex extends Component
             ProcessDocumentJob::dispatch($documento->id);
         }
 
-        $this->reset('arquivo', 'uploadBankAccountId', 'uploadCreditCardId');
+        $this->reset('arquivo', 'uploadBankAccountId', 'uploadCreditCardId', 'updateBalance');
         session()->flash('status', 'Documento enviado. A leitura acontece em segundo plano.');
     }
 
@@ -212,6 +241,10 @@ class DocumentsIndex extends Component
         $this->criarRegraPorItem = [];
         $this->regraPatternPorItem = [];
         $this->regraValorExatoPorItem = [];
+        $this->contaPorItem = [];
+        $this->dicasPorItem = [];
+        $this->grupoCategoria = [];
+        $this->grupoNecessidade = [];
         $this->confirmandoExclusaoItem = null;
 
         // Casamento com conta fixa (ver Parte B do plano) só faz sentido
@@ -219,7 +252,7 @@ class DocumentsIndex extends Component
         // por este caminho hoje.
         $casaContaFixa = $documento->document_type === DocumentType::BankStatement;
 
-        if (! in_array($documento->document_type, [DocumentType::BankStatement, DocumentType::CreditCardInvoice], true)) {
+        if (! in_array($documento->document_type, [DocumentType::BankStatement, DocumentType::CreditCardInvoice, DocumentType::ExternalReport], true)) {
             return;
         }
 
@@ -249,6 +282,80 @@ class DocumentsIndex extends Component
             // reimportado, intervalo sobreposto, ou lançamento digitado
             // à mão).
             $this->checarDuplicata($i, $item, $data, $documento, $ehReceita);
+        }
+
+        if ($documento->document_type === DocumentType::ExternalReport) {
+            $this->prepararRelatorioExterno($documento);
+        }
+    }
+
+    /**
+     * Relatório de outro app: a categoria de origem vira sugestão de categoria (quando existe equivalente no Cerne e
+     * nenhuma regra da pessoa já decidiu), e as linhas com pista forte são tratadas já na abertura:
+     * pagamento de fatura de cartão começa desmarcado (contaria em dobro com as compras da fatura).
+     */
+    private function prepararRelatorioExterno(DocumentUpload $documento): void
+    {
+        $this->dicasPorItem = ExternalReportReview::hints($documento);
+        $categorias = ExpenseCategory::available()->whereNull('necessity')->get();
+
+        foreach (ExternalReportReview::groups($documento) as $gi => $grupo) {
+            $sugerida = ExternalReportReview::suggestCategoryId($grupo['origem'], $categorias);
+            $this->grupoCategoria[$gi] = $sugerida ?? '';
+            $this->grupoNecessidade[$gi] = '';
+
+            if ($sugerida === null) {
+                continue;
+            }
+
+            foreach ($grupo['indices'] as $i) {
+                if (($this->regraAplicadaPorItem[$i] ?? null) === null && ($this->categoriaPorItem[$i] ?? '') === '') {
+                    $this->categoriaPorItem[$i] = $sugerida;
+                }
+            }
+        }
+
+        foreach ($this->dicasPorItem as $i => $dica) {
+            // Pagamento de fatura e compra no cartão não viram saída da conta de graça: a pessoa decide marcando de novo.
+            if ($dica['fatura'] || $dica['cartao'] !== null) {
+                $this->aceitos = array_values(array_diff($this->aceitos, [$i]));
+            }
+
+            if ($dica['outra_conta'] !== null) {
+                $this->contaPorItem[$i] = '';
+            }
+        }
+    }
+
+    /**
+     * Aplica categoria e necessidade escolhidas no resumo a todas as linhas daquela categoria de origem de uma vez.
+     * Linha que uma regra da pessoa já categorizou, e estorno, ficam como estão.
+     */
+    public function aplicarGrupo(int $grupo): void
+    {
+        $documento = DocumentUpload::findOrFail($this->revisandoId);
+        $alvo = ExternalReportReview::groups($documento)->get($grupo);
+
+        if ($alvo === null) {
+            return;
+        }
+
+        $categoria = $this->grupoCategoria[$grupo] ?? '';
+        $necessidade = $this->grupoNecessidade[$grupo] ?? '';
+
+        foreach ($alvo['indices'] as $i) {
+            if (($this->estornoPorItem[$i] ?? false) || ($this->regraAplicadaPorItem[$i] ?? null) !== null) {
+                continue;
+            }
+
+            if ($categoria !== '') {
+                $this->categoriaPorItem[$i] = $categoria;
+                $this->subcategoriaPorItem[$i] = '';
+            }
+
+            if ($necessidade !== '') {
+                $this->necessidadePorItem[$i] = $necessidade;
+            }
         }
     }
 
@@ -367,6 +474,7 @@ class DocumentsIndex extends Component
             'necessidadePorItem', 'estornoPorItem', 'regraAplicadaPorItem', 'fixedBillPaymentPorItem',
             'recurringIncomeOccurrencePorItem', 'notaPorItem', 'duplicataPorItem',
             'criarRegraPorItem', 'regraPatternPorItem', 'regraValorExatoPorItem',
+            'contaPorItem', 'dicasPorItem', 'grupoCategoria', 'grupoNecessidade',
             'confirmandoExclusaoItem',
         );
     }
@@ -455,6 +563,8 @@ class DocumentsIndex extends Component
         }
 
         $faltando = [];
+        // A subcategoria de outro app quase sempre é "Outros": exigir uma do Cerne por linha travaria a importação.
+        $exigeSubcategoria = $this->revisando->document_type !== DocumentType::ExternalReport;
 
         foreach ($this->revisando->extractedItems() as $i => $item) {
             if (($item['tipo'] ?? null) === 'receita') {
@@ -474,7 +584,7 @@ class DocumentsIndex extends Component
 
             $faltando[$i] = $necessidade === ''
                 || $categoria === ''
-                || ($necessidade !== Necessity::Investment->value && $subcategoria === '' && $novaSubcategoria === '');
+                || ($exigeSubcategoria && $necessidade !== Necessity::Investment->value && $subcategoria === '' && $novaSubcategoria === '');
         }
 
         return $faltando;
@@ -531,6 +641,7 @@ class DocumentsIndex extends Component
                 'estorno' => $this->estornoPorItem,
                 'fixedBillPayment' => $this->fixedBillPaymentPorItem,
                 'recurringIncomeOccurrence' => $this->recurringIncomeOccurrencePorItem,
+                'conta' => $this->contaPorItem,
             ]);
 
             $regrasCriadas = $this->criarRegrasMarcadas($itens, $prontos);
@@ -738,7 +849,12 @@ class DocumentsIndex extends Component
     {
         $documento = DocumentUpload::findOrFail($id);
         $documento->deleteFile();
-        $documento->delete();
+
+        // O registro de um relatório de outro app fica (escondido): apagá-lo deixaria descartar e reenviar à vontade,
+        // e cada leitura já custou uma chamada à API.
+        $documento->document_type === DocumentType::ExternalReport
+            ? $documento->update(['dismissed_at' => now()])
+            : $documento->delete();
 
         if ($this->revisandoId === $id) {
             $this->fecharRevisao();
@@ -787,10 +903,19 @@ class DocumentsIndex extends Component
     {
         return DocumentUpload::query()
             ->where('document_type', '!=', DocumentType::InsurancePolicy->value)
+            ->whereNull('dismissed_at')
             ->with('uploadedBy', 'member')
             ->orderByDesc('created_at')
             ->limit(30)
             ->get();
+    }
+
+    private function limiteDiarioAtingido(): bool
+    {
+        return DocumentUpload::query()
+            ->where('document_type', DocumentType::ExternalReport->value)
+            ->where('created_at', '>=', now()->startOfDay())
+            ->count() >= config('cerne.ai.external_imports_per_day');
     }
 
     public function getRevisandoProperty(): ?DocumentUpload
@@ -813,6 +938,16 @@ class DocumentsIndex extends Component
             'expenseSubcategories' => ExpenseSubcategory::query()->available()->get(),
             'incomeCategories' => IncomeCategory::query()->available()->get(),
             'itensFaltandoCategoria' => $this->itensFaltandoCategoria,
+            'externo' => $this->revisando?->document_type === DocumentType::ExternalReport,
+            'gruposExterno' => $this->revisando?->document_type === DocumentType::ExternalReport
+                ? ExternalReportReview::groups($this->revisando)
+                : collect(),
+            'reconciliacao' => $this->revisando?->document_type === DocumentType::ExternalReport
+                ? ExternalReportReview::reconciliation($this->revisando)
+                : null,
+            'restantesHoje' => max(0, config('cerne.ai.external_imports_per_day') - DocumentUpload::query()
+                ->where('document_type', DocumentType::ExternalReport->value)
+                ->where('created_at', '>=', now()->startOfDay())->count()),
         ]);
     }
 }

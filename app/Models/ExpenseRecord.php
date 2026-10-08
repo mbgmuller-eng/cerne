@@ -18,7 +18,7 @@ use LogicException;
 
 #[Fillable([
     'profile_id', 'member_id', 'description', 'necessity', 'is_refund', 'category_id', 'subcategory_id',
-    'amount', 'expense_date', 'bank_account_id', 'credit_card_id', 'credit_card_invoice_id',
+    'amount', 'expense_date', 'bank_account_id', 'affects_balance', 'credit_card_id', 'credit_card_invoice_id',
     'installment_group_id', 'installment_number', 'notes', 'source_document_id',
     'created_by_user_id', 'is_private',
 ])]
@@ -28,11 +28,16 @@ class ExpenseRecord extends Model
 
     protected static string $competenceDate = 'expense_date';
 
+    /** Padrão do sistema inteiro: lançamento com conta mexe no saldo. Só importação de relatório antigo desliga. */
+    protected $attributes = ['affects_balance' => true];
+
     protected function casts(): array
     {
         return [
             'necessity' => Necessity::class,
             'is_refund' => 'boolean',
+            // Falso: lançamento importado sem mexer no saldo da conta; editar ou apagar também não mexe.
+            'affects_balance' => 'boolean',
             'amount' => 'decimal:2',
             'expense_date' => 'date',
             'year' => 'integer',
