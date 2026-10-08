@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Enums\DocumentCategory;
 use App\Enums\InsuranceType;
 use App\Enums\PaymentFrequency;
+use App\Enums\PolicyRevisionSource;
 use App\Enums\ProcessingStatus;
 use App\Models\Document;
 use App\Models\DocumentUpload;
@@ -19,7 +20,8 @@ use Illuminate\Support\Facades\Storage;
 
 /**
  * Importação de apólice por PDF: transforma o que a IA leu (DocumentUpload.extraction_summary) em linhas
- * editáveis para a revisão e, depois que a pessoa confere, grava a apólice e guarda o PDF em Documentos.
+ * editáveis para a revisão e, depois que a pessoa confere, grava a apólice, a versão na linha do tempo
+ * dela (InsurancePolicyHistoryService) e guarda o PDF em Documentos.
  *
  * Nada aqui roda sem revisão: `rowsFor()` só prepara a tela e `commit()` só recebe o que a pessoa confirmou.
  */
@@ -39,11 +41,15 @@ class InsuranceImportService
         'premio_total_anual' => 'prêmio anual',
         'inicio_vigencia' => 'início de vigência',
         'fim_vigencia' => 'vencimento',
+        'vigente_desde' => 'vigente desde',
         'beneficiarios' => 'beneficiários',
         'observacoes_item' => 'observações',
     ];
 
-    public function __construct(private DocumentService $documentos) {}
+    public function __construct(
+        private DocumentService $documentos,
+        private InsurancePolicyHistoryService $historico,
+    ) {}
 
     /**
      * Uma linha por apólice lida que ainda não teve destino, indexada pela posição na extração.
@@ -70,6 +76,14 @@ class InsuranceImportService
             $membro = $mesmaPessoa->count() === 1 ? $mesmaPessoa->first() : null;
             $existente = $this->apolicePorNumero($existentes, $item['numero_apolice'] ?? null);
 
+            $inicio = $this->data($item['inicio_vigencia'] ?? null);
+            $vigenteDesde = $this->data($item['vigente_desde'] ?? null) ?: $inicio;
+
+            // PDF mais antigo que a versão que o Cerne já tem: por padrão só entra no histórico, para não
+            // trocar os valores de hoje por valores de um papel velho.
+            $ultimaVersao = $existente ? $this->historico->latestEffectiveOn($existente) : null;
+            $versaoAntiga = $existente !== null && $vigenteDesde !== '' && $ultimaVersao !== null && $vigenteDesde < $ultimaVersao;
+
             $linhas[$i] = [
                 'import' => true,
                 'target' => $existente?->id ?? 'new',
@@ -83,8 +97,10 @@ class InsuranceImportService
                 'premio' => $this->numero($item['premio'] ?? null),
                 'periodicidade' => in_array($item['periodicidade'] ?? null, array_column(PaymentFrequency::cases(), 'value'), true) ? $item['periodicidade'] : PaymentFrequency::Monthly->value,
                 'premio_anual' => $this->numero($item['premio_total_anual'] ?? null),
-                'inicio' => $this->data($item['inicio_vigencia'] ?? null),
+                'inicio' => $inicio,
                 'fim' => $this->data($item['fim_vigencia'] ?? null),
+                'vigente_desde' => $vigenteDesde,
+                'somente_historico' => $versaoAntiga,
                 'notas' => trim((string) ($item['observacoes_item'] ?? '')),
                 'privado' => false,
                 'coberturas' => array_values(array_map(fn (array $c) => [
@@ -112,12 +128,12 @@ class InsuranceImportService
      * Tudo numa transação: metade de uma importação é pior que nenhuma.
      *
      * @param  array<int, array<string, mixed>>  $linhas  já validadas pela tela
-     * @return array{criadas: int, atualizadas: int}
+     * @return array{criadas: int, atualizadas: int, historicas: int}
      */
     public function commit(DocumentUpload $documento, array $linhas, ?ProfileMember $autor): array
     {
         $resultado = DB::transaction(function () use ($documento, $linhas, $autor): array {
-            $criadas = $atualizadas = 0;
+            $criadas = $atualizadas = $historicas = 0;
             $importados = $documento->imported_item_indices ?? [];
             $excluidos = $documento->excluded_item_indices ?? [];
 
@@ -128,9 +144,18 @@ class InsuranceImportService
                     continue;
                 }
 
-                [$apolice, $nova] = $this->gravar($linha);
-                $nova ? $criadas++ : $atualizadas++;
-                $this->anexarPdf($documento, $apolice, $autor);
+                [$apolice, $nova, $versao, $soHistorico] = $this->gravar($linha);
+                $pdf = $this->anexarPdf($documento, $apolice, $autor);
+                $this->historico->attachDocument($versao, $pdf?->id);
+
+                if ($nova) {
+                    $criadas++;
+                } elseif ($soHistorico) {
+                    $historicas++;
+                } else {
+                    $atualizadas++;
+                }
+
                 $importados[] = (int) $i;
             }
 
@@ -146,7 +171,7 @@ class InsuranceImportService
                 'committed_at' => $finalizado ? now() : null,
             ]);
 
-            return ['criadas' => $criadas, 'atualizadas' => $atualizadas, 'finalizado' => $finalizado];
+            return ['criadas' => $criadas, 'atualizadas' => $atualizadas, 'historicas' => $historicas, 'finalizado' => $finalizado];
         });
 
         // Já está em Documentos: a cópia da pasta de importação não serve mais. Fora da transação porque
@@ -155,10 +180,10 @@ class InsuranceImportService
             $documento->deleteFile();
         }
 
-        return ['criadas' => $resultado['criadas'], 'atualizadas' => $resultado['atualizadas']];
+        return ['criadas' => $resultado['criadas'], 'atualizadas' => $resultado['atualizadas'], 'historicas' => $resultado['historicas']];
     }
 
-    /** @return array{0: InsurancePolicy, 1: bool} a apólice e se foi criada agora */
+    /** @return array{0: InsurancePolicy, 1: bool, 2: \App\Models\InsurancePolicyRevision, 3: bool} apólice, se foi criada agora, a versão registrada e se foi só histórico */
     private function gravar(array $linha): array
     {
         // Nome novo vira sugestão para o admin aprovar; nunca bloqueia (ver Insurer).
@@ -193,6 +218,10 @@ class InsuranceImportService
             'expiry_date' => ($linha['fim'] ?? '') !== '' ? $linha['fim'] : null,
         ];
 
+        // A versão vale desde a data que o próprio papel diz (ex.: "informações vigentes a partir de"), não
+        // desde o dia do envio: é o que permite subir certificados antigos depois e ver cada um no seu lugar.
+        $vigenteDesde = ($linha['vigente_desde'] ?? '') !== '' ? $linha['vigente_desde'] : $linha['inicio'];
+
         if ($linha['target'] === 'new') {
             $membroId = ($linha['member_id'] ?? '') !== '' ? $linha['member_id'] : null;
 
@@ -209,40 +238,64 @@ class InsuranceImportService
                 'created_by_user_id' => auth()->id(),
             ]);
 
-            return [$apolice, true];
+            return [$apolice, true, $this->historico->recordCreated($apolice, PolicyRevisionSource::Import, $vigenteDesde), false];
         }
 
         $apolice = InsurancePolicy::query()->findOrFail($linha['target']);
+        $soHistorico = (bool) ($linha['somente_historico'] ?? false);
+
+        // "Desde quando começou" nunca anda para frente: o PDF de uma renovação traz o início do período novo,
+        // e só um PDF mais antigo pode recuar a data de início da apólice.
+        $inicioReal = min($apolice->start_date->toDateString(), $linha['inicio']);
+        unset($dados['start_date']);
+        if ($inicioReal !== $apolice->start_date->toDateString()) {
+            $apolice->update(['start_date' => $inicioReal]);
+        }
 
         // Renovação: o que veio no PDF vale, mas listas vazias e anotações da pessoa não são apagadas.
-        $apolice->update($dados
-            + ($coberturas !== [] ? ['coverages' => $coberturas] : [])
-            + ($beneficiarios !== [] ? ['beneficiaries' => $beneficiarios] : [])
-            + (blank($apolice->notes) && trim((string) $linha['notas']) !== '' ? ['notes' => trim($linha['notas'])] : []));
+        $versao = $this->historico->apply(
+            $apolice,
+            $dados
+                + ($coberturas !== [] ? ['coverages' => $coberturas] : [])
+                + (! $soHistorico && $beneficiarios !== [] ? ['beneficiaries' => $beneficiarios] : [])
+                + (! $soHistorico && blank($apolice->notes) && trim((string) $linha['notas']) !== '' ? ['notes' => trim($linha['notas'])] : []),
+            PolicyRevisionSource::Import,
+            $vigenteDesde,
+            onlyHistory: $soHistorico,
+            always: true,
+        );
 
-        return [$apolice, false];
+        return [$apolice, false, $versao, $soHistorico];
     }
 
-    /** O PDF vai para Documentos ligado à apólice; o mesmo PDF já anexado a ela não é guardado de novo. */
-    private function anexarPdf(DocumentUpload $documento, InsurancePolicy $apolice, ?ProfileMember $autor): void
+    /**
+     * O PDF vai para Documentos ligado à apólice; o mesmo PDF já anexado a ela não é guardado de novo.
+     * Devolve o documento (novo ou o que já existia) para ligar à versão da linha do tempo.
+     */
+    private function anexarPdf(DocumentUpload $documento, InsurancePolicy $apolice, ?ProfileMember $autor): ?Document
     {
         $disco = config('cerne.documents.disk');
 
-        if (! Storage::disk($disco)->exists($documento->storage_path)) {
-            return;
-        }
+        // O tamanho que vale é o do arquivo guardado (é o que a cópia em Documentos vai registrar).
+        $tamanho = Storage::disk($disco)->exists($documento->storage_path)
+            ? Storage::disk($disco)->size($documento->storage_path)
+            : $documento->size_bytes;
 
         $jaAnexado = Document::query()
             ->where('insurance_policy_id', $apolice->id)
             ->where('original_filename', $documento->original_filename)
-            ->where('size_bytes', $documento->size_bytes)
-            ->exists();
+            ->where('size_bytes', $tamanho)
+            ->first();
 
-        if ($jaAnexado) {
-            return;
+        if ($jaAnexado !== null) {
+            return $jaAnexado;
         }
 
-        $this->documentos->adopt($disco, $documento->storage_path, $documento->original_filename, [
+        if (! Storage::disk($disco)->exists($documento->storage_path)) {
+            return null;
+        }
+
+        return $this->documentos->adopt($disco, $documento->storage_path, $documento->original_filename, [
             'category' => DocumentCategory::InsurancePolicy->value,
             'title' => trim('Apólice '.$apolice->insurer_name.($apolice->policy_number ? ' '.$apolice->policy_number : '')),
             'member_id' => $apolice->member_id,

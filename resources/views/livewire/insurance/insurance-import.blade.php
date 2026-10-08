@@ -155,9 +155,32 @@
                                 </select>
                                 @error("rows.$i.target") <p class="{{ $erro }}">{{ $message }}</p> @enderror
                                 @if ($atualizando)
-                                    <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Os dados abaixo substituem os da apólice escolhida. Pessoa, privacidade e anotações dela são mantidos, e o PDF novo vai para Documentos.</p>
+                                    <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Os dados abaixo substituem os da apólice escolhida. Pessoa, privacidade e anotações dela são mantidos, e o PDF novo vai para Documentos e para o histórico da apólice.</p>
                                 @endif
                             </div>
+
+                            @if ($atualizando)
+                                <div class="space-y-3 rounded-lg bg-slate-50 p-3 dark:bg-white/5">
+                                    <div class="grid gap-4 @sm:grid-cols-2">
+                                        <div>
+                                            <label class="{{ $campo }}">Valores vigentes desde</label>
+                                            <input type="date" wire:model="rows.{{ $i }}.vigente_desde" class="input mt-1.5">
+                                            @error("rows.$i.vigente_desde") <p class="{{ $erro }}">{{ $message }}</p> @enderror
+                                            <p class="mt-1 text-xs text-slate-400">Define o lugar desta versão no histórico.</p>
+                                        </div>
+                                        <label class="flex items-start gap-2 text-sm text-slate-700 dark:text-slate-300 @sm:pt-6">
+                                            <input type="checkbox" wire:model.live="rows.{{ $i }}.somente_historico" class="mt-0.5 h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500">
+                                            <span>
+                                                Esta é uma versão antiga: só guardar no histórico
+                                                <span class="block text-xs text-slate-400">Os valores de hoje da apólice não mudam.</span>
+                                            </span>
+                                        </label>
+                                    </div>
+                                    @if ($linha['somente_historico'])
+                                        <p class="text-xs text-slate-500 dark:text-slate-400">Este papel é mais antigo que a versão que o Cerne já tem, então marquei só histórico. Desmarque se ele for o mais atual.</p>
+                                    @endif
+                                </div>
+                            @endif
 
                             <div class="grid gap-4 @sm:grid-cols-2">
                                 <div>

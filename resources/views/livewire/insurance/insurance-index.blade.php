@@ -368,6 +368,76 @@
                                                                 </div>
                                                             @endif
 
+                                                            {{-- Linha do tempo: desde quando começou e como cada reajuste mexeu no custo. --}}
+                                                            @if ($apolice->revisions->isNotEmpty())
+                                                                @php
+                                                                    $linhaDoTempo = app(\App\Services\InsurancePolicyHistoryService::class)->timeline($apolice->revisions);
+                                                                    $ultimoReajuste = $linhaDoTempo->first(fn ($e) => $e['premio_pct'] !== null && $e['premio_pct'] != 0.0);
+                                                                    $pct = fn (?float $v) => ($v > 0 ? '+' : ($v < 0 ? '−' : '')).number_format(abs($v), 1, ',', '.').'%';
+                                                                @endphp
+                                                                <details class="mt-4 rounded-lg border border-slate-100 dark:border-white/10">
+                                                                    <summary class="flex cursor-pointer flex-wrap items-center justify-between gap-2 px-3 py-2 text-sm font-medium text-slate-700 dark:text-slate-200">
+                                                                        <span>Histórico da apólice · {{ $apolice->revisions->count() }} {{ $apolice->revisions->count() === 1 ? 'registro' : 'registros' }}</span>
+                                                                        @if ($ultimoReajuste)
+                                                                            <span @class([
+                                                                                'badge',
+                                                                                'bg-amber-50 text-amber-900 ring-1 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-300 dark:ring-amber-500/20' => $ultimoReajuste['premio_pct'] > 0,
+                                                                                'bg-accent-50 text-accent-700 dark:bg-accent-500/15 dark:text-accent-300' => $ultimoReajuste['premio_pct'] < 0,
+                                                                            ])>Último reajuste {{ $pct($ultimoReajuste['premio_pct']) }}</span>
+                                                                        @endif
+                                                                    </summary>
+
+                                                                    <ol class="divide-y divide-slate-100 border-t border-slate-100 dark:divide-white/10 dark:border-white/10">
+                                                                        @foreach ($linhaDoTempo as $entrada)
+                                                                            @php
+                                                                                $versao = $entrada['versao'];
+                                                                                $anterior = $linhaDoTempo->get($loop->index + 1)['versao'] ?? null;
+                                                                            @endphp
+                                                                            <li class="px-3 py-3 text-sm" wire:key="rev-{{ $versao->id }}">
+                                                                                <div class="flex flex-wrap items-center justify-between gap-2">
+                                                                                    <p class="font-medium text-slate-900 dark:text-white">
+                                                                                        {{ $versao->source === \App\Enums\PolicyRevisionSource::Baseline ? 'Valores anteriores' : $versao->effective_on->format('d/m/Y') }}
+                                                                                        <span class="text-xs font-normal text-slate-400">· {{ $versao->source->label() }}</span>
+                                                                                    </p>
+                                                                                    @if ($entrada['premio_pct'] !== null)
+                                                                                        <span @class([
+                                                                                            'badge',
+                                                                                            'bg-amber-50 text-amber-900 ring-1 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-300 dark:ring-amber-500/20' => $entrada['premio_pct'] > 0,
+                                                                                            'bg-accent-50 text-accent-700 dark:bg-accent-500/15 dark:text-accent-300' => $entrada['premio_pct'] < 0,
+                                                                                            'bg-slate-100 text-slate-600 dark:bg-white/10 dark:text-slate-300' => $entrada['premio_pct'] == 0.0,
+                                                                                        ])>{{ $entrada['premio_pct'] == 0.0 ? 'Sem reajuste' : 'Reajuste '.$pct($entrada['premio_pct']) }}</span>
+                                                                                    @endif
+                                                                                </div>
+
+                                                                                <p class="mt-1 text-slate-600 dark:text-slate-300">
+                                                                                    Custo: <strong class="text-slate-900 dark:text-white">{{ Money::format($versao->normalizedMonthlyCost()) }}</strong>/mês
+                                                                                    @if ($anterior && $anterior->normalizedMonthlyCost() !== $versao->normalizedMonthlyCost())
+                                                                                        <span class="text-xs text-slate-400">(antes {{ Money::format($anterior->normalizedMonthlyCost()) }})</span>
+                                                                                    @endif
+                                                                                    @if ($versao->coverage_amount !== null)
+                                                                                        · Capital: <strong class="text-slate-900 dark:text-white">{{ Money::format($versao->coverage_amount) }}</strong>
+                                                                                        @if ($entrada['capital_pct'] !== null && $entrada['capital_pct'] != 0.0)
+                                                                                            <span class="text-xs text-slate-400">({{ $pct($entrada['capital_pct']) }})</span>
+                                                                                        @endif
+                                                                                    @endif
+                                                                                </p>
+
+                                                                                @if ($versao->notes)
+                                                                                    <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">{{ $versao->notes }}</p>
+                                                                                @endif
+
+                                                                                @if ($versao->document)
+                                                                                    <a href="{{ route('documents.vault.file', $versao->document) }}" target="_blank" rel="noopener" class="mt-1 inline-block text-xs font-medium text-brand-700 hover:underline dark:text-brand-300">Ver o PDF desta versão</a>
+                                                                                @endif
+                                                                            </li>
+                                                                        @endforeach
+                                                                        <li class="px-3 py-3 text-sm text-slate-600 dark:text-slate-300">
+                                                                            Apólice iniciada em <strong class="text-slate-900 dark:text-white">{{ $apolice->start_date->format('d/m/Y') }}</strong>
+                                                                        </li>
+                                                                    </ol>
+                                                                </details>
+                                                            @endif
+
                                                             @if ($confirmingDeletePolicyId === $apolice->id)
                                                                 <div class="mt-4 flex items-center justify-between rounded-lg bg-red-50 px-3 py-2 text-sm dark:bg-red-500/10">
                                                                     <span class="text-red-800 dark:text-red-300">Excluir esta apólice?</span>

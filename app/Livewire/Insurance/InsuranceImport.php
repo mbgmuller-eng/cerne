@@ -164,6 +164,7 @@ class InsuranceImport extends Component
         $partes = array_filter([
             $resultado['criadas'] ? $resultado['criadas'].($resultado['criadas'] === 1 ? ' apólice cadastrada' : ' apólices cadastradas') : null,
             $resultado['atualizadas'] ? $resultado['atualizadas'].($resultado['atualizadas'] === 1 ? ' apólice atualizada' : ' apólices atualizadas') : null,
+            $resultado['historicas'] ? $resultado['historicas'].($resultado['historicas'] === 1 ? ' versão antiga guardada no histórico' : ' versões antigas guardadas no histórico') : null,
         ]);
         $this->mensagem = ($partes === [] ? 'Nenhuma apólice importada' : ucfirst(implode(' e ', $partes))).'. O PDF ficou guardado em Documentos.';
 
@@ -293,6 +294,9 @@ class InsuranceImport extends Component
                 "rows.$i.premio_anual" => ['nullable', 'numeric', 'min:0'],
                 "rows.$i.inicio" => ['required', 'date'],
                 "rows.$i.fim" => ['nullable', 'date', "after_or_equal:rows.$i.inicio"],
+                // Versão antiga só entra na linha do tempo se souber de quando é; as demais usam o início da vigência.
+                "rows.$i.vigente_desde" => [($marcadas[$i]['target'] ?? 'new') !== 'new' && ($marcadas[$i]['somente_historico'] ?? false) ? 'required' : 'nullable', 'date'],
+                "rows.$i.somente_historico" => ['boolean'],
                 "rows.$i.notas" => ['nullable', 'string', 'max:2000'],
                 "rows.$i.coberturas.*.nome" => ['nullable', 'string', 'max:255'],
                 "rows.$i.coberturas.*.valor" => ['nullable', 'numeric', 'min:0'],
@@ -334,6 +338,7 @@ class InsuranceImport extends Component
                 "rows.$i.premio_anual" => 'prêmio anual'.$sufixo,
                 "rows.$i.inicio" => 'início de vigência'.$sufixo,
                 "rows.$i.fim" => 'vencimento'.$sufixo,
+                "rows.$i.vigente_desde" => 'vigente desde'.$sufixo,
                 "rows.$i.coberturas.*.valor" => 'valor da proteção'.$sufixo,
                 "rows.$i.coberturas.*.nome" => 'nome da proteção'.$sufixo,
                 "rows.$i.beneficiarios.*.percentual" => 'percentual do beneficiário'.$sufixo,

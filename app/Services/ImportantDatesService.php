@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Enums\ConsultantClientStatus;
+use App\Enums\PolicyRevisionSource;
 use App\Models\ConsultantClient;
 use App\Models\FinancialProfile;
 use App\Models\InsurancePolicy;
@@ -231,10 +232,16 @@ class ImportantDatesService
             'notes' => $notes,
         ]);
 
-        $policy->update([
-            'monthly_premium' => $newMonthlyPremium,
-            'coverage_amount' => $newCoverageAmount ?? $policy->coverage_amount,
-        ]);
+        // Entra também na linha do tempo da apólice (a que o cliente vê), com a situação de antes e a de depois.
+        app(InsurancePolicyHistoryService::class)->apply(
+            $policy,
+            [
+                'monthly_premium' => $newMonthlyPremium,
+                'coverage_amount' => $newCoverageAmount ?? $policy->coverage_amount,
+            ],
+            PolicyRevisionSource::Renewal,
+            notes: $notes,
+        );
 
         return $renewal;
     }

@@ -70,6 +70,16 @@ class InsurancePolicy extends Model
         return $this->hasMany(Document::class)->oldest('created_at');
     }
 
+    /**
+     * Linha do tempo da apólice: o que valia a partir de cada data, da mais recente para a mais antiga.
+     *
+     * @return HasMany<InsurancePolicyRevision>
+     */
+    public function revisions(): HasMany
+    {
+        return $this->hasMany(InsurancePolicyRevision::class)->orderByDesc('effective_on');
+    }
+
     /** @return HasMany<InsurancePolicyRenewal> */
     public function renewals(): HasMany
     {
@@ -119,12 +129,17 @@ class InsurancePolicy extends Model
      */
     public function normalizedMonthlyCost(): string
     {
-        if ($this->payment_frequency === PaymentFrequency::Monthly) {
-            return $this->monthly_premium;
+        return self::monthlyCostOf($this->payment_frequency, $this->monthly_premium, $this->annual_premium);
+    }
+
+    /** A mesma conta para uma apólice e para uma versão dela (InsurancePolicyRevision). */
+    public static function monthlyCostOf(PaymentFrequency $frequencia, string $parcela, ?string $anual): string
+    {
+        if ($frequencia === PaymentFrequency::Monthly) {
+            return $parcela;
         }
 
-        $anual = $this->annual_premium
-            ?? bcmul($this->monthly_premium, (string) $this->payment_frequency->chargesPerYear(), 2);
+        $anual ??= bcmul($parcela, (string) $frequencia->chargesPerYear(), 2);
 
         return Money::parse(bcdiv($anual, '12', 2));
     }

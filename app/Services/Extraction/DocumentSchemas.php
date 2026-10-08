@@ -86,6 +86,7 @@ class DocumentSchemas
                 '- premio: o valor de CADA pagamento. periodicidade: monthly se paga todo mês (inclusive parcelado em 10x ou 12x), quarterly se trimestral, annual se à vista ou parcela anual única.',
                 '- premio_total_anual: o prêmio total da vigência quando o documento informar; senão nulo.',
                 '- inicio_vigencia e fim_vigencia: início e fim da vigência do seguro. Seguro vitalício, sem prazo final: fim_vigencia nulo.',
+                '- vigente_desde: a partir de que data os valores DESTE documento (prêmio, capitais) valem, como "informações vigentes a partir de" em certificados de seguro de vida que reajustam todo ano; em apólice de bem é o início da vigência da renovação. Nulo se o documento não diz.',
                 '- beneficiarios: nome, percentual e parentesco (texto vazio se não informado), quando houver; senão lista vazia.',
                 '- observacoes_item: carências, exclusões importantes ou condições especiais em poucas frases; texto vazio se não houver.',
                 '- campos_incertos: nomes dos campos acima que você leu com dúvida (ilegível, ambíguo ou conflitante no documento). Lista vazia se tem certeza de tudo.',
@@ -227,6 +228,7 @@ class DocumentSchemas
             'premio_total_anual' => $dinheiro,
             'inicio_vigencia' => ['type' => ['string', 'null'], 'description' => 'ISO 8601'],
             'fim_vigencia' => ['type' => ['string', 'null'], 'description' => 'ISO 8601'],
+            'vigente_desde' => ['type' => ['string', 'null'], 'description' => 'ISO 8601'],
             'beneficiarios' => [
                 'type' => 'array',
                 'items' => [
@@ -244,7 +246,7 @@ class DocumentSchemas
             'campos_incertos' => ['type' => 'array', 'items' => ['type' => 'string']],
         ], [
             'tipo', 'seguradora', 'numero_apolice', 'segurado', 'objeto_segurado', 'valor_segurado', 'coberturas', 'premio',
-            'periodicidade', 'premio_total_anual', 'inicio_vigencia', 'fim_vigencia', 'beneficiarios', 'observacoes_item', 'campos_incertos',
+            'periodicidade', 'premio_total_anual', 'inicio_vigencia', 'fim_vigencia', 'vigente_desde', 'beneficiarios', 'observacoes_item', 'campos_incertos',
         ]);
     }
 

@@ -5,6 +5,7 @@ namespace App\Livewire\Insurance;
 use App\Enums\ConsultantClientStatus;
 use App\Enums\InsuranceType;
 use App\Enums\PaymentFrequency;
+use App\Enums\PolicyRevisionSource;
 use App\Enums\UserRole;
 use App\Livewire\Concerns\HasPrivacyTabs;
 use App\Livewire\Concerns\RequiresActiveProfile;
@@ -12,6 +13,7 @@ use App\Models\ConsultantClient;
 use App\Models\InsurancePolicy;
 use App\Models\Insurer;
 use App\Models\ProfileMember;
+use App\Services\InsurancePolicyHistoryService;
 use App\Models\User;
 use App\Support\Money;
 use App\Support\ProfileContext;
@@ -185,11 +187,14 @@ class InsuranceIndex extends Component
             'is_private' => $this->policyIsPrivate,
         ];
 
+        $historico = app(InsurancePolicyHistoryService::class);
+
         if ($this->editingPolicyId !== null) {
-            InsurancePolicy::query()->findOrFail($this->editingPolicyId)->update($payload);
+            // Mudou prêmio, capital, forma de pagamento ou vencimento? Entra na linha do tempo da apólice.
+            $historico->apply(InsurancePolicy::query()->findOrFail($this->editingPolicyId), $payload, PolicyRevisionSource::Manual);
             session()->flash('status', 'Apólice atualizada.');
         } else {
-            InsurancePolicy::create($payload + ['is_active' => true, 'created_by_user_id' => auth()->id()]);
+            $historico->recordCreated(InsurancePolicy::create($payload + ['is_active' => true, 'created_by_user_id' => auth()->id()]));
             session()->flash('status', 'Apólice cadastrada.');
         }
 
@@ -313,7 +318,7 @@ class InsuranceIndex extends Component
     /** @return Collection<int, InsurancePolicy> */
     public function getPoliciesProperty(): Collection
     {
-        $query = InsurancePolicy::query()->active()->with('member', 'broker', 'documents')->orderBy('insurance_type');
+        $query = InsurancePolicy::query()->active()->with('member', 'broker', 'documents', 'revisions.document')->orderBy('insurance_type');
 
         if ($this->showPrivacyTabs) {
             $query->where('member_id', $this->viewAs === '' ? null : $this->viewAs);

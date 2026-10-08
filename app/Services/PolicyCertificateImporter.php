@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Enums\DocumentCategory;
 use App\Enums\InsuranceType;
 use App\Enums\PaymentFrequency;
+use App\Enums\PolicyRevisionSource;
 use App\Models\ConsultantClient;
 use App\Models\Document;
 use App\Models\FinancialProfile;
@@ -42,7 +43,7 @@ class PolicyCertificateImporter
     /** Apólices já "tomadas" por um certificado desta rodada, para dois certificados não disputarem a mesma apólice sem número. */
     private array $reivindicadas = [];
 
-    public function __construct(private DocumentService $documentos) {}
+    public function __construct(private DocumentService $documentos, private InsurancePolicyHistoryService $historico) {}
 
     /**
      * @param  list<array<string, mixed>>  $certificados  saída do leitor de PDFs (ver comando)
@@ -152,6 +153,9 @@ class PolicyCertificateImporter
         }
 
         DB::transaction(function () use ($existente, $dados, $cert, $membro, $arquivo, $nomeAmigavel, $linha): void {
+            // A versão vale desde a data que o certificado diz ("informações vigentes a partir de").
+            $vigenteDesde = CarbonImmutable::createFromFormat('d/m/Y', $cert['informacoes_vigentes'] ?? $cert['vigencia_apolice'])->toDateString();
+
             if ($existente === null) {
                 Insurer::resolveOrSuggest(self::INSURER);
                 $apolice = InsurancePolicy::create($dados + [
@@ -159,13 +163,16 @@ class PolicyCertificateImporter
                     'is_active' => true,
                     'created_by_user_id' => auth()->id(),
                 ]);
+                $versao = $this->historico->recordCreated($apolice, PolicyRevisionSource::Import, $vigenteDesde);
             } else {
-                $existente->update($dados);
+                $versao = $this->historico->apply($existente, $dados, PolicyRevisionSource::Import, $vigenteDesde, always: true);
                 $apolice = $existente;
             }
 
+            $pdf = Document::query()->where('insurance_policy_id', $apolice->id)->where('original_filename', $nomeAmigavel)->first();
+
             if ($arquivo !== null && $linha['documento'] === 'anexar') {
-                $this->documentos->upload(
+                $pdf = $this->documentos->upload(
                     new UploadedFile($arquivo, $nomeAmigavel, 'application/pdf', null, true),
                     [
                         'category' => DocumentCategory::InsurancePolicy->value,
@@ -176,6 +183,8 @@ class PolicyCertificateImporter
                     $membro,
                 );
             }
+
+            $this->historico->attachDocument($versao, $pdf?->id);
         });
 
         return $linha;
