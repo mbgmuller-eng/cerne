@@ -21,7 +21,7 @@ use Livewire\Component;
 /**
  * Seguros de TODOS os clientes ativos do consultor, no mesmo molde de "Investimentos da carteira": um
  * cartão por cliente, em ordem alfabética e fechado por padrão, com o resumo no cabeçalho (tipos, quantas
- * apólices, capital e custo) e as apólices — cada uma com o seu tipo — só quando se abre o cartão.
+ * apólices e custo mensal; sem somar capitais, que não se somam entre tipos) e as apólices — cada uma com o seu tipo — só quando se abre o cartão.
  *
  * Quando um cliente tem mais de um dono de apólice (casal), as linhas se separam por pessoa dentro do
  * cartão, senão parecia a mesma apólice repetida (ver PortfolioInsuranceGroupingTest).
@@ -188,7 +188,7 @@ class PortfolioInsurance extends Component
      * Um item por cliente, em ordem alfabética (sem diferença de acento ou maiúscula).
      *
      * @param  Collection<int, array{policy: InsurancePolicy, client_name: string, member_name: ?string, seguradora: string}>  $linhas
-     * @return Collection<string, array{profile_id: string, quantidade: int, cobertura: string, mensal: string, tipos: Collection, seguradoras: Collection, vencendo: int, incompletas: int, separarPorPessoa: bool, pessoas: Collection}>
+     * @return Collection<string, array{profile_id: string, quantidade: int, mensal: string, tipos: Collection, seguradoras: Collection, vencendo: int, incompletas: int, separarPorPessoa: bool, pessoas: Collection}>
      */
     private function group(Collection $linhas): Collection
     {
@@ -215,7 +215,6 @@ class PortfolioInsurance extends Component
                 return [
                     'profile_id' => $ordenadas->first()['policy']->profile_id,
                     'quantidade' => $ordenadas->count(),
-                    'cobertura' => Money::sum($ordenadas->map(fn (array $l) => $l['policy']->coverage_amount)),
                     'mensal' => Money::sum($ordenadas->map(fn (array $l) => $l['policy']->normalizedMonthlyCost())),
                     'tipos' => $ordenadas->map(fn (array $l) => $l['policy']->insurance_type)->unique()->sortBy(fn (InsuranceType $t) => $this->chave($t->label()))->values(),
                     'seguradoras' => $ordenadas->pluck('seguradora')->unique()->sortBy(fn (string $n) => $this->chave($n))->values(),

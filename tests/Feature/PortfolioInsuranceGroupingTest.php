@@ -111,17 +111,19 @@ class PortfolioInsuranceGroupingTest extends TestCase
         $tela->assertSee('Automóvel')->assertSee('Residencial')->assertSee('Vida')->assertSee('Honda Civic 2022');
     }
 
-    public function test_cabecalho_do_cartao_resume_apolices_capital_e_custo(): void
+    public function test_cabecalho_do_cartao_resume_apolices_e_custo_sem_somar_capitais(): void
     {
         [$perfil, $titular] = $this->cliente('Ana Cabral');
         $this->apolice($perfil, $titular, 'vida', 'Icatu Seguros', ['coverage_amount' => '100000.00', 'monthly_premium' => '100.00']);
         $this->apolice($perfil, $titular, 'carro', 'Porto Seguro', ['coverage_amount' => '50000.00', 'monthly_premium' => '60.50']);
 
-        $resumo = $this->tela()->viewData('grouped')->first();
+        $tela = $this->tela();
+        $resumo = $tela->viewData('grouped')->first();
 
         self::assertSame(2, $resumo['quantidade']);
-        self::assertSame('150000.00', $resumo['cobertura']);
         self::assertSame('160.50', $resumo['mensal']);
+        self::assertArrayNotHasKey('cobertura', $resumo, 'capitais de tipos diferentes não se somam');
+        $tela->assertSee('R$ 160,50')->assertDontSee('R$ 150,0 mil');
         self::assertSame(['Icatu Seguros', 'Porto Seguro'], $resumo['seguradoras']->all());
     }
 

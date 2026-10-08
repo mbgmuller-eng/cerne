@@ -177,9 +177,10 @@
                         </button>
 
                         <div class="flex w-full items-center justify-between gap-4 sm:w-auto sm:justify-end">
+                            {{-- Só o custo: somar capitais de tipos diferentes (morte, carro, casa...) não diz nada. --}}
                             <div class="text-left sm:text-right">
-                                <p class="figure text-sm font-semibold text-slate-800 dark:text-slate-200">{{ Money::compact($porCliente['cobertura']) }}</p>
-                                <p class="text-xs text-slate-400">{{ Money::format($porCliente['mensal']) }}/mês</p>
+                                <p class="figure text-sm font-semibold text-slate-800 dark:text-slate-200">{{ Money::format($porCliente['mensal']) }}</p>
+                                <p class="text-xs text-slate-400">por mês</p>
                             </div>
 
                             <form method="POST" action="{{ route('profile.switch', $porCliente['profile_id']) }}">
@@ -261,7 +262,7 @@
                                                         @endif
                                                     </td>
                                                     <td class="py-2 pr-3 text-right align-top tabular-nums text-slate-800 dark:text-slate-200">
-                                                        {{ $apolice->coverage_amount !== null ? Money::compact($apolice->coverage_amount) : '—' }}
+                                                        {{ $apolice->principalCapital() !== null ? Money::compact($apolice->principalCapital()) : '—' }}
                                                     </td>
                                                     <td class="py-2 pr-3 text-right align-top whitespace-nowrap tabular-nums text-slate-500 dark:text-slate-400">
                                                         @if ($apolice->isMissingCost())
