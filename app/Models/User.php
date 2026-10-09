@@ -20,7 +20,7 @@ use NotificationChannels\WebPush\HasPushSubscriptions;
 
 #[Fillable([
     'name', 'email', 'password', 'role', 'phone', 'birthdate', 'cpf_cnpj', 'asaas_customer_id', 'avatar_url', 'is_active', 'is_platform_admin', 'theme',
-    'notify_email_enabled', 'notify_push_enabled', 'gym_keep_awake', 'gym_vibrate', 'gym_sound', 'terms_accepted_at',
+    'agenda_layout', 'notify_email_enabled', 'notify_push_enabled', 'gym_keep_awake', 'gym_vibrate', 'gym_sound', 'terms_accepted_at',
 ])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable implements MustVerifyEmail
@@ -43,6 +43,7 @@ class User extends Authenticatable implements MustVerifyEmail
             'is_active' => 'boolean',
             'is_platform_admin' => 'boolean',
             'theme' => ThemePreference::class,
+            'agenda_layout' => \App\Enums\AgendaLayout::class,
             'notify_email_enabled' => 'boolean',
             'notify_push_enabled' => 'boolean',
             'gym_keep_awake' => 'boolean',

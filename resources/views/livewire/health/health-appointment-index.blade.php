@@ -10,6 +10,72 @@
         <button type="button" wire:click="newAppointment" class="btn-primary shrink-0 px-3 py-2 text-sm">+ Agendar</button>
     </div>
 
+    {{-- O que vem primeiro na tela: a preferência fica na conta, a tela mostra sempre os dois. --}}
+    @php
+        $ehCasal = $membros->count() > 1;
+        $calendarioPrimeiro = $layout === \App\Enums\AgendaLayout::Calendar;
+    @endphp
+    <div class="flex flex-wrap items-center justify-between gap-3">
+        <div class="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400" role="group" aria-label="O que mostrar primeiro">
+            <span>Mostrar primeiro:</span>
+            @foreach (\App\Enums\AgendaLayout::cases() as $opcao)
+                <button
+                    type="button"
+                    wire:click="setLayout('{{ $opcao->value }}')"
+                    aria-pressed="{{ $layout === $opcao ? 'true' : 'false' }}"
+                    @class([
+                        'rounded-full px-3 py-1 font-medium transition',
+                        'bg-saude-800 text-white dark:bg-saude-200 dark:text-saude-950' => $layout === $opcao,
+                        'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-white/10 dark:text-slate-300 dark:hover:bg-white/15' => $layout !== $opcao,
+                    ])
+                >{{ $opcao === \App\Enums\AgendaLayout::Calendar ? 'Calendário' : 'Lista' }}</button>
+            @endforeach
+        </div>
+        @if ($ehCasal)
+            <button type="button" wire:click="toggleColors" class="btn-ghost px-2 py-1 text-xs">{{ $showColors ? 'Fechar cores' : 'Cores do calendário' }}</button>
+        @endif
+    </div>
+
+    {{-- Cada pessoa do casal tem a sua cor; qualquer uma das duas pode mudar. Só cores da paleta. --}}
+    @if ($ehCasal && $showColors)
+        <section class="card space-y-4 p-5">
+            <p class="eyebrow">Cores do calendário</p>
+            @foreach ($membros as $membro)
+                <div class="flex flex-wrap items-center gap-3" wire:key="cor-{{ $membro->id }}">
+                    <span class="flex min-w-24 items-center gap-2 text-sm font-medium text-slate-800 dark:text-slate-200">
+                        <span class="inline-block h-3 w-3 rounded-full" style="background-color: {{ $coresDosMembros[$membro->id] }}"></span>
+                        {{ $membro->name }}
+                    </span>
+                    <div class="flex flex-wrap gap-2">
+                        @foreach ($paleta as $hex => $nome)
+                            <button
+                                type="button"
+                                wire:click="setMemberColor('{{ $membro->id }}', '{{ $hex }}')"
+                                title="{{ $nome }}"
+                                aria-label="{{ $nome }} para {{ $membro->name }}"
+                                aria-pressed="{{ $coresDosMembros[$membro->id] === $hex ? 'true' : 'false' }}"
+                                @class([
+                                    'h-7 w-7 rounded-full ring-offset-2 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 dark:ring-offset-slate-900',
+                                    'ring-2 ring-slate-800 dark:ring-white' => $coresDosMembros[$membro->id] === $hex,
+                                ])
+                                style="background-color: {{ $hex }}"
+                            ></button>
+                        @endforeach
+                    </div>
+                </div>
+            @endforeach
+        </section>
+    @endif
+
+    <div class="space-y-6">
+
+    {{-- Na ordem que a pessoa escolheu: o HTML já sai nela, para o foco do teclado e o leitor de tela seguirem o que se vê. --}}
+    @if ($calendarioPrimeiro)
+        @include('livewire.health.partials.agenda-calendar')
+    @endif
+
+    <div class="space-y-6">
+
     <section class="card space-y-3 p-5">
         <p class="eyebrow">Próximas</p>
         @if ($upcoming->isEmpty())
@@ -23,8 +89,9 @@
                                 {{ $consulta->title }}
                                 <span class="ml-1 rounded-full bg-saude-200/40 px-2 py-0.5 text-[10px] font-medium text-saude-800 dark:bg-saude-800/30 dark:text-saude-200">{{ $consulta->kind->label() }}</span>
                             </p>
-                            <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-                                {{ $consulta->member->name }} · {{ $consulta->scheduled_at->format('d/m/Y \à\s H:i') }}
+                            <p class="mt-0.5 flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
+                                @if ($ehCasal)<span class="inline-block h-2 w-2 shrink-0 rounded-full" style="background-color: {{ $coresDosMembros[$consulta->member_id] ?? '#2563EB' }}"></span>@endif
+                                <span>{{ $consulta->member->name }} · {{ $consulta->scheduled_at->format('d/m/Y \à\s H:i') }}</span>
                             </p>
                             <x-appointment-details :consulta="$consulta" />
                             <x-calendar-actions :consulta="$consulta" :show-person="$membros->count() > 1" />
@@ -53,8 +120,9 @@
                                     {{ $consulta->title }}
                                     <span class="ml-1 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-500 dark:bg-white/10 dark:text-slate-400">{{ $consulta->kind->label() }}</span>
                                 </p>
-                                <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-                                    {{ $consulta->member->name }} · {{ $consulta->scheduled_at->format('d/m/Y') }}
+                                <p class="mt-0.5 flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
+                                    @if ($ehCasal)<span class="inline-block h-2 w-2 shrink-0 rounded-full" style="background-color: {{ $coresDosMembros[$consulta->member_id] ?? '#2563EB' }}"></span>@endif
+                                    <span>{{ $consulta->member->name }} · {{ $consulta->scheduled_at->format('d/m/Y') }}</span>
                                 </p>
                                 <x-appointment-details :consulta="$consulta" />
                             </div>
@@ -65,6 +133,14 @@
             </ul>
         @endif
     </section>
+
+    </div>{{-- /lista (próximas e histórico) --}}
+
+    @unless ($calendarioPrimeiro)
+        @include('livewire.health.partials.agenda-calendar')
+    @endunless
+
+    </div>{{-- /calendário + lista, na ordem escolhida --}}
 
     <x-modal wire-model="showForm">
         <form wire:submit="save" class="space-y-4">

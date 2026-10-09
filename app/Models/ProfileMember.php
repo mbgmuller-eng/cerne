@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\MemberRole;
+use App\Support\MemberPalette;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -37,6 +38,14 @@ class ProfileMember extends Model
     public function investorProfile(): HasOne
     {
         return $this->hasOne(InvestorProfile::class, 'member_id');
+    }
+
+    /** Cor desta pessoa no calendário da Saúde: a escolhida (`color_hex`) ou, sem escolha, a do papel dela. */
+    public function calendarColor(): string
+    {
+        return MemberPalette::isSafe($this->color_hex)
+            ? strtoupper($this->color_hex)
+            : MemberPalette::defaultFor($this->role);
     }
 
     public function isPrimary(): bool
