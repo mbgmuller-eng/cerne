@@ -30,6 +30,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\On;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 
@@ -129,6 +130,16 @@ class InvestmentsIndex extends Component
 
     public string $investmentReturnRate = '';
 
+    /**
+     * Ao editar um ativo que já tem cotas, valor atual e investido deixam de ser digitados: vêm da posição
+     * (comprar mais, vender, atualizar cotação). Deixá-los editáveis desalinharia o valor do preço médio.
+     */
+    public bool $investmentHasPosition = false;
+
+    /** O que o filho PositionActions avisa depois de gravar: só precisa re-renderizar a lista. */
+    #[On('position-saved')]
+    public function refreshAfterPositionChange(): void {}
+
     public function mount(): void
     {
         $this->redirectOrAbortWithoutProfile();
@@ -157,6 +168,7 @@ class InvestmentsIndex extends Component
         return InvestmentRecord::query()
             ->active()
             ->with('member')
+            ->withCount('transactions')
             ->orderBy('sector')
             ->orderByDesc('current_amount')
             ->get();
@@ -500,6 +512,7 @@ class InvestmentsIndex extends Component
         $this->investmentInstitution = (string) $investimento->institution;
         $this->investmentMemberId = $investimento->member_id;
         $this->investmentIsPrivate = $investimento->is_private;
+        $this->investmentHasPosition = $investimento->hasPosition();
         $this->investmentCurrentAmount = $investimento->current_amount;
         $this->investmentValueDate = CarbonImmutable::now()->toDateString();
         $this->investmentInvestedAmount = (string) $investimento->invested_amount;
@@ -577,13 +590,19 @@ class InvestmentsIndex extends Component
 
         if ($editando) {
             $valorAtual = Money::parse($data['investmentCurrentAmount']);
+            $registro = InvestmentRecord::findOrFail($this->editingInvestmentId);
+            $dataValor = CarbonImmutable::parse($data['investmentValueDate']);
+            $temPosicao = $registro->hasPosition();
 
-            InvestmentRecord::findOrFail($this->editingInvestmentId)->update($base + [
-                'current_amount' => $valorAtual,
-                'invested_amount' => $data['investmentInvestedAmount'] !== null && $data['investmentInvestedAmount'] !== ''
-                    ? Money::parse($data['investmentInvestedAmount'])
-                    : $valorAtual,
-            ]);
+            $registro->update($base + ['current_amount' => $valorAtual] + (
+                $temPosicao
+                    // Ativo com cotas: o custo vem das compras (não se digita) e a cotação passa a ser o valor
+                    // digitado dividido pelas cotas, para o valor e a cotação nunca discordarem.
+                    ? ['current_price' => bcdiv($valorAtual, (string) $registro->quantity, 6), 'price_date' => $dataValor->toDateString()]
+                    : ['invested_amount' => $data['investmentInvestedAmount'] !== null && $data['investmentInvestedAmount'] !== ''
+                        ? Money::parse($data['investmentInvestedAmount'])
+                        : $valorAtual]
+            ));
 
             // Mesma "foto mensal" que InvestmentSnapshotService::captureMonth()
             // grava sozinho todo dia 1 — atualizar o valor à mão precisa
@@ -591,10 +610,9 @@ class InvestmentsIndex extends Component
             // patrimônio mostra, senão a curva só refletiria a mudança no
             // próximo mês. Uma foto por mês: editar de novo no mesmo mês
             // corrige a mesma foto, não cria outra.
-            $dataValor = CarbonImmutable::parse($data['investmentValueDate']);
             InvestmentSnapshot::updateOrCreate(
                 ['investment_id' => $this->editingInvestmentId, 'year' => $dataValor->year, 'month' => $dataValor->month],
-                ['amount' => $valorAtual],
+                ['amount' => $valorAtual] + ($temPosicao ? ['quantity' => $registro->quantity] : []),
             );
         } elseif ($comCotas) {
             $custoTotal = bcmul((string) $data['investmentQuantity'], (string) $data['investmentUnitPrice'], 2);
@@ -611,6 +629,14 @@ class InvestmentsIndex extends Component
                 'total_amount' => $custoTotal,
                 'operation_date' => $dataCompra ?? CarbonImmutable::now(),
             ], auth()->id());
+
+            // Cotação inicial: o valor de mercado informado dividido pelas cotas ou, sem ele, o preço pago.
+            $informouValor = $data['investmentCurrentAmount'] !== null && $data['investmentCurrentAmount'] !== '';
+            $service->seedQuote(
+                $investimento->refresh(),
+                $informouValor ? bcdiv($valorAtual, (string) $data['investmentQuantity'], 6) : (string) $data['investmentUnitPrice'],
+                $informouValor ? CarbonImmutable::today() : ($dataCompra ?? CarbonImmutable::today()),
+            );
         } else {
             InvestmentRecord::create($base + [
                 'current_amount' => Money::parse($data['investmentCurrentAmount']),
@@ -631,7 +657,7 @@ class InvestmentsIndex extends Component
         $this->reset(
             'editingInvestmentId', 'investmentName', 'investmentTicker', 'investmentAssetClass', 'investmentReserveType', 'investmentInstitution',
             'investmentMemberId', 'investmentIsPrivate', 'investmentCurrentAmount', 'investmentValueDate', 'investmentInvestedAmount',
-            'investmentQuantity', 'investmentUnitPrice', 'investmentPurchaseDate', 'investmentReturnRate',
+            'investmentQuantity', 'investmentUnitPrice', 'investmentPurchaseDate', 'investmentReturnRate', 'investmentHasPosition',
         );
         $this->resetErrorBag();
     }
@@ -859,6 +885,65 @@ class InvestmentsIndex extends Component
         return $resultado;
     }
 
+    /**
+     * O que mexeu no valor dos ativos em cotas mês a mês: dinheiro que entrou ou saiu (compras menos
+     * vendas) e o que foi só a cotação subindo ou caindo (o restante). Só entram ativos que têm
+     * movimentações; renda fixa e afins não separam as duas coisas. Mais recente primeiro, até 6 meses.
+     *
+     * @return ?list<array{mes: string, valor: string, variacao: string, aportes: string, cotacao: string}>
+     */
+    public function getQuotaMovementProperty(): ?array
+    {
+        $series = $this->evolutionSeries();
+
+        if ($series === null) {
+            return null;
+        }
+
+        $idsComCotas = $this->sectorInvestments
+            ->filter(fn (InvestmentRecord $i) => $i->asset_class->hasQuantity() && (int) $i->getAttribute('transactions_count') > 0)
+            ->pluck('id')
+            ->all();
+        $ids = array_values(array_intersect(array_keys($series['porAtivo']), $idsComCotas));
+
+        if ($ids === []) {
+            return null;
+        }
+
+        $meses = $series['meses'];
+        $totais = $this->somarSeries($series['porAtivo'], $ids);
+
+        $fluxos = InvestmentTransaction::query()
+            ->whereIn('investment_id', $ids)
+            ->whereIn('transaction_type', [TransactionType::Buy->value, TransactionType::Subscription->value, TransactionType::Sell->value])
+            ->whereBetween('operation_date', [$meses[0]->startOfMonth()->toDateString(), end($meses)->endOfMonth()->toDateString()])
+            ->selectRaw("YEAR(operation_date) as ano, MONTH(operation_date) as mes, SUM(CASE WHEN transaction_type = 'sell' THEN -net_amount ELSE net_amount END) as fluxo")
+            ->groupByRaw('YEAR(operation_date), MONTH(operation_date)')
+            ->get()
+            ->mapWithKeys(fn ($linha) => [$linha->ano.'-'.$linha->mes => Money::parse($linha->fluxo)]);
+
+        $linhas = [];
+
+        foreach ($meses as $i => $mes) {
+            if ($i === 0) {
+                continue; // sem mês anterior para comparar
+            }
+
+            $variacao = bcsub(Money::parse($totais[$i]), Money::parse($totais[$i - 1]), 2);
+            $aportes = $fluxos->get($mes->year.'-'.$mes->month, '0.00');
+
+            $linhas[] = [
+                'mes' => $mes->translatedFormat('M/y'),
+                'valor' => Money::parse($totais[$i]),
+                'variacao' => $variacao,
+                'aportes' => $aportes,
+                'cotacao' => bcsub($variacao, $aportes, 2),
+            ];
+        }
+
+        return $linhas === [] ? null : array_slice(array_reverse($linhas), 0, 6);
+    }
+
     /** @return Collection<int, InvestmentPerformance> */
     public function getPerformanceProperty(): Collection
     {
@@ -917,6 +1002,7 @@ class InvestmentsIndex extends Component
             'performance' => $this->performance,
             'portfolioEvolution' => $this->portfolioEvolution,
             'evolutionChart' => $this->evolutionChart,
+            'quotaMovement' => $this->tab === 'performance' ? $this->quotaMovement : null,
             'transactions' => $this->transactions,
             'snapshotHistory' => $this->snapshotHistory,
             'investorAllocations' => $this->investorAllocations,

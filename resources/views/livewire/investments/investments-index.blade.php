@@ -182,10 +182,17 @@
                             </div>
                         @endif
 
-                        <div wire:key="investment-field-invested-amount">
-                            <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Valor investido (aporte)</label>
-                            <input type="number" step="0.01" min="0" wire:model="investmentInvestedAmount" class="input mt-1.5" placeholder="Se vazio, usa o valor atual">
-                        </div>
+                        @if ($investmentHasPosition)
+                            {{-- Ativo com cotas: o custo vem das compras e vendas, não se digita (ver PositionActions). --}}
+                            <p class="rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600 dark:bg-white/5 dark:text-slate-300" wire:key="investment-position-note">
+                                O valor investido vem das compras. Para mudar cotas ou preço médio, use <strong>Comprar mais</strong>, <strong>Vender</strong> ou <strong>Cotação</strong> na lista.
+                            </p>
+                        @else
+                            <div wire:key="investment-field-invested-amount">
+                                <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Valor investido (aporte)</label>
+                                <input type="number" step="0.01" min="0" wire:model="investmentInvestedAmount" class="input mt-1.5" placeholder="Se vazio, usa o valor atual">
+                            </div>
+                        @endif
 
                         <div wire:key="investment-field-return-rate">
                             <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Taxa contratada</label>
@@ -201,6 +208,9 @@
                 </div>
             </form>
         </x-modal>
+
+        {{-- Comprar mais, vender, atualizar cotação e informar cotas de um ativo em cotas. --}}
+        <livewire:investments.position-actions />
 
         {{-- Reservas -------------------------------------------------- --}}
         @if ($reserves->isNotEmpty())
@@ -430,10 +440,29 @@
                                         @if ($ativo->institution) · {{ $ativo->institution }} @endif
                                         @if ($ativo->quantity && (float) $ativo->quantity > 0)
                                             · {{ rtrim(rtrim($ativo->quantity, '0'), '.') }} cotas
-                                            a {{ Money::format($ativo->average_price) }}
+                                            · PM {{ Money::format($ativo->average_price) }}
+                                            @if ($ativo->current_price !== null)
+                                                · cotação {{ Money::format($ativo->current_price) }}@if ($ativo->price_date) ({{ $ativo->price_date->format('d/m') }})@endif
+                                            @endif
+                                        @elseif ($ativo->asset_class->hasQuantity() && ! $ativo->needsQuantity())
+                                            · posição zerada
                                         @endif
                                         @if ($ativo->return_rate) · {{ $ativo->return_rate }} @endif
                                     </p>
+                                    {{-- Posição em cotas: comprar mais, vender e atualizar a cotação (PositionActions). --}}
+                                    @if ($ativo->asset_class->hasQuantity())
+                                        <p class="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs font-medium">
+                                            @if ($ativo->needsQuantity())
+                                                <button type="button" wire:click="$dispatch('open-position', { id: '{{ $ativo->id }}', action: 'initial' })" class="text-brand-700 hover:underline dark:text-accent-400">Informar cotas</button>
+                                            @else
+                                                <button type="button" wire:click="$dispatch('open-position', { id: '{{ $ativo->id }}', action: 'buy' })" class="text-brand-700 hover:underline dark:text-accent-400">Comprar mais</button>
+                                                @if ($ativo->hasPosition())
+                                                    <button type="button" wire:click="$dispatch('open-position', { id: '{{ $ativo->id }}', action: 'sell' })" class="text-brand-700 hover:underline dark:text-accent-400">Vender</button>
+                                                    <button type="button" wire:click="$dispatch('open-position', { id: '{{ $ativo->id }}', action: 'quote' })" class="text-brand-700 hover:underline dark:text-accent-400">Cotação</button>
+                                                @endif
+                                            @endif
+                                        </p>
+                                    @endif
                                 </div>
 
                                 <div class="shrink-0 text-right">
@@ -563,6 +592,42 @@
                             class="text-brand-700 dark:text-brand-300"
                         />
                     @endif
+                </div>
+            </div>
+        @endif
+
+        {{-- Ativos em cotas: o que foi dinheiro que entrou ou saiu e o que foi só a cotação mexendo. --}}
+        @if ($quotaMovement)
+            <div class="card p-5">
+                <p class="eyebrow">O que mexeu no valor das cotas</p>
+                <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                    Compras menos vendas do mês, e o restante da variação, que é a cotação subindo ou caindo.
+                </p>
+                <div class="mt-3 overflow-x-auto">
+                    <table class="w-full min-w-[26rem] text-sm">
+                        <thead>
+                            <tr class="text-left text-[11px] uppercase tracking-wide text-slate-400">
+                                <th class="py-1 pr-3 font-medium">Mês</th>
+                                <th class="py-1 pr-3 text-right font-medium">Valor</th>
+                                <th class="py-1 pr-3 text-right font-medium">Compras − vendas</th>
+                                <th class="py-1 text-right font-medium">Cotações</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100 dark:divide-white/10">
+                            @foreach ($quotaMovement as $linha)
+                                <tr wire:key="quota-{{ $linha['mes'] }}">
+                                    <td class="py-1.5 pr-3 text-slate-700 first-letter:uppercase dark:text-slate-300">{{ $linha['mes'] }}</td>
+                                    <td class="py-1.5 pr-3 text-right tabular-nums text-slate-800 dark:text-slate-200">{{ Money::format($linha['valor']) }}</td>
+                                    <td class="py-1.5 pr-3 text-right tabular-nums text-slate-600 dark:text-slate-400">{{ bccomp($linha['aportes'], '0', 2) > 0 ? '+' : '' }}{{ Money::format($linha['aportes']) }}</td>
+                                    <td @class([
+                                        'py-1.5 text-right tabular-nums',
+                                        'text-accent-700 dark:text-accent-400' => bccomp($linha['cotacao'], '0', 2) >= 0,
+                                        'text-slate-500 dark:text-slate-400' => bccomp($linha['cotacao'], '0', 2) < 0,
+                                    ])>{{ bccomp($linha['cotacao'], '0', 2) > 0 ? '+' : '' }}{{ Money::format($linha['cotacao']) }}</td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
                 </div>
             </div>
         @endif

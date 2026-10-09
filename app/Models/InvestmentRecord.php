@@ -25,7 +25,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 #[Fillable([
     'profile_id', 'member_id', 'sector', 'asset_class', 'reserve_type', 'ticker', 'name', 'institution',
-    'current_amount', 'invested_amount', 'average_price', 'quantity', 'purchase_date',
+    'current_amount', 'invested_amount', 'average_price', 'quantity', 'current_price', 'price_date', 'purchase_date',
     'maturity_date', 'return_rate', 'return_rate_type', 'broker_account_id', 'source',
     'external_asset_id', 'is_locked_by_sync', 'is_active', 'notes', 'source_document_id',
     'created_by_user_id', 'is_private',
@@ -46,6 +46,8 @@ class InvestmentRecord extends Model
             'invested_amount' => 'decimal:2',
             'average_price' => 'decimal:6',
             'quantity' => 'decimal:6',
+            'current_price' => 'decimal:6',
+            'price_date' => 'date',
             'purchase_date' => 'date',
             'maturity_date' => 'date',
             'is_locked_by_sync' => 'boolean',
@@ -123,6 +125,31 @@ class InvestmentRecord extends Model
     public function isReadOnly(): bool
     {
         return $this->source->isReadOnlyByDefault() && ! $this->is_locked_by_sync;
+    }
+
+    /** Ativo negociado em cotas (ação, FII, ETF...) com posição aberta: tem preço médio e cotação. */
+    public function hasPosition(): bool
+    {
+        return $this->asset_class->hasQuantity() && $this->quantity !== null && bccomp($this->quantity, '0', 6) > 0;
+    }
+
+    /**
+     * Ativo que negocia em cotas mas ainda não tem a quantidade informada (cadastrado só pelo valor total).
+     * Quem já negociou e zerou a posição não entra aqui: para esse o caminho é comprar de novo. A listagem
+     * carrega `transactions_count` (withCount) para não consultar ativo a ativo.
+     */
+    public function needsQuantity(): bool
+    {
+        if (! $this->asset_class->hasQuantity() || ($this->quantity !== null && bccomp($this->quantity, '0', 6) > 0)) {
+            return false;
+        }
+
+        // Em modo estrito, ler um atributo que não veio da consulta lança erro: confere antes.
+        $negociacoes = array_key_exists('transactions_count', $this->attributes)
+            ? (int) $this->attributes['transactions_count']
+            : $this->transactions()->count();
+
+        return $negociacoes === 0;
     }
 
     /** Ganho ou perda não realizada: valor atual menos o investido. */
