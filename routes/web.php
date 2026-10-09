@@ -13,6 +13,7 @@ use App\Http\Controllers\ConsultantLinkController;
 use App\Http\Controllers\DocumentFileController;
 use App\Http\Controllers\GymExerciseCatalogImageController;
 use App\Http\Controllers\GymExerciseImageController;
+use App\Http\Controllers\HealthCalendarController;
 use App\Http\Controllers\HealthEmergencyController;
 use App\Http\Controllers\HealthQrCodeController;
 use App\Http\Controllers\ProfileSwitchController;
@@ -196,6 +197,9 @@ Route::middleware(['auth', 'verified'])->group(function (): void {
         Route::get('/saude/ficha/{memberId}/qrcode', [HealthQrCodeController::class, 'show'])->name('health.qrcode.show');
         Route::get('/saude/agenda', HealthAppointmentIndex::class)->name('health.appointments.index');
         Route::get('/saude/cuidados', HealthCareItemIndex::class)->name('health.care.index');
+        // Evento para a agenda da pessoa (.ics); mesma restrição das telas de onde sai.
+        Route::get('/saude/agenda/{appointment}/evento.ics', [HealthCalendarController::class, 'appointment'])->name('health.appointments.ics');
+        Route::get('/saude/cuidados/{item}/evento.ics', [HealthCalendarController::class, 'careItem'])->name('health.care.ics');
         Route::get('/importar', DocumentsIndex::class)->name('documents.index');
         Route::get('/regras-de-categorizacao', CategorizationRulesIndex::class)->name('categorization-rules.index');
         Route::get('/contas', AccountsIndex::class)->name('accounts.index');

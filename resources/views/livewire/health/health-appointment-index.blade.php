@@ -27,6 +27,7 @@
                                 {{ $consulta->member->name }} · {{ $consulta->scheduled_at->format('d/m/Y \à\s H:i') }}
                             </p>
                             <x-appointment-details :consulta="$consulta" />
+                            <x-calendar-actions :consulta="$consulta" :show-person="$membros->count() > 1" />
                         </div>
                         <div class="flex shrink-0 items-center gap-2">
                             <button type="button" wire:click="editAppointment('{{ $consulta->id }}')" class="btn-ghost px-2 py-1 text-xs">Editar</button>

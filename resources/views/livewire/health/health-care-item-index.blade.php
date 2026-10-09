@@ -58,6 +58,7 @@
                                 @if ($item->notes)
                                     <p class="mt-1 whitespace-pre-line text-xs text-slate-500 dark:text-slate-400">{{ $item->notes }}</p>
                                 @endif
+                                <x-calendar-actions :item="$item" :show-person="$membros->count() > 1" />
                             </div>
                             <div class="flex shrink-0 flex-col items-end gap-1">
                                 <button type="button" wire:click="markDone('{{ $item->id }}')" wire:loading.attr="disabled" class="btn-secondary px-3 py-1 text-xs">Feito hoje</button>
