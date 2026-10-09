@@ -843,6 +843,13 @@
     </div>
 @endif
 
+{{-- Atalho de lançamento: quem tem Finanças e está dentro de um perfil. Fora:
+     corretor (só Seguros), áreas do consultor e do admin, e as telas que
+     funcionam com o acesso travado (assinatura, Minha conta). --}}
+@if ($dentroDoPerfil && ! $user?->isBroker() && ! request()->routeIs(['subscription.*', 'my-account']))
+    <x-quick-add :na-tela="request()->routeIs('cashflow.index')" />
+@endif
+
 <script>
     // Cacheia apenas os arquivos estáticos. Dado financeiro nunca entra
     // no cache do navegador — ver public/sw.js.

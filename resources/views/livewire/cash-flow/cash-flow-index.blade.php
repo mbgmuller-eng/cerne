@@ -4,6 +4,13 @@
 
 <div class="space-y-6">
 
+    {{-- Tira o ?acao= do endereço depois de usado: recarregar a página não deve reabrir o formulário. --}}
+    <div
+        x-data
+        x-init="setTimeout(() => { const u = new URL(window.location.href); if (u.searchParams.has('acao')) { u.searchParams.delete('acao'); history.replaceState(history.state, '', u); } }, 300)"
+        class="hidden"
+    ></div>
+
     {{-- Cabeçalho e navegação de mês ---------------------------------- --}}
     <div class="flex flex-wrap items-end justify-between gap-4">
         <div>
@@ -15,18 +22,22 @@
             <button wire:click="toggleIncomeForm" class="btn-secondary px-3 py-1.5">+ Receita</button>
             <button wire:click="toggleExpenseForm" class="btn-primary px-3 py-1.5">+ Despesa</button>
 
-            <div x-data="voiceExpense()" class="contents">
+            {{-- @quick-voice: o item "Falar despesa" do botão "+" fixo (x-quick-add). --}}
+            <div x-data="voiceExpense()" @quick-voice.window="suportado && ! gravando && alternar()" class="contents">
                 <button
                     type="button"
                     x-show="suportado"
                     x-cloak
                     @click="alternar()"
                     :disabled="processando"
-                    :class="gravando ? 'btn-primary' : 'btn-secondary'"
+                    :class="[gravando ? 'btn-primary' : 'btn-secondary', @js($realcarVoz) && ! gravando && ! processando ? 'ring-4 ring-accent-400/50 animate-pulse' : '']"
                     class="px-3 py-1.5 disabled:opacity-60"
                     x-text="rotulo()"
                 ></button>
                 <p x-show="erro" x-text="erro" x-cloak class="w-full text-xs text-red-700 dark:text-red-400"></p>
+                @if ($realcarVoz)
+                    <p x-show="suportado && ! gravando && ! processando" x-cloak class="w-full text-xs text-slate-500 dark:text-slate-400">Toque em "Falar despesa" e diga o gasto.</p>
+                @endif
             </div>
 
             <span class="mx-1 h-5 w-px bg-slate-200 dark:bg-white/10"></span>

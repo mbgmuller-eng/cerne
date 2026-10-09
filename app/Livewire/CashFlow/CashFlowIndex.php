@@ -26,6 +26,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\On;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 
@@ -175,6 +176,9 @@ class CashFlowIndex extends Component
 
     public string $incomeNotes = '';
 
+    /** Chegou por "Falar despesa" do botão "+": destaca o botão de voz até a pessoa usá-lo. */
+    public bool $realcarVoz = false;
+
     public function mount(): void
     {
         $this->redirectOrAbortWithoutProfile();
@@ -184,6 +188,39 @@ class CashFlowIndex extends Component
         $hoje = CarbonImmutable::now();
         $this->year ??= $hoje->year;
         $this->month ??= $hoje->month;
+
+        // Atalho "+" de outras telas (x-quick-add): chega como ?acao=...
+        $this->quickAdd((string) request()->query('acao', ''));
+    }
+
+    /**
+     * Atalho do botão "+" fixo (x-quick-add). Abre o formulário pedido — sempre
+     * abre, nunca alterna: quem chega pelo atalho com um formulário já aberto
+     * não pode vê-lo fechar. "voz" não grava nada sozinho: o navegador só
+     * libera o microfone com um toque da pessoa, então a tela apenas destaca
+     * o botão "Falar despesa".
+     */
+    #[On('quick-add')]
+    public function quickAdd(string $tipo): void
+    {
+        match ($tipo) {
+            'despesa' => $this->abrirDespesa(),
+            'receita' => $this->abrirReceita(),
+            'voz' => $this->realcarVoz = true,
+            default => null,
+        };
+    }
+
+    private function abrirDespesa(): void
+    {
+        $this->showExpenseForm = false;
+        $this->toggleExpenseForm();
+    }
+
+    private function abrirReceita(): void
+    {
+        $this->showIncomeForm = false;
+        $this->toggleIncomeForm();
     }
 
     // -----------------------------------------------------------------
@@ -261,6 +298,7 @@ class CashFlowIndex extends Component
     public function processVoiceExpense(string $transcricao, VoiceExpenseExtractionService $service): bool
     {
         $transcricao = trim($transcricao);
+        $this->realcarVoz = false;
 
         if ($transcricao === '') {
             return false;
