@@ -256,6 +256,19 @@ ssh -p 65002 -i ~/.ssh/cerne_hostinger u165451165@89.117.7.59 "cd ~/cerne && php
 
 Só age em clientes **ativos** do consultor. Casamento por CPF, ou por nome (e nascimento quando o cadastro tem); nome só parecido, dois clientes com o mesmo nome ou apólice já cadastrada para outro cliente viram `revisar` e não são aplicados. Apólice existente (mesmo número) é atualizada, não duplicada; rodar de novo não repete apólice nem PDF.
 
+## Unificar dois clientes como casal
+
+Quando duas pessoas foram cadastradas como clientes separados (perfis individuais) e na verdade são um casal: `cerne:merge-couple` faz o perfil da **principal** virar o perfil do casal e move a outra pessoa para dentro dele, como cônjuge. Os dois logins continuam e passam a abrir o mesmo perfil; o vínculo da cônjuge sai da Carteira do consultor (o casal aparece uma vez, pelo vínculo da principal).
+
+```bash
+# simulação (padrão): confere tudo e mostra o que mudaria, sem gravar nada
+ssh -p 65002 -i ~/.ssh/cerne_hostinger u165451165@89.117.7.59 "cd ~/cerne && php artisan cerne:merge-couple EMAIL_DA_PRINCIPAL EMAIL_DA_CONJUGE"
+# conferiu? aplique, guardando a cópia para desfazer à mão se for preciso:
+ssh -p 65002 -i ~/.ssh/cerne_hostinger u165451165@89.117.7.59 "cd ~/cerne && php artisan cerne:merge-couple EMAIL_DA_PRINCIPAL EMAIL_DA_CONJUGE --apply --backup=\$HOME/unificacao_NOME.json"
+```
+
+O registro de membro da cônjuge é **movido**, não recriado: tudo que é dela continua dela (lançamentos, apólices, documentos, saúde, privacidade por lançamento). A operação recusa, sem alterar nada, quando: um dos perfis já é de casal ou tem outro membro; a cônjuge tem assinatura própria; ela é cliente de um consultor que não acompanha a principal (ou o vínculo da principal não está ativo); há categoria própria de mesmo nome nos dois perfis; ou há a mesma reserva do casal nos dois. Regras de categorização com o mesmo texto ficam com a da principal. As chaves de perfil e de membro apagam em cascata: por isso o perfil antigo só é excluído depois de conferido que nada sobrou nele.
+
 ## Catálogo compartilhado de exercícios (Academia)
 
 Referência genérica (nome, grupo muscular, foto) que qualquer cliente vê ao montar o plano — não é dado de saúde de ninguém, por isso não é por conta (ver `App\Models\GymExerciseCatalog`, padrão `BelongsToProfileOrShared` igual `ExpenseCategory`/`Bank`).
