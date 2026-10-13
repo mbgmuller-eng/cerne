@@ -12,6 +12,8 @@ use App\Models\GymExerciseSuggestion;
 use App\Models\InsurancePolicyRenewal;
 use App\Models\Lead;
 use App\Models\LeadActivity;
+use App\Models\LeadAttachment;
+use App\Models\LeadQuote;
 use App\Models\PartnerInvite;
 use App\Models\ProfessionalInvite;
 use App\Models\ProfileMember;
@@ -56,6 +58,8 @@ class TenancyCoverageTest extends TestCase
         ConsultantInvite::class => 'o convite existe antes de qualquer perfil ser criado',
         Lead::class => 'contato que ainda não é cliente — existe antes de qualquer perfil, mesmo raciocínio de ConsultantInvite; pertence ao consultor (consultant_id)',
         LeadActivity::class => 'segue o Lead — nunca consultada fora do escopo de um lead_id já resolvido',
+        LeadQuote::class => 'cotação de um Lead — sem profile_id (o contato ainda não é cliente); só é lida a partir de um lead já resolvido por consultant_id, mesmo raciocínio de LeadActivity',
+        LeadAttachment::class => 'arquivo de um Lead — sem profile_id; o controlador confere lead.consultant_id antes de abrir (LeadAttachmentController) e o serviço só mexe nos de um lead já resolvido',
         InsurancePolicyRenewal::class => 'segue a InsurancePolicy — sem profile_id próprio, nunca consultada fora do escopo de um insurance_policy_id já resolvido (mesmo raciocínio de LeadActivity)',
         PartnerInvite::class => 'consultado pelo consultor sobre um perfil que não é o contexto ativo dele — filtra profile_id explicitamente, mesmo raciocínio de ConsultantInvite',
         ProfessionalInvite::class => 'convite de conta profissional (Consultor/Corretor) — a conta que nasce dele não tem perfil próprio nenhum, mesmo raciocínio de ConsultantInvite',

@@ -167,6 +167,24 @@ return [
 
     /*
     |---------------------------------------------------------------------------
+    | Anexos de leads (simulações em PDF, documentos do contato)
+    |---------------------------------------------------------------------------
+    | Disco privado, só abre para o dono do lead. Simulação de vida e saúde
+    | carrega dado sensível de alguém que ainda não é cliente: os anexos de um
+    | lead PERDIDO saem do servidor depois de `retention_months` meses (ver
+    | LeadService::purgeExpiredAttachments()).
+    */
+
+    'lead_files' => [
+        'disk' => env('CERNE_DOCUMENTS_DISK', 'local'),
+        'path' => 'leads-anexos',
+        'max_kb' => 10240,
+        'max_per_lead' => 20,
+        'retention_months' => 12,
+    ],
+
+    /*
+    |---------------------------------------------------------------------------
     | Precisão numérica
     |---------------------------------------------------------------------------
     | Dinheiro em 2 casas; quantidade e preço médio de ativos em 6, porque

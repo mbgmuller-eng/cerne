@@ -243,6 +243,13 @@ class ImportantDates extends Component
         return app(ImportantDatesService::class)->upcomingBirthdays(auth()->user(), $from, $to);
     }
 
+    public function getLeadBirthdaysProperty(): Collection
+    {
+        [$from, $to] = $this->intervalo();
+
+        return app(ImportantDatesService::class)->upcomingLeadBirthdays(auth()->user(), $from, $to);
+    }
+
     public function getPolicyAnniversariesProperty(): Collection
     {
         [$from, $to] = $this->intervalo();
@@ -287,6 +294,7 @@ class ImportantDates extends Component
             'periodos' => self::PERIODOS_PADRAO,
             'meses' => self::MESES,
             'birthdays' => $this->birthdays,
+            'leadBirthdays' => $this->aba === 'aniversariantes' ? $this->leadBirthdays : collect(),
             'policyAnniversaries' => $this->policyAnniversaries,
             'policyExpiries' => $this->policyExpiries,
             'investmentMaturities' => $this->investmentMaturities,

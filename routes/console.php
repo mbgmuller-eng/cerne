@@ -154,6 +154,10 @@ Schedule::call(function (): void {
     logger()->info('Aviso de acesso encerrando', ['avisados' => $avisados]);
 })->dailyAt('03:45')->name('aviso-acesso-encerrando')->withoutOverlapping();
 
+// Leads: anexos de contatos perdidos há mais do prazo de retenção saem do servidor.
+// Idempotente: o que já foi apagado não aparece de novo.
+Schedule::command('cerne:purge-lead-files')->dailyAt('04:10')->name('anexos-de-leads')->withoutOverlapping();
+
 // Documentos: os que ficaram "Na fila" porque a ANTHROPIC_API_KEY ainda
 // não estava configurada no envio. Idempotente pelo próprio estado — um
 // documento sai de Pending assim que o job o pega, então despachar de

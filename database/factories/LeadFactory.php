@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Enums\LeadKind;
 use App\Enums\LeadStage;
 use App\Models\Lead;
 use App\Models\User;
@@ -18,6 +19,7 @@ class LeadFactory extends Factory
     {
         return [
             'consultant_id' => User::factory()->consultant(),
+            'kind' => LeadKind::Consulting,
             'name' => fake()->name(),
             'email' => fake()->safeEmail(),
             'phone' => fake()->numerify('###########'),
@@ -28,5 +30,11 @@ class LeadFactory extends Factory
     public function stage(LeadStage $stage): static
     {
         return $this->state(fn () => ['stage' => $stage]);
+    }
+
+    /** Lead do funil de seguros. */
+    public function insurance(): static
+    {
+        return $this->state(fn () => ['kind' => LeadKind::Insurance]);
     }
 }

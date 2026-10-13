@@ -9,6 +9,7 @@ use App\Models\FinancialProfile;
 use App\Models\InsurancePolicy;
 use App\Models\InsurancePolicyRenewal;
 use App\Models\InvestmentRecord;
+use App\Models\Lead;
 use App\Models\ProfileMember;
 use App\Models\User;
 use App\Notifications\ClientBirthdayUpcoming;
@@ -86,6 +87,29 @@ class ImportantDatesService
                 'client_name' => $nomes[$l['member']->profile_id] ?? '—',
                 'policies' => $apolicesPorMembro->get($l['member']->id) ?? collect(),
             ])
+            ->sortBy('occurrence_date')
+            ->values();
+    }
+
+    /**
+     * Aniversário dos contatos que ainda não são clientes (leads em andamento do próprio profissional): relacionamento
+     * antes da venda. Só quem tem data de nascimento cadastrada.
+     *
+     * @return Collection<int, array{lead: Lead, occurrence_date: Carbon, turning_age: int}>
+     */
+    public function upcomingLeadBirthdays(User $professional, Carbon $from, Carbon $to): Collection
+    {
+        return Lead::query()
+            ->where('consultant_id', $professional->id)
+            ->open()
+            ->whereNotNull('birth_date')
+            ->get()
+            ->map(fn (Lead $lead): array => [
+                'lead' => $lead,
+                'occurrence_date' => RecurringDate::nextOccurrence($lead->birth_date, $from),
+                'turning_age' => RecurringDate::yearsCompletingAt($lead->birth_date, $from),
+            ])
+            ->filter(fn (array $l) => $l['occurrence_date']->isBetween($from->copy()->startOfDay(), $to->copy()->endOfDay()))
             ->sortBy('occurrence_date')
             ->values();
     }

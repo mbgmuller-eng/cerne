@@ -117,6 +117,26 @@
             <p class="border-t border-slate-100 px-5 py-2 text-xs text-slate-400 dark:border-white/10">Exibindo {{ $birthdays->count() }} {{ $birthdays->count() === 1 ? 'item' : 'itens' }}.</p>
         </section>
 
+        {{-- Contatos (leads) fazendo aniversário: relacionamento antes de virar cliente ------------------- --}}
+        @if ($leadBirthdays->isNotEmpty())
+            <section class="card space-y-3 p-5">
+                <p class="text-sm font-semibold text-slate-900 dark:text-white">Contatos que ainda não são clientes</p>
+                <ul class="divide-y divide-slate-100 dark:divide-white/10">
+                    @foreach ($leadBirthdays as $linha)
+                        <li class="flex flex-wrap items-center justify-between gap-3 py-2.5 text-sm">
+                            <span>
+                                <span class="text-slate-800 dark:text-slate-200">{{ $linha['lead']->name }}</span>
+                                <span class="text-xs text-slate-400">· {{ $linha['occurrence_date']->format('d \d\e M') }} · {{ $linha['turning_age'] }} anos · {{ $linha['lead']->stageLabel() }}</span>
+                            </span>
+                            @if ($linha['lead']->whatsappUrl())
+                                <a href="{{ $linha['lead']->whatsappUrl() }}" target="_blank" rel="noopener noreferrer" class="text-xs font-medium text-accent-700 hover:underline dark:text-accent-400">WhatsApp</a>
+                            @endif
+                        </li>
+                    @endforeach
+                </ul>
+            </section>
+        @endif
+
         {{-- Sem aniversário cadastrado --------------------------------- --}}
         @if ($membersWithoutBirthdate->isNotEmpty())
             <section class="card space-y-3 p-5">

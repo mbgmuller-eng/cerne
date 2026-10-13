@@ -14,6 +14,7 @@ use App\Http\Controllers\DocumentFileController;
 use App\Http\Controllers\GymExerciseCatalogImageController;
 use App\Http\Controllers\GymExerciseImageController;
 use App\Http\Controllers\HealthCalendarController;
+use App\Http\Controllers\LeadAttachmentController;
 use App\Http\Controllers\HealthEmergencyController;
 use App\Http\Controllers\HealthQrCodeController;
 use App\Http\Controllers\ProfileSwitchController;
@@ -210,6 +211,8 @@ Route::middleware(['auth', 'verified'])->group(function (): void {
         Route::get('/carteira/investimentos', PortfolioInvestments::class)->name('consultant.portfolio.investments');
         Route::get('/carteira/datas-importantes', ImportantDates::class)->name('consultant.portfolio.important-dates');
         Route::get('/leads', LeadsIndex::class)->name('consultant.leads');
+        // Anexo de lead (simulação em PDF etc.): só o dono do lead abre — a checagem é no controlador.
+        Route::get('/leads/anexos/{attachment}', [LeadAttachmentController::class, 'show'])->name('consultant.leads.attachment');
         Route::post('/clientes/{profile}/abrir', [ProfileSwitchController::class, 'store'])->name('profile.switch');
 
         // Gestão de toda a plataforma — gate é isPlatformAdmin() dentro do
