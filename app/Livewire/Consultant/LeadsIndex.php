@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Consultant;
 
+use App\Enums\CommissionType;
 use App\Enums\InsuranceType;
 use App\Enums\LeadActivityType;
 use App\Enums\LeadKind;
@@ -142,6 +143,9 @@ class LeadsIndex extends Component
     /** @var list<array{name: string, value: string, deductible: string}> */
     public array $quoteCoverages = [];
 
+    public string $quoteCommissionType = 'percent';
+
+    /** O número da comissão: percentual ou valor em reais, conforme quoteCommissionType. */
     public string $quoteCommission = '';
 
     public string $quoteValidUntil = '';
@@ -485,7 +489,8 @@ class LeadsIndex extends Component
             'value' => (string) ($c['value'] ?? ''),
             'deductible' => (string) ($c['deductible'] ?? ''),
         ], $quote->coverages ?? []);
-        $this->quoteCommission = (string) ($quote->commission_percent ?? '');
+        $this->quoteCommissionType = $quote->commission_type?->value ?? CommissionType::Percent->value;
+        $this->quoteCommission = (string) ($this->quoteCommissionType === 'amount' ? $quote->commission_amount : $quote->commission_percent) ?: '';
         $this->quoteValidUntil = $quote->valid_until?->toDateString() ?? '';
         $this->quoteStatus = $quote->status->value;
         $this->quoteNotes = $quote->notes ?? '';
@@ -524,7 +529,8 @@ class LeadsIndex extends Component
             'quoteCoverages.*.name' => ['nullable', 'string', 'max:255'],
             'quoteCoverages.*.value' => ['nullable', 'numeric', 'min:0', 'max:9999999999999'],
             'quoteCoverages.*.deductible' => ['nullable', 'string', 'max:255'],
-            'quoteCommission' => ['nullable', 'numeric', 'min:0', 'max:100'],
+            'quoteCommissionType' => ['required', Rule::enum(CommissionType::class)],
+            'quoteCommission' => ['nullable', 'numeric', 'min:0', $this->quoteCommissionType === 'percent' ? 'max:100' : 'max:9999999999'],
             'quoteValidUntil' => ['nullable', 'date'],
             'quoteStatus' => ['required', Rule::enum(LeadQuoteStatus::class)],
             'quoteNotes' => ['nullable', 'string', 'max:2000'],
@@ -549,7 +555,9 @@ class LeadsIndex extends Component
             'payment_frequency' => $this->quoteFrequency,
             'coverage_amount' => $this->quoteCoverageAmount,
             'coverages' => $this->quoteCoverages,
+            'commission_type' => $this->quoteCommissionType,
             'commission_percent' => $this->quoteCommission,
+            'commission_amount' => $this->quoteCommission,
             'valid_until' => $this->quoteValidUntil,
             'status' => $this->quoteStatus,
             'notes' => $this->quoteNotes,
@@ -581,6 +589,7 @@ class LeadsIndex extends Component
             'editingQuoteId', 'quoteInsurer', 'quoteProduct', 'quoteReference', 'quotePremium', 'quoteCoverageAmount',
             'quoteCoverages', 'quoteCommission', 'quoteValidUntil', 'quoteNotes',
         );
+        $this->quoteCommissionType = CommissionType::Percent->value;
         $this->quoteType = InsuranceType::Vida->value;
         $this->quoteFrequency = PaymentFrequency::Monthly->value;
         $this->quoteStatus = LeadQuoteStatus::Draft->value;

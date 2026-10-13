@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\CommissionType;
 use App\Enums\LeadActivityType;
 use App\Enums\LeadKind;
 use App\Enums\LeadLostReason;
@@ -166,6 +167,8 @@ class LeadService
             $coberturas = LifeCoverage::standardize($coberturas);
         }
 
+        $tipoComissao = CommissionType::tryFrom((string) ($dados['commission_type'] ?? '')) ?? CommissionType::Percent;
+
         $campos = [
             'insurance_type' => $dados['insurance_type'],
             'insurer_name' => trim($dados['insurer_name']),
@@ -176,7 +179,10 @@ class LeadService
             'coverage_amount' => $this->blankToNull($dados['coverage_amount'] ?? null)
                 ?? ($dados['insurance_type'] === 'vida' ? LifeCoverage::deathCapital($coberturas, null) : null),
             'coverages' => $coberturas === [] ? null : $coberturas,
-            'commission_percent' => $this->blankToNull($dados['commission_percent'] ?? null),
+            // Só o campo do tipo escolhido fica gravado: trocar de percentual para valor fixo não deixa o outro para trás.
+            'commission_type' => $tipoComissao->value,
+            'commission_percent' => $tipoComissao === CommissionType::Percent ? $this->blankToNull($dados['commission_percent'] ?? null) : null,
+            'commission_amount' => $tipoComissao === CommissionType::Amount ? $this->blankToNull($dados['commission_amount'] ?? null) : null,
             'valid_until' => $this->blankToNull($dados['valid_until'] ?? null),
             'status' => $dados['status'] ?? LeadQuoteStatus::Draft->value,
             'notes' => $this->blankToNull($dados['notes'] ?? null),

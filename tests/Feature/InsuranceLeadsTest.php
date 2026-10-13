@@ -287,6 +287,93 @@ class InsuranceLeadsTest extends TestCase
         self::assertNull($trimestral->expectedCommission());
     }
 
+    public function test_comissao_em_valor_fixo_e_o_proprio_valor_independente_do_premio(): void
+    {
+        $lead = $this->lead();
+        $fixa = $this->quote($lead, ['premium' => '141.40', 'commission_type' => 'amount', 'commission_amount' => '700.00']);
+        $semPremio = $this->quote($lead, ['premium' => null, 'commission_type' => 'amount', 'commission_amount' => '250.50']);
+        $semValor = $this->quote($lead, ['commission_type' => 'amount', 'commission_amount' => null]);
+
+        self::assertSame('700.00', $fixa->fresh()->expectedCommission());
+        self::assertSame('250.50', $semPremio->fresh()->expectedCommission());
+        self::assertNull($semValor->fresh()->expectedCommission());
+    }
+
+    public function test_tela_grava_so_o_campo_do_tipo_escolhido_e_trocar_de_tipo_limpa_o_outro(): void
+    {
+        $lead = $this->lead(['interests' => ['vida']]);
+
+        $tela = $this->abrirCotacoes($lead)
+            ->call('newQuote')
+            ->set('quoteInsurer', 'Azos')
+            ->set('quotePremium', '100')
+            ->set('quoteCommissionType', 'amount')
+            ->set('quoteCommission', '450')
+            ->call('saveQuote')
+            ->assertHasNoErrors();
+
+        $quote = LeadQuote::query()->sole();
+        self::assertSame(\App\Enums\CommissionType::Amount, $quote->commission_type);
+        self::assertSame('450.00', $quote->commission_amount);
+        self::assertNull($quote->commission_percent);
+        self::assertSame('450.00', $quote->expectedCommission(), 'um valor fixo acima de 100 é válido');
+
+        $tela->call('editQuote', $quote->id)
+            ->assertSet('quoteCommissionType', 'amount')
+            ->assertSet('quoteCommission', '450.00')
+            ->set('quoteCommissionType', 'percent')
+            ->set('quoteCommission', '30')
+            ->call('saveQuote')
+            ->assertHasNoErrors();
+
+        $quote->refresh();
+        self::assertSame(\App\Enums\CommissionType::Percent, $quote->commission_type);
+        self::assertSame('30.00', $quote->commission_percent);
+        self::assertNull($quote->commission_amount);
+        self::assertSame('360.00', $quote->expectedCommission(), '30% de 1.200,00 por ano');
+    }
+
+    public function test_percentual_acima_de_100_e_recusado_mas_valor_fixo_nao(): void
+    {
+        $lead = $this->lead();
+
+        $this->abrirCotacoes($lead)
+            ->call('newQuote')
+            ->set('quoteInsurer', 'Azos')
+            ->set('quoteCommissionType', 'percent')
+            ->set('quoteCommission', '150')
+            ->call('saveQuote')
+            ->assertHasErrors('quoteCommission')
+            ->set('quoteCommissionType', 'amount')
+            ->call('saveQuote')
+            ->assertHasNoErrors();
+    }
+
+    public function test_tipo_de_comissao_desconhecido_e_recusado(): void
+    {
+        $lead = $this->lead();
+
+        $this->abrirCotacoes($lead)
+            ->call('newQuote')
+            ->set('quoteInsurer', 'Azos')
+            ->set('quoteCommissionType', 'bonus')
+            ->call('saveQuote')
+            ->assertHasErrors('quoteCommissionType');
+    }
+
+    public function test_valor_do_funil_soma_comissao_em_percentual_e_em_valor_fixo(): void
+    {
+        $hoje = CarbonImmutable::parse('2026-10-20');
+        $a = $this->lead();
+        $this->quote($a, ['premium' => '100.00', 'commission_type' => 'percent', 'commission_percent' => '30']);
+        $b = $this->lead();
+        $this->quote($b, ['premium' => '200.00', 'commission_type' => 'amount', 'commission_amount' => '500.00']);
+
+        $funil = app(LeadService::class)->funnelValue(Lead::query()->with('quotes')->get(), $hoje);
+
+        self::assertSame('860.00', $funil['comissao'], '360,00 (30% de 1.200) + 500,00 fixos');
+    }
+
     public function test_cotacao_sem_premio_nao_quebra_nada(): void
     {
         $lead = $this->lead();

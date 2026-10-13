@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\CommissionType;
 use App\Enums\InsuranceType;
 use App\Enums\LeadQuoteStatus;
 use App\Enums\PaymentFrequency;
@@ -20,7 +21,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  */
 #[Fillable([
     'lead_id', 'insurance_type', 'insurer_name', 'product', 'reference', 'premium', 'payment_frequency',
-    'coverage_amount', 'coverages', 'commission_percent', 'valid_until', 'status', 'notes', 'created_by_user_id',
+    'coverage_amount', 'coverages', 'commission_percent', 'commission_type', 'commission_amount', 'valid_until', 'status', 'notes', 'created_by_user_id',
 ])]
 class LeadQuote extends Model
 {
@@ -35,6 +36,8 @@ class LeadQuote extends Model
             'premium' => 'decimal:2',
             'coverage_amount' => 'decimal:2',
             'commission_percent' => 'decimal:2',
+            'commission_type' => CommissionType::class,
+            'commission_amount' => 'decimal:2',
             'coverages' => 'array',
             'valid_until' => 'date',
         ];
@@ -65,9 +68,16 @@ class LeadQuote extends Model
         return $anual === null ? null : bcdiv($anual, '12', 2);
     }
 
-    /** Comissão prevista no primeiro ano: o percentual combinado sobre o prêmio anual. Nulo sem um dos dois. */
+    /**
+     * Comissão prevista no primeiro ano. Em valor fixo é o próprio valor; em percentual, o combinado sobre o prêmio
+     * anual (nulo sem um dos dois).
+     */
     public function expectedCommission(): ?string
     {
+        if ($this->commission_type === CommissionType::Amount) {
+            return $this->commission_amount === null ? null : (string) $this->commission_amount;
+        }
+
         $anual = $this->annualPremium();
 
         if ($anual === null || $this->commission_percent === null) {

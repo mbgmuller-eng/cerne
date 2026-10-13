@@ -93,8 +93,17 @@
                 </div>
 
                 <div>
-                    <label class="{{ $campo }}">Comissão prevista (% do prêmio anual)</label>
-                    <input type="number" step="0.01" min="0" max="100" wire:model="quoteCommission" class="input mt-1.5" placeholder="Opcional">
+                    <label class="{{ $campo }}">Comissão prevista</label>
+                    <div class="mt-1.5 flex gap-2">
+                        <select wire:model.live="quoteCommissionType" class="select w-44 shrink-0" aria-label="Tipo de comissão">
+                            @foreach (\App\Enums\CommissionType::cases() as $tipoComissao)
+                                <option value="{{ $tipoComissao->value }}">{{ $tipoComissao->label() }}</option>
+                            @endforeach
+                        </select>
+                        <input type="number" step="0.01" min="0" @if ($quoteCommissionType === 'percent') max="100" @endif wire:model="quoteCommission" class="input min-w-0 flex-1" placeholder="Opcional">
+                    </div>
+                    <p class="mt-1 text-xs text-slate-400">{{ $quoteCommissionType === 'percent' ? 'Percentual sobre o prêmio anual.' : 'Valor total previsto para o 1º ano.' }}</p>
+                    @error('quoteCommissionType') <p class="{{ $erro }}">{{ $message }}</p> @enderror
                     @error('quoteCommission') <p class="{{ $erro }}">{{ $message }}</p> @enderror
                 </div>
 
