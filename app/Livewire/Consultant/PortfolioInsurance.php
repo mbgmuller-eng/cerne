@@ -11,7 +11,10 @@ use App\Services\ClientInviteService;
 use App\Services\ConsultantCapacityService;
 use App\Services\ConsultantLinkService;
 use App\Services\ConsultantPortfolioService;
+use App\Services\ImportantDatesService;
+use App\Services\LeadAutomationService;
 use App\Support\Money;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Layout;
@@ -125,6 +128,36 @@ class PortfolioInsurance extends Component
             ->values();
     }
 
+    /**
+     * Renovações a tratar nos próximos dias, na mesma janela dos leads de renovação do profissional: apólice com
+     * vencimento, ou, sem vencimento, o aniversário dela. Apólice que renova sozinha fica de fora (não há o que
+     * renovar) e o corretor só vê as compartilhadas com ele (regra de ImportantDatesService).
+     *
+     * @return Collection<int, array{policy: InsurancePolicy, client_name: string, occurrence_date: Carbon, kind: string, days: int}>
+     */
+    public function getRenovacoesProperty(): Collection
+    {
+        $dias = app(LeadAutomationService::class)->renewalSettings(auth()->user())['days'];
+        $dias = $dias >= 7 ? $dias : (int) config('cerne.lead_automation.renewal_days');
+        $dias = $dias >= 7 ? $dias : 45; // rotina de leads desligada por ambiente: a lista continua útil
+
+        $de = Carbon::now()->startOfDay();
+        $ate = $de->copy()->addDays($dias);
+        $datas = app(ImportantDatesService::class);
+
+        $vencimentos = $datas->upcomingPolicyExpiries(auth()->user(), $de, $ate)
+            ->map(fn (array $l) => $l + ['kind' => 'vencimento']);
+
+        $aniversarios = $datas->upcomingPolicyAnniversaries(auth()->user(), $de, $ate)
+            ->reject(fn (array $l) => $l['policy']->expiry_date !== null || $l['policy']->auto_renews || $l['years_completing'] < 1)
+            ->map(fn (array $l) => $l + ['kind' => 'aniversario']);
+
+        return $vencimentos->concat($aniversarios)
+            ->map(fn (array $l) => $l + ['days' => (int) ceil($de->diffInDays($l['occurrence_date']->copy()->startOfDay()))])
+            ->sortBy(fn (array $l) => $l['occurrence_date']->timestamp)
+            ->values();
+    }
+
     public function render(ConsultantPortfolioService $portfolio)
     {
         $nomeOficial = Insurer::canonicalizer();
@@ -143,6 +176,7 @@ class PortfolioInsurance extends Component
             'totalFiltrado' => $linhas->count(),
             'filtrando' => $this->busca !== '' || $this->tipo !== '' || $this->seguradora !== '' || $this->situacao !== '',
             'insurerColors' => Insurer::colorMap(),
+            'renovacoes' => $this->renovacoes,
         ]);
     }
 

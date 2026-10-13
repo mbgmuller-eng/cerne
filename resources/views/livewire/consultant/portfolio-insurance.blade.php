@@ -82,6 +82,53 @@
         </div>
     @endif
 
+    {{-- Renovações a tratar ------------------------------------------------------------------ --}}
+    @if ($renovacoes->isNotEmpty())
+        <div class="card p-5" id="renovacoes">
+            <div class="flex flex-wrap items-baseline justify-between gap-2">
+                <h2 class="text-sm font-semibold text-slate-900 dark:text-white">
+                    Renovações nos próximos dias
+                    <span class="text-xs font-normal text-slate-400">({{ $renovacoes->count() }})</span>
+                </h2>
+                <p class="text-xs text-slate-400">Fora as que renovam automaticamente.</p>
+            </div>
+
+            <ul class="mt-3 divide-y divide-slate-100 dark:divide-white/10">
+                @foreach ($renovacoes->take(10) as $r)
+                    @php $apolice = $r['policy']; @endphp
+                    <li class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 py-2.5" wire:key="renovacao-{{ $apolice->id }}-{{ $r['occurrence_date']->toDateString() }}">
+                        <div class="min-w-0">
+                            <p class="truncate text-sm font-medium text-slate-900 dark:text-white">
+                                {{ $r['client_name'] }}
+                                @if ($apolice->personLabel() && $apolice->personLabel() !== $r['client_name'])
+                                    <span class="text-xs font-normal text-slate-500 dark:text-slate-400">· {{ $apolice->personLabel() }}</span>
+                                @endif
+                            </p>
+                            <p class="truncate text-xs text-slate-500 dark:text-slate-400">
+                                {{ $apolice->insurance_type->label() }} · {{ $apolice->insurer_name }}@if ($apolice->policy_number) · {{ $apolice->policy_number }}@endif
+                            </p>
+                        </div>
+
+                        <div class="flex flex-wrap items-center gap-2">
+                            <span @class([
+                                'badge',
+                                'bg-amber-50 text-amber-900 ring-1 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-300 dark:ring-amber-500/20' => $r['days'] <= 15,
+                                'bg-slate-100 text-slate-600 dark:bg-white/10 dark:text-slate-300' => $r['days'] > 15,
+                            ])>
+                                {{ $r['kind'] === 'vencimento' ? 'Vence' : 'Aniversário' }} {{ $r['occurrence_date']->format('d/m') }} · {{ $r['days'] === 0 ? 'hoje' : ($r['days'] === 1 ? 'amanhã' : 'em '.$r['days'].' dias') }}
+                            </span>
+                            <x-portfolio-policy-link :profile="$apolice->profile_id" :policy="$apolice->id" acao="editar" label="Editar" />
+                            <x-portfolio-policy-link :profile="$apolice->profile_id" :policy="$apolice->id" label="Ver apólice" />
+                        </div>
+                    </li>
+                @endforeach
+            </ul>
+
+            @if ($renovacoes->count() > 10)
+                <p class="mt-2 text-xs text-slate-400">Mostrando as 10 mais próximas de {{ $renovacoes->count() }}. Use o filtro "Vencendo em 30 dias" para ver as demais.</p>
+            @endif
+        </div>
+    @endif
     {{-- Filtros --------------------------------------------------------- --}}
     <div class="card p-4">
         <div class="grid gap-3 sm:grid-cols-3">
@@ -183,6 +230,8 @@
                                 <p class="text-xs text-slate-400">por mês</p>
                             </div>
 
+                            <x-portfolio-policy-link :profile="$porCliente['profile_id']" :expandir="true" label="Apólices" :primary="true" />
+
                             <form method="POST" action="{{ route('profile.switch', $porCliente['profile_id']) }}">
                                 @csrf
                                 <button type="submit" class="btn-secondary px-3 py-1.5 whitespace-nowrap">Abrir perfil</button>
@@ -209,14 +258,15 @@
 
                                 <div class="overflow-x-auto">
                                     {{-- table-fixed + colgroup: com uma tabela por pessoa, sem largura fixa as colunas não alinhavam entre uma e outra. --}}
-                                    <table class="w-full min-w-[720px] table-fixed text-sm">
+                                    <table class="w-full min-w-[860px] table-fixed text-sm">
                                         <colgroup>
+                                            <col class="w-[9%]">
+                                            <col class="w-[17%]">
+                                            <col class="w-[19%]">
                                             <col class="w-[11%]">
-                                            <col class="w-[21%]">
-                                            <col class="w-[21%]">
+                                            <col class="w-[14%]">
                                             <col class="w-[13%]">
-                                            <col class="w-[18%]">
-                                            <col class="w-[16%]">
+                                            <col class="w-[17%]">
                                         </colgroup>
                                         <thead>
                                             <tr class="text-left text-[10.5px] tracking-wide text-slate-400 uppercase">
@@ -226,6 +276,7 @@
                                                 <th class="pb-1.5 text-right font-medium">Capital</th>
                                                 <th class="pb-1.5 text-right font-medium">Custo</th>
                                                 <th class="pb-1.5 pl-3 font-medium">Vencimento</th>
+                                                <th class="pb-1.5 text-right font-medium"><span class="sr-only">Ações</span></th>
                                             </tr>
                                         </thead>
                                         <tbody class="divide-y divide-slate-100 dark:divide-white/10">
@@ -274,6 +325,9 @@
                                                     <td class="py-2 pl-3 align-top whitespace-nowrap">
                                                         @if ($apolice->expiry_date === null)
                                                             <span class="text-xs text-slate-400">{{ $apolice->validityLabel() }}</span>
+                                                        @elseif ($apolice->auto_renews)
+                                                            <span class="text-xs text-slate-500 dark:text-slate-400">{{ $apolice->expiry_date->format('d/m/Y') }}</span>
+                                                            <span class="block text-[10.5px] text-slate-400">renova sozinha</span>
                                                         @elseif ($apolice->isExpiring(30))
                                                             <span class="badge bg-amber-50 text-amber-900 ring-1 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-300 dark:ring-amber-500/20">
                                                                 {{ $apolice->expiry_date->format('d/m/Y') }}
@@ -281,6 +335,10 @@
                                                         @else
                                                             <span class="text-xs text-slate-500 dark:text-slate-400">{{ $apolice->expiry_date->format('d/m/Y') }}</span>
                                                         @endif
+                                                    </td>
+                                                    <td class="py-2 pl-2 text-right align-top whitespace-nowrap">
+                                                        <x-portfolio-policy-link :profile="$apolice->profile_id" :policy="$apolice->id" label="Detalhes" />
+                                                        <x-portfolio-policy-link :profile="$apolice->profile_id" :policy="$apolice->id" acao="editar" label="Editar" />
                                                     </td>
                                                 </tr>
                                             @endforeach

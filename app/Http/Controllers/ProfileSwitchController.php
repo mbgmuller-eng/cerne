@@ -26,6 +26,18 @@ class ProfileSwitchController extends Controller
 
         $request->session()->put(SetProfileContext::SESSION_KEY, $profile->id);
 
+        // Atalho da carteira de seguros: cai direto na tela de Seguros do cliente, opcionalmente já na apólice ou com a
+        // edição aberta. Só valores conhecidos passam adiante; a tela confere de novo o que o usuário enxerga.
+        if ($request->input('destino') === 'seguros') {
+            $apolice = (string) $request->input('apolice');
+
+            return redirect()->route('insurance.index', array_filter([
+                'apolice' => preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', $apolice) === 1 ? $apolice : null,
+                'editar' => $request->input('acao') === 'editar' ? 1 : null,
+                'expandir' => $request->boolean('expandir') ? 1 : null,
+            ]));
+        }
+
         // Corretor não tem Visão geral (é tela financeira, ver Dashboard::
         // mount()) — cai direto em Seguros, a única tela dele dentro do perfil.
         return redirect()->route($request->user()->isBroker() ? 'insurance.index' : 'dashboard');

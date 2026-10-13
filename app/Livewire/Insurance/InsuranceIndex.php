@@ -29,6 +29,7 @@ use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\On;
+use Livewire\Attributes\Url;
 use Livewire\Component;
 
 /**
@@ -93,10 +94,27 @@ class InsuranceIndex extends Component
         return [InsurancePolicy::class];
     }
 
+    /** Apólice em foco (vem do atalho da carteira): o grupo dela abre, ela se destaca na tela. */
+    #[Url(as: 'apolice')]
+    public ?string $foco = null;
+
+    /** Atalho "Apólices" da carteira: chega com todos os grupos abertos. */
+    #[Url(as: 'expandir')]
+    public bool $expandir = false;
+
     public function mount(): void
     {
         $this->redirectOrAbortWithoutProfile();
         $this->policyStartDate = now()->toDateString();
+
+        // Atalho "Editar" da carteira: só vale ao chegar (lido da URL uma vez, sem ficar nela), abrindo o formulário da
+        // apólice em foco.
+        if (request()->boolean('editar')) {
+            // find() com os escopos da tela: apólice que a pessoa não enxerga (privada, de outro corretor) é ignorada.
+            if ($this->foco !== null && InsurancePolicy::query()->find($this->foco) !== null) {
+                $this->editPolicy($this->foco);
+            }
+        }
     }
 
     // -----------------------------------------------------------------

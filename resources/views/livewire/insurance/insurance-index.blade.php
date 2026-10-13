@@ -251,7 +251,12 @@
         @else
             <div class="mt-3 space-y-3">
                 @foreach ($grouped as $grupoTipo)
-                    <div x-data="{ open: false }" class="card overflow-hidden">
+                    @php
+                        $grupoComFoco = $foco !== null && collect($grupoTipo['membros'])->contains(
+                            fn ($m) => collect($m['seguradoras'])->contains(fn ($apolices) => collect($apolices)->contains('id', $foco))
+                        );
+                    @endphp
+                    <div x-data="{ open: {{ $expandir || $grupoComFoco ? 'true' : 'false' }} }" class="card overflow-hidden">
                         <button
                             type="button"
                             @click="open = ! open"
@@ -293,7 +298,7 @@
 
                                                 <div class="divide-y divide-slate-100 dark:divide-white/10">
                                                     @foreach ($apolicesDaSeguradora as $apolice)
-                                                        <div class="px-5 py-4">
+                                                        <div @class(['px-5 py-4', 'bg-brand-50/60 ring-1 ring-inset ring-brand-200 dark:bg-brand-500/10 dark:ring-brand-500/30' => $foco === $apolice->id]) id="apolice-{{ $apolice->id }}" @if ($foco === $apolice->id) x-data x-init="$nextTick(() => $el.scrollIntoView({ block: 'center' }))" @endif>
                                                             <div class="flex flex-wrap items-center justify-between gap-2">
                                                                 <div>
                                                                     @if ($apolice->insured_item)
@@ -315,6 +320,9 @@
                                                                 </div>
 
                                                                 <div class="flex items-center gap-2">
+                                                                    @if ($apolice->auto_renews)
+                                                                        <span class="badge bg-slate-100 text-slate-600 dark:bg-white/10 dark:text-slate-300">Renova automaticamente</span>
+                                                                    @endif
                                                                     @if ($apolice->isExpiring(30))
                                                                         <span class="badge bg-amber-50 text-amber-900 ring-1 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-300 dark:ring-amber-500/20">
                                                                             Vence em {{ $apolice->daysUntilExpiry() }} {{ $apolice->daysUntilExpiry() === 1 ? 'dia' : 'dias' }}
