@@ -12,8 +12,13 @@ use App\Livewire\Concerns\RequiresActiveProfile;
 use App\Models\ConsultantClient;
 use App\Models\InsurancePolicy;
 use App\Models\Insurer;
+use App\Models\LeadQuote;
 use App\Models\ProfileMember;
 use App\Services\InsurancePolicyHistoryService;
+use App\Services\LeadService;
+use App\Enums\LeadQuoteStatus;
+use App\Support\LifeCoverage;
+use Illuminate\Support\Facades\DB;
 use App\Models\User;
 use App\Support\Money;
 use App\Support\ProfileContext;
@@ -75,6 +80,9 @@ class InsuranceIndex extends Component
 
     public bool $policyIsPrivate = false;
 
+    /** Cotação aceita de um lead da qual a apólice nova nasce (só profissional vinculado). */
+    public string $policySourceQuoteId = '';
+
     public ?string $confirmingDeletePolicyId = null;
 
     protected function privacyModels(): array
@@ -102,6 +110,51 @@ class InsuranceIndex extends Component
 
         if ($this->showPolicyForm) {
             $this->resetPolicyForm();
+        }
+    }
+
+    /**
+     * Cotações aceitas dos leads do próprio profissional que ainda não viraram apólice. É de onde ele "começa de uma
+     * cotação" ao cadastrar a apólice do cliente que acabou de fechar.
+     *
+     * @return Collection<int, LeadQuote>
+     */
+    public function getAcceptedQuotesProperty(): Collection
+    {
+        if (! auth()->user()->isLinkedProfessional()) {
+            return collect();
+        }
+
+        return LeadQuote::query()
+            ->with('lead:id,name')
+            ->where('status', LeadQuoteStatus::Accepted->value)
+            ->whereHas('lead', fn ($q) => $q->where('consultant_id', auth()->id()))
+            ->whereNotIn('id', DB::table('insurance_policies')->whereNotNull('source_lead_quote_id')->select('source_lead_quote_id'))
+            ->latest('updated_at')
+            ->get();
+    }
+
+    /** Escolheu uma cotação aceita: pré-preenche o formulário. O profissional confere e salva; nada é gravado aqui. */
+    public function updatedPolicySourceQuoteId(string $id): void
+    {
+        $quote = $this->acceptedQuotes->firstWhere('id', $id);
+
+        if ($quote === null) {
+            $this->policySourceQuoteId = '';
+
+            return;
+        }
+
+        $this->policyInsuranceType = $quote->insurance_type->value;
+        $this->policyInsurerName = $quote->insurer_name;
+        $this->policyMonthlyPremium = (string) ($quote->premium ?? '0');
+        $this->policyPaymentFrequency = $quote->payment_frequency->value;
+        $this->policyAnnualPremium = (string) ($quote->annualPremium() ?? '');
+        $this->policyCoverageAmount = (string) ($quote->coverage_amount ?? '');
+
+        // Sem membro escolhido, a apólice guarda o nome livre: já vem o do contato.
+        if ($this->policyMemberId === '' && $this->policyInsuredPersonName === '') {
+            $this->policyInsuredPersonName = $quote->lead->name;
         }
     }
 
@@ -196,8 +249,22 @@ class InsuranceIndex extends Component
             $historico->apply(InsurancePolicy::query()->findOrFail($this->editingPolicyId), $payload, PolicyRevisionSource::Manual);
             session()->flash('status', 'Apólice atualizada.');
         } else {
-            $historico->recordCreated(InsurancePolicy::create($payload + ['is_active' => true, 'created_by_user_id' => auth()->id()]));
-            session()->flash('status', 'Apólice cadastrada.');
+            $origem = $this->policySourceQuoteId !== '' ? $this->acceptedQuotes->firstWhere('id', $this->policySourceQuoteId) : null;
+
+            if ($origem !== null) {
+                $coberturas = $origem->coverages ?? [];
+                $payload['source_lead_quote_id'] = $origem->id;
+                $payload['coverages'] = $origem->insurance_type === InsuranceType::Vida ? LifeCoverage::standardize($coberturas) : $coberturas;
+            }
+
+            $apolice = InsurancePolicy::create($payload + ['is_active' => true, 'created_by_user_id' => auth()->id()]);
+            $historico->recordCreated($apolice);
+
+            if ($origem !== null) {
+                app(LeadService::class)->markIssued($origem->lead()->first(), $origem, auth()->id());
+            }
+
+            session()->flash('status', $origem !== null ? 'Apólice cadastrada e contato marcado como emitido.' : 'Apólice cadastrada.');
         }
 
         $this->resetPolicyForm();
@@ -226,7 +293,7 @@ class InsuranceIndex extends Component
         $this->reset(
             'editingPolicyId', 'policyMemberId', 'policyBrokerId', 'policyInsuredPersonName', 'policyInsurerName', 'policyNumber',
             'policyInsuredItem', 'policyCoverageAmount', 'policyAnnualPremium', 'policyExpiryDate', 'policyNotes',
-            'policyIsPrivate',
+            'policyIsPrivate', 'policySourceQuoteId',
         );
         $this->policyInsuranceType = 'vida';
         $this->policyMonthlyPremium = '0';
@@ -462,6 +529,7 @@ class InsuranceIndex extends Component
             'knownInsurers' => Insurer::names(),
             'insurerColors' => Insurer::colorMap(),
             'availableBrokers' => $this->availableBrokers,
+            'acceptedQuotes' => $this->editingPolicyId === null ? $this->acceptedQuotes : collect(),
             'members' => ProfileMember::query()
                 ->where('profile_id', $profileId)
                 ->where('is_active', true)

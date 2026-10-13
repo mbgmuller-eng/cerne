@@ -12,6 +12,7 @@ use App\Models\GymExerciseSuggestion;
 use App\Models\InsurancePolicyRenewal;
 use App\Models\Lead;
 use App\Models\LeadActivity;
+use App\Models\LeadAlertDigest;
 use App\Models\LeadAttachment;
 use App\Models\LeadQuote;
 use App\Models\PartnerInvite;
@@ -58,6 +59,7 @@ class TenancyCoverageTest extends TestCase
         ConsultantInvite::class => 'o convite existe antes de qualquer perfil ser criado',
         Lead::class => 'contato que ainda não é cliente — existe antes de qualquer perfil, mesmo raciocínio de ConsultantInvite; pertence ao consultor (consultant_id)',
         LeadActivity::class => 'segue o Lead — nunca consultada fora do escopo de um lead_id já resolvido',
+        LeadAlertDigest::class => 'registro do resumo diário de leads já enviado a um profissional (consultant_id): só sustenta o índice único (profissional, dia), nunca é consultado por perfil',
         LeadQuote::class => 'cotação de um Lead — sem profile_id (o contato ainda não é cliente); só é lida a partir de um lead já resolvido por consultant_id, mesmo raciocínio de LeadActivity',
         LeadAttachment::class => 'arquivo de um Lead — sem profile_id; o controlador confere lead.consultant_id antes de abrir (LeadAttachmentController) e o serviço só mexe nos de um lead já resolvido',
         InsurancePolicyRenewal::class => 'segue a InsurancePolicy — sem profile_id próprio, nunca consultada fora do escopo de um insurance_policy_id já resolvido (mesmo raciocínio de LeadActivity)',

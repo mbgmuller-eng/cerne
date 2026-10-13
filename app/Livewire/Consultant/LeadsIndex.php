@@ -11,8 +11,11 @@ use App\Enums\LeadQuoteStatus;
 use App\Enums\LeadSource;
 use App\Enums\LeadStage;
 use App\Enums\PaymentFrequency;
+use App\Enums\ProcessingStatus;
 use App\Models\Lead;
+use App\Models\LeadAttachment;
 use App\Models\LeadQuote;
+use App\Services\Extraction\LeadQuoteExtractionService;
 use App\Services\LeadService;
 use App\Support\LeadQuoteFields;
 use Carbon\CarbonImmutable;
@@ -124,6 +127,9 @@ class LeadsIndex extends Component
 
     public bool $showQuoteForm = false;
 
+    /** Mostra as cotações lado a lado em vez da lista. */
+    public bool $showComparison = false;
+
     public ?string $editingQuoteId = null;
 
     public string $quoteType = 'vida';
@@ -158,6 +164,15 @@ class LeadsIndex extends Component
     public string $attachTarget = '';
 
     public $anexo = null;
+
+    /** Anexo cuja leitura por IA está sendo conferida no formulário de cotação (nada é gravado antes de salvar). */
+    public ?string $reviewingAttachmentId = null;
+
+    /** Qual das cotações lidas no PDF está no formulário. */
+    public int $reviewingItem = 0;
+
+    /** @var list<string> campos que a leitura marcou como duvidosos */
+    public array $reviewUncertain = [];
 
     public function mount(): void
     {
@@ -449,6 +464,7 @@ class LeadsIndex extends Component
         $this->quotesLeadId = $this->leadDoUsuario($leadId)->id;
         $this->showQuotes = true;
         $this->showQuoteForm = false;
+        $this->showComparison = false;
         $this->attachTarget = '';
         $this->reset('anexo');
         $this->resetErrorBag();
@@ -458,13 +474,21 @@ class LeadsIndex extends Component
     {
         $this->showQuotes = false;
         $this->showQuoteForm = false;
+        $this->showComparison = false;
         $this->quotesLeadId = null;
+    }
+
+    public function toggleComparison(): void
+    {
+        $this->showComparison = ! $this->showComparison;
+        $this->showQuoteForm = false;
     }
 
     public function newQuote(): void
     {
         $lead = $this->leadDoUsuario((string) $this->quotesLeadId);
 
+        $this->showComparison = false;
         $this->resetQuoteForm();
         // O tipo mais provável: o primeiro dos interesses do lead.
         $this->quoteType = $lead->interests[0] ?? InsuranceType::Vida->value;
@@ -546,7 +570,7 @@ class LeadsIndex extends Component
 
         $quote = $this->editingQuoteId !== null ? $this->minhaCotacao($this->editingQuoteId) : null;
 
-        $service->saveQuote($lead, [
+        $salva = $service->saveQuote($lead, [
             'insurance_type' => $this->quoteType,
             'insurer_name' => $this->quoteInsurer,
             'product' => $this->quoteProduct,
@@ -562,6 +586,10 @@ class LeadsIndex extends Component
             'status' => $this->quoteStatus,
             'notes' => $this->quoteNotes,
         ], $quote, auth()->id());
+
+        if ($this->reviewingAttachmentId !== null) {
+            $this->markReadingApplied($lead, $salva);
+        }
 
         $this->showQuoteForm = false;
         $this->resetQuoteForm();
@@ -593,6 +621,7 @@ class LeadsIndex extends Component
         $this->quoteType = InsuranceType::Vida->value;
         $this->quoteFrequency = PaymentFrequency::Monthly->value;
         $this->quoteStatus = LeadQuoteStatus::Draft->value;
+        $this->reset('reviewingAttachmentId', 'reviewingItem', 'reviewUncertain');
         $this->resetErrorBag();
     }
 
@@ -616,19 +645,21 @@ class LeadsIndex extends Component
     }
 
     /** O arquivo é guardado assim que a pessoa o escolhe (Livewire chama este gancho depois do upload). */
-    public function updatedAnexo(LeadService $service): void
+    public function updatedAnexo(LeadService $service, LeadQuoteExtractionService $reader): void
     {
         $lead = $this->leadDoUsuario((string) $this->quotesLeadId);
 
+        $lerComIa = $this->attachTarget === 'ia';
+
         $this->validate([
-            'anexo' => ['required', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:'.config('cerne.lead_files.max_kb')],
+            'anexo' => ['required', 'file', $lerComIa ? 'mimes:pdf' : 'mimes:pdf,jpg,jpeg,png', 'max:'.config('cerne.lead_files.max_kb')],
         ], attributes: ['anexo' => 'arquivo']);
 
         // 'geral' = arquivo do contato; senão é o id da cotação a que a simulação pertence.
-        $quote = ! in_array($this->attachTarget, ['', 'geral'], true) ? $this->minhaCotacao($this->attachTarget) : null;
+        $quote = ! in_array($this->attachTarget, ['', 'geral', 'ia'], true) ? $this->minhaCotacao($this->attachTarget) : null;
 
         try {
-            $service->attachFile($lead, $this->anexo, $quote, auth()->id());
+            $anexado = $service->attachFile($lead, $this->anexo, $quote, auth()->id());
         } catch (InvalidArgumentException $e) {
             $this->addError('anexo', $e->getMessage());
             $this->reset('anexo');
@@ -638,7 +669,147 @@ class LeadsIndex extends Component
 
         $this->reset('anexo');
         $this->attachTarget = '';
+
+        if ($lerComIa && $this->canRead($anexado, $reader)) {
+            $reader->request($anexado);
+            session()->flash('status', 'Simulação enviada. A leitura leva alguns instantes: quando terminar, use "Revisar leitura".');
+
+            return;
+        }
+
         session()->flash('status', 'Arquivo anexado.');
+    }
+
+    // -----------------------------------------------------------------
+    // Leitura da simulação por IA
+    // -----------------------------------------------------------------
+
+    /** Pede a leitura de um PDF já anexado (a cotação dele, se houver, ou o arquivo geral do contato). */
+    public function readWithAi(string $attachmentId, LeadQuoteExtractionService $reader): void
+    {
+        $anexo = $this->leadDoUsuario((string) $this->quotesLeadId)->attachments()->findOrFail($attachmentId);
+
+        if ($this->canRead($anexo, $reader)) {
+            $reader->request($anexo);
+            session()->flash('status', 'Leitura iniciada. Quando terminar, use "Revisar leitura".');
+        }
+    }
+
+    private function canRead(LeadAttachment $anexo, LeadQuoteExtractionService $reader): bool
+    {
+        if (! $anexo->isPdf()) {
+            $this->addError('anexo', 'A leitura automática vale só para PDF.');
+
+            return false;
+        }
+
+        if (blank(config('cerne.ai.api_key'))) {
+            $this->addError('anexo', 'A leitura automática não está disponível agora.');
+
+            return false;
+        }
+
+        if (in_array($anexo->extraction_status, [ProcessingStatus::Pending, ProcessingStatus::Processing], true)) {
+            return false;
+        }
+
+        if ($reader->limitReached(auth()->user())) {
+            $this->addError('anexo', 'Limite de '.config('cerne.ai.lead_quote_reads_per_day').' leituras por dia atingido. Cadastre a cotação à mão ou tente amanhã.');
+
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Abre o formulário de cotação preenchido com o que a IA leu. Nada é gravado aqui: a cotação só existe depois que
+     * quem revisa confere os campos e salva.
+     */
+    public function reviewReading(string $attachmentId, int $item = 0): void
+    {
+        $anexo = $this->leadDoUsuario((string) $this->quotesLeadId)->attachments()->findOrFail($attachmentId);
+        $cotacoes = $anexo->extraction_summary['cotacoes'] ?? [];
+
+        if ($anexo->extraction_status !== ProcessingStatus::Completed || ! isset($cotacoes[$item])) {
+            return;
+        }
+
+        // A primeira conferência de um PDF já ligado a uma cotação atualiza essa cotação; as demais opções do mesmo
+        // PDF viram cotações novas.
+        $primeira = ($anexo->extraction_summary['aplicadas'] ?? []) === [];
+
+        if ($anexo->lead_quote_id !== null && $primeira) {
+            $this->editQuote($anexo->lead_quote_id);
+        } else {
+            $this->newQuote();
+        }
+
+        $lido = LeadQuoteExtractionService::toFormValues($cotacoes[$item]);
+        $nova = $this->editingQuoteId === null;
+
+        // Ao atualizar uma cotação existente, o que a leitura não trouxe não apaga o que já estava preenchido.
+        $this->quoteType = $lido['type'];
+        $this->quoteInsurer = $lido['insurer'] !== '' || $nova ? $lido['insurer'] : $this->quoteInsurer;
+        $this->quoteProduct = $lido['product'] !== '' || $nova ? $lido['product'] : $this->quoteProduct;
+        $this->quoteReference = $lido['reference'] !== '' || $nova ? $lido['reference'] : $this->quoteReference;
+        $this->quoteCoverageAmount = $lido['coverageAmount'] !== '' || $nova ? $lido['coverageAmount'] : $this->quoteCoverageAmount;
+        $this->quoteValidUntil = $lido['validUntil'] !== '' || $nova ? $lido['validUntil'] : $this->quoteValidUntil;
+        $this->quoteNotes = $lido['notes'] !== '' || $nova ? $lido['notes'] : $this->quoteNotes;
+
+        if ($lido['premium'] !== '') {
+            $this->quotePremium = $lido['premium'];
+            $this->quoteFrequency = $lido['frequency'];
+        }
+
+        if ($lido['coverages'] !== []) {
+            $this->quoteCoverages = $lido['coverages'];
+        }
+
+        $this->reviewingAttachmentId = $anexo->id;
+        $this->reviewingItem = $item;
+        $this->reviewUncertain = $lido['uncertain'];
+    }
+
+    /** Descarta a leitura sem cadastrar nada. */
+    public function discardReading(string $attachmentId): void
+    {
+        $this->leadDoUsuario((string) $this->quotesLeadId)->attachments()->findOrFail($attachmentId)->update([
+            'extraction_status' => null,
+            'extraction_summary' => null,
+            'extraction_error' => null,
+            'extraction_applied_at' => null,
+        ]);
+
+        if ($this->reviewingAttachmentId === $attachmentId) {
+            $this->cancelQuoteForm();
+        }
+    }
+
+    /** A cotação foi salva a partir da leitura: liga o PDF a ela e registra quais opções já foram usadas. */
+    private function markReadingApplied(Lead $lead, LeadQuote $quote): void
+    {
+        $anexo = $lead->attachments()->find($this->reviewingAttachmentId);
+
+        if ($anexo === null) {
+            return;
+        }
+
+        $resumo = $anexo->extraction_summary ?? [];
+        $aplicadas = array_values(array_unique([...($resumo['aplicadas'] ?? []), $this->reviewingItem]));
+        $resumo['aplicadas'] = $aplicadas;
+
+        $dados = ['extraction_summary' => $resumo];
+
+        if (count($aplicadas) >= count($resumo['cotacoes'] ?? [])) {
+            $dados['extraction_applied_at'] = now();
+        }
+
+        if ($anexo->lead_quote_id === null) {
+            $dados['lead_quote_id'] = $quote->id;
+        }
+
+        $anexo->update($dados);
     }
 
     public function deleteAttachment(string $id, LeadService $service): void
@@ -754,6 +925,7 @@ class LeadsIndex extends Component
             'lostReasons' => LeadLostReason::options(),
             'insuranceTypes' => InsuranceType::options(),
             'quoteStatuses' => LeadQuoteStatus::options(),
+            'aiReading' => filled(config('cerne.ai.api_key')),
             'frequencies' => PaymentFrequency::options(),
             'quoteFields' => LeadQuoteFields::all(),
             'ehCorretor' => auth()->user()->isBroker(),

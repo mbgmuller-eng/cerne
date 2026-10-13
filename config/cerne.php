@@ -121,6 +121,9 @@ return [
         // envio repetido por engano não virar conta. Tentativas que falharam também contam.
         'insurance_imports_per_day' => (int) env('CERNE_INSURANCE_IMPORTS_PER_DAY', 10),
 
+        // Idem para a simulação em PDF de um lead (ver LeadQuoteExtractionService), por profissional.
+        'lead_quote_reads_per_day' => (int) env('CERNE_LEAD_QUOTE_READS_PER_DAY', 20),
+
         // Idem para relatório de outro aplicativo (ver DocumentsIndex::enviar).
         'external_imports_per_day' => (int) env('CERNE_EXTERNAL_IMPORTS_PER_DAY', 10),
     ],
@@ -174,6 +177,13 @@ return [
     | lead PERDIDO saem do servidor depois de `retention_months` meses (ver
     | LeadService::purgeExpiredAttachments()).
     */
+
+    // Resumo diário de leads (ver LeadAlertService): com quantos dias de antecedência avisar uma cotação que vence e
+    // depois de quantos dias sem contato um lead é considerado parado.
+    'lead_alerts' => [
+        'quote_days' => (int) env('CERNE_LEAD_ALERT_QUOTE_DAYS', 3),
+        'stale_days' => (int) env('CERNE_LEAD_ALERT_STALE_DAYS', 7),
+    ],
 
     'lead_files' => [
         'disk' => env('CERNE_DOCUMENTS_DISK', 'local'),

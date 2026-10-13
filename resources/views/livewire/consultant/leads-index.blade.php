@@ -182,7 +182,7 @@
     </x-modal>
 
     {{-- Cotações e anexos do lead -------------------------------------- --}}
-    <x-modal wire-model="showQuotes" max-width="2xl">
+    <x-modal wire-model="showQuotes" max-width="{{ $showComparison ? '4xl' : '2xl' }}">
         @if ($quotesLead)
             @include('livewire.consultant.partials.lead-quotes', ['lead' => $quotesLead])
         @endif

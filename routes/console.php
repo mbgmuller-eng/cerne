@@ -154,6 +154,14 @@ Schedule::call(function (): void {
     logger()->info('Aviso de acesso encerrando', ['avisados' => $avisados]);
 })->dailyAt('03:45')->name('aviso-acesso-encerrando')->withoutOverlapping();
 
+// Leads: um resumo por dia, por profissional, com cotações vencendo, contatos sem retorno e próximos passos
+// atrasados. Idempotente por índice único (lead_alert_digests: profissional + dia).
+Schedule::call(function (): void {
+    $avisados = app(\App\Services\LeadAlertService::class)->notifyDigests();
+
+    logger()->info('Resumo de leads', ['avisados' => $avisados]);
+})->dailyAt('08:00')->name('resumo-de-leads')->withoutOverlapping();
+
 // Leads: anexos de contatos perdidos há mais do prazo de retenção saem do servidor.
 // Idempotente: o que já foi apagado não aparece de novo.
 Schedule::command('cerne:purge-lead-files')->dailyAt('04:10')->name('anexos-de-leads')->withoutOverlapping();

@@ -55,6 +55,19 @@
                 <button type="button" wire:click="togglePolicyForm" class="btn-ghost px-2 py-1 text-xs">Cancelar</button>
             </div>
 
+            @if ($acceptedQuotes->isNotEmpty())
+                <div class="rounded-xl bg-seguros-200/20 p-3 dark:bg-seguros-800/20">
+                    <label class="block text-xs font-medium text-slate-600 dark:text-slate-300">Começar de uma cotação aceita (opcional)</label>
+                    <select wire:model.live="policySourceQuoteId" class="select mt-1.5 w-full">
+                        <option value="">Cadastrar do zero</option>
+                        @foreach ($acceptedQuotes as $cotacaoAceita)
+                            <option value="{{ $cotacaoAceita->id }}">{{ $cotacaoAceita->lead->name }} · {{ $cotacaoAceita->insurer_name }} · {{ $cotacaoAceita->insurance_type->label() }}</option>
+                        @endforeach
+                    </select>
+                    <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Preenche seguradora, prêmio e capital. Confira os dados e informe o número e a vigência da apólice emitida. Ao salvar, o contato passa a "Emitida" nos leads.</p>
+                </div>
+            @endif
+
             <div class="grid gap-4 @sm:grid-cols-2 @lg:grid-cols-3">
                 <div>
                     <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Tipo de seguro</label>

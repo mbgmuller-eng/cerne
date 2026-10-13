@@ -17,7 +17,14 @@
     });
 @endphp
 
-<div class="space-y-5">
+@php
+    $todosAnexos = $lead->attachments->merge($lead->quotes->flatMap->attachments);
+    $algumaLendo = $todosAnexos->contains(fn ($a) => in_array($a->extraction_status, [\App\Enums\ProcessingStatus::Pending, \App\Enums\ProcessingStatus::Processing], true));
+@endphp
+
+@php $grupos = \App\Support\LeadQuoteComparison::build($lead->quotes); @endphp
+
+<div class="space-y-5" @if ($algumaLendo) wire:poll.4s @endif>
     <div class="flex items-start justify-between gap-3">
         <div class="min-w-0">
             <h2 class="truncate text-sm font-semibold text-slate-900 dark:text-white">Cotações · {{ $lead->name }}</h2>
@@ -40,6 +47,28 @@
     @if ($showQuoteForm)
         <form wire:submit="saveQuote" class="space-y-4 rounded-xl border border-slate-100 p-4 dark:border-white/10" wire:key="quote-form">
             <p class="text-sm font-semibold text-slate-900 dark:text-white">{{ $editingQuoteId ? 'Editar cotação' : 'Nova cotação' }}</p>
+
+            @if ($reviewingAttachmentId)
+                @php
+                    $anexoLido = $todosAnexos->firstWhere('id', $reviewingAttachmentId);
+                    $opcoesLidas = count($anexoLido?->extraction_summary['cotacoes'] ?? []);
+                    $aplicadas = $anexoLido?->extraction_summary['aplicadas'] ?? [];
+                @endphp
+                <div class="space-y-1.5 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:bg-amber-500/10 dark:text-amber-200">
+                    <p><strong>Preenchido pela leitura automática</strong> de {{ $anexoLido?->original_filename }}. Confira cada campo com a simulação antes de salvar: nada é gravado até você salvar.</p>
+                    @if ($reviewUncertain !== [])
+                        <p>A leitura ficou em dúvida em: {{ implode(', ', $reviewUncertain) }}.</p>
+                    @endif
+                    @if ($opcoesLidas > 1)
+                        <p class="flex flex-wrap items-center gap-1.5">
+                            O PDF traz {{ $opcoesLidas }} opções:
+                            @for ($o = 0; $o < $opcoesLidas; $o++)
+                                <button type="button" wire:click="reviewReading('{{ $reviewingAttachmentId }}', {{ $o }})" wire:confirm="Carregar a opção {{ $o + 1 }}? O que você editou no formulário será trocado." class="rounded-full px-2 py-0.5 font-medium {{ $o === $reviewingItem ? 'bg-amber-700 text-white' : 'bg-white text-amber-800 ring-1 ring-amber-300 dark:bg-transparent dark:text-amber-200' }}">{{ $o + 1 }}{{ in_array($o, $aplicadas, true) ? ' (já cadastrada)' : '' }}</button>
+                            @endfor
+                        </p>
+                    @endif
+                </div>
+            @endif
 
             <div class="grid gap-3 @sm:grid-cols-2">
                 <div>
@@ -153,10 +182,30 @@
             </div>
         </form>
     @else
-        <button type="button" wire:click="newQuote" class="btn-secondary px-3 py-1.5 text-sm">+ Nova cotação</button>
+        <div class="flex flex-wrap items-center gap-2">
+            <button type="button" wire:click="newQuote" class="btn-secondary px-3 py-1.5 text-sm">+ Nova cotação</button>
+            @if ($grupos !== [])
+                <button type="button" wire:click="toggleComparison" class="btn-ghost px-3 py-1.5 text-sm">{{ $showComparison ? 'Voltar à lista' : 'Comparar cotações' }}</button>
+            @endif
+            @if ($aiReading)
+                <button type="button" wire:click="chooseAttachTarget('{{ $attachTarget === 'ia' ? '' : 'ia' }}')" class="btn-ghost px-3 py-1.5 text-sm">{{ $attachTarget === 'ia' ? 'Cancelar' : 'Ler simulação com IA' }}</button>
+            @endif
+        </div>
+
+        @if ($attachTarget === 'ia')
+            <div class="rounded-lg bg-slate-50 p-2.5 dark:bg-slate-800/60">
+                <p class="mb-1.5 text-xs text-slate-500 dark:text-slate-400">Envie o PDF da simulação. A IA lê seguradora, prêmio, capital e proteções e preenche a cotação para você conferir; nada é cadastrado sem a sua confirmação.</p>
+                <input type="file" wire:model="anexo" accept=".pdf" class="block w-full text-xs text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-slate-200 file:px-3 file:py-1.5 file:text-xs file:font-medium dark:text-slate-300 dark:file:bg-slate-700">
+                <p class="mt-1 text-xs text-slate-400" wire:loading wire:target="anexo">Enviando...</p>
+                @error('anexo') <p class="{{ $erro }}">{{ $message }}</p> @enderror
+            </div>
+        @endif
     @endif
 
     {{-- Cotações feitas -------------------------------------------------------- --}}
+    @if ($showComparison && $grupos !== [])
+        @include('livewire.consultant.partials.lead-quote-comparison', ['groups' => $grupos])
+    @else
     @forelse ($lead->quotes as $quote)
         @php
             $vencida = $quote->isExpired();
@@ -219,16 +268,11 @@
 
             {{-- A simulação em PDF --------------------------------------------------- --}}
             @if ($quote->attachments->isNotEmpty())
-                <ul class="space-y-1">
+                <div class="space-y-2">
                     @foreach ($quote->attachments as $anexo)
-                        <li class="flex items-center justify-between gap-2 text-xs" wire:key="anexo-{{ $anexo->id }}">
-                            <a href="{{ route('consultant.leads.attachment', $anexo) }}" target="_blank" rel="noopener" class="truncate font-medium text-brand-700 hover:underline dark:text-brand-300">{{ $anexo->original_filename }}</a>
-                            <span class="shrink-0 text-slate-400">{{ $anexo->sizeLabel() }}
-                                <button type="button" wire:click="deleteAttachment('{{ $anexo->id }}')" wire:confirm="Remover este arquivo?" class="ml-1 hover:text-red-700">remover</button>
-                            </span>
-                        </li>
+                        @include('livewire.consultant.partials.lead-attachment-row', ['anexo' => $anexo])
                     @endforeach
-                </ul>
+                </div>
             @endif
 
             @if ($attachTarget === $quote->id)
@@ -253,6 +297,7 @@
     @empty
         <p class="rounded-xl border border-dashed border-slate-300 px-4 py-6 text-center text-xs text-slate-400 dark:border-slate-600">Nenhuma cotação ainda. Cadastre as simulações que fizer para este contato.</p>
     @endforelse
+    @endif
 
     {{-- Arquivos do contato (CNH, CRLV, documentos em geral) ---------------------------- --}}
     <div class="space-y-2 border-t border-slate-100 pt-4 dark:border-white/10">
@@ -270,12 +315,7 @@
         @endif
 
         @forelse ($lead->attachments as $anexo)
-            <div class="flex items-center justify-between gap-2 text-xs" wire:key="geral-{{ $anexo->id }}">
-                <a href="{{ route('consultant.leads.attachment', $anexo) }}" target="_blank" rel="noopener" class="truncate font-medium text-brand-700 hover:underline dark:text-brand-300">{{ $anexo->original_filename }}</a>
-                <span class="shrink-0 text-slate-400">{{ $anexo->sizeLabel() }}
-                    <button type="button" wire:click="deleteAttachment('{{ $anexo->id }}')" wire:confirm="Remover este arquivo?" class="ml-1 hover:text-red-700">remover</button>
-                </span>
-            </div>
+            @include('livewire.consultant.partials.lead-attachment-row', ['anexo' => $anexo])
         @empty
             <p class="text-xs text-slate-400">Nenhum arquivo. PDF ou imagem, até 10 MB cada.</p>
         @endforelse

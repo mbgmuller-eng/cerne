@@ -289,3 +289,9 @@ ssh -p 65002 -i ~/.ssh/cerne_hostinger u165451165@89.117.7.59 "cd ~/cerne && php
 # conferiu? repita sem --dry-run, depois apague os arquivos do servidor
 ssh -p 65002 -i ~/.ssh/cerne_hostinger u165451165@89.117.7.59 "cd ~/cerne && php artisan cerne:gym-catalog-link-images ~/mapping.json && rm -rf ~/gym-catalog-images ~/mapping.json"
 ```
+
+## Leads de seguros (rotinas e ajustes)
+
+- **Anexos:** ficam no disco privado (`cerne.lead_files`). `cerne:purge-lead-files` (diário, 04:10) apaga os de leads perdidos há mais de 12 meses.
+- **Resumo diário de leads:** `resumo-de-leads` (08:00) manda uma notificação por profissional com cotações vencendo, contatos sem retorno e próximos passos atrasados. Idempotente por índice único (`lead_alert_digests`). Prazos: `CERNE_LEAD_ALERT_QUOTE_DAYS` (3) e `CERNE_LEAD_ALERT_STALE_DAYS` (7).
+- **Leitura da simulação por IA:** usa a mesma `ANTHROPIC_API_KEY` e a fila do banco da importação de apólices (`ExtractLeadQuoteJob`). Teto por profissional e por dia: `CERNE_LEAD_QUOTE_READS_PER_DAY` (20). O resultado fica no anexo e só vira cotação quando o profissional confere e salva.

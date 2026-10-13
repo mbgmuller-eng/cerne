@@ -24,7 +24,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'profile_id', 'member_id', 'broker_id', 'insured_person_name', 'insurance_type', 'insurer_name', 'policy_number', 'insured_item',
     'coverage_amount', 'coverages', 'monthly_premium', 'annual_premium', 'payment_frequency',
     'bank_account_id', 'start_date', 'expiry_date', 'is_active', 'beneficiaries',
-    'notes', 'source_document_id', 'created_by_user_id', 'is_private',
+    'notes', 'source_document_id', 'source_lead_quote_id', 'created_by_user_id', 'is_private',
 ])]
 class InsurancePolicy extends Model
 {

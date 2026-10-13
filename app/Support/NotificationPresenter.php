@@ -74,6 +74,11 @@ final class NotificationPresenter
                 'message' => self::juntar($titulo, isset($d['member_name']) ? 'para '.$d['member_name'] : null, ($d['days_left'] ?? 0) <= 0 ? 'é hoje' : 'é amanhã'),
                 'url' => route('health.care.index'),
             ],
+            'lead_follow_up_digest' => [
+                'heading' => 'Leads que pedem atenção',
+                'message' => implode('; ', \App\Notifications\LeadFollowUpDigest::linesFor((int) ($d['quotes_expiring'] ?? 0), (int) ($d['stale_leads'] ?? 0), (int) ($d['overdue_actions'] ?? 0))) ?: null,
+                'url' => route('consultant.leads'),
+            ],
             'document_processed' => [
                 'heading' => ($d['status'] ?? null) === 'completed' ? 'Importação concluída' : 'Falha na importação',
                 'message' => $titulo,
@@ -103,6 +108,13 @@ final class NotificationPresenter
         $d = $notificacao->data;
 
         [$modelo, $id] = match ($d['kind'] ?? null) {
+            'lead_follow_up_digest' => [
+                'heading' => 'Leads que pedem atenção',
+                'message' => (new \App\Notifications\LeadFollowUpDigest((int) ($d['quotes_expiring'] ?? 0), (int) ($d['stale_leads'] ?? 0), (int) ($d['overdue_actions'] ?? 0)))->lines() === []
+                    ? null
+                    : implode('; ', (new \App\Notifications\LeadFollowUpDigest((int) ($d['quotes_expiring'] ?? 0), (int) ($d['stale_leads'] ?? 0), (int) ($d['overdue_actions'] ?? 0)))->lines()),
+                'url' => route('consultant.leads'),
+            ],
             'document_processed' => [DocumentUpload::class, $d['document_upload_id'] ?? null],
             'fixed_bill_due_soon' => [FixedBillPayment::class, $d['fixed_bill_payment_id'] ?? null],
             'credit_card_invoice_due_soon' => [CreditCardInvoice::class, $d['credit_card_invoice_id'] ?? null],

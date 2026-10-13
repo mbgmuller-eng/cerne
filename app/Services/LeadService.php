@@ -134,6 +134,21 @@ class LeadService
         return $link;
     }
 
+    /**
+     * A cotação aceita virou apólice emitida: o lead passa a "Emitida" (reabrindo, se estava perdido) e o fato entra
+     * na linha do tempo dele. Idempotente: chamar de novo não repete a anotação.
+     */
+    public function markIssued(Lead $lead, LeadQuote $quote, ?string $userId = null): void
+    {
+        if ($lead->stage === LeadStage::Converted) {
+            return;
+        }
+
+        $lead->update(['stage' => LeadStage::Converted, 'lost_category' => null, 'lost_reason' => null, 'lost_at' => null]);
+
+        $this->logActivity($lead, LeadActivityType::Note, 'Apólice emitida a partir da cotação '.$quote->insurer_name.'.', CarbonImmutable::now(), $userId);
+    }
+
     /** Exclui o lead de vez, com os arquivos dele: o registro cai em cascata, o arquivo no disco não. */
     public function delete(Lead $lead): void
     {
