@@ -15,6 +15,7 @@ use App\Notifications\ClientBirthdayUpcoming;
 use App\Notifications\InsurancePolicyAnniversaryUpcoming;
 use App\Notifications\InsurancePolicyExpiringUpcoming;
 use App\Notifications\InvestmentMaturityUpcoming;
+use App\Support\ClientDisplayName;
 use App\Support\RecurringDate;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -192,17 +193,17 @@ class ImportantDatesService
 
         return FinancialProfile::query()
             ->whereIn('owner_user_id', $clientUserIds)
-            ->with('owner')
+            ->with(['owner', 'members.user'])
             ->get();
     }
 
     /**
      * @param  Collection<int, FinancialProfile>  $profiles
-     * @return array<string, string>
+     * @return array<string, string> profile_id => nome do cliente (o dono do perfil e, no casal, o cônjuge junto)
      */
     private function clientNamesByProfile(Collection $profiles): array
     {
-        return $profiles->mapWithKeys(fn (FinancialProfile $p) => [$p->id => $p->owner->name])->all();
+        return $profiles->mapWithKeys(fn (FinancialProfile $p) => [$p->id => ClientDisplayName::forProfile($p)])->all();
     }
 
     // -----------------------------------------------------------------

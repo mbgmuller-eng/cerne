@@ -17,6 +17,7 @@ use App\Models\InvestmentRecord;
 use App\Models\InvestmentSnapshot;
 use App\Models\Scopes\MemberPrivacyScope;
 use App\Models\User;
+use App\Support\ClientDisplayName;
 use App\Support\Money;
 use App\Support\PrivacyGovernedModels;
 use Carbon\CarbonImmutable;
@@ -173,17 +174,17 @@ class ConsultantPortfolioService
 
         return FinancialProfile::query()
             ->whereIn('owner_user_id', $clientUserIds)
-            ->with('owner')
+            ->with(['owner', 'members.user'])
             ->get();
     }
 
     /**
      * @param  Collection<int, FinancialProfile>  $profiles
-     * @return array<string, string> profile_id => nome do dono do perfil
+     * @return array<string, string> profile_id => nome do cliente (o dono do perfil e, no casal, o cônjuge junto)
      */
     private function clientNamesByProfile(Collection $profiles): array
     {
-        return $profiles->mapWithKeys(fn (FinancialProfile $p) => [$p->id => $p->owner->name])->all();
+        return $profiles->mapWithKeys(fn (FinancialProfile $p) => [$p->id => ClientDisplayName::forProfile($p)])->all();
     }
 
     /**
@@ -356,33 +357,13 @@ class ConsultantPortfolioService
             return ['name' => $profile->owner->name, 'tipo_perfil' => $tipoPerfil, 'parceiro' => $conjuge?->name, 'acessos' => 1, 'vida_financeira' => null];
         }
 
-        $titular = $profile->owner->name;
-        $parceiro = $conjuge->user->name;
-        $sobrenomeTitular = $this->sobrenome($titular);
-
-        $nome = ($sobrenomeTitular !== '' && $sobrenomeTitular === $this->sobrenome($parceiro))
-            ? $this->primeiroNome($titular).' e '.$parceiro
-            : $titular.' e '.$parceiro;
-
         return [
-            'name' => $nome,
+            'name' => ClientDisplayName::forProfile($profile, onlyWithLogin: true),
             'tipo_perfil' => $tipoPerfil,
             'parceiro' => $conjuge->name,
             'acessos' => 2,
             'vida_financeira' => PrivacyGovernedModels::anyPrivate($profile->id) ? 'separada' : 'unica',
         ];
-    }
-
-    private function sobrenome(string $nomeCompleto): string
-    {
-        $partes = explode(' ', trim($nomeCompleto));
-
-        return count($partes) > 1 ? end($partes) : '';
-    }
-
-    private function primeiroNome(string $nomeCompleto): string
-    {
-        return explode(' ', trim($nomeCompleto))[0];
     }
 
     /**
