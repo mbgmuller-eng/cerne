@@ -24,6 +24,7 @@ class ImportPolicyCertificates extends Command
         {--consultant= : E-mail do consultor dono da carteira}
         {--pdf-dir= : Pasta com os PDFs (nomes iguais ao campo "arquivo" do JSON)}
         {--accept= : Apólices (separadas por vírgula) cujo casamento por nome parcial você já conferiu}
+        {--birthdates-only : Só preenche a data de nascimento que falta no cadastro (não mexe em apólice nem em PDF)}
         {--apply : Grava de verdade (sem isto é só simulação)}';
 
     protected $description = 'Cria ou atualiza apólices de vida (Icatu, Azos) a partir dos PDFs e guarda o PDF em Documentos';
@@ -51,10 +52,11 @@ class ImportPolicyCertificates extends Command
             $this->option('pdf-dir'),
             $apply,
             array_filter(array_map('trim', explode(',', (string) $this->option('accept')))),
+            (bool) $this->option('birthdates-only'),
         );
 
         $this->table(
-            ['Status', 'Nome no PDF', 'Apólice', 'Cliente / pessoa', 'Ação', 'PDF', 'Observação'],
+            ['Status', 'Nome no PDF', 'Apólice', 'Cliente / pessoa', 'Ação', 'PDF', 'Aniversário', 'Observação'],
             array_map(fn (array $l) => [
                 $l['status'],
                 mb_substr($l['nome'], 0, 32),
@@ -62,6 +64,7 @@ class ImportPolicyCertificates extends Command
                 $l['cliente'] ? $l['cliente'].' / '.$l['membro'] : '-',
                 $l['acao'] ?? '-',
                 $l['documento'] ?? '-',
+                $l['aniversario'] ?? '-',
                 $l['motivo'] ?? $this->resumirMudancas($l['mudancas']),
             ], $linhas),
         );

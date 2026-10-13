@@ -250,6 +250,22 @@
                                     @error("rows.$i.fim") <p class="{{ $erro }}">{{ $message }}</p> @enderror
                                 </div>
 
+                                {{-- Aniversário do segurado, lido do papel: alimenta Datas importantes quando o cadastro está sem ele. --}}
+                                @if (($linha['nascimento'] ?? '') !== '')
+                                    <div class="@sm:col-span-2 rounded-lg bg-slate-50 px-3 py-2.5 dark:bg-white/5">
+                                        <label class="{{ $campo }}">Data de nascimento do segurado (no documento)</label>
+                                        <div class="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-2">
+                                            <input type="date" wire:model="rows.{{ $i }}.nascimento" class="input w-auto">
+                                            <label class="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
+                                                <input type="checkbox" wire:model="rows.{{ $i }}.salvar_nascimento" class="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500">
+                                                Guardar como aniversário da pessoa
+                                            </label>
+                                        </div>
+                                        <p class="mt-1 text-xs text-slate-400">Só é guardado se o cadastro da pessoa ainda estiver sem data. Uma data já cadastrada nunca é trocada.</p>
+                                        @error("rows.$i.nascimento") <p class="{{ $erro }}">{{ $message }}</p> @enderror
+                                    </div>
+                                @endif
+
                                 @unless ($atualizando)
                                     <div>
                                         <label class="{{ $campo }}">Membro</label>

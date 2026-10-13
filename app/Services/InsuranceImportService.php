@@ -34,6 +34,7 @@ class InsuranceImportService
         'seguradora' => 'seguradora',
         'numero_apolice' => 'número da apólice',
         'segurado' => 'pessoa segurada',
+        'segurado_nascimento' => 'nascimento do segurado',
         'objeto_segurado' => 'item segurado',
         'valor_segurado' => 'valor segurado',
         'coberturas' => 'proteções',
@@ -96,6 +97,9 @@ class InsuranceImportService
                 'numero' => trim((string) ($item['numero_apolice'] ?? '')),
                 'member_id' => $membro?->id ?? '',
                 'pessoa' => $membro === null ? $segurado : '',
+                // Aniversário do segurado, quando o papel traz: alimenta Datas importantes se o cadastro está sem ele.
+                'nascimento' => $this->data($item['segurado_nascimento'] ?? null),
+                'salvar_nascimento' => true,
                 'objeto' => trim((string) ($item['objeto_segurado'] ?? '')),
                 'valor_segurado' => $valorSegurado,
                 'premio' => $this->numero($item['premio'] ?? null),
@@ -133,7 +137,7 @@ class InsuranceImportService
     public function commit(DocumentUpload $documento, array $linhas, ?ProfileMember $autor): array
     {
         $resultado = DB::transaction(function () use ($documento, $linhas, $autor): array {
-            $criadas = $atualizadas = $historicas = 0;
+            $criadas = $atualizadas = $historicas = $aniversarios = 0;
             $importados = $documento->imported_item_indices ?? [];
             $excluidos = $documento->excluded_item_indices ?? [];
 
@@ -147,6 +151,7 @@ class InsuranceImportService
                 [$apolice, $nova, $versao, $soHistorico] = $this->gravar($linha);
                 $pdf = $this->anexarPdf($documento, $apolice, $autor);
                 $this->historico->attachDocument($versao, $pdf?->id);
+                $aniversarios += $this->preencherAniversario($apolice, $linha) ? 1 : 0;
 
                 if ($nova) {
                     $criadas++;
@@ -171,7 +176,7 @@ class InsuranceImportService
                 'committed_at' => $finalizado ? now() : null,
             ]);
 
-            return ['criadas' => $criadas, 'atualizadas' => $atualizadas, 'historicas' => $historicas, 'finalizado' => $finalizado];
+            return ['criadas' => $criadas, 'atualizadas' => $atualizadas, 'historicas' => $historicas, 'aniversarios' => $aniversarios, 'finalizado' => $finalizado];
         });
 
         // Já está em Documentos: a cópia da pasta de importação não serve mais. Fora da transação porque
@@ -180,7 +185,32 @@ class InsuranceImportService
             $documento->deleteFile();
         }
 
-        return ['criadas' => $resultado['criadas'], 'atualizadas' => $resultado['atualizadas'], 'historicas' => $resultado['historicas']];
+        return ['criadas' => $resultado['criadas'], 'atualizadas' => $resultado['atualizadas'], 'historicas' => $resultado['historicas'], 'aniversarios' => $resultado['aniversarios']];
+    }
+
+    /**
+     * Guarda a data de nascimento lida no papel como aniversário de quem é o segurado, quando a pessoa deixou marcado
+     * e o cadastro ainda não tem data. Uma data já cadastrada nunca é trocada.
+     *
+     * @param  array<string, mixed>  $linha
+     */
+    private function preencherAniversario(InsurancePolicy $apolice, array $linha): bool
+    {
+        $data = $this->data($linha['nascimento'] ?? null);
+
+        if ($data === '' || ! ($linha['salvar_nascimento'] ?? false) || $apolice->member_id === null) {
+            return false;
+        }
+
+        $membro = ProfileMember::query()->where('profile_id', $apolice->profile_id)->find($apolice->member_id);
+
+        if ($membro === null || $membro->birthdate !== null) {
+            return false;
+        }
+
+        $membro->update(['birthdate' => $data]);
+
+        return true;
     }
 
     /** @return array{0: InsurancePolicy, 1: bool, 2: \App\Models\InsurancePolicyRevision, 3: bool} apólice, se foi criada agora, a versão registrada e se foi só histórico */

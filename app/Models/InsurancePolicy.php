@@ -123,6 +123,32 @@ class InsurancePolicy extends Model
     }
 
     /**
+     * Fora as apólices-casca: as que a carga em planilha deixa só com seguradora e tipo (sem número, custo, capital
+     * nem proteções). A data de início delas é a do dia da carga, não a da apólice de verdade, então não servem
+     * para aniversário nem para avisos de data. Ver isPlaceholder().
+     */
+    public function scopeWithRealData(Builder $query): Builder
+    {
+        return $query->where(function (Builder $q): void {
+            $q->whereNotNull('policy_number')
+                ->orWhere('monthly_premium', '>', 0)
+                ->orWhereNotNull('annual_premium')
+                ->orWhereNotNull('coverage_amount')
+                ->orWhereRaw('JSON_LENGTH(coverages) > 0');
+        });
+    }
+
+    /** Apólice-casca: nada além de seguradora e tipo foi preenchido (ver scopeWithRealData). */
+    public function isPlaceholder(): bool
+    {
+        return blank($this->policy_number)
+            && bccomp((string) $this->monthly_premium, '0', 2) <= 0
+            && blank($this->annual_premium)
+            && blank($this->coverage_amount)
+            && blank($this->coverages);
+    }
+
+    /**
      * Custo mensal equivalente.
      *
      * Apólice anual custa o mesmo no ano, mas comparar R$ 2.400/ano com

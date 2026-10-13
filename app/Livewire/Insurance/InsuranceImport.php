@@ -165,6 +165,7 @@ class InsuranceImport extends Component
             $resultado['criadas'] ? $resultado['criadas'].($resultado['criadas'] === 1 ? ' apólice cadastrada' : ' apólices cadastradas') : null,
             $resultado['atualizadas'] ? $resultado['atualizadas'].($resultado['atualizadas'] === 1 ? ' apólice atualizada' : ' apólices atualizadas') : null,
             $resultado['historicas'] ? $resultado['historicas'].($resultado['historicas'] === 1 ? ' versão antiga guardada no histórico' : ' versões antigas guardadas no histórico') : null,
+            $resultado['aniversarios'] ? $resultado['aniversarios'].($resultado['aniversarios'] === 1 ? ' aniversário preenchido no cadastro' : ' aniversários preenchidos no cadastro') : null,
         ]);
         $this->mensagem = ($partes === [] ? 'Nenhuma apólice importada' : ucfirst(implode(' e ', $partes))).'. O PDF ficou guardado em Documentos.';
 
@@ -287,6 +288,8 @@ class InsuranceImport extends Component
                 "rows.$i.numero" => ['nullable', 'string', 'max:100'],
                 "rows.$i.member_id" => ['nullable', Rule::exists('profile_members', 'id')->where('profile_id', $perfilId)],
                 "rows.$i.pessoa" => ['nullable', 'string', 'max:255'],
+                "rows.$i.nascimento" => ['nullable', 'date', 'before:today'],
+                "rows.$i.salvar_nascimento" => ['boolean'],
                 "rows.$i.objeto" => ['nullable', 'string', 'max:255'],
                 "rows.$i.valor_segurado" => ['nullable', 'numeric', 'min:0'],
                 "rows.$i.premio" => ['required', 'numeric', 'min:0'],
@@ -332,6 +335,7 @@ class InsuranceImport extends Component
                 "rows.$i.seguradora" => 'seguradora'.$sufixo,
                 "rows.$i.numero" => 'número da apólice'.$sufixo,
                 "rows.$i.member_id" => 'membro'.$sufixo,
+                "rows.$i.nascimento" => 'data de nascimento'.$sufixo,
                 "rows.$i.valor_segurado" => 'valor segurado'.$sufixo,
                 "rows.$i.premio" => 'custo'.$sufixo,
                 "rows.$i.periodicidade" => 'periodicidade'.$sufixo,

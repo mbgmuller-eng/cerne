@@ -96,6 +96,8 @@ class ImportantDatesService
     public function upcomingPolicyAnniversaries(User $professional, Carbon $from, Carbon $to): Collection
     {
         return $this->activePoliciesFor($professional)
+            // Apólice-casca tem como início o dia da carga em planilha: o "aniversário" dela seria falso.
+            ->reject(fn (array $l) => $l['policy']->isPlaceholder())
             ->map(function (array $l) use ($from): array {
                 $apolice = $l['policy'];
 
@@ -293,6 +295,7 @@ class ImportantDatesService
 
         InsurancePolicy::withoutProfileScope()
             ->active()
+            ->withRealData()
             ->whereMonth('start_date', $alvo->month)
             ->whereDay('start_date', $alvo->day)
             ->with('profile')

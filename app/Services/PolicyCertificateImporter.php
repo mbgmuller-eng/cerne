@@ -58,7 +58,7 @@ class PolicyCertificateImporter
      * @param  list<string>  $aceitar  números de apólice cujo casamento por nome parcial uma pessoa já conferiu
      * @return list<array<string, mixed>> uma linha por certificado
      */
-    public function run(User $consultor, array $certificados, ?string $pdfDir, bool $apply, array $aceitar = []): array
+    public function run(User $consultor, array $certificados, ?string $pdfDir, bool $apply, array $aceitar = [], bool $soAniversarios = false): array
     {
         $this->reivindicadas = [];
         $aceitar = array_map(fn (string $n) => $this->digitos($n), $aceitar);
@@ -77,6 +77,7 @@ class PolicyCertificateImporter
                 'acao' => null,
                 'mudancas' => [],
                 'documento' => null,
+                'aniversario' => null,
                 'motivo' => null,
             ];
 
@@ -104,7 +105,9 @@ class PolicyCertificateImporter
             $this->entrarNoPerfil($consultor, $dono['perfil']);
 
             try {
-                $linha = $this->processar($cert, $dono, $consultor, $pdfDir, $apply, $linha);
+                $linha = $soAniversarios
+                    ? $this->soAniversario($cert, $dono, $apply, $linha)
+                    : $this->processar($cert, $dono, $consultor, $pdfDir, $apply, $linha);
             } finally {
                 app(ProfileContext::class)->clear();
             }
@@ -132,6 +135,8 @@ class PolicyCertificateImporter
 
         $existente = $this->apoliceExistente($cert, $membro);
         $dados = $this->dadosDaApolice($cert, $consultor, $membro);
+        $aniversario = $this->aniversario($cert, $membro);
+        $linha['aniversario'] = $this->rotuloAniversario($aniversario);
 
         if ($existente === null) {
             $linha['acao'] = 'criar';
@@ -160,7 +165,13 @@ class PolicyCertificateImporter
             return $linha;
         }
 
-        DB::transaction(function () use ($existente, $dados, $cert, $membro, $arquivo, $nomeAmigavel, $linha): void {
+        DB::transaction(function () use ($existente, $dados, $cert, $membro, $arquivo, $nomeAmigavel, $linha, $aniversario): void {
+            // O PDF traz a data de nascimento de quem é segurado: se o cadastro não tem, é daqui que ela vem
+            // (Datas importantes só lista aniversário de quem tem a data). Nunca sobrescreve uma data já cadastrada.
+            if ($aniversario['acao'] === 'preencher') {
+                $membro->update(['birthdate' => $aniversario['data']]);
+            }
+
             // A versão vale desde a data que o certificado diz ("informações vigentes a partir de").
             $vigenteDesde = CarbonImmutable::createFromFormat('d/m/Y', $cert['informacoes_vigentes'] ?? $cert['vigencia_apolice'])->toDateString();
 
@@ -196,6 +207,66 @@ class PolicyCertificateImporter
         });
 
         return $linha;
+    }
+
+    /**
+     * Modo "só aniversários": acha a pessoa pelas mesmas regras de sempre e só preenche a data de nascimento que falta.
+     * Não toca em apólice nem em PDF. Serve para o que já foi carregado antes de a carga passar a preencher isso.
+     *
+     * @return array<string, mixed>
+     */
+    private function soAniversario(array $cert, array $dono, bool $apply, array $linha): array
+    {
+        $membro = $dono['membro'];
+        $aniversario = $this->aniversario($cert, $membro);
+
+        $linha['acao'] = 'aniversário';
+        $linha['aniversario'] = $this->rotuloAniversario($aniversario);
+
+        if ($apply && $aniversario['acao'] === 'preencher') {
+            $membro->update(['birthdate' => $aniversario['data']]);
+        }
+
+        return $linha;
+    }
+
+    /**
+     * O que fazer com a data de nascimento do PDF em relação ao cadastro: preencher (cadastro vazio), conferir (igual),
+     * divergir (cadastro diferente: não mexe, só avisa) ou nada (o PDF não traz).
+     *
+     * @return array{acao: string, data: ?string, cadastro: ?string}
+     */
+    private function aniversario(array $cert, ProfileMember $membro): array
+    {
+        $cadastro = $membro->birthdate?->toDateString();
+        $data = null;
+
+        if (! empty($cert['nascimento'])) {
+            $lida = CarbonImmutable::createFromFormat('!d/m/Y', (string) $cert['nascimento']);
+            $data = $lida instanceof CarbonImmutable && $lida->format('d/m/Y') === $cert['nascimento'] ? $lida->toDateString() : null;
+        }
+
+        return [
+            'acao' => match (true) {
+                $data === null => 'sem_dado',
+                $cadastro === null => 'preencher',
+                $cadastro === $data => 'confere',
+                default => 'diverge',
+            },
+            'data' => $data,
+            'cadastro' => $cadastro,
+        ];
+    }
+
+    /** @param  array{acao: string, data: ?string, cadastro: ?string}  $a */
+    private function rotuloAniversario(array $a): string
+    {
+        return match ($a['acao']) {
+            'preencher' => 'preencher: '.CarbonImmutable::parse($a['data'])->format('d/m/Y'),
+            'confere' => 'confere',
+            'diverge' => 'DIVERGE: cadastro '.CarbonImmutable::parse($a['cadastro'])->format('d/m/Y').', PDF '.CarbonImmutable::parse($a['data'])->format('d/m/Y'),
+            default => '-',
+        };
     }
 
     /** @return array<string, mixed> */

@@ -81,6 +81,7 @@ class DocumentSchemas
                 '- tipo: vida (inclui prestamista e acidentes pessoais), carro (automóvel, moto), residencia (residencial, condomínio, empresarial), saude (plano de saúde ou odontológico), viagem, eletronicos (celular, notebook, equipamento portátil), civil (responsabilidade civil), outro.',
                 '- seguradora: o nome da seguradora que emite (não o corretor, o estipulante ou o banco que vendeu).',
                 '- segurado: nome da pessoa segurada ou titular; em apólice de bem, o proprietário/segurado nomeado.',
+                '- segurado_nascimento: a data de nascimento da pessoa segurada, em AAAA-MM-DD, quando o documento traz. Texto vazio se não traz; nunca calcule a partir da idade.',
                 '- objeto_segurado: o que está coberto quando é um bem (modelo, ano e placa do veículo; endereço do imóvel; aparelho). Texto vazio para seguro de pessoa.',
                 '- valor_segurado: o valor principal coberto: capital de morte ou capital segurado em vida; valor do bem ou limite máximo de indenização nos demais. Nulo se o documento não trouxer um valor único.',
                 '- coberturas: cada proteção contratada com seu valor (limite máximo de indenização ou capital) e a franquia como está escrita no documento (ex.: "R$ 3.500,00" ou "10% dos prejuízos"). Inclua assistências (24h, guincho) com valor nulo quando não houver; franquia em texto vazio quando não houver.',
@@ -221,6 +222,8 @@ class DocumentSchemas
             'seguradora' => ['type' => ['string', 'null']],
             'numero_apolice' => ['type' => ['string', 'null']],
             'segurado' => ['type' => ['string', 'null']],
+            // Texto e não "string ou nulo": a API recusa esquema com mais de 16 campos "valor ou nulo".
+            'segurado_nascimento' => ['type' => 'string', 'description' => 'AAAA-MM-DD; texto vazio quando o documento não traz'],
             'objeto_segurado' => ['type' => 'string', 'description' => 'Texto vazio quando não há bem segurado'],
             'valor_segurado' => $dinheiro,
             'coberturas' => [
@@ -258,7 +261,7 @@ class DocumentSchemas
             'observacoes_item' => ['type' => 'string', 'description' => 'Texto vazio quando não há'],
             'campos_incertos' => ['type' => 'array', 'items' => ['type' => 'string']],
         ], [
-            'tipo', 'seguradora', 'numero_apolice', 'segurado', 'objeto_segurado', 'valor_segurado', 'coberturas', 'premio',
+            'tipo', 'seguradora', 'numero_apolice', 'segurado', 'segurado_nascimento', 'objeto_segurado', 'valor_segurado', 'coberturas', 'premio',
             'periodicidade', 'premio_total_anual', 'inicio_vigencia', 'fim_vigencia', 'vigente_desde', 'beneficiarios', 'observacoes_item', 'campos_incertos',
         ]);
     }
