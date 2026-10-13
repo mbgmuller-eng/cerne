@@ -126,11 +126,12 @@
             <button wire:click="deleteLead('{{ $lead->id }}')" class="text-xs font-medium text-red-700 hover:underline dark:text-red-400">Sim</button>
             <button wire:click="cancelDeleteLead" class="text-xs text-slate-400 hover:text-slate-700 dark:hover:text-slate-300">Não</button>
         @else
-            <div class="relative ml-auto" x-data="{ open: false }" @click.outside="open = false">
-                <button type="button" @click="open = !open" class="btn-ghost px-1.5 py-1" aria-label="Mais ações">
+            <div class="relative ml-auto" x-data="{ open: false, top: 0, right: 0 }" @click.outside="open = false" @scroll.window="open = false">
+                {{-- Menu fixo na tela: dentro do quadro que rola para o lado, um menu absoluto seria cortado. --}}
+                <button type="button" @click="const r = $el.getBoundingClientRect(); top = r.bottom + 4; right = window.innerWidth - r.right; open = !open" class="btn-ghost px-1.5 py-1" aria-label="Mais ações">
                     <x-nav-icon name="dots" class="h-4 w-4" />
                 </button>
-                <div x-show="open" x-transition x-cloak @click="open = false" class="absolute right-0 z-10 mt-1 w-36 overflow-hidden rounded-xl bg-white py-1 shadow-card ring-1 ring-brand-950/5 dark:bg-slate-800 dark:ring-white/10">
+                <div x-show="open" x-transition x-cloak @click="open = false" :style="`top:${top}px;right:${right}px`" class="fixed z-30 w-36 overflow-hidden rounded-xl bg-white py-1 shadow-card ring-1 ring-brand-950/5 dark:bg-slate-800 dark:ring-white/10">
                     <button wire:click="editLead('{{ $lead->id }}')" type="button" class="block w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-700">Editar</button>
                     @unless ($encerrado)
                         <button wire:click="toggleMarkLost('{{ $lead->id }}')" type="button" class="block w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-700">Marcar perdido</button>

@@ -33,7 +33,7 @@ use Livewire\WithFileUploads;
  * Dois funis na mesma tela: consultoria (reunião, proposta) e seguros (dados, cotações, negociação, emissão). No de
  * seguros cada lead guarda as cotações feitas (valor estimado, validade, simulação em PDF).
  */
-#[Layout('components.layouts.app')]
+#[Layout('components.layouts.app', ['wide' => true])]
 class LeadsIndex extends Component
 {
     use WithFileUploads;

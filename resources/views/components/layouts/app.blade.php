@@ -1,4 +1,6 @@
 @php
+    // Telas largas (quadros em colunas) pedem a largura toda; as demais usam a medida normal, que cresce em monitores grandes.
+    $wide = $wide ?? false;
     /** @var \App\Support\ProfileContext $context */
     $context = app(\App\Support\ProfileContext::class);
     $profile = $context->profile();
@@ -526,7 +528,7 @@
             "$corBarraModulo border-b border-white/10" => $dentroDoPerfil,
             'border-b border-brand-950/5 bg-white/90 backdrop-blur dark:border-white/10 dark:bg-slate-900/90' => ! $dentroDoPerfil,
         ])>
-            <div class="mx-auto flex h-14 max-w-6xl items-center justify-between gap-3 px-4">
+            <div class="mx-auto flex h-14 max-w-6xl 2xl:max-w-[96rem] items-center justify-between gap-3 px-4">
                 <a href="{{ route('dashboard') }}" @class([
                     'flex shrink-0 items-center gap-2 font-display text-xl font-semibold tracking-tight',
                     'text-white' => $dentroDoPerfil,
@@ -607,7 +609,8 @@
         </header>
 
         <main @class([
-            'mx-auto w-full max-w-6xl flex-1 px-4 py-6 sm:px-6 sm:py-8 lg:px-10 lg:py-10',
+            'mx-auto w-full flex-1 px-4 py-6 sm:px-6 sm:py-8 lg:px-10 lg:py-10',
+            'max-w-6xl 2xl:max-w-[96rem]' => ! $wide,
             'pb-24 lg:pb-10' => $mostraAsideDesktop,  // espaço para a barra inferior no celular
         ])>
             @if (session('status'))

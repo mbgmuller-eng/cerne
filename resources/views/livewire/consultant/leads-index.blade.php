@@ -198,10 +198,12 @@
 
     {{-- Quadro — sem arrastar-e-soltar de propósito: os botões "Avançar/Voltar"
          funcionam igual no celular. --}}
-    <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+    {{-- Uma linha só a partir do tablet: as colunas dividem a largura e, quando não cabem com folga, a linha rola
+         para o lado em vez de quebrar em duas. No celular ficam empilhadas. --}}
+    <div class="space-y-6 md:grid md:grid-flow-col md:auto-cols-[minmax(12rem,1fr)] md:gap-4 md:space-y-0 md:overflow-x-auto md:pb-4">
         @foreach ($openStages as $stageCase)
             @php $leadsDaColuna = $leadsByStage->get($stageCase->value, collect()); @endphp
-            <div class="space-y-3">
+            <div class="min-w-0 space-y-3">
                 <div class="flex items-center gap-2 px-1">
                     <span class="h-2.5 w-2.5 shrink-0 rounded-full" style="background: {{ $stageCase->color() }}"></span>
                     <h2 class="text-sm font-semibold text-slate-800 dark:text-slate-200">{{ $stageCase->labelFor($kind) }}</h2>
