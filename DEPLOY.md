@@ -254,6 +254,8 @@ ssh -p 65002 -i ~/.ssh/cerne_hostinger u165451165@89.117.7.59 "cd ~/cerne && php
 ssh -p 65002 -i ~/.ssh/cerne_hostinger u165451165@89.117.7.59 "cd ~/cerne && php artisan cerne:import-policies ~/apolices.json --consultant=EMAIL_DO_CONSULTOR --pdf-dir=../certificados --apply && rm -rf ~/certificados ~/apolices.json"
 ```
 
+Serve também para a **Azos** (e outra seguradora que se acrescente): o leitor do PDF acrescenta ao item do JSON as chaves opcionais `seguradora`, `seguradora_curta`, `notas`, `vencimento`, `capital_principal`, `padronizar_coberturas`, `email_pdf` e a `franquia` de cada cobertura (descritas em `PolicyCertificateImporter`). A apólice-casca que a carga em planilha deixou (mesma seguradora, sem número) é preenchida em vez de criar outra. Quando a apólice-casca não tem custo, capital nem proteções, o histórico não grava uma linha "Valores anteriores" vazia.
+
 Só age em clientes **ativos** do consultor. Casamento por CPF, ou por nome (e nascimento quando o cadastro tem); nome só parecido, dois clientes com o mesmo nome ou apólice já cadastrada para outro cliente viram `revisar` e não são aplicados. Apólice existente (mesmo número) é atualizada, não duplicada; rodar de novo não repete apólice nem PDF.
 
 ## Unificar dois clientes como casal

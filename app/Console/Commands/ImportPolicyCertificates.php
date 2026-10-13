@@ -10,6 +10,9 @@ use Illuminate\Console\Command;
  * Carga de certificados de seguro de vida lidos dos PDFs (ver DEPLOY.md). O JSON traz um item por
  * certificado: arquivo, nome, cpf, nascimento, certificado, apolice, produto, emissao, premio_total,
  * periodicidade, forma_pagamento, indice, vigencia_apolice, coberturas[], beneficiarios[].
+ * Para outra seguradora (hoje a Azos) o item traz também as chaves opcionais descritas em
+ * PolicyCertificateImporter: seguradora, seguradora_curta, notas, vencimento, capital_principal,
+ * padronizar_coberturas, email_pdf e a franquia de cada cobertura.
  *
  * Sem --apply nada é gravado: o relatório mostra quem seria criado, atualizado ou deixado para
  * revisão, para uma pessoa conferir antes (dado extraído de PDF não entra sem olho humano).
@@ -23,7 +26,7 @@ class ImportPolicyCertificates extends Command
         {--accept= : Apólices (separadas por vírgula) cujo casamento por nome parcial você já conferiu}
         {--apply : Grava de verdade (sem isto é só simulação)}';
 
-    protected $description = 'Cria ou atualiza apólices de vida a partir de certificados e guarda o PDF em Documentos';
+    protected $description = 'Cria ou atualiza apólices de vida (Icatu, Azos) a partir dos PDFs e guarda o PDF em Documentos';
 
     public function handle(PolicyCertificateImporter $importador): int
     {

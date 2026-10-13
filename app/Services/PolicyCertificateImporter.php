@@ -13,6 +13,7 @@ use App\Models\Insurer;
 use App\Models\InsurancePolicy;
 use App\Models\ProfileMember;
 use App\Models\User;
+use App\Support\LifeCoverage;
 use App\Support\PersonName;
 use App\Support\ProfileContext;
 use Carbon\CarbonImmutable;
@@ -22,13 +23,20 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 /**
- * Carga em lote de certificados de seguro de vida (hoje Icatu): acha o cliente do consultor
+ * Carga em lote de certificados de seguro de vida (Icatu e Azos): acha o cliente do consultor
  * dono de cada certificado, cria ou atualiza a apólice e guarda o PDF em Documentos, já ligado
  * à apólice.
  *
  * Só age sobre clientes ATIVOS do consultor informado, com o mesmo contexto que ele teria na
  * tela (ProfileContext de consultor), então privacidade do casal e escopos valem como no app.
  * Casamento ambíguo ou fraco nunca é aplicado: vira "revisar" e fica para uma pessoa decidir.
+ *
+ * Sem nenhuma chave extra o certificado é tratado como Icatu (o primeiro uso). Chaves opcionais
+ * por certificado para outras seguradoras: `seguradora` e `seguradora_curta` (nome gravado e nome nos
+ * Documentos), `notas` (texto da observação, no lugar do texto padrão da Icatu), `vencimento` (d/m/Y),
+ * `capital_principal` (o valor da apólice; nulo quando não há "morte qualquer causa"),
+ * `padronizar_coberturas` (aplica o padrão do Cerne, ver LifeCoverage), `coberturas[].franquia` e
+ * `email_pdf` (o e-mail que consta no PDF: se for o de alguém da carteira, casa por ele; senão cai no nome).
  */
 class PolicyCertificateImporter
 {
@@ -137,7 +145,7 @@ class PolicyCertificateImporter
             return ['status' => 'erro', 'motivo' => 'PDF não encontrado na pasta'] + $linha;
         }
 
-        $nomeAmigavel = 'Apólice Icatu '.$cert['apolice'].'.pdf';
+        $nomeAmigavel = 'Apólice '.$this->seguradoraCurta($cert).' '.$cert['apolice'].'.pdf';
 
         if ($existente !== null) {
             $linha['documento'] = Document::query()
@@ -157,9 +165,9 @@ class PolicyCertificateImporter
             $vigenteDesde = CarbonImmutable::createFromFormat('d/m/Y', $cert['informacoes_vigentes'] ?? $cert['vigencia_apolice'])->toDateString();
 
             if ($existente === null) {
-                Insurer::resolveOrSuggest(self::INSURER);
+                Insurer::resolveOrSuggest($this->seguradora($cert));
                 $apolice = InsurancePolicy::create($dados + [
-                    'insurer_name' => self::INSURER,
+                    'insurer_name' => $this->seguradora($cert),
                     'is_active' => true,
                     'created_by_user_id' => auth()->id(),
                 ]);
@@ -176,7 +184,7 @@ class PolicyCertificateImporter
                     new UploadedFile($arquivo, $nomeAmigavel, 'application/pdf', null, true),
                     [
                         'category' => DocumentCategory::InsurancePolicy->value,
-                        'title' => 'Apólice Icatu '.$cert['apolice'],
+                        'title' => 'Apólice '.$this->seguradoraCurta($cert).' '.$cert['apolice'],
                         'member_id' => $membro->id,
                         'insurance_policy_id' => $apolice->id,
                     ],
@@ -201,7 +209,8 @@ class PolicyCertificateImporter
         $maior = '0';
         foreach ($cert['coberturas'] as $cobertura) {
             $valor = (string) $cobertura['titular'];
-            $coberturas[] = ['name' => $cobertura['name'], 'value' => $valor];
+            $coberturas[] = ['name' => $cobertura['name'], 'value' => $valor]
+                + (! empty($cobertura['franquia']) ? ['deductible' => $cobertura['franquia']] : []);
 
             if (str_starts_with($cobertura['name'], 'Morte')) {
                 $morte = $valor;
@@ -211,12 +220,18 @@ class PolicyCertificateImporter
             }
         }
 
-        $notas = array_filter([
-            'Certificado Icatu nº '.$cert['certificado'].' ('.$cert['produto'].'), emitido em '.$cert['emissao'].'.',
-            ! empty($cert['forma_pagamento']) ? 'Pagamento: '.$cert['forma_pagamento'].'.' : null,
-            ! empty($cert['indice']) ? 'Atualização anual: '.$cert['indice'].'.' : null,
-            'Seguro vitalício enquanto o prêmio estiver em dia.',
-        ]);
+        if (! empty($cert['padronizar_coberturas'])) {
+            $coberturas = LifeCoverage::standardize($coberturas);
+        }
+
+        $notas = isset($cert['notas'])
+            ? [(string) $cert['notas']]
+            : array_filter([
+                'Certificado Icatu nº '.$cert['certificado'].' ('.$cert['produto'].'), emitido em '.$cert['emissao'].'.',
+                ! empty($cert['forma_pagamento']) ? 'Pagamento: '.$cert['forma_pagamento'].'.' : null,
+                ! empty($cert['indice']) ? 'Atualização anual: '.$cert['indice'].'.' : null,
+                'Seguro vitalício enquanto o prêmio estiver em dia.',
+            ]);
 
         return [
             'member_id' => $membro->id,
@@ -224,18 +239,20 @@ class PolicyCertificateImporter
             'broker_id' => $consultor->isBroker() ? $consultor->id : null,
             'insurance_type' => InsuranceType::Vida,
             'policy_number' => $cert['apolice'],
-            'coverage_amount' => $morte ?? $maior,
+            // Sem "morte qualquer causa" (ex.: só doenças graves) não há capital principal a inventar:
+            // quem informa `capital_principal` (mesmo nulo) assume essa decisão.
+            'coverage_amount' => array_key_exists('capital_principal', $cert) ? $cert['capital_principal'] : ($morte ?? $maior),
             'coverages' => $coberturas,
             'beneficiaries' => array_map(fn (array $b) => [
                 'name' => $b['name'],
                 'percentage' => $b['percentage'],
                 'relationship' => $b['relationship'],
-            ], $cert['beneficiarios']),
+            ], $cert['beneficiarios'] ?? []),
             'monthly_premium' => $anual ? bcdiv($premio, '12', 2) : $premio,
             'annual_premium' => $anual ? $premio : null,
             'payment_frequency' => $anual ? PaymentFrequency::Annual : PaymentFrequency::Monthly,
             'start_date' => CarbonImmutable::createFromFormat('d/m/Y', $cert['vigencia_apolice'])->toDateString(),
-            'expiry_date' => null,
+            'expiry_date' => ! empty($cert['vencimento']) ? CarbonImmutable::createFromFormat('d/m/Y', $cert['vencimento'])->toDateString() : null,
             'notes' => implode(' ', $notas),
         ];
     }
@@ -248,6 +265,10 @@ class PolicyCertificateImporter
     private function diferencas(InsurancePolicy $atual, array $novos): array
     {
         $campos = ['coverage_amount', 'monthly_premium', 'annual_premium', 'start_date', 'policy_number', 'member_id'];
+        // O vencimento só entra no relatório quando o certificado informa um (Icatu é vitalícia: sempre nulo).
+        if ($novos['expiry_date'] !== null) {
+            $campos[] = 'expiry_date';
+        }
         $mudou = [];
 
         foreach ($campos as $campo) {
@@ -275,11 +296,13 @@ class PolicyCertificateImporter
             return $porNumero;
         }
 
+        $marca = Str::lower(Str::ascii($this->seguradoraCurta($cert)));
+
         $semNumero = $todas->filter(fn (InsurancePolicy $p) => blank($p->policy_number)
             && ! in_array($p->id, $this->reivindicadas, true)
             && $p->member_id === $membro->id
             && $p->insurance_type === InsuranceType::Vida
-            && str_contains(Str::lower(Str::ascii($p->insurer_name)), 'icatu'));
+            && str_contains(Str::lower(Str::ascii($p->insurer_name)), $marca));
 
         if ($semNumero->count() !== 1) {
             return null;
@@ -369,6 +392,12 @@ class PolicyCertificateImporter
             return $candidato['email'] === Str::lower(trim($cert['email'])) ? 100 : 0;
         }
 
+        // E-mail que consta no PDF: se for o de alguém da carteira, é a pessoa. Se não for, não conta contra:
+        // o cadastro pode ter outro e-mail, e o casamento segue por CPF ou nome.
+        if (! empty($cert['email_pdf']) && $candidato['email'] === Str::lower(trim($cert['email_pdf']))) {
+            return 100;
+        }
+
         $cpf = ! empty($cert['cpf']) ? $this->digitos($cert['cpf']) : null;
         if ($cpf !== null && $candidato['cpf'] !== null) {
             return $cpf === $candidato['cpf'] ? 100 : 0;
@@ -417,6 +446,18 @@ class PolicyCertificateImporter
     private function tokens(string $nome): array
     {
         return PersonName::tokens($nome);
+    }
+
+    /** Nome gravado na apólice. */
+    private function seguradora(array $cert): string
+    {
+        return $cert['seguradora'] ?? self::INSURER;
+    }
+
+    /** Nome curto, usado nos Documentos ("Apólice Azos 0569...") e para achar a apólice-casca da carga em planilha. */
+    private function seguradoraCurta(array $cert): string
+    {
+        return $cert['seguradora_curta'] ?? 'Icatu';
     }
 
     private function digitos(?string $valor): string

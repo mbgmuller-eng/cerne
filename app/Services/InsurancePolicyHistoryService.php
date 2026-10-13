@@ -97,6 +97,12 @@ class InsurancePolicyHistoryService
      */
     private function ensureCurrentRepresented(InsurancePolicy $policy, array $antes, string $efetiva): void
     {
+        // Apólice-casca (cadastrada só com seguradora e tipo, sem custo, capital nem proteções, como a carga em
+        // planilha deixa): não há situação anterior a guardar. Uma linha "Valores anteriores: R$ 0,00" só confundiria.
+        if ($this->semNenhumaInformacao($antes)) {
+            return;
+        }
+
         $ultima = $this->versoes($policy)->first();
 
         if ($ultima !== null && ! $this->differs($this->snapshotOfRevision($ultima), $antes)) {
@@ -111,6 +117,15 @@ class InsurancePolicyHistoryService
         }
 
         $this->record($policy, $data, $antes, PolicyRevisionSource::Baseline, null);
+    }
+
+    /** @param  array<string, mixed>  $snapshot já normalizado */
+    private function semNenhumaInformacao(array $snapshot): bool
+    {
+        return bccomp((string) $snapshot['monthly_premium'], '0', 2) === 0
+            && $snapshot['annual_premium'] === null
+            && $snapshot['coverage_amount'] === null
+            && $snapshot['coverages'] === null;
     }
 
     /**
