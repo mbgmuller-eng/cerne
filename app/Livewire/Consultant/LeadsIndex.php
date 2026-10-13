@@ -124,6 +124,8 @@ class LeadsIndex extends Component
 
     public bool $showQuotes = false;
 
+    public bool $showRenewalSettings = false;
+
     public ?string $quotesLeadId = null;
 
     public bool $showQuoteForm = false;
@@ -435,6 +437,17 @@ class LeadsIndex extends Component
             $service->markIssued($lead, null, auth()->id());
             session()->flash('status', 'Negócio marcado como fechado.');
         }
+    }
+
+    public function toggleRenewalSettings(): void
+    {
+        $this->showRenewalSettings = ! $this->showRenewalSettings;
+    }
+
+    #[\Livewire\Attributes\On('renewal-settings-saved')]
+    public function closeRenewalSettings(): void
+    {
+        $this->showRenewalSettings = false;
     }
 
     public function convertLead(string $id, LeadService $service): void

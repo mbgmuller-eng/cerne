@@ -142,6 +142,7 @@ class ImportantDatesService
     {
         return $this->activePoliciesFor($professional)
             ->filter(fn (array $l) => $l['policy']->expiry_date !== null
+                && ! $l['policy']->auto_renews
                 && $l['policy']->expiry_date->isBetween($from->copy()->startOfDay(), $to->copy()->endOfDay()))
             ->map(fn (array $l) => $l + ['occurrence_date' => $l['policy']->expiry_date])
             ->sortBy('occurrence_date')
@@ -352,6 +353,7 @@ class ImportantDatesService
 
         InsurancePolicy::withoutProfileScope()
             ->active()
+            ->where('auto_renews', false)
             ->whereDate('expiry_date', $alvo->toDateString())
             ->with('profile')
             ->chunkById(200, function ($apolices) use (&$notificados): void {

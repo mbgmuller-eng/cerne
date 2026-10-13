@@ -23,7 +23,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 #[Fillable([
     'profile_id', 'member_id', 'broker_id', 'insured_person_name', 'insurance_type', 'insurer_name', 'policy_number', 'insured_item',
     'coverage_amount', 'coverages', 'monthly_premium', 'annual_premium', 'payment_frequency',
-    'bank_account_id', 'start_date', 'expiry_date', 'is_active', 'beneficiaries',
+    'bank_account_id', 'start_date', 'expiry_date', 'auto_renews', 'is_active', 'beneficiaries',
     'notes', 'source_document_id', 'source_lead_quote_id', 'created_by_user_id', 'is_private',
 ])]
 class InsurancePolicy extends Model
@@ -41,6 +41,7 @@ class InsurancePolicy extends Model
             'start_date' => 'date',
             'expiry_date' => 'date',
             'is_active' => 'boolean',
+            'auto_renews' => 'boolean',
             'is_private' => 'boolean',
             // Funciona igual em MySQL e MariaDB; a diferença entre os dois
             // só apareceria se consultássemos JSON pelo banco.
@@ -197,9 +198,11 @@ class InsurancePolicy extends Model
         return bccomp($this->normalizedMonthlyCost(), '0', 2) === 0;
     }
 
+    /** Apólice que renova sozinha não "vence": o aviso de vencimento só atrapalharia. */
     public function isExpiring(int $dias = 30): bool
     {
-        return $this->expiry_date !== null
+        return ! $this->auto_renews
+            && $this->expiry_date !== null
             && $this->expiry_date->isBetween(now(), now()->addDays($dias));
     }
 

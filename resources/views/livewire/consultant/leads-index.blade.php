@@ -17,6 +17,7 @@
 
         <div class="flex items-center gap-2">
             <a href="{{ route('consultant.leads.metrics', ['aba' => $aba]) }}" class="btn-ghost px-3 py-1.5">Métricas</a>
+            <button type="button" wire:click="toggleRenewalSettings" class="btn-ghost px-3 py-1.5">Renovações</button>
             <button wire:click="toggleLeadForm" class="btn-primary px-3 py-1.5">+ Novo contato</button>
         </div>
     </div>
@@ -209,6 +210,13 @@
                 <button type="submit" class="btn-primary px-4 py-2" wire:loading.attr="disabled">{{ $editingLeadId ? 'Salvar alterações' : 'Salvar contato' }}</button>
             </div>
         </form>
+    </x-modal>
+
+    {{-- Preferências de renovação -------------------------------------- --}}
+    <x-modal wire-model="showRenewalSettings" max-width="lg">
+        @if ($showRenewalSettings)
+            <livewire:consultant.lead-renewal-settings />
+        @endif
     </x-modal>
 
     {{-- Cotações e anexos do lead -------------------------------------- --}}

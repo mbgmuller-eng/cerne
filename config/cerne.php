@@ -190,6 +190,9 @@ return [
     'lead_automation' => [
         'renewal_days' => (int) env('CERNE_LEAD_RENEWAL_DAYS', 45),
         'contact_days_before' => (int) env('CERNE_LEAD_RENEWAL_CONTACT_DAYS', 30),
+        // Cada profissional escolhe os tipos que geram lead de renovação. Sem escolha, todos menos vida: o seguro de
+        // vida costuma renovar sozinho.
+        'renewal_default_types' => ['carro', 'residencia', 'saude', 'viagem', 'eletronicos', 'civil', 'outro'],
         'cross_sell_types' => ['vida', 'residencia', 'saude'],
     ],
 

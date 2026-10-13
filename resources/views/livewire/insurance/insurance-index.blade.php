@@ -174,6 +174,11 @@
                 </div>
 
                 <div class="flex items-center gap-2 pt-5">
+                    <input type="checkbox" wire:model="policyAutoRenews" id="policyAutoRenews" class="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500">
+                    <label for="policyAutoRenews" class="text-sm text-slate-600 dark:text-slate-400">Renova automaticamente</label>
+                </div>
+
+                <div class="flex items-center gap-2 pt-5">
                     <input type="checkbox" wire:model="policyIsPrivate" id="policyIsPrivate" class="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500">
                     <label for="policyIsPrivate" class="text-sm text-slate-600 dark:text-slate-400">Ocultar do cônjuge</label>
                 </div>

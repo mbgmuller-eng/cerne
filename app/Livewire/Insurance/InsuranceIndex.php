@@ -76,6 +76,9 @@ class InsuranceIndex extends Component
 
     public string $policyExpiryDate = '';
 
+    /** Renova sozinha no vencimento: não gera lead de renovação nem aviso de vencimento. */
+    public bool $policyAutoRenews = false;
+
     public string $policyNotes = '';
 
     public bool $policyIsPrivate = false;
@@ -176,6 +179,7 @@ class InsuranceIndex extends Component
         $this->policyPaymentFrequency = $apolice->payment_frequency->value;
         $this->policyStartDate = $apolice->start_date->toDateString();
         $this->policyExpiryDate = $apolice->expiry_date?->toDateString() ?? '';
+        $this->policyAutoRenews = $apolice->auto_renews;
         $this->policyNotes = (string) $apolice->notes;
         $this->policyIsPrivate = $apolice->is_private;
         $this->showPolicyForm = true;
@@ -238,6 +242,7 @@ class InsuranceIndex extends Component
             'payment_frequency' => $data['policyPaymentFrequency'],
             'start_date' => $data['policyStartDate'],
             'expiry_date' => $data['policyExpiryDate'] !== '' ? $data['policyExpiryDate'] : null,
+            'auto_renews' => $this->policyAutoRenews,
             'notes' => $data['policyNotes'] !== '' ? $data['policyNotes'] : null,
             'is_private' => $this->policyIsPrivate,
         ];
@@ -293,7 +298,7 @@ class InsuranceIndex extends Component
         $this->reset(
             'editingPolicyId', 'policyMemberId', 'policyBrokerId', 'policyInsuredPersonName', 'policyInsurerName', 'policyNumber',
             'policyInsuredItem', 'policyCoverageAmount', 'policyAnnualPremium', 'policyExpiryDate', 'policyNotes',
-            'policyIsPrivate', 'policySourceQuoteId',
+            'policyIsPrivate', 'policySourceQuoteId', 'policyAutoRenews',
         );
         $this->policyInsuranceType = 'vida';
         $this->policyMonthlyPremium = '0';

@@ -53,11 +53,25 @@ class LeadAutomationService
         return $criados;
     }
 
+    /**
+     * As escolhas do profissional para a renovação: quais tipos de seguro geram lead e com quantos dias de antecedência.
+     *
+     * @return array{types: list<string>, days: int}
+     */
+    public function renewalSettings(User $profissional): array
+    {
+        return [
+            'types' => $profissional->renewal_lead_types ?? config('cerne.lead_automation.renewal_default_types'),
+            'days' => (int) ($profissional->renewal_lead_days ?? config('cerne.lead_automation.renewal_days')),
+        ];
+    }
+
     /** @return int quantos leads foram criados para este profissional */
     public function createRenewalLeads(User $profissional, ?Carbon $hoje = null): int
     {
+        $escolhas = $this->renewalSettings($profissional);
         $de = ($hoje ?? Carbon::now())->copy()->startOfDay();
-        $ate = $de->copy()->addDays((int) config('cerne.lead_automation.renewal_days'));
+        $ate = $de->copy()->addDays($escolhas['days']);
         $criados = 0;
 
         // Apólice com vencimento renova no vencimento; sem vencimento (vida vitalícia, por exemplo), no aniversário.
@@ -65,7 +79,11 @@ class LeadAutomationService
         $aniversarios = $this->dates->upcomingPolicyAnniversaries($profissional, $de, $ate)
             ->reject(fn (array $l) => $l['policy']->expiry_date !== null || $l['years_completing'] < 1);
 
-        foreach ($vencimentos->concat($aniversarios) as $item) {
+        // Fora o que o profissional não quer tratar como renovação (tipo desligado) e a apólice que renova sozinha.
+        $candidatos = $vencimentos->concat($aniversarios)->reject(fn (array $l) => $l['policy']->auto_renews
+            || ! in_array($l['policy']->insurance_type->value, $escolhas['types'], true));
+
+        foreach ($candidatos as $item) {
             if ($this->createRenewalLead($profissional, $item['policy'], $item['client_name'], $item['occurrence_date'], $de)) {
                 $criados++;
             }

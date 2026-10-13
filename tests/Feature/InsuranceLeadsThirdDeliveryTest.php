@@ -9,6 +9,11 @@ use App\Enums\LeadLostReason;
 use App\Enums\LeadSource;
 use App\Enums\LeadStage;
 use App\Livewire\Consultant\LeadMetrics;
+use App\Livewire\Consultant\LeadRenewalSettings;
+use App\Livewire\Insurance\InsuranceIndex;
+use App\Services\ImportantDatesService;
+use App\Support\ProfileContext;
+use Illuminate\Support\Facades\Notification;
 use App\Livewire\Consultant\LeadsIndex;
 use App\Models\ConsultantClient;
 use App\Models\FinancialProfile;
@@ -121,8 +126,8 @@ class InsuranceLeadsThirdDeliveryTest extends TestCase
     {
         Carbon::setTestNow('2026-02-10');
         [$consultor, $perfil] = $this->clienteVinculado();
-        // Vida vitalícia: sem vencimento; completa mais um ano em 01/03/2026.
-        $this->apolice($perfil, ['insurance_type' => InsuranceType::Vida, 'start_date' => '2024-03-01', 'expiry_date' => null]);
+        // Sem vencimento (saúde, por exemplo); completa mais um ano em 01/03/2026.
+        $this->apolice($perfil, ['insurance_type' => InsuranceType::Saude, 'start_date' => '2024-03-01', 'expiry_date' => null]);
 
         self::assertSame(1, app(LeadAutomationService::class)->createRenewalLeads($consultor));
         self::assertStringContainsString('mais um ano', Lead::query()->sole()->notes);
@@ -154,7 +159,7 @@ class InsuranceLeadsThirdDeliveryTest extends TestCase
         $corretor = User::factory()->broker()->create();
         [, $perfil] = $this->clienteVinculado($corretor);
         $this->apolice($perfil, ['expiry_date' => '2026-11-10', 'broker_id' => null, 'insurer_name' => 'De outro corretor']);
-        $minha = $this->apolice($perfil, ['expiry_date' => '2026-11-12', 'broker_id' => $corretor->id, 'insurer_name' => 'Minha', 'insurance_type' => InsuranceType::Vida]);
+        $minha = $this->apolice($perfil, ['expiry_date' => '2026-11-12', 'broker_id' => $corretor->id, 'insurer_name' => 'Minha', 'insurance_type' => InsuranceType::Residencia]);
 
         self::assertSame(1, app(LeadAutomationService::class)->createRenewalLeads($corretor));
         self::assertSame($minha->id, Lead::query()->sole()->source_policy_id);
@@ -244,6 +249,159 @@ class InsuranceLeadsThirdDeliveryTest extends TestCase
         self::assertNull(Lead::query()->sole()->client_profile_id);
     }
 
+    // ---- renovação por vontade do profissional
+
+    public function test_por_padrao_vida_nao_gera_lead_de_renovacao_mas_os_outros_tipos_geram(): void
+    {
+        Carbon::setTestNow('2026-10-20');
+        [$consultor, $perfil] = $this->clienteVinculado();
+        $this->apolice($perfil, ['insurance_type' => InsuranceType::Vida, 'expiry_date' => '2026-11-10']);
+        $this->apolice($perfil, ['insurance_type' => InsuranceType::Residencia, 'expiry_date' => '2026-11-12']);
+
+        self::assertSame(1, app(LeadAutomationService::class)->createRenewalLeads($consultor));
+        self::assertSame(['residencia'], Lead::query()->sole()->interests);
+    }
+
+    public function test_profissional_liga_vida_e_desliga_carro_nas_preferencias(): void
+    {
+        Carbon::setTestNow('2026-10-20');
+        [$consultor, $perfil] = $this->clienteVinculado();
+        $consultor->update(['renewal_lead_types' => ['vida']]);
+        $this->apolice($perfil, ['insurance_type' => InsuranceType::Vida, 'expiry_date' => '2026-11-10']);
+        $this->apolice($perfil, ['insurance_type' => InsuranceType::Carro, 'expiry_date' => '2026-11-12']);
+
+        self::assertSame(1, app(LeadAutomationService::class)->createRenewalLeads($consultor->fresh()));
+        self::assertSame(['vida'], Lead::query()->sole()->interests);
+    }
+
+    public function test_nenhum_tipo_marcado_desliga_os_leads_de_renovacao(): void
+    {
+        Carbon::setTestNow('2026-10-20');
+        [$consultor, $perfil] = $this->clienteVinculado();
+        $consultor->update(['renewal_lead_types' => []]);
+        $this->apolice($perfil, ['expiry_date' => '2026-11-10']);
+
+        self::assertSame(0, app(LeadAutomationService::class)->createRenewalLeads($consultor->fresh()));
+    }
+
+    public function test_apolice_que_renova_sozinha_nao_gera_lead_nem_aviso_de_vencimento(): void
+    {
+        Carbon::setTestNow('2026-10-20');
+        Notification::fake();
+        [$consultor, $perfil] = $this->clienteVinculado();
+        $sozinha = $this->apolice($perfil, ['expiry_date' => '2026-10-27', 'auto_renews' => true]);
+        $manual = $this->apolice($perfil, ['expiry_date' => '2026-10-27', 'insurer_name' => 'Manual']);
+
+        self::assertSame(1, app(LeadAutomationService::class)->createRenewalLeads($consultor));
+        self::assertSame($manual->id, Lead::query()->sole()->source_policy_id);
+
+        // Na lista de datas importantes e no aviso diário, só a que precisa de renovação aparece.
+        $lista = app(ImportantDatesService::class)->upcomingPolicyExpiries($consultor, Carbon::now(), Carbon::now()->addDays(10));
+        self::assertSame([$manual->id], $lista->map(fn ($l) => $l['policy']->id)->all());
+
+        app(ImportantDatesService::class)->notifyUpcomingPolicyExpiries(Carbon::now());
+        Notification::assertSentToTimes($consultor, \App\Notifications\InsurancePolicyExpiringUpcoming::class, 1);
+
+        self::assertTrue($sozinha->fresh()->auto_renews);
+        self::assertFalse($sozinha->fresh()->isExpiring(30));
+        self::assertTrue($manual->fresh()->isExpiring(30));
+    }
+
+    public function test_antecedencia_escolhida_pelo_profissional_vale_no_lugar_da_padrao(): void
+    {
+        Carbon::setTestNow('2026-10-20');
+        [$consultor, $perfil] = $this->clienteVinculado();
+        $this->apolice($perfil, ['expiry_date' => '2026-12-01']); // 42 dias: dentro dos 45 padrão
+
+        $consultor->update(['renewal_lead_days' => 30]);
+        self::assertSame(0, app(LeadAutomationService::class)->createRenewalLeads($consultor->fresh()));
+
+        $consultor->update(['renewal_lead_days' => 60]);
+        self::assertSame(1, app(LeadAutomationService::class)->createRenewalLeads($consultor->fresh()));
+    }
+
+    public function test_chave_de_ambiente_negativa_desliga_a_rotina_para_quem_nao_configurou(): void
+    {
+        Carbon::setTestNow('2026-10-20');
+        config(['cerne.lead_automation.renewal_days' => -1]);
+        [$consultor, $perfil] = $this->clienteVinculado();
+        $this->apolice($perfil, ['expiry_date' => '2026-10-21']);
+
+        self::assertSame(0, app(LeadAutomationService::class)->createRenewalLeadsForAll());
+    }
+
+    public function test_tela_de_preferencias_mostra_o_padrao_e_salva_a_escolha(): void
+    {
+        [$consultor] = $this->clienteVinculado();
+        $this->actingAs($consultor);
+
+        Livewire::test(LeadRenewalSettings::class)
+            ->assertSet('days', '45')
+            ->assertSet('types', ['carro', 'residencia', 'saude', 'viagem', 'eletronicos', 'civil', 'outro'])
+            ->set('types', ['vida', 'carro'])
+            ->set('days', '60')
+            ->call('save')
+            ->assertHasNoErrors()
+            ->assertDispatched('renewal-settings-saved');
+
+        $consultor->refresh();
+        self::assertSame(['vida', 'carro'], $consultor->renewal_lead_types);
+        self::assertSame(60, $consultor->renewal_lead_days);
+
+        Livewire::test(LeadRenewalSettings::class)->assertSet('days', '60')->assertSet('types', ['vida', 'carro']);
+    }
+
+    public function test_preferencias_recusam_tipo_desconhecido_e_antecedencia_fora_do_limite(): void
+    {
+        [$consultor] = $this->clienteVinculado();
+        $this->actingAs($consultor);
+
+        Livewire::test(LeadRenewalSettings::class)->set('types', ['barco'])->call('save')->assertHasErrors('types.0');
+        Livewire::test(LeadRenewalSettings::class)->set('days', '3')->call('save')->assertHasErrors('days');
+        Livewire::test(LeadRenewalSettings::class)->set('days', '500')->call('save')->assertHasErrors('days');
+
+        self::assertNull($consultor->fresh()->renewal_lead_days);
+    }
+
+    public function test_preferencias_so_para_profissional_e_abrem_pela_tela_de_leads(): void
+    {
+        $this->actingAs(User::factory()->create());
+        Livewire::test(LeadRenewalSettings::class)->assertStatus(403);
+
+        $consultor = User::factory()->consultant()->create();
+        $this->actingAs($consultor);
+        Livewire::test(LeadsIndex::class)
+            ->assertSee('Renovações')
+            ->call('toggleRenewalSettings')
+            ->assertSet('showRenewalSettings', true)
+            ->dispatch('renewal-settings-saved')
+            ->assertSet('showRenewalSettings', false);
+    }
+
+    public function test_formulario_da_apolice_grava_e_carrega_renova_automaticamente(): void
+    {
+        $cliente = User::factory()->create();
+        $perfil = FinancialProfile::factory()->create(['owner_user_id' => $cliente->id]);
+        $membro = ProfileMember::factory()->create(['profile_id' => $perfil->id, 'user_id' => $cliente->id]);
+        $this->actingAs($cliente);
+        app(ProfileContext::class)->set($perfil, $membro);
+
+        Livewire::test(InsuranceIndex::class)
+            ->call('togglePolicyForm')
+            ->set('policyInsurerName', 'Azos')
+            ->set('policyMonthlyPremium', '120')
+            ->set('policyStartDate', '2026-01-01')
+            ->set('policyExpiryDate', '2027-01-01')
+            ->set('policyAutoRenews', true)
+            ->call('savePolicy')
+            ->assertHasNoErrors();
+
+        $apolice = InsurancePolicy::withoutProfileScope()->sole();
+        self::assertTrue($apolice->auto_renews);
+
+        Livewire::test(InsuranceIndex::class)->call('editPolicy', $apolice->id)->assertSet('policyAutoRenews', true)->set('policyAutoRenews', false)->call('savePolicy');
+        self::assertFalse($apolice->fresh()->auto_renews);
+    }
     // ---- venda cruzada
 
     public function test_sugere_o_tipo_que_o_cliente_nao_tem_e_nao_o_que_ele_ja_tem(): void
