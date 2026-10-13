@@ -154,6 +154,14 @@ Schedule::call(function (): void {
     logger()->info('Aviso de acesso encerrando', ['avisados' => $avisados]);
 })->dailyAt('03:45')->name('aviso-acesso-encerrando')->withoutOverlapping();
 
+// Leads: apólices que vencem ou fazem aniversário nos próximos dias viram lead de renovação, uma vez por apólice e data
+// (chave de automação com índice único em leads). Roda antes do resumo das 8h, que já os conta.
+Schedule::call(function (): void {
+    $criados = app(\App\Services\LeadAutomationService::class)->createRenewalLeadsForAll();
+
+    logger()->info('Leads de renovação', ['criados' => $criados]);
+})->dailyAt('07:30')->name('leads-de-renovacao')->withoutOverlapping();
+
 // Leads: um resumo por dia, por profissional, com cotações vencendo, contatos sem retorno e próximos passos
 // atrasados. Idempotente por índice único (lead_alert_digests: profissional + dia).
 Schedule::call(function (): void {

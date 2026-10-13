@@ -15,7 +15,10 @@
             <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Contatos que ainda não são clientes.</p>
         </div>
 
-        <button wire:click="toggleLeadForm" class="btn-primary px-3 py-1.5">+ Novo contato</button>
+        <div class="flex items-center gap-2">
+            <a href="{{ route('consultant.leads.metrics', ['aba' => $aba]) }}" class="btn-ghost px-3 py-1.5">Métricas</a>
+            <button wire:click="toggleLeadForm" class="btn-primary px-3 py-1.5">+ Novo contato</button>
+        </div>
     </div>
 
     {{-- Funis: consultoria e seguros. Corretor só trabalha com seguros. ----------------- --}}
@@ -37,6 +40,33 @@
         </div>
     @endunless
 
+    {{-- Oportunidades na carteira (venda cruzada) ----------------------------------------- --}}
+    @if ($crossSell->isNotEmpty())
+        <details class="card p-4">
+            <summary class="cursor-pointer text-sm font-medium text-slate-800 dark:text-slate-200">
+                Oportunidades na carteira
+                <span class="text-xs font-normal text-slate-400">({{ $crossSell->count() }} {{ $crossSell->count() === 1 ? 'sugestão' : 'sugestões' }})</span>
+            </summary>
+            <p class="mt-2 text-xs text-slate-500 dark:text-slate-400">Clientes que ainda não têm vida, residência ou saúde entre as apólices que você acompanha. Aceite para criar o contato no funil, ou dispense para a sugestão não voltar.</p>
+            <ul class="mt-3 divide-y divide-slate-100 dark:divide-white/10">
+                @foreach ($crossSell->take(12) as $sugestao)
+                    <li class="flex flex-wrap items-center justify-between gap-2 py-2" wire:key="sug-{{ $sugestao['key'] }}">
+                        <p class="min-w-0 text-sm text-slate-700 dark:text-slate-300">
+                            <span class="font-medium text-slate-900 dark:text-white">{{ $sugestao['client_name'] }}</span>
+                            <span class="text-xs text-slate-500 dark:text-slate-400">· sem {{ mb_strtolower($sugestao['type']->label()) }}</span>
+                        </p>
+                        <span class="flex shrink-0 items-center gap-2">
+                            <button type="button" wire:click="acceptSuggestion('{{ $sugestao['profile_id'] }}', '{{ $sugestao['type']->value }}')" class="btn-secondary px-2 py-1 text-xs">Criar contato</button>
+                            <button type="button" wire:click="dismissSuggestion('{{ $sugestao['profile_id'] }}', '{{ $sugestao['type']->value }}')" class="text-xs text-slate-400 hover:text-red-700">dispensar</button>
+                        </span>
+                    </li>
+                @endforeach
+            </ul>
+            @if ($crossSell->count() > 12)
+                <p class="mt-2 text-xs text-slate-400">Mostrando 12 de {{ $crossSell->count() }}. As demais aparecem conforme você aceita ou dispensa.</p>
+            @endif
+        </details>
+    @endif
     {{-- Valor do funil de seguros --------------------------------------------------- --}}
     @if ($funnelValue !== null)
         <div class="grid gap-3 sm:grid-cols-3">

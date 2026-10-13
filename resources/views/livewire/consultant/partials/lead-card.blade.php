@@ -36,6 +36,10 @@
             <p class="mt-0.5 text-xs text-slate-400">{{ $lead->stageLabel() }}</p>
         @endif
 
+        @if ($lead->isClientDeal())
+            <p class="mt-1"><span class="rounded-full bg-brand-50 px-2 py-0.5 text-[10px] font-medium text-brand-800 dark:bg-brand-500/10 dark:text-brand-200">Já é cliente</span></p>
+        @endif
+
         {{-- O que ele quer e de onde veio ------------------------------------ --}}
         @if ($seguros && ! empty($lead->interests))
             <div class="mt-1.5 flex flex-wrap gap-1">
@@ -112,9 +116,13 @@
             <button type="button" wire:click="toggleLogActivity('{{ $lead->id }}')" class="btn-secondary px-2 py-1 text-xs whitespace-nowrap">
                 {{ $loggingActivityLeadId === $lead->id ? 'Cancelar' : 'Registrar' }}
             </button>
-            <button wire:click="convertLead('{{ $lead->id }}')" class="btn-primary px-2 py-1 text-xs whitespace-nowrap">
-                Converter
-            </button>
+            @if ($lead->isClientDeal())
+                <button wire:click="closeDeal('{{ $lead->id }}')" wire:confirm="Marcar este negócio como fechado?" class="btn-primary px-2 py-1 text-xs whitespace-nowrap">Fechado</button>
+            @else
+                <button wire:click="convertLead('{{ $lead->id }}')" class="btn-primary px-2 py-1 text-xs whitespace-nowrap">
+                    Converter
+                </button>
+            @endif
         @else
             @if ($seguros)
                 <button type="button" wire:click="openQuotes('{{ $lead->id }}')" class="btn-ghost px-2 py-1 text-xs whitespace-nowrap">Ver cotações</button>

@@ -16,6 +16,7 @@ use App\Models\Lead;
 use App\Models\LeadAttachment;
 use App\Models\LeadQuote;
 use App\Services\Extraction\LeadQuoteExtractionService;
+use App\Services\LeadAutomationService;
 use App\Services\LeadService;
 use App\Support\LeadQuoteFields;
 use Carbon\CarbonImmutable;
@@ -425,9 +426,25 @@ class LeadsIndex extends Component
     // Converter em cliente
     // -----------------------------------------------------------------
 
+    /** Negócio fechado com um cliente que já é da carteira (renovação, venda cruzada): não há convite a enviar. */
+    public function closeDeal(string $id, LeadService $service): void
+    {
+        $lead = $this->leadDoUsuario($id);
+
+        if ($lead->isClientDeal()) {
+            $service->markIssued($lead, null, auth()->id());
+            session()->flash('status', 'Negócio marcado como fechado.');
+        }
+    }
+
     public function convertLead(string $id, LeadService $service): void
     {
         $lead = $this->leadDoUsuario($id);
+
+        // Quem já é cliente não recebe convite: o negócio se fecha em closeDeal().
+        if ($lead->isClientDeal()) {
+            return;
+        }
 
         if (blank($lead->email)) {
             $this->addError('convert', 'Este contato não tem e-mail cadastrado — edite o contato antes de converter.');
@@ -438,6 +455,32 @@ class LeadsIndex extends Component
         $this->lastConvertedLeadId = $lead->id;
         $this->lastInviteLink = $service->convert($lead, auth()->user());
         session()->flash('status', 'Convite enviado — o lead virou cliente em potencial.');
+    }
+
+    // -----------------------------------------------------------------
+    // Venda cruzada
+    // -----------------------------------------------------------------
+
+    public function acceptSuggestion(string $profileId, string $type, LeadAutomationService $automation): void
+    {
+        $lead = $automation->createFromSuggestion(auth()->user(), $profileId, $type);
+
+        if ($lead !== null) {
+            session()->flash('status', 'Contato criado para '.$lead->name.'.');
+        }
+    }
+
+    public function dismissSuggestion(string $profileId, string $type, LeadAutomationService $automation): void
+    {
+        $automation->dismissSuggestion(auth()->user(), $profileId, $type);
+    }
+
+    /** @return \Illuminate\Support\Collection<int, array{key: string, profile_id: string, client_name: string, type: \App\Enums\InsuranceType, policies: int}> */
+    public function getCrossSellProperty(): Collection
+    {
+        return $this->kind() === LeadKind::Insurance
+            ? app(LeadAutomationService::class)->crossSellSuggestions(auth()->user())
+            : collect();
     }
 
     // -----------------------------------------------------------------
@@ -919,6 +962,7 @@ class LeadsIndex extends Component
             'activityTypes' => LeadActivityType::options(),
             'abaCounts' => $this->abaCounts,
             'funnelValue' => $this->funnelValue,
+            'crossSell' => $this->crossSell,
             'quotesLead' => $this->quotesLead,
             'kinds' => LeadKind::options(),
             'sources' => LeadSource::options(),

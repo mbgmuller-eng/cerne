@@ -25,8 +25,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * (interesses e dados por tipo) e as cotações feitas (LeadQuote), cada uma com a simulação em PDF.
  */
 #[Fillable([
-    'consultant_id', 'kind', 'name', 'email', 'phone', 'interests', 'quote_data', 'birth_date', 'source', 'source_detail',
-    'stage', 'notes', 'lost_reason', 'lost_category', 'lost_at', 'next_action_at',
+    'consultant_id', 'client_profile_id', 'source_policy_id', 'automation_key', 'kind', 'name', 'email', 'phone', 'interests', 'quote_data', 'birth_date', 'source', 'source_detail',
+    'stage', 'notes', 'lost_reason', 'lost_category', 'lost_at', 'converted_at', 'next_action_at',
 ])]
 class Lead extends Model
 {
@@ -43,6 +43,7 @@ class Lead extends Model
             'quote_data' => 'array',
             'birth_date' => 'date',
             'lost_at' => 'datetime',
+            'converted_at' => 'datetime',
             'next_action_at' => 'datetime',
         ];
     }
@@ -71,6 +72,12 @@ class Lead extends Model
     public function scopeOpen(Builder $query): Builder
     {
         return $query->whereNotIn('stage', [LeadStage::Converted->value, LeadStage::Lost->value]);
+    }
+
+    /** Lead que o Cerne criou a partir de um cliente que o profissional já atende (renovação, venda cruzada). */
+    public function isClientDeal(): bool
+    {
+        return $this->client_profile_id !== null;
     }
 
     public function stageLabel(): string

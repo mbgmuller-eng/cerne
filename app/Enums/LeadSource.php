@@ -14,6 +14,8 @@ enum LeadSource: string
     case Event = 'event';
     case Social = 'social';
     case Website = 'website';
+    case Renewal = 'renewal';
+    case CrossSell = 'cross_sell';
     case Other = 'other';
 
     public function label(): string
@@ -24,6 +26,8 @@ enum LeadSource: string
             self::Event => 'Evento',
             self::Social => 'Redes sociais',
             self::Website => 'Site',
+            self::Renewal => 'Renovação de cliente',
+            self::CrossSell => 'Venda cruzada',
             self::Other => 'Outra',
         };
     }

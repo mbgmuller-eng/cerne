@@ -184,7 +184,7 @@ class ImportantDatesService
     }
 
     /** @return Collection<int, array{policy: InsurancePolicy, client_name: string}> */
-    private function activePoliciesFor(User $professional): Collection
+    public function activePoliciesFor(User $professional): Collection
     {
         $profiles = $this->activeClientProfiles($professional);
 
@@ -210,7 +210,7 @@ class ImportantDatesService
     }
 
     /** @return Collection<int, FinancialProfile> */
-    private function activeClientProfiles(User $professional): Collection
+    public function activeClientProfiles(User $professional): Collection
     {
         $clientUserIds = ConsultantClient::query()
             ->where('consultant_id', $professional->id)

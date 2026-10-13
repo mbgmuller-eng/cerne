@@ -211,6 +211,7 @@ Route::middleware(['auth', 'verified'])->group(function (): void {
         Route::get('/carteira/investimentos', PortfolioInvestments::class)->name('consultant.portfolio.investments');
         Route::get('/carteira/datas-importantes', ImportantDates::class)->name('consultant.portfolio.important-dates');
         Route::get('/leads', LeadsIndex::class)->name('consultant.leads');
+        Route::get('/leads/metricas', \App\Livewire\Consultant\LeadMetrics::class)->name('consultant.leads.metrics');
         // Anexo de lead (simulação em PDF etc.): só o dono do lead abre — a checagem é no controlador.
         Route::get('/leads/anexos/{attachment}', [LeadAttachmentController::class, 'show'])->name('consultant.leads.attachment');
         Route::post('/clientes/{profile}/abrir', [ProfileSwitchController::class, 'store'])->name('profile.switch');

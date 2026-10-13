@@ -185,6 +185,14 @@ return [
         'stale_days' => (int) env('CERNE_LEAD_ALERT_STALE_DAYS', 7),
     ],
 
+    // Leads criados a partir da carteira (ver LeadAutomationService): com quantos dias de antecedência uma renovação vira
+    // lead, quantos dias antes da data o primeiro contato fica marcado e quais tipos de seguro entram na venda cruzada.
+    'lead_automation' => [
+        'renewal_days' => (int) env('CERNE_LEAD_RENEWAL_DAYS', 45),
+        'contact_days_before' => (int) env('CERNE_LEAD_RENEWAL_CONTACT_DAYS', 30),
+        'cross_sell_types' => ['vida', 'residencia', 'saude'],
+    ],
+
     'lead_files' => [
         'disk' => env('CERNE_DOCUMENTS_DISK', 'local'),
         'path' => 'leads-anexos',
