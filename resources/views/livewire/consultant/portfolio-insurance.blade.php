@@ -117,8 +117,8 @@
                             ])>
                                 {{ $r['kind'] === 'vencimento' ? 'Vence' : 'Aniversário' }} {{ $r['occurrence_date']->format('d/m') }} · {{ $r['days'] === 0 ? 'hoje' : ($r['days'] === 1 ? 'amanhã' : 'em '.$r['days'].' dias') }}
                             </span>
-                            <x-portfolio-policy-link :profile="$apolice->profile_id" :policy="$apolice->id" acao="editar" label="Editar" />
-                            <x-portfolio-policy-link :profile="$apolice->profile_id" :policy="$apolice->id" label="Ver apólice" />
+                            <x-portfolio-policy-link :profile="$apolice->profile_id" :policy="$apolice->id" acao="editar" label="Editar" :voltar="$voltarUrl.'#renovacoes'" />
+                            <x-portfolio-policy-link :profile="$apolice->profile_id" :policy="$apolice->id" label="Ver apólice" :voltar="$voltarUrl.'#renovacoes'" />
                         </div>
                     </li>
                 @endforeach
@@ -197,7 +197,7 @@
         <div class="space-y-3">
             @foreach ($grouped as $clienteNome => $porCliente)
                 {{-- Fechado por padrão, como em Investimentos da carteira. "Expandir/Recolher todos" fala com todos os cartões. --}}
-                <div x-data="{ open: false }" x-on:portfolio-toggle.window="open = $event.detail.open" class="card overflow-hidden" wire:key="cliente-{{ $porCliente['profile_id'] }}">
+                <div x-data="{ open: false }" x-init="if (location.hash === '#cliente-{{ $porCliente['profile_id'] }}') { open = true; $nextTick(() => $el.scrollIntoView({ block: 'start' })) }" x-on:portfolio-toggle.window="open = $event.detail.open" id="cliente-{{ $porCliente['profile_id'] }}" class="card overflow-hidden" wire:key="cliente-{{ $porCliente['profile_id'] }}">
                     <div class="flex w-full flex-wrap items-center justify-between gap-3 px-5 py-4">
                         <button type="button" x-on:click="open = ! open" class="w-full min-w-0 text-left sm:w-auto sm:flex-1">
                             <p class="font-display text-lg font-semibold text-slate-900 sm:text-xl dark:text-white">{{ $clienteNome }}</p>
@@ -230,7 +230,7 @@
                                 <p class="text-xs text-slate-400">por mês</p>
                             </div>
 
-                            <x-portfolio-policy-link :profile="$porCliente['profile_id']" :expandir="true" label="Apólices" :primary="true" />
+                            <x-portfolio-policy-link :profile="$porCliente['profile_id']" :expandir="true" label="Apólices" :primary="true" :voltar="$voltarUrl.'#cliente-'.$porCliente['profile_id']" />
 
                             <form method="POST" action="{{ route('profile.switch', $porCliente['profile_id']) }}">
                                 @csrf
@@ -337,8 +337,8 @@
                                                         @endif
                                                     </td>
                                                     <td class="py-2 pl-2 text-right align-top whitespace-nowrap">
-                                                        <x-portfolio-policy-link :profile="$apolice->profile_id" :policy="$apolice->id" label="Detalhes" />
-                                                        <x-portfolio-policy-link :profile="$apolice->profile_id" :policy="$apolice->id" acao="editar" label="Editar" />
+                                                        <x-portfolio-policy-link :profile="$apolice->profile_id" :policy="$apolice->id" label="Detalhes" :voltar="$voltarUrl.'#cliente-'.$porCliente['profile_id']" />
+                                                        <x-portfolio-policy-link :profile="$apolice->profile_id" :policy="$apolice->id" acao="editar" label="Editar" :voltar="$voltarUrl.'#cliente-'.$porCliente['profile_id']" />
                                                     </td>
                                                 </tr>
                                             @endforeach

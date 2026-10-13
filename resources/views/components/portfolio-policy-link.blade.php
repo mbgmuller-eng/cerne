@@ -1,4 +1,4 @@
-@props(['profile', 'policy' => null, 'acao' => null, 'expandir' => false, 'label', 'primary' => false])
+@props(['profile', 'policy' => null, 'acao' => null, 'expandir' => false, 'label', 'primary' => false, 'voltar' => null])
 
 {{--
     Atalho da carteira para dentro do cliente: abre o perfil direto na tela de Seguros, já na apólice (e, com
@@ -13,6 +13,9 @@
     @endif
     @if ($acao)
         <input type="hidden" name="acao" value="{{ $acao }}">
+    @endif
+    @if ($voltar)
+        <input type="hidden" name="voltar" value="{{ $voltar }}">
     @endif
     @if ($expandir)
         <input type="hidden" name="expandir" value="1">

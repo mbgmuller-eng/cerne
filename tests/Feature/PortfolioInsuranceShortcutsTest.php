@@ -206,6 +206,77 @@ class PortfolioInsuranceShortcutsTest extends TestCase
         $this->actingAs($consultor)->post(route('profile.switch', $perfilAlheio->id), ['destino' => 'seguros'])->assertForbidden();
     }
 
+    // ---- voltar para a carteira
+
+    public function test_a_carteira_manda_o_endereco_com_os_filtros_e_a_ancora_de_cada_atalho(): void
+    {
+        $consultor = User::factory()->consultant()->create();
+        [, $perfil] = $this->clienteDe($consultor);
+        $this->apolice($perfil, ['insurer_name' => 'Porto Seguro', 'expiry_date' => '2027-06-01']);
+
+        $this->actingAs($consultor);
+        $html = Livewire::withQueryParams(['busca' => 'Porto', 'tipo' => 'carro'])->test(PortfolioInsurance::class)->html();
+
+        self::assertStringContainsString('name="voltar" value="/carteira/seguros?busca=Porto&amp;tipo=carro#cliente-'.$perfil->id.'"', $html);
+        self::assertStringContainsString('id="cliente-'.$perfil->id.'"', $html);
+    }
+
+    public function test_o_atalho_guarda_o_voltar_e_a_tela_de_seguros_do_cliente_mostra_o_botao(): void
+    {
+        $consultor = User::factory()->consultant()->create();
+        [, $perfil] = $this->clienteDe($consultor);
+        $apolice = $this->apolice($perfil);
+
+        $this->actingAs($consultor)->post(route('profile.switch', $perfil->id), [
+            'destino' => 'seguros', 'apolice' => $apolice->id, 'voltar' => '/carteira/seguros?busca=Ana&situacao=vencendo#cliente-'.$perfil->id,
+        ]);
+
+        self::assertSame(
+            ['url' => '/carteira/seguros?busca=Ana&situacao=vencendo#cliente-'.$perfil->id, 'profile_id' => $perfil->id],
+            session('carteira_voltar'),
+        );
+
+        app(ProfileContext::class)->set($perfil, member: null, asConsultant: true);
+        Livewire::test(InsuranceIndex::class)
+            ->assertSee('Voltar para Seguros da carteira')
+            ->assertSee('href="/carteira/seguros?busca=Ana&amp;situacao=vencendo#cliente-'.$perfil->id.'"', false);
+    }
+
+    public function test_endereco_de_fora_ou_estranho_nunca_vira_voltar(): void
+    {
+        $consultor = User::factory()->consultant()->create();
+        [, $perfil] = $this->clienteDe($consultor);
+
+        foreach (['https://exemplo.com/carteira/seguros', '//exemplo.com/carteira/seguros', '/carteira/seguros?x=<script>', '/dashboard', "/carteira/seguros\nSet-Cookie: a=b", 'javascript:alert(1)'] as $voltar) {
+            $this->actingAs($consultor)->post(route('profile.switch', $perfil->id), ['destino' => 'seguros', 'voltar' => $voltar]);
+
+            self::assertNull(session('carteira_voltar'), "não deveria aceitar: $voltar");
+        }
+    }
+
+    public function test_abrir_o_perfil_de_forma_comum_apaga_o_voltar_e_ele_nao_vale_para_outro_cliente(): void
+    {
+        $consultor = User::factory()->consultant()->create();
+        [, $perfil] = $this->clienteDe($consultor);
+        [, $outro] = $this->clienteDe($consultor, 'Bruno Lima');
+
+        $this->actingAs($consultor)->post(route('profile.switch', $perfil->id), ['destino' => 'seguros', 'voltar' => '/carteira/seguros']);
+        self::assertNotNull(session('carteira_voltar'));
+
+        // O voltar é de um cliente só: no perfil de outro, não aparece.
+        app(ProfileContext::class)->set($outro, member: null, asConsultant: true);
+        Livewire::test(InsuranceIndex::class)->assertDontSee('Voltar para Seguros da carteira');
+
+        $this->post(route('profile.switch', $perfil->id));
+        self::assertNull(session('carteira_voltar'));
+    }
+
+    public function test_sem_atalho_nao_ha_botao_de_voltar(): void
+    {
+        [, $perfil] = $this->noPerfilDoCliente();
+
+        Livewire::test(InsuranceIndex::class)->assertDontSee('Voltar para Seguros da carteira');
+    }
     // ---- a tela de seguros do cliente
 
     private function noPerfilDoCliente(): array

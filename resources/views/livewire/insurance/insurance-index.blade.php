@@ -10,6 +10,12 @@
 
 <div class="space-y-8">
 
+    @if ($voltar)
+        <a href="{{ $voltar }}" class="inline-flex items-center gap-1.5 text-sm font-medium text-brand-700 hover:underline dark:text-brand-300">
+            <span aria-hidden="true">←</span> Voltar para Seguros da carteira
+        </a>
+    @endif
+
     {{-- Hero --------------------------------------------------------- --}}
     <div class="card relative overflow-hidden bg-brand-800 p-6 text-white sm:p-8">
         <div class="pointer-events-none absolute -top-24 -right-24 h-64 w-64 rounded-full bg-brand-600/50 dark:bg-brand-400/20 blur-3xl"></div>

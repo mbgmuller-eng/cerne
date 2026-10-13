@@ -177,6 +177,10 @@ class PortfolioInsurance extends Component
             'filtrando' => $this->busca !== '' || $this->tipo !== '' || $this->seguradora !== '' || $this->situacao !== '',
             'insurerColors' => Insurer::colorMap(),
             'renovacoes' => $this->renovacoes,
+            // O endereço desta tela com os filtros de agora: é para onde o "Voltar" do cliente devolve o profissional.
+            'voltarUrl' => route('consultant.portfolio.insurance', array_filter([
+                'busca' => $this->busca, 'tipo' => $this->tipo, 'seguradora' => $this->seguradora, 'situacao' => $this->situacao,
+            ]), false),
         ]);
     }
 

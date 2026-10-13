@@ -20,16 +20,30 @@ use Illuminate\Http\Request;
  */
 class ProfileSwitchController extends Controller
 {
+    /** Sessão: a carteira de seguros de onde o profissional entrou no perfil de um cliente (ver InsuranceIndex). */
+    public const VOLTAR_KEY = 'carteira_voltar';
+
     public function store(Request $request, FinancialProfile $profile): RedirectResponse
     {
         $this->authorize('view', $profile);
 
         $request->session()->put(SetProfileContext::SESSION_KEY, $profile->id);
 
+        // Abrir o perfil de forma comum apaga o "voltar" de um atalho anterior.
+        $request->session()->forget(self::VOLTAR_KEY);
+
         // Atalho da carteira de seguros: cai direto na tela de Seguros do cliente, opcionalmente já na apólice ou com a
         // edição aberta. Só valores conhecidos passam adiante; a tela confere de novo o que o usuário enxerga.
         if ($request->input('destino') === 'seguros') {
             $apolice = (string) $request->input('apolice');
+
+            // De onde o atalho saiu, para a tela de Seguros do cliente oferecer o "Voltar". Só caminho da própria carteira de
+            // seguros (com os filtros e, se houver, a âncora do cartão): nunca um endereço de fora.
+            $voltar = (string) $request->input('voltar');
+
+            if (preg_match('#^/carteira/seguros(\?[A-Za-z0-9_=&%.+\-]*)?(\#[A-Za-z0-9_\-]*)?$#', $voltar) === 1) {
+                $request->session()->put(self::VOLTAR_KEY, ['url' => $voltar, 'profile_id' => $profile->id]);
+            }
 
             return redirect()->route('insurance.index', array_filter([
                 'apolice' => preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', $apolice) === 1 ? $apolice : null,

@@ -7,6 +7,7 @@ use App\Enums\InsuranceType;
 use App\Enums\PaymentFrequency;
 use App\Enums\PolicyRevisionSource;
 use App\Enums\UserRole;
+use App\Http\Controllers\ProfileSwitchController;
 use App\Livewire\Concerns\HasPrivacyTabs;
 use App\Livewire\Concerns\RequiresActiveProfile;
 use App\Models\ConsultantClient;
@@ -531,6 +532,21 @@ class InsuranceIndex extends Component
         return $this->policies->pluck('insurer_name')->unique()->count();
     }
 
+    /**
+     * A tela da carteira de seguros de onde o profissional veio (atalho "Detalhes", "Editar" ou "Apólices"), para
+     * voltar a ela exatamente como estava. Só vale para o cliente aberto por esse atalho.
+     */
+    private function voltar(?string $profileId): ?string
+    {
+        $guardado = session(ProfileSwitchController::VOLTAR_KEY);
+
+        return auth()->user()->isLinkedProfessional()
+            && is_array($guardado)
+            && ($guardado['profile_id'] ?? null) === $profileId
+            ? $guardado['url']
+            : null;
+    }
+
     public function render()
     {
         $context = app(ProfileContext::class);
@@ -549,6 +565,7 @@ class InsuranceIndex extends Component
             'totalMonthly' => $this->totalMonthly,
             'expiring' => $this->expiring,
             'insurersCount' => $this->insurersCount,
+            'voltar' => $this->voltar($profileId),
             'knownInsurers' => Insurer::names(),
             'insurerColors' => Insurer::colorMap(),
             'availableBrokers' => $this->availableBrokers,
