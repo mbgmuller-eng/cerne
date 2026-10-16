@@ -14,7 +14,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 #[Fillable([
     'profile_id', 'member_id', 'investment_id', 'transaction_type', 'quantity',
-    'unit_price', 'total_amount', 'broker_fee', 'other_fees', 'net_amount',
+    'unit_price', 'ratio_from', 'ratio_to', 'total_amount', 'broker_fee', 'other_fees', 'net_amount',
     'operation_date', 'settlement_date', 'source_document_id', 'created_by_user_id',
 ])]
 class InvestmentTransaction extends Model
@@ -32,6 +32,8 @@ class InvestmentTransaction extends Model
             'transaction_type' => TransactionType::class,
             'quantity' => 'decimal:6',
             'unit_price' => 'decimal:6',
+            'ratio_from' => 'decimal:6',
+            'ratio_to' => 'decimal:6',
             'total_amount' => 'decimal:2',
             'broker_fee' => 'decimal:2',
             'other_fees' => 'decimal:2',

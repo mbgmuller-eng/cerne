@@ -3,6 +3,9 @@
 namespace App\Services;
 
 use App\Enums\TransactionType;
+use App\Models\BankAccount;
+use App\Models\IncomeCategory;
+use App\Models\IncomeRecord;
 use App\Models\InvestmentRecord;
 use App\Models\InvestmentSnapshot;
 use App\Models\InvestmentTransaction;
@@ -92,8 +95,14 @@ class InvestmentTransactionService
     {
         $tipo = $tx->transaction_type;
 
+        if ($tipo === TransactionType::Amortization) {
+            $this->applyAmortization($investment, $tx);
+
+            return;
+        }
+
         if (! $tipo->affectsPosition()) {
-            // Provento: entra como rendimento, não mexe na posição.
+            // Dividendo e JCP: entram como rendimento, não mexem na posição.
             return;
         }
 
@@ -106,8 +115,7 @@ class InvestmentTransactionService
                 $investment, $qtdAtual, $pmAtual, $qtdOperada, $tx
             ),
             TransactionType::Sell => $this->applySell($investment, $qtdAtual, $qtdOperada),
-            TransactionType::Split => $this->applyRatio($investment, $qtdAtual, $pmAtual, $qtdOperada),
-            TransactionType::Grouping => $this->applyRatio($investment, $qtdAtual, $pmAtual, $qtdOperada),
+            TransactionType::Split, TransactionType::Grouping => $this->applyRatio($investment, $qtdAtual, $pmAtual, $this->finalQuantity($qtdAtual, $qtdOperada, $tx)),
             default => null,
         };
     }
@@ -204,6 +212,183 @@ class InvestmentTransactionService
         }
 
         return $investment->refresh();
+    }
+
+    /** Quantidade depois do evento: pela proporção, quando ela existe; senão (evento antigo) a que veio gravada. */
+    private function finalQuantity(string $qtdAtual, string $qtdGravada, InvestmentTransaction $tx): string
+    {
+        if ($tx->ratio_from === null || $tx->ratio_to === null) {
+            return $qtdGravada;
+        }
+
+        return bcdiv(bcmul($qtdAtual, $this->scale($tx->ratio_to), self::SCALE), $this->scale($tx->ratio_from), self::SCALE);
+    }
+
+    /**
+     * Amortização de cota (típica de FII): devolve parte do capital, então reduz o custo de aquisição, que é o que a
+     * Receita exige. O valor entra pelo líquido; o custo nunca fica negativo. O preço médio cai na mesma proporção.
+     */
+    private function applyAmortization(InvestmentRecord $investment, InvestmentTransaction $tx): void
+    {
+        $qtd = $this->scale($investment->quantity ?? '0');
+
+        if (bccomp($qtd, '0', self::SCALE) <= 0) {
+            return;
+        }
+
+        $custo = bcmul($qtd, $this->scale($investment->average_price ?? '0'), self::SCALE);
+        $novoCusto = bcsub($custo, $this->scale($tx->net_amount), self::SCALE);
+
+        if (bccomp($novoCusto, '0', self::SCALE) < 0) {
+            $novoCusto = '0';
+        }
+
+        $investment->update([
+            'average_price' => bcdiv($novoCusto, $qtd, self::SCALE),
+            'invested_amount' => Money::parse($novoCusto),
+        ]);
+    }
+
+    /**
+     * Registra um provento (dividendo, JCP ou amortização). O valor líquido é o bruto menos o imposto retido (o JCP sai
+     * com 15% retido na fonte). Com conta escolhida, o líquido entra como receita e soma no saldo; sem conta, fica só no
+     * histórico do ativo. Amortização também reduz o custo (ver applyAmortization()).
+     *
+     * @throws \InvalidArgumentException tipo que não é provento, valor inválido ou imposto maior que o bruto
+     */
+    public function registerIncome(
+        InvestmentRecord $investment,
+        TransactionType $tipo,
+        string $bruto,
+        string $impostoRetido,
+        CarbonImmutable $data,
+        ?BankAccount $conta,
+        string $userId,
+    ): InvestmentTransaction {
+        if (! $tipo->isIncome()) {
+            throw new \InvalidArgumentException('Este tipo de movimentação não é um provento.');
+        }
+
+        $bruto = Money::parse($bruto);
+        $imposto = Money::parse($impostoRetido === '' ? '0' : $impostoRetido);
+
+        if (bccomp($bruto, '0', 2) <= 0) {
+            throw new \InvalidArgumentException('O valor do provento precisa ser maior que zero.');
+        }
+
+        if (bccomp($imposto, '0', 2) < 0 || bccomp($imposto, $bruto, 2) >= 0) {
+            throw new \InvalidArgumentException('O imposto retido precisa ser menor que o valor bruto.');
+        }
+
+        return DB::transaction(function () use ($investment, $tipo, $bruto, $imposto, $data, $conta, $userId): InvestmentTransaction {
+            $transacao = $this->record($investment, [
+                'type' => $tipo,
+                'total_amount' => $bruto,
+                // O imposto retido vai em "outras taxas": o líquido (bruto - taxas) sai do record() sozinho.
+                'other_fees' => $imposto,
+                'operation_date' => $data,
+            ], $userId);
+
+            // A amortização mexeu no custo; um provento antigo lançado depois de movimentações mais novas refaz a posição.
+            $haDepois = InvestmentTransaction::withoutProfileScope()
+                ->where('investment_id', $investment->id)
+                ->whereDate('operation_date', '>', $data->toDateString())
+                ->exists();
+
+            if ($haDepois) {
+                $this->rebuildPosition($investment);
+            }
+
+            if ($conta !== null) {
+                $categoria = IncomeCategory::available()->where('name', 'Dividendos')->first() ?? IncomeCategory::available()->first();
+
+                IncomeRecord::create([
+                    'member_id' => $investment->member_id,
+                    'category_id' => $categoria?->id,
+                    'description' => $tipo->label().' · '.$investment->displayName(),
+                    'amount' => $transacao->net_amount,
+                    'received_date' => $data,
+                    'bank_account_id' => $conta->id,
+                    'affects_balance' => true,
+                    'notes' => 'Provento registrado em Investimentos',
+                    'created_by_user_id' => $userId,
+                    'is_private' => (bool) $investment->is_private,
+                ]);
+
+                $conta->applyToBalance($transacao->net_amount);
+            }
+
+            return $transacao;
+        });
+    }
+
+    /**
+     * Desdobramento ("cada 1 vira 2") ou grupamento ("cada 10 viram 1"). A quantidade muda na proporção, o preço médio na
+     * proporção inversa e o custo total fica igual. Se o evento é o mais recente, a cotação guardada acompanha a proporção, de
+     * modo que o valor do ativo não muda; evento antigo, de antes da última cotação, deixa a cotação como está.
+     *
+     * @throws \InvalidArgumentException proporção inválida, ou que não combina com o tipo
+     */
+    public function registerRatio(
+        InvestmentRecord $investment,
+        TransactionType $tipo,
+        string $de,
+        string $para,
+        CarbonImmutable $data,
+        string $userId,
+    ): InvestmentTransaction {
+        if (! in_array($tipo, [TransactionType::Split, TransactionType::Grouping], true)) {
+            throw new \InvalidArgumentException('Só desdobramento e grupamento passam por aqui.');
+        }
+
+        $de = $this->scale($de);
+        $para = $this->scale($para);
+
+        if (bccomp($de, '0', self::SCALE) <= 0 || bccomp($para, '0', self::SCALE) <= 0) {
+            throw new \InvalidArgumentException('A proporção precisa ter valores maiores que zero.');
+        }
+
+        $cmp = bccomp($para, $de, self::SCALE);
+
+        if (($tipo === TransactionType::Split && $cmp <= 0) || ($tipo === TransactionType::Grouping && $cmp >= 0)) {
+            throw new \InvalidArgumentException($tipo === TransactionType::Split
+                ? 'No desdobramento, o número depois tem de ser maior que o de antes.'
+                : 'No grupamento, o número depois tem de ser menor que o de antes.');
+        }
+
+        return DB::transaction(function () use ($investment, $tipo, $de, $para, $data, $userId): InvestmentTransaction {
+            $transacao = InvestmentTransaction::create([
+                'profile_id' => $investment->profile_id,
+                'member_id' => $investment->member_id,
+                'investment_id' => $investment->id,
+                'transaction_type' => $tipo,
+                'ratio_from' => $de,
+                'ratio_to' => $para,
+                'total_amount' => '0',
+                'net_amount' => '0',
+                'operation_date' => $data,
+                'created_by_user_id' => $userId,
+            ]);
+
+            $haDepois = InvestmentTransaction::withoutProfileScope()
+                ->where('investment_id', $investment->id)
+                ->whereDate('operation_date', '>', $data->toDateString())
+                ->exists();
+
+            $investment->refresh();
+            $maisRecente = $investment->price_date === null || $data->startOfDay()->greaterThanOrEqualTo($investment->price_date);
+            $precoAtual = $investment->current_price;
+
+            // Mesma posição, na ordem das datas: o evento multiplica o que havia naquele dia.
+            $haDepois || $investment->quantity === null ? $this->rebuildPosition($investment) : $this->applyToPosition($investment, $transacao);
+            $investment->refresh();
+
+            if ($maisRecente && $precoAtual !== null) {
+                $investment->update(['current_price' => bcdiv(bcmul($this->scale($precoAtual), $de, self::SCALE), $para, self::SCALE)]);
+            }
+
+            return $transacao;
+        });
     }
 
     // -----------------------------------------------------------------

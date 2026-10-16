@@ -7,9 +7,12 @@
 
 <div class="space-y-6">
 
-    <div>
-        <h1 class="font-display text-3xl font-semibold tracking-tight text-slate-900 dark:text-white">Investimentos</h1>
-        <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Carteira, rentabilidade e movimentações.</p>
+    <div class="flex flex-wrap items-end justify-between gap-4">
+        <div>
+            <h1 class="font-display text-3xl font-semibold tracking-tight text-slate-900 dark:text-white">Investimentos</h1>
+            <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Carteira, rentabilidade e movimentações.</p>
+        </div>
+        <a href="{{ route('investments.tax') }}" class="btn-ghost px-3 py-1.5">Imposto de renda</a>
     </div>
 
     {{-- Totais -------------------------------------------------------- --}}
@@ -211,6 +214,9 @@
 
         {{-- Comprar mais, vender, atualizar cotação e informar cotas de um ativo em cotas. --}}
         <livewire:investments.position-actions />
+
+        {{-- Proventos e desdobramento/grupamento. --}}
+        <livewire:investments.investment-events />
 
         {{-- Reservas -------------------------------------------------- --}}
         @if ($reserves->isNotEmpty())
@@ -459,6 +465,8 @@
                                                 @if ($ativo->hasPosition())
                                                     <button type="button" wire:click="$dispatch('open-position', { id: '{{ $ativo->id }}', action: 'sell' })" class="text-brand-700 hover:underline dark:text-accent-400">Vender</button>
                                                     <button type="button" wire:click="$dispatch('open-position', { id: '{{ $ativo->id }}', action: 'quote' })" class="text-brand-700 hover:underline dark:text-accent-400">Cotação</button>
+                                                    <button type="button" wire:click="$dispatch('open-event', { id: '{{ $ativo->id }}', action: 'income' })" class="text-brand-700 hover:underline dark:text-accent-400">Provento</button>
+                                                    <button type="button" wire:click="$dispatch('open-event', { id: '{{ $ativo->id }}', action: 'ratio' })" class="text-brand-700 hover:underline dark:text-accent-400">Desdobramento ou grupamento</button>
                                                 @endif
                                             @endif
                                         </p>
@@ -681,8 +689,13 @@
                             </p>
                             <p class="truncate text-xs text-slate-500 dark:text-slate-400">
                                 {{ $tx->operation_date->format('d/m/Y') }}
-                                @if ($tx->quantity && (float) $tx->quantity > 0)
+                                @if ($tx->ratio_from && $tx->ratio_to)
+                                    · cada {{ rtrim(rtrim($tx->ratio_from, '0'), '.') }} {{ $tx->transaction_type === \App\Enums\TransactionType::Split ? 'vira' : 'viram' }} {{ rtrim(rtrim($tx->ratio_to, '0'), '.') }}
+                                @elseif ($tx->quantity && (float) $tx->quantity > 0)
                                     · {{ rtrim(rtrim($tx->quantity, '0'), '.') }} a {{ Money::format($tx->unit_price) }}
+                                @endif
+                                @if ($tx->transaction_type->isIncome())
+                                    · bruto {{ Money::format($tx->total_amount) }}@if ($tx->other_fees && (float) $tx->other_fees > 0), imposto retido {{ Money::format($tx->other_fees) }}@endif
                                 @endif
                                 @if ($tx->broker_fee && (float) $tx->broker_fee > 0)
                                     · taxa {{ Money::format($tx->broker_fee) }}
