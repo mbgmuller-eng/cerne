@@ -26,7 +26,11 @@ model de domínio não estiver coberto. Se ele falhar, adicione a trait — não
 adicione o model à lista de exceções sem entender por quê.
 
 Exceções legítimas já existentes: taxonomia compartilhada (categorias padrão com
-`profile_id = null`) usa `BelongsToProfileOrShared`.
+`profile_id = null`) usa `BelongsToProfileOrShared`. Os dados do profissional que
+ainda não são do cliente (`Lead`, `LeadQuote`, `LeadAttachment`, `LeadAlertDigest`,
+`LeadSuggestionDismissal`) não têm `profile_id`: o isolamento é por `consultant_id`,
+conferido onde o dado é lido (ver `LeadAttachmentController` e `LeadsIndex`), e cada
+um está justificado na lista de exceções do `TenancyCoverageTest`.
 
 ### 2. Privacidade do casal é uma camada *acima* do tenancy, e é SIMÉTRICA
 
@@ -62,12 +66,21 @@ proteção é **índice único**, não `if (existe)` — que perde a corrida.
 
 Já existem em: `credit_card_invoices(credit_card_id, year, month)`,
 `fixed_bill_payments(fixed_bill_id, year, month)`,
-`investment_snapshots(investment_id, year, month)`.
+`investment_snapshots(investment_id, year, month)`,
+`leads(consultant_id, automation_key)` (leads de renovação e venda cruzada),
+`lead_alert_digests(consultant_id, sent_on)` (resumo diário de leads),
+`insurance_policies(source_lead_quote_id)` (uma cotação gera uma apólice).
 
 ### 5. Dado extraído por IA passa por revisão humana
 
 A extração de PDF grava em `extraction_summary` (JSON) e **só vira lançamento
 depois que a pessoa confirma na tela**. Não crie caminho que pule essa etapa.
+
+Vale para todas as leituras: extrato, fatura, apólice, relatório de outro app e a
+simulação em PDF de um lead (`lead_attachments.extraction_summary`, que só vira
+cotação quando o formulário pré-preenchido é salvo). Sugestões de casamento
+(fatura de cartão, transferência entre contas, conta fixa) também nunca são
+automáticas: a linha vem sugerida e a pessoa confirma.
 
 ---
 
@@ -90,8 +103,40 @@ app/Models/Concerns/                  as traits que sustentam tudo
 app/Policies/ProfilePolicy.php        dono / cônjuge / consultor
 app/Http/Middleware/SetProfileContext.php
 app/Services/                         regra de negócio pesada
+app/Services/Extraction/              leitura por IA e casamento das linhas importadas
 routes/console.php                    rotinas agendadas
 ```
+
+### Rotinas agendadas (`routes/console.php`)
+
+Todas idempotentes (regra 4). O cron da Hostinger chama `schedule:run` a cada minuto.
+
+| Nome | Quando | O que faz |
+|---|---|---|
+| `batimento` | todo minuto | marca que o agendador está vivo (o `cerne:check` confere) |
+| `contas-fixas`, `receitas-recorrentes`, `faturas` | 03:10 a 03:20 | gera vencimentos e avisos |
+| `datas-importantes` | 03:25 | avisos de aniversário e de vencimento de apólice (não avisa apólice que renova sozinha) |
+| `snapshots` | dia 1, 03:30 | foto mensal dos investimentos |
+| `agenda-saude`, `cuidados-saude` | 03:35 | avisos de saúde |
+| cobrança (`lembrete-pix`, `pix-automatico-*`, `nota-fiscal-pendentes`, `lembrete-fim-do-teste`, `aviso-acesso-encerrando`) | 03:35 a 04:00 | assinatura e Asaas |
+| `anexos-de-leads` | 04:10 | apaga arquivos de leads perdidos há mais de 12 meses |
+| `leads-de-renovacao` | 07:30 | cria lead para apólice que vence (preferências em `users.renewal_lead_*`) |
+| `resumo-de-leads` | 08:00 | uma notificação por profissional com o que pede atenção nos leads |
+| `documentos-pendentes` | a cada 5 min | despacha leitura por IA dos envios que ficaram na fila sem chave da API |
+
+A leitura por IA roda em fila do banco (`queue:work --stop-when-empty` no cron):
+`ProcessDocumentJob` (documentos) e `ExtractLeadQuoteJob` (simulação de lead).
+
+### Dinheiro que não vira lançamento
+
+Na revisão de extrato, estes casos **mexem no saldo da conta sem criar receita nem
+despesa**, e o rastro fica em colunas JSON de `document_uploads`:
+
+- pagamento de fatura de cartão: dá baixa na fatura cadastrada
+  (`InvoiceService::payFromStatement`) ou, sem fatura, só o saldo (`card_payment_log`);
+- transferência entre contas do próprio perfil (`transfer_log`).
+
+Criar uma despesa nesses casos conta o mesmo dinheiro duas vezes no fluxo de caixa.
 
 **Ordem de middleware importa:** `SetProfileContext` roda **antes** de
 `SubstituteBindings` (ver `bootstrap/app.php`). Invertido, o route-model binding
@@ -107,8 +152,12 @@ de regressão para isso — não "modernize" o login para Livewire.
 php artisan test
 ```
 
-363 testes. **Verde é obrigatório**, não desejável. Se algo ficou vermelho, o
-conserto é o código novo — não o teste.
+Cerca de 1600 testes (rodam em uns 10 minutos; no Windows, rode em segundo plano).
+**Verde é obrigatório**, não desejável. Se algo ficou vermelho, o conserto é o código
+novo — não o teste. Para iterar, filtre: `php artisan test --filter=NomeDoTeste`.
+
+Os testes usam o MySQL local (`cerne_test`). Se `php artisan test` falhar com
+"connection refused", o servidor local caiu: suba o `mysqld` antes.
 
 Ao mexer em model, rota ou listagem, confira que ainda passam:
 `TenancyIsolationTest`, `TenancyCoverageTest`, `MemberPrivacyTest`,
@@ -116,3 +165,8 @@ Ao mexer em model, rota ou listagem, confira que ainda passam:
 
 Para publicar: `php artisan cerne:check` no servidor precisa ficar verde
 (exceto contas de demonstração, enquanto elas existirem de propósito).
+
+A sequência de deploy completa (`git pull`, `composer install --no-scripts`,
+`package:discover`, `config:clear` **antes** do `migrate`, caches, `cerne:check --strict`)
+e o porquê de cada passo estão em `DEPLOY.md`. Só se publica depois de o dono do
+projeto autorizar; nunca se grava em produção sem ele pedir.
