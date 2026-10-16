@@ -12,10 +12,7 @@
             <h1 class="font-display text-3xl font-semibold tracking-tight text-slate-900 dark:text-white">Investimentos</h1>
             <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Carteira, rentabilidade e movimentações.</p>
         </div>
-        <div class="flex flex-wrap gap-2">
-            <a href="{{ route('investments.performance') }}" class="btn-ghost px-3 py-1.5">Desempenho</a>
-            <a href="{{ route('investments.tax') }}" class="btn-ghost px-3 py-1.5">Imposto de renda</a>
-        </div>
+        <a href="{{ route('investments.tax') }}" class="btn-ghost px-3 py-1.5">Imposto de renda</a>
     </div>
 
     {{-- Totais -------------------------------------------------------- --}}
@@ -643,11 +640,22 @@
             </div>
         @endif
 
+        @if ($performanceCharts !== null && $performanceCharts['has_data'])
+            <div class="flex flex-wrap items-center justify-between gap-2">
+                <p class="text-xs text-slate-500 dark:text-slate-400">Últimos 12 meses.</p>
+                <a href="{{ route('investments.performance') }}" class="btn-ghost px-3 py-1.5 text-xs">Escolher período e pessoa</a>
+            </div>
+
+            @include('livewire.investments.partials.performance-charts', ['dados' => $performanceCharts, 'meses' => 12])
+        @endif
+
         @if ($performance->isEmpty())
+            @if ($performanceCharts === null || ! $performanceCharts['has_data'])
             <div class="rounded-2xl border border-dashed border-slate-300 dark:border-slate-600 bg-white/60 dark:bg-slate-800/40 px-5 py-12 text-center">
                 <p class="text-sm text-slate-600 dark:text-slate-300">Nenhuma rentabilidade registrada.</p>
                 <p class="mt-1 text-xs text-slate-400">Os relatórios de rentabilidade chegam pela importação de PDF.</p>
             </div>
+            @endif
         @else
             <ul class="card divide-y divide-slate-100 dark:divide-white/10">
                 @foreach ($performance as $p)

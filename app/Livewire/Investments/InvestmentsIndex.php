@@ -21,6 +21,7 @@ use App\Models\InvestmentTransaction;
 use App\Models\InvestorProfile;
 use App\Models\ProfileMember;
 use App\Models\RecommendedAllocation;
+use App\Services\InvestmentPerformanceService;
 use App\Services\InvestmentTransactionService;
 use App\Support\Money;
 use App\Support\ProfileContext;
@@ -944,6 +945,19 @@ class InvestmentsIndex extends Component
         return $linhas === [] ? null : array_slice(array_reverse($linhas), 0, 6);
     }
 
+    /**
+     * Gráficos de desempenho da aba Performance (últimos 12 meses), com o que a corretora informa mês a mês. Com a aba de
+     * privacidade visível, acompanha a pessoa escolhida.
+     *
+     * @return array<string, mixed>
+     */
+    public function getPerformanceChartsProperty(): array
+    {
+        $membro = $this->showPrivacyTabs && $this->viewAs !== '' ? $this->viewAs : null;
+
+        return app(InvestmentPerformanceService::class)->forPeriod($membro, 12);
+    }
+
     /** @return Collection<int, InvestmentPerformance> */
     public function getPerformanceProperty(): Collection
     {
@@ -1000,6 +1014,7 @@ class InvestmentsIndex extends Component
             'totalGain' => $this->totalGain,
             'reserves' => $this->reserves,
             'performance' => $this->performance,
+            'performanceCharts' => $this->tab === 'performance' ? $this->performanceCharts : null,
             'portfolioEvolution' => $this->portfolioEvolution,
             'evolutionChart' => $this->evolutionChart,
             'quotaMovement' => $this->tab === 'performance' ? $this->quotaMovement : null,

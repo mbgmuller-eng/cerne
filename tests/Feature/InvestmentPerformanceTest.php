@@ -241,6 +241,23 @@ class InvestmentPerformanceTest extends TestCase
         $this->get(route('investments.performance'))->assertOk()->assertSee('Desempenho');
     }
 
+    public function test_a_aba_performance_do_investimentos_mostra_os_graficos_da_carteira_importada(): void
+    {
+        Livewire::test(\App\Livewire\Investments\InvestmentsIndex::class)
+            ->call('setTab', 'performance')
+            ->assertSee('Nenhuma rentabilidade registrada')
+            ->assertDontSee('Rentabilidade acumulada contra o CDI');
+
+        $this->mes(2026, 9, ['return_percent' => '1.0000', 'cdi_percent' => '1.0000', 'closing_balance' => '1000.00']);
+        $this->mes(2026, 10, ['return_percent' => '1.5000', 'cdi_percent' => '1.0000', 'closing_balance' => '1015.00']);
+
+        Livewire::test(\App\Livewire\Investments\InvestmentsIndex::class)
+            ->call('setTab', 'performance')
+            ->assertSee('Rentabilidade acumulada contra o CDI')
+            ->assertSee('Escolher período e pessoa')
+            ->assertDontSee('Nenhuma rentabilidade registrada');
+    }
+
     public function test_sem_dados_mostra_o_aviso(): void
     {
         Livewire::test(InvestmentPerformance::class)->assertSee('Ainda não há dados de investimentos');
