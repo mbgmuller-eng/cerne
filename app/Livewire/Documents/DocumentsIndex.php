@@ -21,6 +21,7 @@ use App\Services\Extraction\CategorizationRuleMatcher;
 use App\Services\Extraction\DocumentCommitService;
 use App\Services\Extraction\ExternalReportReview;
 use App\Services\Extraction\InvoicePaymentMatcher;
+use App\Services\Extraction\OwnTransferMatcher;
 use App\Support\Money;
 use App\Support\ProfileContext;
 use Carbon\CarbonImmutable;
@@ -116,6 +117,12 @@ class DocumentsIndex extends Component
 
     /** @var array<int, list<array{id: string, label: string, sugerida: bool}>> faturas oferecidas na linha */
     public array $faturaOpcoesPorItem = [];
+
+    /** Linha que é transferência entre contas do próprio perfil: só o saldo mexe, não vira receita nem despesa. */
+    public array $transferenciaPorItem = [];
+
+    /** O que fez o Cerne sugerir a transferência (ou vazio, quando a pessoa apontou à mão). */
+    public array $transferenciaMotivoPorItem = [];
 
     /**
      * Aviso quando já existe um lançamento com a mesma conta, data e valor
@@ -249,6 +256,8 @@ class DocumentsIndex extends Component
         $this->notaPorItem = [];
         $this->faturaPorItem = [];
         $this->faturaOpcoesPorItem = [];
+        $this->transferenciaPorItem = [];
+        $this->transferenciaMotivoPorItem = [];
         $this->duplicataPorItem = [];
         $this->criarRegraPorItem = [];
         $this->regraPatternPorItem = [];
@@ -303,6 +312,7 @@ class DocumentsIndex extends Component
         // Por último: a baixa reconhecida volta a marcar a linha que o relatório de outro app tinha desmarcado.
         if ($documento->document_type !== DocumentType::CreditCardInvoice) {
             $this->casarPagamentosDeFatura($documento, $itens);
+            $this->casarTransferencias($documento, $itens);
         }
     }
 
@@ -589,7 +599,7 @@ class DocumentsIndex extends Component
             }
 
             // Estorno e pagamento de fatura de cartão não são gasto novo: não pedem categoria.
-            if (($this->estornoPorItem[$i] ?? false) || ($this->faturaPorItem[$i] ?? '') !== '') {
+            if (($this->estornoPorItem[$i] ?? false) || ($this->faturaPorItem[$i] ?? '') !== '' || ($this->transferenciaPorItem[$i] ?? false)) {
                 $faltando[$i] = false;
 
                 continue;
@@ -696,6 +706,69 @@ class DocumentsIndex extends Component
         $this->faturaOpcoesPorItem[$i] = $this->opcoesDeFatura($res);
         $this->faturaPorItem[$i] = $res['sugeridas']->first()?->id ?? 'sem';
         $this->estornoPorItem[$i] = false;
+        $this->transferenciaPorItem[$i] = false;
+    }
+
+    /**
+     * Linhas que são transferência entre contas do próprio perfil (entrada ou saída): a evidência forte já vem marcada, a
+     * fraca só mostra a caixa. Pagamento de fatura e baixa de conta fixa ou receita recorrente têm prioridade: são outro
+     * destino para a mesma linha.
+     *
+     * @param  array<int, array<string, mixed>>  $itens
+     */
+    private function casarTransferencias(DocumentUpload $documento, array $itens): void
+    {
+        $matcher = app(OwnTransferMatcher::class)->prepare($documento->bank_account_id, $itens);
+
+        foreach ($itens as $i => $item) {
+            if (($this->faturaPorItem[$i] ?? '') !== ''
+                || ($this->fixedBillPaymentPorItem[$i] ?? null) !== null
+                || ($this->recurringIncomeOccurrencePorItem[$i] ?? null) !== null
+                || ($this->estornoPorItem[$i] ?? false)
+                || $this->parseItemDate($item['data'] ?? null) === null) {
+                continue;
+            }
+
+            $res = $matcher->match($item);
+
+            if (! $res['sugerir']) {
+                continue;
+            }
+
+            $this->transferenciaMotivoPorItem[$i] = $res['motivo'];
+            $this->transferenciaPorItem[$i] = $res['selecionar'];
+        }
+    }
+
+    /** "É transferência entre minhas contas": a pessoa aponta na linha, quando nada foi reconhecido sozinho. */
+    public function marcarTransferencia(int $i): void
+    {
+        $documento = DocumentUpload::findOrFail($this->revisandoId);
+
+        if ($documento->document_type === DocumentType::CreditCardInvoice || ! isset($documento->extractedItems()[$i])) {
+            return;
+        }
+
+        $this->transferenciaPorItem[$i] = true;
+        $this->transferenciaMotivoPorItem[$i] ??= '';
+        $this->faturaPorItem[$i] = '';
+        $this->estornoPorItem[$i] = false;
+    }
+
+    /** Uma linha é pagamento de fatura OU transferência, nunca as duas. */
+    public function updatedTransferenciaPorItem(mixed $valor, string $chave): void
+    {
+        if ($valor) {
+            $this->faturaPorItem[(int) $chave] = '';
+            $this->estornoPorItem[(int) $chave] = false;
+        }
+    }
+
+    public function updatedFaturaPorItem(mixed $valor, string $chave): void
+    {
+        if ($valor !== '' && $valor !== null) {
+            $this->transferenciaPorItem[(int) $chave] = false;
+        }
     }
 
     /**
@@ -749,6 +822,7 @@ class DocumentsIndex extends Component
                 'estorno' => $this->estornoPorItem,
                 'fixedBillPayment' => $this->fixedBillPaymentPorItem,
                 'fatura' => $this->faturaPorItem,
+                'transferencia' => $this->transferenciaPorItem,
                 'recurringIncomeOccurrence' => $this->recurringIncomeOccurrencePorItem,
                 'conta' => $this->contaPorItem,
             ]);

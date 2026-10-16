@@ -224,7 +224,8 @@
                                     $resolvido = $jaImportado || $jaExcluido;
                                     $ehReceita = ($item['tipo'] ?? null) === 'receita';
                                     $ehFatura = ! $ehReceita && ($faturaPorItem[$i] ?? '') !== '';
-                                    $ehEstorno = ($estornoPorItem[$i] ?? false) || $ehFatura; // sem categoria: nenhum dos dois é gasto novo
+                                    $ehTransferencia = ! $ehFatura && ($transferenciaPorItem[$i] ?? false);
+                                    $ehEstorno = ($estornoPorItem[$i] ?? false) || $ehFatura || $ehTransferencia; // sem categoria: nenhum dos dois é gasto novo
                                     $necessidadeItem = $necessidadePorItem[$i] ?? '';
                                     $faltaCategorizar = ! $ehReceita && ($itensFaltandoCategoria[$i] ?? false);
                                     $categoriasDoItem = $necessidadeItem === Necessity::Investment->value
@@ -286,6 +287,8 @@
                                         <td class="px-3 py-2">
                                             @if ($ehFatura)
                                                 <span class="text-xs font-medium text-brand-700 dark:text-brand-300">Pagamento de fatura</span>
+                                            @elseif ($ehTransferencia)
+                                                <span class="text-xs font-medium text-brand-700 dark:text-brand-300">Transferência</span>
                                             @elseif ($ehEstorno)
                                                 <span class="text-xs font-medium text-emerald-700 dark:text-emerald-400">Estorno</span>
                                             @elseif (! $ehReceita)
@@ -388,6 +391,20 @@
                                                     @endif
                                                 </div>
                                             @endif
+                                            @if ($ehTransferencia || isset($transferenciaMotivoPorItem[$i]))
+                                                <div class="mb-1.5 space-y-1 rounded-lg bg-brand-50 px-3 py-2 dark:bg-white/5">
+                                                    <label class="inline-flex items-center gap-2 font-medium text-slate-600 dark:text-slate-300">
+                                                        <input type="checkbox" wire:model.live="transferenciaPorItem.{{ $i }}" class="rounded border-slate-300 dark:border-slate-600 text-brand-700 dark:text-brand-400 focus:ring-brand-500">
+                                                        Transferência entre minhas contas
+                                                    </label>
+                                                    @if (($transferenciaMotivoPorItem[$i] ?? '') !== '')
+                                                        <p class="text-slate-500 dark:text-slate-400">{{ $transferenciaMotivoPorItem[$i] }}</p>
+                                                    @endif
+                                                    @if ($ehTransferencia)
+                                                        <p class="text-slate-500 dark:text-slate-400">Só o saldo da conta muda: não vira {{ $ehReceita ? 'receita' : 'despesa' }}, para o fluxo de caixa não contar o mesmo dinheiro duas vezes.</p>
+                                                    @endif
+                                                </div>
+                                            @endif
                                             @if ($faltaCategorizar || ($duplicataPorItem[$i] ?? null) || ($regraAplicadaPorItem[$i] ?? null) || ($notaPorItem[$i] ?? null))
                                                 <div class="flex flex-wrap gap-x-3 gap-y-1">
                                                     @if ($faltaCategorizar)
@@ -406,7 +423,7 @@
                                             @endif
 
                                             <div class="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
-                                                @unless ($ehReceita || $ehFatura)
+                                                @unless ($ehReceita || $ehFatura || $ehTransferencia)
                                                     <label class="inline-flex items-center gap-1.5 text-emerald-700 dark:text-emerald-400">
                                                         <input type="checkbox" wire:model.live="estornoPorItem.{{ $i }}" class="rounded border-slate-300 dark:border-slate-600 text-emerald-600 focus:ring-emerald-500">
                                                         Estorno / cashback
@@ -416,6 +433,11 @@
 
                                                 @if (! $ehReceita && ! $ehEstorno && ! isset($faturaOpcoesPorItem[$i]) && $revisando->document_type !== \App\Enums\DocumentType::CreditCardInvoice)
                                                     <button type="button" wire:click="marcarPagamentoFatura({{ $i }})" class="text-brand-700 hover:underline dark:text-brand-300">É pagamento de fatura de cartão</button>
+                                                    <span class="text-slate-300 dark:text-slate-600">·</span>
+                                                @endif
+
+                                                @if (! $ehEstorno && ! isset($transferenciaMotivoPorItem[$i]) && $revisando->document_type !== \App\Enums\DocumentType::CreditCardInvoice)
+                                                    <button type="button" wire:click="marcarTransferencia({{ $i }})" class="text-brand-700 hover:underline dark:text-brand-300">É transferência entre minhas contas</button>
                                                     <span class="text-slate-300 dark:text-slate-600">·</span>
                                                 @endif
 

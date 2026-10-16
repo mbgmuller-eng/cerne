@@ -120,6 +120,15 @@ class DocumentCommitService
             // Linha de outra conta de origem pode ter sido apontada para uma conta do Cerne na revisão.
             $conta = $this->contaDaLinha($overrides, $i) ?? $contaDoDocumento;
 
+            // Transferência entre contas do próprio perfil: só o saldo desta conta mexe; não é receita nem despesa. Estorno
+            // nunca é transferência.
+            if (($overrides['transferencia'][$i] ?? false) === true && ($overrides['estorno'][$i] ?? false) !== true) {
+                $this->transferenciaEntreContas($documento, $i, $item, $valor, $data, $conta, $mexeNoSaldo);
+                $criados++;
+
+                continue;
+            }
+
             if (($item['tipo'] ?? null) === 'receita') {
                 // Confere o status de novo aqui — não confia no que a
                 // revisão viu: se mudou nesse meio-tempo (foi recebida por
@@ -229,6 +238,35 @@ class DocumentCommitService
         }
 
         return $criados;
+    }
+
+    /**
+     * A linha do extrato é uma transferência entre contas do próprio perfil: entrada credita a conta, saída debita, e nada
+     * vira receita ou despesa. O outro lado da transferência é tratado no extrato da outra conta, que reconhece a sua
+     * linha por conta própria; por isso não há ligação entre os dois, nem risco de mexer duas vezes no mesmo saldo.
+     *
+     * @param  array<string, mixed>  $item
+     */
+    private function transferenciaEntreContas(DocumentUpload $documento, int $i, array $item, string $valor, CarbonImmutable $data, ?BankAccount $conta, bool $mexeNoSaldo): void
+    {
+        $magnitude = ltrim($valor, '-');
+        $entrada = ($item['tipo'] ?? null) === 'receita';
+        $moveu = $mexeNoSaldo && $conta !== null;
+
+        if ($moveu) {
+            $conta->applyToBalance($entrada ? $magnitude : bcmul($magnitude, '-1', Money::SCALE));
+        }
+
+        $documento->transfer_log = array_merge($documento->transfer_log ?? [], [[
+            'item' => $i,
+            'tipo' => $entrada ? 'entrada' : 'saida',
+            'descricao' => $item['descricao'] ?? null,
+            'valor' => $magnitude,
+            'data' => $data->toDateString(),
+            'conta_id' => $conta?->id,
+            'saldo_movido' => $moveu,
+        ]]);
+        $documento->save();
     }
 
     /**
