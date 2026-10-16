@@ -4,6 +4,8 @@ namespace App\Services;
 
 use App\Enums\ConsultantClientStatus;
 use App\Mail\ConsultantLinkRequestMail;
+use App\Mail\EngagementPlanMail;
+use App\Models\FinancialProfile;
 use App\Models\ConsultantClient;
 use App\Models\User;
 use Illuminate\Support\Facades\Mail;
@@ -46,6 +48,47 @@ class ConsultantLinkService
         Mail::to($client->email)->queue(new ConsultantLinkRequestMail($consultant, $link));
 
         return $link;
+    }
+
+    /** O perfil do cliente do vínculo (o que ele possui). */
+    private function clientProfile(ConsultantClient $vinculo): ?FinancialProfile
+    {
+        return FinancialProfile::query()->where('owner_user_id', $vinculo->client_id)->first();
+    }
+
+    /**
+     * Há plano de acompanhamento a entregar? Só consultor financeiro tem: corretor de seguros não usa o Acompanhamento.
+     * Ao encerrar o vínculo, quem decide o destino do plano é o consultor (ver end()).
+     */
+    public function hasPlanToDeliver(ConsultantClient $vinculo): bool
+    {
+        $perfil = $this->clientProfile($vinculo);
+
+        return $perfil !== null
+            && $vinculo->consultant->isConsultant()
+            && app(EngagementPlanReport::class)->hasData($perfil->id, $vinculo->consultant_id);
+    }
+
+    /**
+     * Encerra o vínculo. O histórico do Acompanhamento NÃO é apagado: se o mesmo consultor voltar a ser vinculado, tudo
+     * reaparece; um consultor novo começa do zero. O consultor decide se o plano vai em PDF para o e-mail do cliente.
+     */
+    public function end(ConsultantClient $vinculo, bool $enviarPlano): void
+    {
+        $entrega = null;
+        $perfil = $this->clientProfile($vinculo);
+
+        if ($this->hasPlanToDeliver($vinculo)) {
+            $entrega = $enviarPlano ? 'sent' : 'declined';
+        } elseif ($vinculo->consultant->isConsultant()) {
+            $entrega = 'empty';
+        }
+
+        $vinculo->update(['status' => ConsultantClientStatus::Inactive, 'ended_at' => now(), 'plan_delivery' => $entrega]);
+
+        if ($entrega === 'sent' && $perfil !== null) {
+            Mail::to($vinculo->client->email)->queue(new EngagementPlanMail($perfil->id, $vinculo->consultant_id, $vinculo->consultant->name, $perfil->profile_name));
+        }
     }
 
     /**

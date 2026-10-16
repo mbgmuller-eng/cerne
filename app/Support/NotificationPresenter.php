@@ -79,6 +79,11 @@ final class NotificationPresenter
                 'message' => implode('; ', \App\Notifications\LeadFollowUpDigest::linesFor((int) ($d['quotes_expiring'] ?? 0), (int) ($d['stale_leads'] ?? 0), (int) ($d['overdue_actions'] ?? 0))) ?: null,
                 'url' => route('consultant.leads'),
             ],
+            'engagement_notice' => [
+                'heading' => $titulo !== '' ? $titulo : 'Acompanhamento',
+                'message' => $d['message'] ?? null,
+                'url' => route('engagement.index'),
+            ],
             'document_processed' => [
                 'heading' => ($d['status'] ?? null) === 'completed' ? 'Importação concluída' : 'Falha na importação',
                 'message' => $titulo,
@@ -106,6 +111,11 @@ final class NotificationPresenter
     public static function profileId(DatabaseNotification $notificacao): ?string
     {
         $d = $notificacao->data;
+
+        // O aviso do Acompanhamento já grava o perfil: o clique abre o perfil do cliente antes de ir para a tela.
+        if (($d['kind'] ?? null) === 'engagement_notice') {
+            return $d['profile_id'] ?? null;
+        }
 
         [$modelo, $id] = match ($d['kind'] ?? null) {
             'lead_follow_up_digest' => [

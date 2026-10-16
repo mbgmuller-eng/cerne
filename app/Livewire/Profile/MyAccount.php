@@ -14,6 +14,7 @@ use App\Models\ProfileMember;
 use App\Models\Subscription;
 use App\Services\ClientOnboardingService;
 use App\Services\ConsultantCapacityService;
+use App\Services\ConsultantLinkService;
 use App\Services\PartnerInviteService;
 use App\Support\ProfileContext;
 use Livewire\Attributes\Layout;
@@ -34,6 +35,9 @@ class MyAccount extends Component
     use RequiresActiveProfile;
 
     public bool $showInviteForm = false;
+
+    /** Vínculo que o consultor está encerrando e precisa decidir o destino do plano de acompanhamento. */
+    public ?string $encerrandoVinculoId = null;
 
     public string $partnerName = '';
 
@@ -259,9 +263,43 @@ class MyAccount extends Component
 
         abort_if($vinculo === null, 404);
 
-        $vinculo->update(['status' => ConsultantClientStatus::Inactive]);
+        // Há plano de acompanhamento: antes de encerrar, o consultor decide se o cliente recebe uma cópia por e-mail.
+        if (app(ConsultantLinkService::class)->hasPlanToDeliver($vinculo)) {
+            $this->encerrandoVinculoId = $vinculo->id;
+
+            return;
+        }
+
+        app(ConsultantLinkService::class)->end($vinculo, false);
 
         session()->flash('status', 'Cliente removido da carteira. O acesso foi encerrado agora.');
+    }
+
+    /** Conclui o encerramento depois da pergunta: enviar o plano em PDF ao e-mail do cliente, ou não. */
+    public function encerrarVinculo(bool $enviarPlano): void
+    {
+        abort_unless(auth()->user()->isLinkedProfessional(), 403);
+
+        $vinculo = ConsultantClient::query()
+            ->where('id', $this->encerrandoVinculoId)
+            ->where('consultant_id', auth()->id())
+            ->active()
+            ->first();
+
+        abort_if($vinculo === null, 404);
+
+        app(ConsultantLinkService::class)->end($vinculo, $enviarPlano);
+
+        $this->encerrandoVinculoId = null;
+
+        session()->flash('status', $enviarPlano
+            ? 'Cliente removido da carteira. O plano de acompanhamento foi enviado ao e-mail dele(a).'
+            : 'Cliente removido da carteira. O plano de acompanhamento ficou guardado e não foi enviado.');
+    }
+
+    public function cancelarEncerramento(): void
+    {
+        $this->encerrandoVinculoId = null;
     }
 
     public function render()
@@ -367,6 +405,7 @@ class MyAccount extends Component
             'profissional' => $profissional,
             'minhaAssinatura' => $minhaAssinatura,
             'clientesVinculados' => $clientesVinculados,
+            'vinculoEmEncerramento' => $this->encerrandoVinculoId !== null ? $clientesVinculados->firstWhere('id', $this->encerrandoVinculoId) : null,
             'vagasRestantes' => app(ConsultantCapacityService::class)->remainingSlots($profissional),
         ]);
     }

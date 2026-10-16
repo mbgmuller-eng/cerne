@@ -27,6 +27,11 @@
         ['documents.index', 'Importar', 'Importar', 'upload'],
         ['categorization-rules.index', 'Regras de categorização', 'Regras', 'tag'],
     ];
+    // Acompanhamento: só quem tem vínculo ativo com um consultor financeiro (cliente), ou o consultor dentro do perfil de um
+    // cliente dele. Sem consultor, a área não existe.
+    if ($profile && app(\App\Services\EngagementAccess::class)->viewer() !== null) {
+        array_splice($navFinancas, 5, 0, [['engagement.index', 'Acompanhamento', 'Consultoria', 'contact']]);
+    }
     $navSeguros = [
         ['insurance.index', 'Apólices', 'Seguros', 'shield'],
     ];
@@ -155,6 +160,7 @@
             'items' => [
                 ['consultant.portfolio', 'Painel da carteira', 'Carteira', 'invest'],
                 ['consultant.portfolio.investments', 'Investimentos da carteira', 'Invest.', 'flow'],
+                ['consultant.week', 'Minha semana', 'Semana', 'calendar'],
             ],
         ],
         [

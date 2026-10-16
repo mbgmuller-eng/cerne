@@ -245,10 +245,17 @@
                                     <p class="figure text-sm text-slate-700 dark:text-slate-300">{{ Money::compact($cliente['patrimonio']) }}</p>
                                     <p class="text-xs text-slate-400">cliente desde {{ $cliente['since']?->translatedFormat('m/Y') ?? '—' }}</p>
                                 </div>
-                                <form method="POST" action="{{ route('profile.switch', $cliente['profile_id']) }}">
-                                    @csrf
-                                    <button type="submit" class="btn-secondary px-3 py-1.5 whitespace-nowrap">Abrir perfil</button>
-                                </form>
+                                <div class="flex items-center gap-2">
+                                    <form method="POST" action="{{ route('profile.switch', $cliente['profile_id']) }}">
+                                        @csrf
+                                        <input type="hidden" name="destino" value="acompanhamento">
+                                        <button type="submit" class="btn-ghost px-3 py-1.5 whitespace-nowrap">Acompanhamento</button>
+                                    </form>
+                                    <form method="POST" action="{{ route('profile.switch', $cliente['profile_id']) }}">
+                                        @csrf
+                                        <button type="submit" class="btn-secondary px-3 py-1.5 whitespace-nowrap">Abrir perfil</button>
+                                    </form>
+                                </div>
                             </div>
                         </div>
                     @endforeach

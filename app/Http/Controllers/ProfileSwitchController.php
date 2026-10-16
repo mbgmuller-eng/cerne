@@ -52,6 +52,12 @@ class ProfileSwitchController extends Controller
             ]));
         }
 
+        // Atalho da "Minha semana": entra no perfil do cliente já no Acompanhamento. Quem não tem a área (sem vínculo de
+        // consultoria) cai na Visão geral, porque a tela confere o acesso de novo.
+        if ($request->input('destino') === 'acompanhamento' && $request->user()->isConsultant()) {
+            return redirect()->route('engagement.index');
+        }
+
         // Corretor não tem Visão geral (é tela financeira, ver Dashboard::
         // mount()) — cai direto em Seguros, a única tela dele dentro do perfil.
         return redirect()->route($request->user()->isBroker() ? 'insurance.index' : 'dashboard');

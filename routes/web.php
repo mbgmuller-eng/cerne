@@ -172,6 +172,8 @@ Route::middleware(['auth', 'verified'])->group(function (): void {
         Route::get('/investimentos/imposto-de-renda', \App\Livewire\Investments\InvestmentTaxReport::class)->name('investments.tax');
         Route::get('/investimentos/desempenho', \App\Livewire\Investments\InvestmentPerformance::class)->name('investments.performance');
         Route::get('/seguros', InsuranceIndex::class)->name('insurance.index');
+        // Acompanhamento do consultor financeiro com o cliente: só existe com vínculo ativo (ver EngagementAccess).
+        Route::get('/acompanhamento', \App\Livewire\Engagement\EngagementHome::class)->name('engagement.index');
         Route::get('/objetivos', GoalsIndex::class)->name('goals.index');
 
         // Documentos: visível ao consultor/corretor também (ao contrário de
@@ -212,6 +214,7 @@ Route::middleware(['auth', 'verified'])->group(function (): void {
         Route::get('/carteira/seguros', PortfolioInsurance::class)->name('consultant.portfolio.insurance');
         Route::get('/carteira/investimentos', PortfolioInvestments::class)->name('consultant.portfolio.investments');
         Route::get('/carteira/datas-importantes', ImportantDates::class)->name('consultant.portfolio.important-dates');
+        Route::get('/semana', \App\Livewire\Consultant\EngagementWeek::class)->name('consultant.week');
         Route::get('/leads', LeadsIndex::class)->name('consultant.leads');
         Route::get('/leads/metricas', \App\Livewire\Consultant\LeadMetrics::class)->name('consultant.leads.metrics');
         // Anexo de lead (simulação em PDF etc.): só o dono do lead abre — a checagem é no controlador.

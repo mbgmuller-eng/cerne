@@ -188,3 +188,11 @@ Schedule::call(function (): void {
         ->pluck('id')
         ->each(fn (string $id) => \App\Jobs\ProcessDocumentJob::dispatch($id));
 })->everyFiveMinutes()->name('documentos-pendentes')->withoutOverlapping();
+
+// Acompanhamento: lembrete de reunião no dia seguinte e de tarefa que vence ou venceu. Idempotente por índice único
+// (engagement_reminders: usuário + assunto + tipo).
+Schedule::call(function (): void {
+    $enviados = app(\App\Services\EngagementReminderService::class)->run();
+
+    logger()->info('Lembretes do acompanhamento', ['enviados' => $enviados]);
+})->dailyAt('07:45')->name('acompanhamento-lembretes')->withoutOverlapping();

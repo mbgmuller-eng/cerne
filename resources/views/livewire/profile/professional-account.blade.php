@@ -84,6 +84,23 @@
         @endif
     </section>
 
+    @if ($vinculoEmEncerramento)
+        <div class="fixed inset-0 z-40 flex items-center justify-center bg-slate-950/50 p-4" wire:key="encerrar-vinculo">
+            <div class="card w-full max-w-md space-y-4 p-5">
+                <div>
+                    <h2 class="text-sm font-semibold text-slate-900 dark:text-white">Encerrar o vínculo com {{ $vinculoEmEncerramento->client->name }}</h2>
+                    <p class="mt-2 text-sm text-slate-600 dark:text-slate-300">Vocês têm um plano de acompanhamento (reuniões, tarefas, demandas e notas compartilhadas). Quer enviar o plano em PDF para o e-mail do cliente?</p>
+                    <p class="mt-2 text-xs text-slate-500 dark:text-slate-400">De qualquer forma o histórico fica guardado. Se vocês se vincularem de novo, ele volta. Suas notas privadas nunca vão no plano.</p>
+                </div>
+                <div class="flex flex-wrap justify-end gap-2">
+                    <button type="button" wire:click="cancelarEncerramento" class="btn-ghost px-3 py-1.5 text-sm">Cancelar</button>
+                    <button type="button" wire:click="encerrarVinculo(false)" class="btn-secondary px-3 py-1.5 text-sm">Encerrar sem enviar</button>
+                    <button type="button" wire:click="encerrarVinculo(true)" class="btn-primary px-3 py-1.5 text-sm">Enviar o plano e encerrar</button>
+                </div>
+            </div>
+        </div>
+    @endif
+
     @include('livewire.profile.partials.notifications')
 
     @include('livewire.profile.partials.logout-mobile')
