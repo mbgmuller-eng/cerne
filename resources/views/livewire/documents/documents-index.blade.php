@@ -191,6 +191,13 @@
                 <p class="mt-3 text-sm text-red-700 dark:text-red-400">{{ $message }}</p>
             @enderror
 
+            @if ($this->transferenciasSugeridasPendentes > 0)
+                <div class="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-lg bg-brand-50 px-3 py-2 text-xs text-slate-600 dark:bg-white/5 dark:text-slate-300">
+                    <span>{{ $this->transferenciasSugeridasPendentes }} {{ $this->transferenciasSugeridasPendentes === 1 ? 'linha parece transferência entre as suas contas e ainda não está marcada' : 'linhas parecem transferência entre as suas contas e ainda não estão marcadas' }}. Cada uma mostra o motivo.</span>
+                    <button type="button" wire:click="marcarTransferenciasSugeridas" class="btn-secondary px-3 py-1 text-xs">Marcar {{ $this->transferenciasSugeridasPendentes === 1 ? 'a linha' : 'todas' }} como transferência</button>
+                </div>
+            @endif
+
             @php
                 $itens = $revisando->extractedItems();
                 $temCategorizacao = in_array($revisando->document_type, [DocumentType::BankStatement, DocumentType::CreditCardInvoice, DocumentType::ExternalReport], true);

@@ -755,6 +755,33 @@ class DocumentsIndex extends Component
         $this->estornoPorItem[$i] = false;
     }
 
+    /** Quantas linhas pendentes parecem transferência entre contas e ainda não foram marcadas. */
+    public function getTransferenciasSugeridasPendentesProperty(): int
+    {
+        if ($this->revisando === null) {
+            return 0;
+        }
+
+        $pendentes = $this->revisando->pendingItemIndices();
+
+        return collect(array_keys($this->transferenciaMotivoPorItem))
+            ->filter(fn ($i) => in_array($i, $pendentes, true) && ! ($this->transferenciaPorItem[$i] ?? false))
+            ->count();
+    }
+
+    /** "Marcar todas": uma extrato de conta investimento pode ter dezenas de linhas assim, e a pessoa já conferiu o motivo de cada uma. */
+    public function marcarTransferenciasSugeridas(): void
+    {
+        $pendentes = $this->revisando?->pendingItemIndices() ?? [];
+
+        foreach (array_keys($this->transferenciaMotivoPorItem) as $i) {
+            if (in_array($i, $pendentes, true) && ! ($this->transferenciaPorItem[$i] ?? false) && ($this->faturaPorItem[$i] ?? '') === '') {
+                $this->transferenciaPorItem[$i] = true;
+                $this->estornoPorItem[$i] = false;
+            }
+        }
+    }
+
     /** Uma linha é pagamento de fatura OU transferência, nunca as duas. */
     public function updatedTransferenciaPorItem(mixed $valor, string $chave): void
     {

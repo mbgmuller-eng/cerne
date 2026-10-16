@@ -155,6 +155,78 @@ class OwnTransferFromStatementTest extends TestCase
         self::assertTrue($res['selecionar']);
     }
 
+    // ---- rótulos de banco com o nome truncado (BTG)
+
+    public function test_nome_truncado_depois_do_traco_com_duas_palavras_ou_mais_vem_selecionado(): void
+    {
+        $conta = $this->conta('BTG');
+
+        foreach (['ENVIO TRANSFERÊNCIA - Marcelo Bernardes', 'RECEBIMENTO TRANSFERÊNCIA - Marcelo Bernardes Muller', 'ENVIO TRANSFERÊNCIA - Marcelo B D G Müller'] as $descricao) {
+            self::assertTrue($this->reconhecer($conta, $this->linha(['descricao' => $descricao]))['selecionar'], $descricao);
+        }
+    }
+
+    public function test_so_o_primeiro_nome_apenas_sugere_e_com_par_de_valor_seleciona(): void
+    {
+        $btg = $this->conta('BTG');
+        $itau = $this->conta('Itaú');
+        $linha = $this->linha(['descricao' => 'TRANSFERÊNCIA A CRÉDITO VIA PIX - Marcelo', 'tipo' => 'receita', 'valor' => '300.00', 'data' => '2026-10-10']);
+
+        $sem = $this->reconhecer($btg, $linha);
+        self::assertTrue($sem['sugerir']);
+        self::assertFalse($sem['selecionar']);
+        self::assertStringContainsString('primeiro nome', $sem['motivo']);
+
+        ExpenseRecord::factory()->create(['profile_id' => $this->perfil->id, 'member_id' => $this->membro->id, 'bank_account_id' => $itau->id,
+            'description' => 'Saída', 'amount' => '300.00', 'expense_date' => '2026-10-09', 'necessity' => 'essential', 'category_id' => ExpenseCategory::first()->id]);
+
+        $com = $this->reconhecer($btg, $linha);
+        self::assertTrue($com['selecionar']);
+        self::assertStringContainsString('uma saída igual', $com['motivo']);
+    }
+
+    public function test_nome_de_outra_pessoa_nao_e_reconhecido(): void
+    {
+        $conta = $this->conta('BTG');
+
+        foreach (['ENVIO TRANSFERÊNCIA - Marcelo Silva', 'TED ENVIADA - Happy Viagens', 'ENVIO TRANSFERÊNCIA - Marcelo Bernardes Costa', 'TRANSFERÊNCIA A CRÉDITO VIA PIX - Joana'] as $descricao) {
+            self::assertFalse($this->reconhecer($conta, $this->linha(['descricao' => $descricao]))['sugerir'], $descricao);
+        }
+    }
+
+    public function test_marcar_todas_as_sugeridas_de_uma_vez_e_o_aviso_some(): void
+    {
+        $doc = $this->extrato($this->conta('BTG'), [
+            $this->linha(['descricao' => 'TRANSFERÊNCIA A CRÉDITO VIA PIX - Marcelo', 'tipo' => 'receita', 'valor' => '100.00']),
+            $this->linha(['descricao' => 'TRANSFERÊNCIA A CRÉDITO VIA PIX - Marcelo', 'tipo' => 'receita', 'valor' => '200.00']),
+            $this->linha(['descricao' => 'ENVIO TRANSFERÊNCIA - Marcelo Bernardes', 'valor' => '50.00']),
+            $this->linha(['descricao' => 'Mercado', 'valor' => '80.00']),
+        ]);
+
+        $tela = Livewire::test(DocumentsIndex::class)->call('revisar', $doc->id);
+
+        self::assertSame(2, $tela->get('transferenciasSugeridasPendentes'), 'a de nome completo já veio marcada');
+        $tela->assertSee('2 linhas parecem transferência entre as suas contas');
+
+        $tela->call('marcarTransferenciasSugeridas');
+
+        self::assertSame(0, $tela->get('transferenciasSugeridasPendentes'));
+        self::assertTrue($tela->get('transferenciaPorItem')[0]);
+        self::assertTrue($tela->get('transferenciaPorItem')[1]);
+        self::assertArrayNotHasKey(3, $tela->get('transferenciaPorItem'), 'o mercado continua despesa comum');
+        $tela->assertDontSee('parecem transferência entre as suas contas');
+    }
+
+    public function test_marcar_todas_nao_pega_linha_que_ja_e_pagamento_de_fatura(): void
+    {
+        $doc = $this->extrato($this->conta('BTG'), [$this->linha(['descricao' => 'PIX - Marcelo', 'valor' => '100.00'])]);
+
+        $tela = Livewire::test(DocumentsIndex::class)->call('revisar', $doc->id);
+        $tela->set('transferenciaPorItem.0', false)->call('marcarPagamentoFatura', 0)->call('marcarTransferenciasSugeridas');
+
+        $tela->assertSet('faturaPorItem.0', 'sem');
+        self::assertFalse($tela->get('transferenciaPorItem')[0] ?? false);
+    }
     // ---- a revisão
 
     public function test_a_revisao_ja_marca_a_transferencia_e_nao_pede_categoria(): void

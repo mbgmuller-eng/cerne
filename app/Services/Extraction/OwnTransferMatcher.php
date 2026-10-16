@@ -97,19 +97,59 @@ class OwnTransferMatcher
         $nome = $viaTransferencia && $this->mentionsOwnName($descricao);
         $par = $data === null ? null : $this->pair($ehReceita, $valor, $data);
 
+        // Rótulo de banco que traz só o começo do nome ("... - Marcelo Buarque De"): dois nomes ou mais que são o começo
+        // do seu nome valem tanto quanto o nome completo; só o primeiro nome pode ser outra pessoa, então só sugere.
+        $comecoDoNome = $this->ownNamePrefix($descricao);
+        $nome = $nome || $comecoDoNome === 'nome';
+        $primeiroNome = ! $nome && $comecoDoNome === 'primeiro';
+
         $motivo = match (true) {
             $texto => 'A descrição diz que é transferência entre contas.',
             $nome && $par !== null => 'Tem o seu nome, e existe '.($ehReceita ? 'uma saída' : 'uma entrada').' igual na conta '.$par['conta'].' em '.$par['data']->format('d/m').'.',
             $nome => 'Tem o seu nome na descrição de um PIX ou TED.',
+            $primeiroNome && $par !== null => 'O nome na descrição começa como o seu, e existe '.($ehReceita ? 'uma saída' : 'uma entrada').' igual na conta '.$par['conta'].' em '.$par['data']->format('d/m').'.',
+            $primeiroNome => 'O nome na descrição é só o seu primeiro nome: pode ser transferência sua, ou de outra pessoa com o mesmo nome.',
             $par !== null => 'Existe '.($ehReceita ? 'uma saída' : 'uma entrada').' de mesmo valor na conta '.$par['conta'].' em '.$par['data']->format('d/m').' ("'.Str::limit($par['descricao'], 40).'").',
             default => null,
         };
 
         return [
-            'selecionar' => $texto || ($nome && ($par !== null || $viaTransferencia)),
+            'selecionar' => $texto || ($nome && ($par !== null || $viaTransferencia)) || ($primeiroNome && $par !== null),
             'sugerir' => $motivo !== null,
             'motivo' => $motivo,
         ];
+    }
+
+    /**
+     * Rótulos como "ENVIO TRANSFERÊNCIA - Marcelo Buarque De" ou "TRANSFERÊNCIA A CRÉDITO VIA PIX - Marcelo": o nome depois
+     * do traço, comparado palavra a palavra com o começo do nome de cada membro do perfil.
+     *
+     * @return ?string 'nome' (duas palavras ou mais, todas iguais ao começo do nome), 'primeiro' (só o primeiro nome) ou nulo
+     */
+    private function ownNamePrefix(string $descricao): ?string
+    {
+        if (preg_match('/(?:transferencia a credito via pix|envio transferencia|recebimento transferencia|transferencia recebida|transferencia enviada|ted recebida|ted enviada|pix recebido|pix enviado)\s+-\s+(.+)$/u', $descricao, $m) !== 1) {
+            return null;
+        }
+
+        $palavras = array_values(array_filter(explode(' ', trim($m[1]))));
+        $resultado = null;
+
+        foreach ($this->names as $nome) {
+            $membro = explode(' ', $nome);
+
+            if ($palavras === [] || count($palavras) > count($membro) || array_slice($membro, 0, count($palavras)) !== $palavras) {
+                continue;
+            }
+
+            if (count($palavras) >= 2) {
+                return 'nome';
+            }
+
+            $resultado = 'primeiro';
+        }
+
+        return $resultado;
     }
 
     private function mentionsOwnName(string $descricao): bool
