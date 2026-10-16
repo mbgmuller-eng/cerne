@@ -5,6 +5,8 @@ namespace App\Livewire\Engagement;
 use App\Enums\EngagementMeetingStatus;
 use App\Enums\EngagementTaskOwner;
 use App\Enums\EngagementTaskStatus;
+use App\Livewire\Engagement\Concerns\HandlesAttachments;
+use App\Models\EngagementAttachment;
 use App\Models\EngagementMeeting;
 use App\Models\EngagementTask;
 use App\Services\EngagementAccess;
@@ -18,6 +20,8 @@ use Livewire\Component;
  */
 class EngagementTasks extends Component
 {
+    use HandlesAttachments;
+
     public bool $showForm = false;
 
     public ?string $editingId = null;
@@ -116,6 +120,8 @@ class EngagementTasks extends Component
 
         return view('livewire.engagement.engagement-tasks', [
             'visitante' => $visitante,
+            'anexos' => $this->attachmentsFor(EngagementAttachment::TASK, $abertas->pluck('id')->all()),
+            'documentos' => $this->shareableDocuments($visitante),
             'abertas' => $abertas->values(),
             'concluidas' => $todas->filter(fn (EngagementTask $t) => ! $t->isOpen())->sortByDesc('completed_at')->take(8)->values(),
             'situacoes' => EngagementTaskStatus::options(),

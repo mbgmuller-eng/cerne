@@ -174,6 +174,8 @@ Route::middleware(['auth', 'verified'])->group(function (): void {
         Route::get('/seguros', InsuranceIndex::class)->name('insurance.index');
         // Acompanhamento do consultor financeiro com o cliente: só existe com vínculo ativo (ver EngagementAccess).
         Route::get('/acompanhamento', \App\Livewire\Engagement\EngagementHome::class)->name('engagement.index');
+        Route::get('/acompanhamento/reunioes/{meeting}/evento.ics', [\App\Http\Controllers\EngagementCalendarController::class, 'meeting'])->name('engagement.meeting.ics');
+        Route::get('/acompanhamento/tarefas/{task}/evento.ics', [\App\Http\Controllers\EngagementCalendarController::class, 'task'])->name('engagement.task.ics');
         Route::get('/objetivos', GoalsIndex::class)->name('goals.index');
 
         // Documentos: visível ao consultor/corretor também (ao contrário de

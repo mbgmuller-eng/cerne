@@ -137,6 +137,8 @@ Reuniões, tarefas, demandas e notas (`Engagement*`). Regras que não se quebram
 - **Todo registro pertence a uma relação** (perfil + `consultant_id`) e o `EngagementScope` só o mostra a quem está nessa relação. Encerrar o vínculo **não apaga** nada: o mesmo consultor de volta recupera o histórico; um consultor novo começa do zero.
 - **Nota privada** (`is_private`) é só do consultor que a escreveu; nunca vai ao cliente nem ao PDF do plano.
 - **Passo a passo (roteiro)**: o consultor monta (etapas e itens, a partir de texto no formato `# etapa` / `- item @critério`); o cliente só acompanha. O roteiro do cliente é uma **cópia** do modelo; mudar o modelo não o altera. Item com `@critério` é marcado pelo app (`EngagementPlanCriteria`, sempre da perspectiva do consultor, para o resultado não mudar conforme quem abre a tela); item sem critério, só o consultor marca. O estado fica gravado em `done_at`. Os **modelos** (`EngagementPlanTemplate`) são do consultor e só ele os vê.
+- **Anexos** (`EngagementAttachment`) são **referência** a um documento da área de Documentos, nunca cópia: só se anexa o que o consultor também pode ver (`EngagementDocuments::shareable`, que respeita o `DocumentVisibilityScope`: apólice e "outros" marcado como visível ao profissional; documento pessoal ou de saúde nunca). Anexar não abre nada que estava fechado.
+- **Reunião recorrente**: `scheduleSeries` cria N reuniões comuns ligadas por `series_id` (permite cancelar "esta e as próximas"). **Agenda**: `.ics` por reunião e por prazo de tarefa (`EngagementCalendarController`).
 - Quem decide se o cliente recebe o plano em PDF é o **consultor**, ao encerrar o vínculo (`ConsultantLinkService::end`, `plan_delivery`).
 
 ### Dinheiro que não vira lançamento

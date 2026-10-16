@@ -13,10 +13,15 @@
         @if ($ehConsultor)
             <div class="flex flex-wrap gap-2">
                 <a href="{{ route('consultant.week') }}" class="btn-ghost px-3 py-1.5 text-sm">Minha semana</a>
+                <button type="button" wire:click="enviarPlano" wire:confirm="Enviar o plano em PDF para o e-mail do cliente?" class="btn-ghost px-3 py-1.5 text-sm">Enviar plano ao cliente</button>
                 <button type="button" wire:click="baixarPlano" class="btn-secondary px-3 py-1.5 text-sm">Baixar plano em PDF</button>
             </div>
         @endif
     </div>
+
+    @if ($envio)
+        <p class="rounded-lg bg-accent-50 px-4 py-3 text-xs text-accent-700 dark:bg-accent-500/10 dark:text-accent-300">{{ $envio }}</p>
+    @endif
 
     <livewire:engagement.engagement-meetings />
 

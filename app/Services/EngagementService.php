@@ -7,15 +7,22 @@ use App\Enums\EngagementMeetingStatus;
 use App\Enums\EngagementRequestStatus;
 use App\Enums\EngagementTaskOwner;
 use App\Enums\EngagementTaskStatus;
+use App\Mail\EngagementPlanMail;
+use App\Models\EngagementAttachment;
 use App\Models\EngagementMeeting;
 use App\Models\EngagementNote;
 use App\Models\EngagementRequest;
 use App\Models\EngagementRequestComment;
 use App\Models\EngagementTask;
+use App\Models\FinancialProfile;
+use App\Support\Engagement\EngagementDocuments;
 use App\Support\Engagement\EngagementViewer;
 use Carbon\CarbonInterface;
 use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Str;
 
 /**
  * Regras do Acompanhamento: quem pode fazer o quê, em que situação, e quem é avisado.
@@ -64,6 +71,48 @@ class EngagementService
         return $reuniao;
     }
 
+    /**
+     * Marca uma série de reuniões de uma vez (semanal, quinzenal ou mensal), todas com a mesma pauta. Cada uma é uma reunião
+     * comum depois de criada (dá para remarcar, cancelar e escrever a ata em cada uma); o que as une é o `series_id`, que
+     * permite cancelar "esta e as próximas". O cliente recebe um aviso só.
+     *
+     * @param  array{scheduled_at: CarbonInterface, duration_minutes?: int, format?: string, location?: ?string, agenda?: ?string, prep_notes?: ?string}  $dados
+     * @return Collection<int, EngagementMeeting>
+     */
+    public function scheduleSeries(EngagementViewer $v, array $dados, string $frequencia, int $vezes): Collection
+    {
+        $this->somenteConsultor($v);
+
+        if (! in_array($frequencia, ['weekly', 'biweekly', 'monthly'], true) || $vezes < 2 || $vezes > 12) {
+            throw new \InvalidArgumentException('Série inválida: escolha a frequência e de 2 a 12 reuniões.');
+        }
+
+        $serie = (string) Str::uuid();
+        $primeira = \Carbon\CarbonImmutable::instance($dados['scheduled_at']);
+
+        $reunioes = DB::transaction(function () use ($v, $dados, $frequencia, $vezes, $serie, $primeira): Collection {
+            return collect(range(0, $vezes - 1))->map(function (int $i) use ($v, $dados, $frequencia, $serie, $primeira): EngagementMeeting {
+                $quando = match ($frequencia) {
+                    'weekly' => $primeira->addWeeks($i),
+                    'biweekly' => $primeira->addWeeks(2 * $i),
+                    default => $primeira->addMonthsNoOverflow($i),
+                };
+
+                return EngagementMeeting::create([
+                    'profile_id' => $v->profileId, 'consultant_id' => $v->consultantId(), 'created_by_user_id' => $v->userId, 'series_id' => $serie,
+                    'status' => EngagementMeetingStatus::Scheduled, 'scheduled_at' => $quando,
+                    'duration_minutes' => $dados['duration_minutes'] ?? 45, 'format' => $dados['format'] ?? EngagementMeetingFormat::Video->value,
+                    'location' => $dados['location'] ?? null, 'agenda' => $dados['agenda'] ?? null, 'prep_notes' => $dados['prep_notes'] ?? null,
+                ]);
+            });
+        });
+
+        $rotulo = ['weekly' => 'toda semana', 'biweekly' => 'a cada 15 dias', 'monthly' => 'todo mês'][$frequencia];
+        $this->avisos->toOtherSide($v, 'meeting_series', 'Reuniões marcadas', "{$vezes} reuniões de acompanhamento, {$rotulo}, a primeira em ".$primeira->format('d/m \à\s H:i').'.');
+
+        return $reunioes;
+    }
+
     /** Pauta e "o que levar": os dois lados editam, enquanto a reunião não aconteceu. */
     public function updateAgenda(EngagementViewer $v, EngagementMeeting $reuniao, ?string $pauta, ?string $levar): EngagementMeeting
     {
@@ -92,10 +141,23 @@ class EngagementService
         return $reuniao;
     }
 
-    public function cancelMeeting(EngagementViewer $v, EngagementMeeting $reuniao): EngagementMeeting
+    /** Cancela a reunião; com `$eProximas`, cancela também as da mesma série que ainda não aconteceram. */
+    public function cancelMeeting(EngagementViewer $v, EngagementMeeting $reuniao, bool $eProximas = false): EngagementMeeting
     {
         $this->somenteConsultor($v);
         $this->daRelacao($v, $reuniao->consultant_id);
+
+        if ($eProximas && $reuniao->series_id !== null) {
+            $canceladas = EngagementMeeting::query()
+                ->where('series_id', $reuniao->series_id)
+                ->where('status', EngagementMeetingStatus::Scheduled)
+                ->where('scheduled_at', '>=', $reuniao->scheduled_at)
+                ->update(['status' => EngagementMeetingStatus::Cancelled, 'updated_at' => now()]);
+
+            $this->avisos->toOtherSide($v, 'meeting_cancelled', 'Reuniões canceladas', "{$canceladas} reuniões de acompanhamento, a partir de ".$reuniao->scheduled_at->format('d/m').', foram canceladas.');
+
+            return $reuniao->refresh();
+        }
 
         $reuniao->update(['status' => EngagementMeetingStatus::Cancelled]);
         $this->avisos->toOtherSide($v, 'meeting_cancelled', 'Reunião cancelada', 'A reunião de '.$reuniao->scheduled_at->format('d/m \à\s H:i').' foi cancelada.');
@@ -258,6 +320,72 @@ class EngagementService
         }
 
         $nota->delete();
+    }
+
+    // ------------------------------------------------------------------ anexos (área de Documentos)
+
+    /**
+     * Anexa um documento do cofre a uma reunião ou tarefa. Só entra documento que o consultor também pode ver (ver
+     * EngagementDocuments): o anexo é uma referência, e a regra de visibilidade do documento não muda por causa dele.
+     */
+    public function attachDocument(EngagementViewer $v, string $tipo, string $assuntoId, string $documentoId): EngagementAttachment
+    {
+        $existe = match ($tipo) {
+            EngagementAttachment::MEETING => EngagementMeeting::query()->whereKey($assuntoId)->exists(),
+            EngagementAttachment::TASK => EngagementTask::query()->whereKey($assuntoId)->exists(),
+            default => false,
+        };
+
+        if (! $existe) {
+            throw new AuthorizationException('Reunião ou tarefa de outra relação de consultoria.');
+        }
+
+        $perfil = FinancialProfile::query()->findOrFail($v->profileId);
+
+        if (! EngagementDocuments::shareable($perfil)->contains('id', $documentoId)) {
+            throw new AuthorizationException('Este documento não pode ser compartilhado com o consultor.');
+        }
+
+        return EngagementAttachment::query()->firstOrCreate(
+            ['subject_type' => $tipo, 'subject_id' => $assuntoId, 'document_id' => $documentoId],
+            ['profile_id' => $v->profileId, 'consultant_id' => $v->consultantId(), 'attached_by_user_id' => $v->userId],
+        );
+    }
+
+    public function detachDocument(EngagementViewer $v, EngagementAttachment $anexo): void
+    {
+        $this->daRelacao($v, $anexo->consultant_id);
+
+        if ($v->isClient() && $anexo->attached_by_user_id !== $v->userId) {
+            throw new AuthorizationException('Só quem anexou, ou o consultor, remove o anexo.');
+        }
+
+        $anexo->delete();
+    }
+
+    // ------------------------------------------------------------------ plano em PDF
+
+    /**
+     * O consultor manda o plano em PDF ao e-mail do cliente quando quiser, sem encerrar o vínculo. O cliente nunca baixa por
+     * conta própria: quem decide o que sai da relação é o consultor.
+     *
+     * @return string o e-mail para onde foi
+     */
+    public function sendPlanToClient(EngagementViewer $v): string
+    {
+        $this->somenteConsultor($v);
+
+        $perfil = FinancialProfile::query()->findOrFail($v->profileId);
+
+        if (! app(EngagementPlanReport::class)->hasData($perfil->id, $v->consultantId())) {
+            throw new AuthorizationException('Ainda não há nada no plano para enviar.');
+        }
+
+        $email = $perfil->owner->email;
+
+        Mail::to($email)->queue(new EngagementPlanMail($perfil->id, $v->consultantId(), \App\Models\User::query()->findOrFail($v->consultantId())->name, $perfil->profile_name, false));
+
+        return $email;
     }
 
     // ------------------------------------------------------------------ permissões

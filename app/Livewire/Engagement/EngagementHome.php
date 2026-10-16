@@ -19,6 +19,9 @@ use Livewire\Component;
 #[Layout('components.layouts.app')]
 class EngagementHome extends Component
 {
+    /** Resultado do último envio do plano ao cliente (mensagem para o consultor). */
+    public ?string $envio = null;
+
     public function mount(): void
     {
         abort_if($this->visitante() === null, 404);
@@ -43,6 +46,21 @@ class EngagementHome extends Component
             fn () => print ($relatorio->pdf($visitante->profileId, $visitante->consultantId())),
             $relatorio->fileName($perfil->profile_name),
         );
+    }
+
+    /** O consultor manda o plano em PDF ao e-mail do cliente quando quiser, sem encerrar o vínculo. */
+    public function enviarPlano(): void
+    {
+        $visitante = $this->visitante();
+
+        abort_unless($visitante?->isConsultant(), 403);
+
+        try {
+            $email = app(\App\Services\EngagementService::class)->sendPlanToClient($visitante);
+            $this->envio = 'Plano enviado para '.$email.'.';
+        } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
+            $this->envio = $e->getMessage();
+        }
     }
 
     public function render()

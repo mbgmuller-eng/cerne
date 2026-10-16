@@ -23,16 +23,19 @@ class EngagementPlanMail extends Mailable
         public string $consultantId,
         public string $consultantName,
         public string $profileName,
+        public bool $ended = true,
     ) {}
 
     public function envelope(): Envelope
     {
-        return new Envelope(subject: "Seu plano de acompanhamento com {$this->consultantName}");
+        return new Envelope(subject: $this->ended
+            ? "Seu plano de acompanhamento com {$this->consultantName}"
+            : "Plano de acompanhamento atualizado por {$this->consultantName}");
     }
 
     public function content(): Content
     {
-        return new Content(markdown: 'mail.engagement-plan', with: ['consultantName' => $this->consultantName]);
+        return new Content(markdown: 'mail.engagement-plan', with: ['consultantName' => $this->consultantName, 'ended' => $this->ended]);
     }
 
     /** @return array<int, Attachment> */

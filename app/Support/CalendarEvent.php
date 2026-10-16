@@ -2,6 +2,8 @@
 
 namespace App\Support;
 
+use App\Models\EngagementMeeting;
+use App\Models\EngagementTask;
 use App\Models\HealthAppointment;
 use App\Models\HealthCareItem;
 use Carbon\CarbonImmutable;
@@ -104,6 +106,56 @@ final class CalendarEvent
             description: implode("\n", $linhas),
             notes: $withNotes && filled($item->notes) ? trim($item->notes) : null,
             modifiedAt: $item->updated_at ?? $dia,
+        );
+    }
+
+    /** Reunião do acompanhamento: o horário, o local ou link, a pauta e o que levar. `$titulo` já vem pronto para quem baixa. */
+    public static function forEngagementMeeting(EngagementMeeting $reuniao, string $titulo): self
+    {
+        $linhas = [];
+
+        if ($reuniao->agendaItems() !== []) {
+            $linhas[] = 'Pauta: '.implode('; ', $reuniao->agendaItems());
+        }
+
+        if (filled($reuniao->prep_notes)) {
+            $linhas[] = 'O que levar: '.trim($reuniao->prep_notes);
+        }
+
+        $inicio = CarbonImmutable::instance($reuniao->scheduled_at);
+
+        return new self(
+            uid: "acompanhamento-reuniao-{$reuniao->id}@cerne",
+            title: $titulo,
+            start: $inicio,
+            end: $inicio->addMinutes($reuniao->duration_minutes),
+            allDay: false,
+            location: filled($reuniao->location) ? trim($reuniao->location) : null,
+            description: implode("\n", $linhas),
+            notes: null,
+            modifiedAt: $reuniao->updated_at ?? $inicio,
+        );
+    }
+
+    /** Tarefa do acompanhamento: evento de dia inteiro no prazo. Sem prazo, não há dia para marcar. */
+    public static function forEngagementTask(EngagementTask $tarefa): ?self
+    {
+        if ($tarefa->due_date === null) {
+            return null;
+        }
+
+        $dia = CarbonImmutable::parse($tarefa->due_date->toDateString());
+
+        return new self(
+            uid: "acompanhamento-tarefa-{$tarefa->id}@cerne",
+            title: 'Prazo: '.$tarefa->title,
+            start: $dia,
+            end: $dia->addDay(),
+            allDay: true,
+            location: null,
+            description: 'Responsável: '.$tarefa->owner->label().(filled($tarefa->description) ? "\n".trim($tarefa->description) : ''),
+            notes: null,
+            modifiedAt: $tarefa->updated_at ?? $dia,
         );
     }
 

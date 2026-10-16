@@ -31,14 +31,23 @@
                         <p class="mt-3 text-xs font-medium text-slate-600 dark:text-slate-300">O que levar</p>
                         <p class="mt-1 whitespace-pre-line text-sm text-slate-700 dark:text-slate-300">{{ $proxima->prep_notes }}</p>
                     @endif
+
+                    <div class="mt-3 space-y-1.5">
+                        @include('livewire.engagement.partials.attachment-chips', ['anexos' => $anexos->get($proxima->id, collect()), 'visitante' => $visitante])
+                        <button type="button" wire:click="openAttach('meeting', '{{ $proxima->id }}')" class="btn-ghost px-2 py-1 text-xs">+ Anexar documento</button>
+                    </div>
                 </div>
 
                 <div class="flex shrink-0 flex-col items-stretch gap-2">
                     <button type="button" wire:click="openAgenda('{{ $proxima->id }}')" class="btn-secondary px-3 py-1.5 text-xs">Editar pauta</button>
+                    <a href="{{ route('engagement.meeting.ics', $proxima->id) }}" class="btn-ghost px-3 py-1.5 text-center text-xs">Adicionar à agenda</a>
                     @if ($ehConsultor)
                         <button type="button" wire:click="openForm('{{ $proxima->id }}')" class="btn-ghost px-3 py-1.5 text-xs">Remarcar</button>
                         <button type="button" wire:click="openSummary('{{ $proxima->id }}')" class="btn-ghost px-3 py-1.5 text-xs">Registrar ata</button>
                         <button type="button" wire:click="cancelMeeting('{{ $proxima->id }}')" wire:confirm="Cancelar esta reunião? O cliente é avisado." class="btn-ghost px-3 py-1.5 text-xs text-red-700 dark:text-red-400">Cancelar</button>
+                        @if ($temSerie)
+                            <button type="button" wire:click="cancelMeeting('{{ $proxima->id }}', true)" wire:confirm="Cancelar esta reunião e todas as próximas da série? O cliente é avisado." class="btn-ghost px-3 py-1.5 text-xs text-red-700 dark:text-red-400">Cancelar esta e as próximas</button>
+                        @endif
                     @endif
                 </div>
             </div>
@@ -144,6 +153,24 @@
                     <input type="text" wire:model="location" maxlength="255" class="input mt-1.5" placeholder="Link da videochamada ou endereço">
                     @error('location') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
                 </div>
+                @if (! $editingId)
+                    <div>
+                        <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Repetir</label>
+                        <select wire:model.live="repeat" class="select mt-1.5 w-full">
+                            <option value="none">Não repetir</option>
+                            <option value="weekly">Toda semana</option>
+                            <option value="biweekly">A cada 15 dias</option>
+                            <option value="monthly">Todo mês</option>
+                        </select>
+                    </div>
+                    @if ($repeat !== 'none')
+                        <div>
+                            <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Quantas reuniões no total</label>
+                            <input type="number" wire:model="occurrences" min="2" max="12" class="input mt-1.5">
+                            @error('occurrences') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                        </div>
+                    @endif
+                @endif
                 <div class="@sm:col-span-2">
                     <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Pauta <span class="font-normal text-slate-400">(um assunto por linha)</span></label>
                     <textarea wire:model="agenda" rows="3" maxlength="2000" class="input mt-1.5"></textarea>
@@ -183,6 +210,8 @@
             </div>
         </form>
     </x-modal>
+
+    @include('livewire.engagement.partials.attach-modal')
 
     {{-- Ata --}}
     <x-modal wire-model="showSummary">

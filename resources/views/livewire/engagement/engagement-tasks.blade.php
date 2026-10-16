@@ -41,6 +41,9 @@
                             <span class="badge shrink-0 bg-amber-50 text-amber-900 dark:bg-amber-500/10 dark:text-amber-300">vence amanhã</span>
                         @endif
                     </div>
+                    <div class="mt-2 space-y-1.5">
+                        @include('livewire.engagement.partials.attachment-chips', ['anexos' => $anexos->get($t->id, collect()), 'visitante' => $visitante])
+                    </div>
                     <div class="mt-2 flex flex-wrap items-center gap-2">
                         @if ($podeStatus)
                             <select wire:change="setStatus('{{ $t->id }}', $event.target.value)" class="select w-auto py-1 text-xs">
@@ -48,6 +51,10 @@
                                     <option value="{{ $valor }}" @selected($t->status->value === $valor)>{{ $rotulo }}</option>
                                 @endforeach
                             </select>
+                        @endif
+                        <button type="button" wire:click="openAttach('task', '{{ $t->id }}')" class="btn-ghost px-2 py-1 text-xs">Anexar</button>
+                        @if ($t->due_date)
+                            <a href="{{ route('engagement.task.ics', $t->id) }}" class="btn-ghost px-2 py-1 text-xs">Agenda</a>
                         @endif
                         @if ($podeMexer)
                             <button type="button" wire:click="openForm('{{ $t->id }}')" class="btn-ghost px-2 py-1 text-xs">Editar</button>
@@ -77,6 +84,8 @@
             </ul>
         </details>
     @endif
+
+    @include('livewire.engagement.partials.attach-modal')
 
     <x-modal wire-model="showForm">
         <form wire:submit="save" class="space-y-4">

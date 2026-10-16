@@ -15,7 +15,6 @@ use App\Models\IncomeRecord;
 use App\Models\InsurancePolicy;
 use App\Models\InvestmentRecord;
 use App\Models\InvestorProfile;
-use App\Support\ProfileContext;
 
 /**
  * Critérios automáticos dos itens do passo a passo: o que o app já sabe do cliente e basta para dar o item como feito.
@@ -56,13 +55,8 @@ final class EngagementPlanCriteria
      */
     public static function evaluate(FinancialProfile $perfil, array $chaves): array
     {
-        $contexto = app(ProfileContext::class);
-        $antes = [$contexto->profile(), $contexto->member(), $contexto->isConsultant()];
-
-        // Os models de dado só enxergam o perfil do contexto. Entra no perfil do cliente como consultor e restaura no fim.
-        $contexto->set($perfil, null, true);
-
-        try {
+        // Os models de dado só enxergam o perfil do contexto: entra no do cliente como consultor e restaura no fim.
+        return AsConsultant::run($perfil, function () use ($chaves): array {
             $resultado = [];
 
             foreach (array_unique($chaves) as $chave) {
@@ -70,9 +64,7 @@ final class EngagementPlanCriteria
             }
 
             return $resultado;
-        } finally {
-            $antes[0] !== null ? $contexto->set($antes[0], $antes[1], $antes[2]) : $contexto->clear();
-        }
+        });
     }
 
     private static function check(string $chave): bool

@@ -17,7 +17,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  *
  * Visível só dentro da relação de consultoria (EngagementScope), além do isolamento por perfil.
  */
-#[Fillable(['profile_id', 'consultant_id', 'scheduled_at', 'duration_minutes', 'format', 'location', 'agenda', 'prep_notes', 'status', 'summary', 'created_by_user_id'])]
+#[Fillable(['profile_id', 'consultant_id', 'series_id', 'scheduled_at', 'duration_minutes', 'format', 'location', 'agenda', 'prep_notes', 'status', 'summary', 'created_by_user_id'])]
 class EngagementMeeting extends Model
 {
     use BelongsToProfile, HasUuids;

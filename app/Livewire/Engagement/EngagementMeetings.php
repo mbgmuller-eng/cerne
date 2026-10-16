@@ -4,6 +4,8 @@ namespace App\Livewire\Engagement;
 
 use App\Enums\EngagementMeetingFormat;
 use App\Enums\EngagementMeetingStatus;
+use App\Livewire\Engagement\Concerns\HandlesAttachments;
+use App\Models\EngagementAttachment;
 use App\Models\EngagementMeeting;
 use App\Services\EngagementAccess;
 use App\Services\EngagementService;
@@ -17,6 +19,8 @@ use Livewire\Component;
  */
 class EngagementMeetings extends Component
 {
+    use HandlesAttachments;
+
     // Marcar / remarcar (só o consultor)
     public bool $showForm = false;
 
@@ -35,6 +39,11 @@ class EngagementMeetings extends Component
     public string $agenda = '';
 
     public string $prep = '';
+
+    /** Só ao marcar: repetir a reunião (none, weekly, biweekly, monthly) e quantas no total. */
+    public string $repeat = 'none';
+
+    public int $occurrences = 4;
 
     // Pauta e "o que levar" (os dois lados)
     public bool $showAgenda = false;
@@ -75,6 +84,8 @@ class EngagementMeetings extends Component
             $this->prep = (string) $reuniao->prep_notes;
         } else {
             $this->reset('date', 'location', 'agenda', 'prep');
+            $this->repeat = 'none';
+            $this->occurrences = 4;
             $this->time = '19:00';
             $this->duration = 45;
             $this->format = 'video';
@@ -96,18 +107,27 @@ class EngagementMeetings extends Component
             'location' => ['nullable', 'string', 'max:255'],
             'agenda' => ['nullable', 'string', 'max:2000'],
             'prep' => ['nullable', 'string', 'max:1000'],
-        ], [], ['date' => 'data', 'time' => 'horário', 'duration' => 'duração', 'format' => 'formato', 'location' => 'local ou link', 'agenda' => 'pauta', 'prep' => 'o que levar']);
+            'repeat' => ['required', 'in:none,weekly,biweekly,monthly'],
+            'occurrences' => ['required', 'integer', 'min:2', 'max:12'],
+        ], [], ['date' => 'data', 'time' => 'horário', 'duration' => 'duração', 'format' => 'formato', 'location' => 'local ou link', 'agenda' => 'pauta', 'prep' => 'o que levar', 'occurrences' => 'quantidade de reuniões']);
 
         $reuniao = $this->editingId !== null ? EngagementMeeting::query()->findOrFail($this->editingId) : null;
 
-        app(EngagementService::class)->saveMeeting($visitante, $reuniao, [
+        $campos = [
             'scheduled_at' => CarbonImmutable::createFromFormat('Y-m-d H:i', $dados['date'].' '.$dados['time']),
             'duration_minutes' => $dados['duration'],
             'format' => $dados['format'],
             'location' => $dados['location'] ?: null,
             'agenda' => $dados['agenda'] ?: null,
             'prep_notes' => $dados['prep'] ?: null,
-        ]);
+        ];
+
+        // A repetição só vale ao marcar; remarcar mexe numa reunião só.
+        if ($reuniao === null && $dados['repeat'] !== 'none') {
+            app(EngagementService::class)->scheduleSeries($visitante, $campos, $dados['repeat'], $dados['occurrences']);
+        } else {
+            app(EngagementService::class)->saveMeeting($visitante, $reuniao, $campos);
+        }
 
         $this->showForm = false;
         $this->editingId = null;
@@ -162,11 +182,11 @@ class EngagementMeetings extends Component
         $this->showSummary = false;
     }
 
-    public function cancelMeeting(string $id): void
+    public function cancelMeeting(string $id, bool $proximas = false): void
     {
         $visitante = $this->visitante();
 
-        app(EngagementService::class)->cancelMeeting($visitante, EngagementMeeting::query()->findOrFail($id));
+        app(EngagementService::class)->cancelMeeting($visitante, EngagementMeeting::query()->findOrFail($id), $proximas);
     }
 
     public function render()
@@ -175,10 +195,16 @@ class EngagementMeetings extends Component
         $inicioDoDia = now()->startOfDay();
 
         $agendadas = EngagementMeeting::query()->where('status', EngagementMeetingStatus::Scheduled)->orderBy('scheduled_at')->get();
+        $proximaReuniao = $agendadas->first(fn (EngagementMeeting $m) => $m->scheduled_at->gte($inicioDoDia));
 
         return view('livewire.engagement.engagement-meetings', [
             'ehConsultor' => $visitante->isConsultant(),
-            'proxima' => $agendadas->first(fn (EngagementMeeting $m) => $m->scheduled_at->gte($inicioDoDia)),
+            'proxima' => $proximaReuniao,
+            // A próxima faz parte de uma série com mais reuniões marcadas depois dela: dá para cancelar "esta e as próximas".
+            'temSerie' => $proximaReuniao?->series_id !== null && $agendadas->where('series_id', $proximaReuniao->series_id)->count() > 1,
+            'anexos' => $this->attachmentsFor(EngagementAttachment::MEETING, $proximaReuniao ? [$proximaReuniao->id] : []),
+            'documentos' => $this->shareableDocuments($visitante),
+            'visitante' => $visitante,
             'outrasAgendadas' => $agendadas->filter(fn (EngagementMeeting $m) => $m->scheduled_at->gte($inicioDoDia))->slice(1)->values(),
             // Já passou do dia e ninguém registrou a ata nem cancelou.
             'aguardandoAta' => $agendadas->filter(fn (EngagementMeeting $m) => $m->scheduled_at->lt($inicioDoDia))->values(),
