@@ -26,6 +26,7 @@ class DocumentSchemas
             DocumentType::BrokerageNote => self::brokerageNote(),
             DocumentType::PerformanceReport => self::performanceReport(),
             DocumentType::InsurancePolicy => self::insurancePolicy(),
+            DocumentType::ConsortiumStatement => self::consortiumStatement(),
             DocumentType::ExternalReport => self::externalReport(),
             default => self::generic(),
         };
@@ -92,6 +93,21 @@ class DocumentSchemas
                 '- beneficiarios: nome, percentual e parentesco (texto vazio se não informado), quando houver; senão lista vazia.',
                 '- observacoes_item: carências, exclusões importantes ou condições especiais em poucas frases; texto vazio se não houver.',
                 '- campos_incertos: nomes dos campos acima que você leu com dúvida (ilegível, ambíguo ou conflitante no documento). Lista vazia se tem certeza de tudo.',
+            ]),
+            DocumentType::ConsortiumStatement => implode("\n", [
+                'Este é o EXTRATO DO CONSORCIADO de uma administradora de consórcio (por exemplo, Ademicon). Devolva UM item, o da cota do documento.',
+                '',
+                '- grupo e cota: como impressos (ex.: grupo "001020", cota "3503-00"); contrato: o número do contrato. Texto vazio quando não houver.',
+                '- administradora: o nome da administradora que emite o extrato.',
+                '- tipo_bem: imovel, veiculo, servicos ou outro, pelo produto do plano (IMOVEIS = imovel).',
+                '- plano_meses: o prazo do plano em meses ("Plano Básico" ou "Prazo do grupo").',
+                '- valor_credito: o "Valor Crédito" atual (já reajustado). valor_bem: o valor do bem do plano ("Bem"), texto vazio se não houver.',
+                '- taxa_adm_percentual: a taxa de administração do plano, em percentual ("24,0000" vira "24.0000").',
+                '- data_adesao: a data de adesão; ultimo_reajuste: a data do "último reajuste"; vencimento_atual: a data do campo "Vencimento" do cabeçalho; data_extrato: a data em que o extrato foi emitido (canto da página). Texto vazio quando não houver. NÃO use o "próximo reajuste" impresso, que costuma estar desatualizado.',
+                '- valor_contribuicao_mensal: o "Valor Contrib. Mensal" (a parcela de hoje). percentual_fundo_comum_mensal: o "Mensal" do quadro de contribuição. percentual_seguro: o "% Seguro" desse quadro.',
+                '- total_pago: o total pago impresso na linha TOTAIS da conta corrente (coluna Valor Pago). a_pagar_total: o TOTAL "a pagar" do quadro "Valores / Percentuais a Pagar" (valor em reais). parcelas_a_pagar: a "Qtde Total" de parcelas a pagar; 0 se não houver.',
+                '- parcelas: UMA linha por recebimento de parcela na conta corrente (transação "RECBTO. PARCELA"), com o número da parcela, a data de PAGAMENTO (não a de contabilização), o "Valor a Pagar" e o "Valor Pago". Não invente parcela que não aparece na tabela: parcela que não aparece não foi paga. Estornos ou cancelamentos, se houver, não entram: descreva-os em observacoes.',
+                '- campos_incertos: nomes dos campos que você leu com dúvida; lista vazia se tem certeza.',
             ]),
             DocumentType::ExternalReport => implode("\n", [
                 'Este documento é um RELATÓRIO ou EXPORTAÇÃO DE LANÇAMENTOS de outro aplicativo financeiro (ou um extrato). Extraia CADA lançamento: uma linha do documento = um item, sem agrupar nem pular nenhum.',
@@ -263,6 +279,58 @@ class DocumentSchemas
         ], [
             'tipo', 'seguradora', 'numero_apolice', 'segurado', 'segurado_nascimento', 'objeto_segurado', 'valor_segurado', 'coberturas', 'premio',
             'periodicidade', 'premio_total_anual', 'inicio_vigencia', 'fim_vigencia', 'vigente_desde', 'beneficiarios', 'observacoes_item', 'campos_incertos',
+        ]);
+    }
+
+    /**
+     * Extrato do consorciado: um item por cota, com a lista de parcelas pagas. Sem campos "valor ou nulo" (a API recusa mais
+     * de 16): o que falta vem como texto vazio ou zero.
+     */
+    private static function consortiumStatement(): array
+    {
+        $texto = ['type' => 'string'];
+        $dinheiro = ['type' => 'string', 'description' => 'Reais com ponto decimal, sem milhar: "1234.56"; texto vazio quando não houver'];
+        $data = ['type' => 'string', 'description' => 'AAAA-MM-DD; texto vazio quando não houver'];
+
+        return self::envelope([
+            'grupo' => $texto,
+            'cota' => $texto,
+            'contrato' => $texto,
+            'administradora' => $texto,
+            'tipo_bem' => ['type' => 'string', 'enum' => ['imovel', 'veiculo', 'servicos', 'outro']],
+            'plano_meses' => ['type' => 'integer'],
+            'valor_credito' => $dinheiro,
+            'valor_bem' => $dinheiro,
+            'taxa_adm_percentual' => ['type' => 'string', 'description' => 'Percentual com ponto decimal: "24.0000"; texto vazio quando não houver'],
+            'data_adesao' => $data,
+            'ultimo_reajuste' => $data,
+            'vencimento_atual' => $data,
+            'data_extrato' => $data,
+            'valor_contribuicao_mensal' => $dinheiro,
+            'percentual_fundo_comum_mensal' => ['type' => 'string', 'description' => 'Percentual com ponto decimal: "0.2304"; texto vazio quando não houver'],
+            'percentual_seguro' => ['type' => 'string', 'description' => 'Percentual com ponto decimal: "0.046371"; texto vazio quando não houver'],
+            'total_pago' => $dinheiro,
+            'a_pagar_total' => $dinheiro,
+            'parcelas_a_pagar' => ['type' => 'integer'],
+            'parcelas' => [
+                'type' => 'array',
+                'items' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'numero' => ['type' => 'integer'],
+                        'pagamento' => ['type' => 'string', 'description' => 'AAAA-MM-DD'],
+                        'valor_a_pagar' => ['type' => 'string', 'description' => 'Reais com ponto decimal: "384.27"'],
+                        'valor_pago' => ['type' => 'string', 'description' => 'Reais com ponto decimal: "384.27"'],
+                    ],
+                    'required' => ['numero', 'pagamento', 'valor_a_pagar', 'valor_pago'],
+                    'additionalProperties' => false,
+                ],
+            ],
+            'campos_incertos' => ['type' => 'array', 'items' => ['type' => 'string']],
+        ], [
+            'grupo', 'cota', 'contrato', 'administradora', 'tipo_bem', 'plano_meses', 'valor_credito', 'valor_bem', 'taxa_adm_percentual', 'data_adesao',
+            'ultimo_reajuste', 'vencimento_atual', 'data_extrato', 'valor_contribuicao_mensal', 'percentual_fundo_comum_mensal', 'percentual_seguro',
+            'total_pago', 'a_pagar_total', 'parcelas_a_pagar', 'parcelas', 'campos_incertos',
         ]);
     }
 

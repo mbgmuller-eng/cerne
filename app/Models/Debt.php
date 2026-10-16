@@ -37,6 +37,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'consortium_type', 'consortium_group', 'credit_amount', 'is_flex', 'adjustment_index', 'adjustment_every_months',
     'adjustment_first_after_months', 'next_adjustment_on', 'contemplated_on', 'contemplation_mode', 'bid_amount', 'credit_released',
     'current_balance', 'balance_updated_on', 'agreement_on', 'agreement_total', 'agreement_discount',
+    'flex_percent', 'consortium_contract', 'statement_on', 'statement_balance', 'statement_remaining', 'insurance_percent', 'last_adjustment_on',
 ])]
 class Debt extends Model
 {
@@ -61,6 +62,12 @@ class Debt extends Model
             'consortium_type' => ConsortiumType::class,
             'credit_amount' => 'decimal:2',
             'is_flex' => 'boolean',
+            'flex_percent' => 'integer',
+            'statement_on' => 'date',
+            'statement_balance' => 'decimal:2',
+            'statement_remaining' => 'integer',
+            'insurance_percent' => 'decimal:6',
+            'last_adjustment_on' => 'date',
             'adjustment_index' => AdjustmentIndex::class,
             'adjustment_every_months' => 'integer',
             'adjustment_first_after_months' => 'integer',
@@ -131,6 +138,22 @@ class Debt extends Model
     public function paidCount(): int
     {
         return $this->installments()->where('status', DebtInstallmentStatus::Paid)->count();
+    }
+
+    /**
+     * Estimativa da parcela cheia se o consórcio flex fosse contemplado agora, sem lance: o que o extrato diz que falta pagar,
+     * dividido pelas parcelas que restam, mais o seguro. É só uma ordem de grandeza (o lance e o reajuste mudam a conta).
+     */
+    public function estimatedFullInstallment(): ?string
+    {
+        if (! $this->isSavingForCredit() || $this->statement_balance === null || ! $this->statement_remaining) {
+            return null;
+        }
+
+        $base = bcdiv((string) $this->statement_balance, (string) $this->statement_remaining, 6);
+        $seguro = $this->insurance_percent !== null ? bcmul(bcdiv((string) $this->insurance_percent, '100', 8), (string) $this->credit_amount, 6) : '0';
+
+        return bcadd(bcadd($base, $seguro, 6), '0.005', 2);
     }
 
     public function isConsortium(): bool

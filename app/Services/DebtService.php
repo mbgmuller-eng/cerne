@@ -322,6 +322,15 @@ class DebtService
             throw new InvalidArgumentException('Informe de quantos em quantos meses a carta é reajustada.');
         }
 
+        $flex = $this->flexPercent($d);
+
+        // Parcela pulada (valor diluído nas seguintes): vale entre as que já venceram, ou seja, as pagas e as próprias puladas.
+        $pulos = collect($d['skipped_installments'] ?? [])->map(fn ($n) => (int) $n)->filter(fn (int $n) => $n >= 1)->unique()->sort()->values();
+
+        if ($pulos->isNotEmpty() && ($pulos->last() > $jaPagas + $pulos->count() || $jaPagas + $pulos->count() > $prazo)) {
+            throw new InvalidArgumentException('As parcelas puladas precisam estar entre as que já venceram (as pagas e as puladas).');
+        }
+
         $classificacao = DebtClassification::consortiumInvestment();
 
         if ($classificacao['category_id'] === null) {
@@ -330,7 +339,7 @@ class DebtService
 
         $primeira = CarbonImmutable::parse($d['first_due_date'])->startOfDay();
 
-        return DB::transaction(function () use ($d, $tipo, $prazo, $jaPagas, $parcela, $carta, $indice, $cada, $primeiro, $classificacao, $primeira, $userId): Debt {
+        return DB::transaction(function () use ($d, $tipo, $prazo, $jaPagas, $parcela, $carta, $indice, $cada, $primeiro, $classificacao, $primeira, $userId, $flex, $pulos): Debt {
             $divida = Debt::create([
                 'member_id' => $d['member_id'] ?? null,
                 'is_private' => ($d['member_id'] ?? null) !== null && ! empty($d['is_private']),
@@ -341,7 +350,9 @@ class DebtService
                 'consortium_type' => $tipo,
                 'consortium_group' => $d['consortium_group'] ?? null,
                 'credit_amount' => $carta,
-                'is_flex' => ! empty($d['is_flex']),
+                'is_flex' => $flex !== null || ! empty($d['is_flex']),
+                'flex_percent' => $flex,
+                'consortium_contract' => $d['consortium_contract'] ?? null,
                 'adjustment_index' => $indice,
                 'adjustment_every_months' => $cada,
                 'adjustment_first_after_months' => $primeiro,
@@ -359,7 +370,13 @@ class DebtService
                 'created_by_user_id' => $userId ?? auth()->id(),
             ]);
 
-            $this->generateFixedInstallments($divida, $prazo, $parcela, $primeira, $jaPagas);
+            $this->generateFixedInstallments($divida, $prazo, $parcela, $primeira, $jaPagas + $pulos->count());
+
+            if ($pulos->isNotEmpty()) {
+                DebtInstallment::query()->where('debt_id', $divida->id)->whereIn('number', $pulos->all())
+                    ->update(['status' => DebtInstallmentStatus::Diluted, 'paid_on' => null, 'paid_amount' => null]);
+            }
+
             $this->linkGoal($divida, $d['goal_id'] ?? null, $d['goal_name'] ?? null);
             $this->refreshStatus($divida);
 
@@ -475,6 +492,214 @@ class DebtService
                 Goal::query()->where('linked_debt_id', $divida->id)->update(['status' => GoalStatus::Achieved->value]);
             }
 
+            $this->refreshStatus($divida);
+
+            return $divida->refresh();
+        });
+    }
+
+    // ------------------------------------------------------------------ parcela pulada e extrato da administradora
+
+    /** O quanto a parcela flex é menor até a contemplação: 10, 20, 30, 40 ou 50%. Vazio = não é flex. */
+    private function flexPercent(array $d): ?int
+    {
+        $valor = $d['flex_percent'] ?? null;
+
+        if ($valor === null || $valor === '' || (int) $valor === 0) {
+            return null;
+        }
+
+        if (! in_array((int) $valor, [10, 20, 30, 40, 50], true)) {
+            throw new InvalidArgumentException('O flex da parcela é de 10%, 20%, 30%, 40% ou 50%.');
+        }
+
+        return (int) $valor;
+    }
+
+    /**
+     * Marca uma parcela em aberto como pulada: não foi paga e o valor foi diluído nas seguintes. Fica fora do que está em aberto e
+     * do que foi pago. Só vale para parcela sem despesa ligada.
+     */
+    public function markDiluted(DebtInstallment $parcela): DebtInstallment
+    {
+        if ($parcela->status !== DebtInstallmentStatus::Open) {
+            throw new InvalidArgumentException('Só uma parcela em aberto pode ser marcada como pulada.');
+        }
+
+        $parcela->update(['status' => DebtInstallmentStatus::Diluted]);
+        $this->refreshStatus($parcela->debt()->firstOrFail());
+
+        return $parcela->refresh();
+    }
+
+    public function reopenDiluted(DebtInstallment $parcela): DebtInstallment
+    {
+        if ($parcela->status !== DebtInstallmentStatus::Diluted) {
+            throw new InvalidArgumentException('Esta parcela não está marcada como pulada.');
+        }
+
+        $parcela->update(['status' => DebtInstallmentStatus::Open]);
+        $this->refreshStatus($parcela->debt()->firstOrFail());
+
+        return $parcela->refresh();
+    }
+
+    /**
+     * Cria ou atualiza o consórcio a partir do extrato da administradora, já conferido pela pessoa (regra 5). O extrato é a fonte
+     * da verdade: cada parcela paga entra com a data e o valor realmente pagos, as que ficaram para trás sem pagamento viram
+     * "diluídas" e as demais ficam em aberto com a parcela atual. Rodar de novo com o mesmo extrato não muda nada (idempotente), e
+     * parcela paga pelo Cerne (com despesa ligada) nunca é mexida.
+     *
+     * @param  array<string, mixed>  $d  consortium_type, name?, creditor?, consortium_group?, consortium_contract?, credit_amount, installment_amount,
+     *                                   term, flex_percent?, adjustment_index?, adjustment_every_months?, last_adjustment_on?, anchor_number,
+     *                                   anchor_due (vencimento da parcela anchor_number), statement_on?, statement_balance?, statement_remaining?,
+     *                                   insurance_percent?, paid: list<array{number, paid_on, due_amount, paid_amount}>, member_id?, is_private?,
+     *                                   goal_id?, goal_name?, bank_account_id?
+     */
+    public function importConsortiumStatement(array $d, ?Debt $existente = null, ?string $userId = null): Debt
+    {
+        $tipo = ConsortiumType::from($d['consortium_type']);
+        $prazo = (int) $d['term'];
+        $parcela = Money::parse($d['installment_amount'] ?? 0);
+        $carta = Money::parse($d['credit_amount'] ?? 0);
+        $ancora = (int) ($d['anchor_number'] ?? 0);
+
+        if ($prazo < 1 || $prazo > 480) {
+            throw new InvalidArgumentException('O prazo deve ficar entre 1 e 480 parcelas.');
+        }
+
+        if (bccomp($parcela, '0', 2) <= 0 || bccomp($carta, '0', 2) <= 0) {
+            throw new InvalidArgumentException('Informe o valor da carta e o valor da parcela atual.');
+        }
+
+        if ($ancora < 1 || $ancora > $prazo || empty($d['anchor_due'])) {
+            throw new InvalidArgumentException('Informe o número e o vencimento de uma parcela, para as datas do cronograma.');
+        }
+
+        if ($existente !== null && ! $existente->isConsortium()) {
+            throw new InvalidArgumentException('O contrato escolhido não é um consórcio.');
+        }
+
+        $flex = $this->flexPercent($d);
+        $pagas = collect($d['paid'] ?? [])->keyBy(fn (array $p) => (int) $p['number']);
+
+        if ($pagas->keys()->contains(fn (int $n) => $n < 1 || $n > $prazo)) {
+            throw new InvalidArgumentException('Há parcela paga fora do prazo do plano.');
+        }
+
+        $indice = ! empty($d['adjustment_index']) ? AdjustmentIndex::from($d['adjustment_index']) : $existente?->adjustment_index;
+        $cada = $indice !== null ? (int) ($d['adjustment_every_months'] ?? $existente?->adjustment_every_months ?? 12) : null;
+        $ultimoReajuste = ! empty($d['last_adjustment_on']) ? CarbonImmutable::parse($d['last_adjustment_on'])->startOfDay() : null;
+        $primeira = CarbonImmutable::parse($d['anchor_due'])->startOfDay()->subMonthsNoOverflow($ancora - 1);
+        $ultimaPaga = (int) ($pagas->keys()->max() ?? 0);
+
+        $classificacao = $existente !== null && $existente->isContemplated()
+            ? ['category_id' => $existente->category_id, 'subcategory_id' => $existente->subcategory_id]
+            : DebtClassification::consortiumInvestment();
+
+        if ($classificacao['category_id'] === null) {
+            throw new InvalidArgumentException('A categoria de investimento "Consórcio" não foi encontrada.');
+        }
+
+        return DB::transaction(function () use ($d, $existente, $tipo, $prazo, $parcela, $carta, $flex, $pagas, $indice, $cada, $ultimoReajuste, $primeira, $ultimaPaga, $classificacao, $userId): Debt {
+            $campos = [
+                'consortium_type' => $tipo,
+                'consortium_group' => $d['consortium_group'] ?? $existente?->consortium_group,
+                'consortium_contract' => $d['consortium_contract'] ?? $existente?->consortium_contract,
+                'credit_amount' => $carta,
+                'is_flex' => $flex !== null,
+                'flex_percent' => $flex,
+                'adjustment_index' => $indice,
+                'adjustment_every_months' => $cada,
+                'last_adjustment_on' => $ultimoReajuste ?? $existente?->last_adjustment_on,
+                'term' => $prazo,
+                'first_due_date' => $primeira,
+                'installment_amount' => $parcela,
+                'statement_on' => $d['statement_on'] ?? null,
+                'statement_balance' => ! empty($d['statement_balance']) ? Money::parse($d['statement_balance']) : null,
+                'statement_remaining' => ! empty($d['statement_remaining']) ? (int) $d['statement_remaining'] : null,
+                'insurance_percent' => isset($d['insurance_percent']) && $d['insurance_percent'] !== '' ? bcadd(str_replace(',', '.', (string) $d['insurance_percent']), '0', 6) : null,
+            ];
+
+            // O reajuste seguinte conta a partir do último que a administradora informou (e não da 1ª parcela).
+            if ($indice !== null && $cada !== null) {
+                $base = $ultimoReajuste ?? ($existente?->last_adjustment_on ? CarbonImmutable::instance($existente->last_adjustment_on) : null);
+                $campos['next_adjustment_on'] = $base?->addMonthsNoOverflow($cada)
+                    ?? $existente?->next_adjustment_on
+                    ?? $primeira->addMonthsNoOverflow((int) ($d['adjustment_first_after_months'] ?? $cada));
+                $campos['adjustment_first_after_months'] = $existente?->adjustment_first_after_months ?? (int) ($d['adjustment_first_after_months'] ?? $cada);
+            } else {
+                $campos['next_adjustment_on'] = null;
+            }
+
+            if ($existente === null) {
+                $divida = Debt::create($campos + [
+                    'member_id' => $d['member_id'] ?? null,
+                    'is_private' => ($d['member_id'] ?? null) !== null && ! empty($d['is_private']),
+                    'kind' => DebtKind::Consortium,
+                    'status' => DebtStatus::Active,
+                    'name' => ! empty($d['name']) ? $d['name'] : 'Consórcio de '.mb_strtolower($tipo->label()),
+                    'creditor' => $d['creditor'] ?? null,
+                    'amortization' => DebtAmortization::Fixed,
+                    'necessity' => Necessity::Investment,
+                    'category_id' => $classificacao['category_id'],
+                    'subcategory_id' => $classificacao['subcategory_id'],
+                    'bank_account_id' => $d['bank_account_id'] ?? null,
+                    'created_by_user_id' => $userId ?? auth()->id(),
+                ]);
+            } else {
+                $divida = $existente;
+                $parcelaAntes = (string) $existente->installment_amount;
+                $divida->update($campos + array_filter(['creditor' => $d['creditor'] ?? null]));
+            }
+
+            $linhas = DebtInstallment::query()->where('debt_id', $divida->id)->get()->keyBy('number');
+            $parcelaAntes ??= $parcela;
+
+            for ($n = 1; $n <= $prazo; $n++) {
+                $vencimento = $primeira->addMonthsNoOverflow($n - 1);
+                $linha = $linhas->get($n);
+                $extrato = $pagas->get($n);
+
+                // Paga pelo Cerne (despesa ligada): a despesa manda, o extrato não mexe.
+                if ($linha !== null && $linha->expense_id !== null) {
+                    continue;
+                }
+
+                if ($extrato !== null) {
+                    $devido = Money::parse($extrato['due_amount'] ?? $extrato['paid_amount']);
+                    $pago = Money::parse($extrato['paid_amount']);
+                    $valores = [
+                        'status' => DebtInstallmentStatus::Paid, 'due_date' => $vencimento, 'paid_on' => $extrato['paid_on'],
+                        'paid_amount' => $pago, 'amount' => $devido, 'principal_amount' => $devido,
+                    ];
+                } elseif ($n < $ultimaPaga) {
+                    $valores = ['status' => DebtInstallmentStatus::Diluted, 'due_date' => $vencimento, 'paid_on' => null, 'paid_amount' => null];
+                } else {
+                    // Em aberto: a parcela atual, a menos que a pessoa tenha ajustado esta ao boleto (valor diferente do padrão anterior).
+                    $manteve = $linha !== null && $linha->status === DebtInstallmentStatus::Open && bccomp((string) $linha->amount, $parcelaAntes, 2) !== 0;
+                    $valor = $manteve ? (string) $linha->amount : $parcela;
+                    $valores = [
+                        'status' => DebtInstallmentStatus::Open, 'due_date' => $vencimento, 'paid_on' => null, 'paid_amount' => null,
+                        'amount' => $valor, 'principal_amount' => $valor,
+                    ];
+                }
+
+                if ($linha === null) {
+                    DebtInstallment::create($valores + [
+                        'debt_id' => $divida->id, 'member_id' => $divida->member_id, 'is_private' => $divida->is_private,
+                        'number' => $n, 'amount' => $parcela, 'principal_amount' => $parcela, 'interest_amount' => '0.00', 'fees_amount' => '0.00',
+                    ]);
+                } else {
+                    $linha->update($valores);
+                }
+            }
+
+            DebtInstallment::query()->where('debt_id', $divida->id)->where('number', '>', $prazo)->whereNull('expense_id')->delete();
+
+            $divida->update(['paid_before' => DebtInstallment::query()->where('debt_id', $divida->id)->where('status', DebtInstallmentStatus::Paid)->whereNull('expense_id')->count()]);
+
+            $this->linkGoal($divida, $d['goal_id'] ?? null, $d['goal_name'] ?? null);
             $this->refreshStatus($divida);
 
             return $divida->refresh();

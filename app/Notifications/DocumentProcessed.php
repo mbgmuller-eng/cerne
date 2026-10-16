@@ -80,10 +80,14 @@ class DocumentProcessed extends Notification implements ShouldQueue
         ];
     }
 
-    /** Leitura de apólice se revisa em Seguros; o resto, em Importar. */
+    /** Leitura de apólice se revisa em Seguros, a de extrato de consórcio em Dívidas; o resto, em Importar. */
     private function destinationUrl(): string
     {
-        return $this->documentType === 'insurance_policy' ? route('insurance.index') : route('documents.index');
+        return match ($this->documentType) {
+            'insurance_policy' => route('insurance.index'),
+            'consortium_statement' => route('debts.index'),
+            default => route('documents.index'),
+        };
     }
 
     public function toWebPush(object $notifiable, self $notification): WebPushMessage

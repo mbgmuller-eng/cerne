@@ -121,6 +121,9 @@ return [
         // envio repetido por engano não virar conta. Tentativas que falharam também contam.
         'insurance_imports_per_day' => (int) env('CERNE_INSURANCE_IMPORTS_PER_DAY', 10),
 
+        // Idem para o extrato de consórcio lido em Dívidas.
+        'consortium_imports_per_day' => (int) env('CERNE_CONSORTIUM_IMPORTS_PER_DAY', 10),
+
         // Idem para a simulação em PDF de um lead (ver LeadQuoteExtractionService), por profissional.
         'lead_quote_reads_per_day' => (int) env('CERNE_LEAD_QUOTE_READS_PER_DAY', 20),
 

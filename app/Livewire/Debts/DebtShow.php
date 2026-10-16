@@ -180,6 +180,30 @@ class DebtShow extends Component
         $this->debt->refresh();
     }
 
+    // ------------------------------------------------------------------ parcela pulada
+
+    public function skip(string $id): void
+    {
+        try {
+            app(DebtService::class)->markDiluted(DebtInstallment::query()->where('debt_id', $this->debt->id)->findOrFail($id));
+        } catch (InvalidArgumentException $e) {
+            $this->addError('skip', $e->getMessage());
+        }
+
+        $this->debt->refresh();
+    }
+
+    public function reopen(string $id): void
+    {
+        try {
+            app(DebtService::class)->reopenDiluted(DebtInstallment::query()->where('debt_id', $this->debt->id)->findOrFail($id));
+        } catch (InvalidArgumentException $e) {
+            $this->addError('skip', $e->getMessage());
+        }
+
+        $this->debt->refresh();
+    }
+
     // ------------------------------------------------------------------ vincular
 
     public function openLink(string $id): void
@@ -294,8 +318,9 @@ class DebtShow extends Component
         $this->contemplationMode = ContemplationMode::Draw->value;
         $this->bidAmount = '';
         $this->creditReleased = (string) $this->debt->credit_amount;
-        $this->newInstallmentAmount = (string) $this->debt->installment_amount;
-        $this->remainingInstallments = (string) max(1, $this->debt->term - $this->debt->paidCount());
+        // Com extrato da administradora, já sugere a parcela cheia estimada e as parcelas que faltam (é só ponto de partida).
+        $this->newInstallmentAmount = $this->debt->estimatedFullInstallment() ?? (string) $this->debt->installment_amount;
+        $this->remainingInstallments = (string) max(1, $this->debt->statement_remaining ?? $this->debt->term - $this->debt->paidCount());
         $this->contemplationCategoryId = (string) $sugestao['category_id'];
         $this->contemplationSubcategoryId = (string) $sugestao['subcategory_id'];
         $this->markGoalAchieved = true;
@@ -557,6 +582,8 @@ class DebtShow extends Component
             'candidatas' => $this->candidatas(),
             'semCategoria' => $this->semCategoria(),
             'emCarta' => $this->debt->isSavingForCredit(),
+            'ultimaPaga' => (int) $parcelas->where('status', DebtInstallmentStatus::Paid)->max('number'),
+            'quantidadePuladas' => $parcelas->where('status', DebtInstallmentStatus::Diluted)->count(),
             'ajustes' => $this->debt->isConsortium() ? $this->debt->adjustments()->orderByDesc('applied_on')->orderByDesc('created_at')->get() : collect(),
             'objetivo' => Goal::query()->where('linked_debt_id', $this->debt->id)->first(),
             'modosContemplacao' => ContemplationMode::options(),

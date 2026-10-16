@@ -1112,7 +1112,7 @@ class DocumentsIndex extends Component
     public function getDocumentsProperty(): Collection
     {
         return DocumentUpload::query()
-            ->where('document_type', '!=', DocumentType::InsurancePolicy->value)
+            ->whereNotIn('document_type', [DocumentType::InsurancePolicy->value, DocumentType::ConsortiumStatement->value])
             ->whereNull('dismissed_at')
             ->with('uploadedBy', 'member')
             ->orderByDesc('created_at')

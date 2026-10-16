@@ -79,7 +79,11 @@ class DebtsIndex extends Component
 
     public string $creditAmount = '';
 
-    public bool $isFlex = false;
+    /** '' (não é flex) ou 10, 20, 30, 40, 50: quanto a parcela é menor até a contemplação. */
+    public string $flexPercent = '';
+
+    /** Números das parcelas que ficaram sem pagamento, separados por vírgula (o valor foi diluído nas seguintes). */
+    public string $skippedInstallments = '';
 
     public string $adjustmentIndex = 'incc';
 
@@ -110,7 +114,7 @@ class DebtsIndex extends Component
         $this->resetValidation();
         $this->reset(
             'name', 'creditor', 'principal', 'rate', 'term', 'firstDueDate', 'installmentAmount', 'monthlyFees', 'paidBefore', 'bankAccountId', 'isPrivate', 'notes',
-            'consortiumGroup', 'creditAmount', 'isFlex', 'goalChoice', 'goalName', 'currentBalance',
+            'consortiumGroup', 'creditAmount', 'flexPercent', 'skippedInstallments', 'goalChoice', 'goalName', 'currentBalance',
         );
         $this->paidBefore = '0';
         $this->kind = 'financing';
@@ -228,6 +232,8 @@ class DebtsIndex extends Component
             'term' => ['required', 'integer', 'min:1', 'max:480'],
             'firstDueDate' => ['required', 'date_format:Y-m-d'],
             'paidBefore' => ['required', 'integer', 'min:0', 'lte:term'],
+            'flexPercent' => ['nullable', 'in:10,20,30,40,50'],
+            'skippedInstallments' => ['nullable', 'string', 'max:200', 'regex:/^[0-9,;\s]*$/'],
             'adjustmentIndex' => ['nullable', AdjustmentIndex::rule()],
             'adjustmentEvery' => [$comReajuste ? 'required' : 'nullable', 'integer', 'min:1', 'max:60'],
             'adjustmentFirstAfter' => [$comReajuste ? 'required' : 'nullable', 'integer', 'min:1', 'max:120'],
@@ -235,13 +241,15 @@ class DebtsIndex extends Component
             'goalName' => [$this->goalChoice === 'new' ? 'required' : 'nullable', 'string', 'max:120'],
             'bankAccountId' => ['nullable', 'string'],
             'notes' => ['nullable', 'string', 'max:2000'],
-        ], ['paidBefore.lte' => 'As parcelas já pagas não podem passar do prazo.'], $this->attributeNames());
+        ], ['paidBefore.lte' => 'As parcelas já pagas não podem passar do prazo.', 'skippedInstallments.regex' => 'Informe só os números das parcelas, separados por vírgula (ex.: 3, 12).'], $this->attributeNames());
+
+        $puladas = collect(preg_split('/[,;\s]+/', $dados['skippedInstallments'] ?? '', -1, PREG_SPLIT_NO_EMPTY))->map(fn ($n) => (int) $n)->all();
 
         $this->persist(fn () => app(DebtService::class)->createConsortium([
             'consortium_type' => $dados['consortiumType'], 'name' => $dados['name'] ?: null, 'creditor' => $dados['creditor'] ?: null,
             'consortium_group' => $dados['consortiumGroup'] ?: null, 'credit_amount' => $dados['creditAmount'],
             'installment_amount' => $dados['installmentAmount'], 'term' => $dados['term'], 'first_due_date' => $dados['firstDueDate'],
-            'paid_before' => $dados['paidBefore'], 'is_flex' => $this->isFlex,
+            'paid_before' => $dados['paidBefore'], 'flex_percent' => $dados['flexPercent'] ?: null, 'skipped_installments' => $puladas,
             'adjustment_index' => $comReajuste ? $dados['adjustmentIndex'] : null,
             'adjustment_every_months' => $comReajuste ? $dados['adjustmentEvery'] : null,
             'adjustment_first_after_months' => $comReajuste ? $dados['adjustmentFirstAfter'] : null,
@@ -298,7 +306,7 @@ class DebtsIndex extends Component
         return [
             'name' => 'nome', 'creditor' => 'credor', 'principal' => 'valor', 'rate' => 'taxa', 'rateBasis' => 'base da taxa',
             'term' => 'prazo', 'firstDueDate' => 'primeiro vencimento', 'installmentAmount' => 'valor da parcela', 'paidBefore' => 'parcelas já pagas',
-            'categoryId' => 'categoria', 'creditAmount' => 'valor da carta', 'consortiumType' => 'tipo do consórcio',
+            'categoryId' => 'categoria', 'creditAmount' => 'valor da carta', 'flexPercent' => 'flex da parcela', 'skippedInstallments' => 'parcelas puladas', 'consortiumType' => 'tipo do consórcio',
             'adjustmentEvery' => 'periodicidade do reajuste', 'adjustmentFirstAfter' => 'prazo do primeiro reajuste', 'goalName' => 'nome do objetivo',
             'currentBalance' => 'saldo atual', 'balanceDate' => 'data do saldo', 'openStatus' => 'situação',
         ];

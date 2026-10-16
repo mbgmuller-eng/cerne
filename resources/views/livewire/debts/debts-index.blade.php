@@ -17,7 +17,10 @@
             <h1 class="font-display text-3xl font-semibold tracking-tight text-slate-900 dark:text-white">Dívidas</h1>
             <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Financiamentos, empréstimos, consórcios e dívidas em aberto, com as parcelas ligadas às suas despesas.</p>
         </div>
-        <button type="button" wire:click="openForm" class="btn-secondary px-3 py-1.5 text-sm">Nova dívida</button>
+        <div class="flex flex-wrap gap-2">
+            <button type="button" wire:click="$dispatch('open-consortium-import')" class="btn-secondary px-3 py-1.5 text-sm">Importar extrato do consórcio</button>
+            <button type="button" wire:click="openForm" class="btn-secondary px-3 py-1.5 text-sm">Nova dívida</button>
+        </div>
     </div>
 
     <div @class(['grid gap-4 sm:grid-cols-3', 'lg:grid-cols-4' => $temCartas])>
@@ -44,6 +47,8 @@
             </div>
         @endif
     </div>
+
+    <livewire:debts.consortium-import />
 
     @if (! $temContratos)
         <div class="rounded-2xl border border-dashed border-slate-300 bg-white/60 px-5 py-12 text-center dark:border-slate-600 dark:bg-slate-800/40">
@@ -162,15 +167,24 @@
                         @error('firstDueDate') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
                     </div>
                     <div>
-                        <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Parcelas já pagas</label>
+                        <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Parcelas já pagas <span class="font-normal text-slate-400">(sem contar as puladas)</span></label>
                         <input type="number" wire:model="paidBefore" min="0" class="input mt-1.5">
                         @error('paidBefore') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
                     </div>
-                    <div class="flex items-end">
-                        <label class="inline-flex items-center gap-2 pb-2 text-xs text-slate-600 dark:text-slate-300">
-                            <input type="checkbox" wire:model="isFlex" class="rounded border-slate-300">
-                            Parcela flex (menor até ser contemplado)
-                        </label>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Parcelas puladas <span class="font-normal text-slate-400">(opcional)</span></label>
+                        <input type="text" wire:model="skippedInstallments" class="input mt-1.5" placeholder="Ex.: 3, 12">
+                        @error('skippedInstallments') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                    </div>
+                    <div class="@sm:col-span-2">
+                        <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Parcela flex: quanto a parcela é menor até a contemplação</label>
+                        <select wire:model="flexPercent" class="select mt-1.5 w-full">
+                            <option value="">Não é flex</option>
+                            @foreach ([10, 20, 30, 40, 50] as $pct)
+                                <option value="{{ $pct }}">{{ $pct }}%</option>
+                            @endforeach
+                        </select>
+                        @error('flexPercent') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
                     </div>
 
                     <div>

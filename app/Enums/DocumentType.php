@@ -20,6 +20,8 @@ enum DocumentType: string
     case BrokerageNote = 'brokerage_note';
     case PerformanceReport = 'performance_report';
     case InsurancePolicy = 'insurance_policy';
+    /** Extrato do consorciado (administradora de consórcio): vira o cadastro e as parcelas do consórcio em Dívidas. */
+    case ConsortiumStatement = 'consortium_statement';
     /** Relatório ou exportação de lançamentos de outro aplicativo financeiro (Minhas Finanças etc.). */
     case ExternalReport = 'external_report';
     case IncomeTax = 'income_tax';
@@ -34,6 +36,7 @@ enum DocumentType: string
             self::BrokerageNote => 'Nota de corretagem',
             self::PerformanceReport => 'Relatório de rentabilidade',
             self::InsurancePolicy => 'Apólice de seguro',
+            self::ConsortiumStatement => 'Extrato de consórcio',
             self::ExternalReport => 'Relatório de outro aplicativo',
             self::IncomeTax => 'Declaração de IR',
             self::Other => 'Outro',
@@ -50,6 +53,7 @@ enum DocumentType: string
             self::BrokerageNote => 'transações de investimento',
             self::PerformanceReport => 'rentabilidade',
             self::InsurancePolicy => 'apólices',
+            self::ConsortiumStatement => 'consórcios',
             self::ExternalReport => 'receitas e despesas',
             self::IncomeTax, self::Other => 'nenhum registro automático',
         };
@@ -57,11 +61,12 @@ enum DocumentType: string
 
     /**
      * Apólice tem fluxo próprio dentro de Seguros (revisão com vínculo a apólice existente e PDF
-     * guardado em Documentos), então não aparece na tela Importar.
+     * guardado em Documentos), e o extrato de consórcio tem o seu dentro de Dívidas: nenhum dos dois
+     * aparece na tela Importar.
      */
     public function availableInImportScreen(): bool
     {
-        return $this !== self::InsurancePolicy;
+        return ! in_array($this, [self::InsurancePolicy, self::ConsortiumStatement], true);
     }
 
     /** Tipos que a IA sabe extrair hoje. */

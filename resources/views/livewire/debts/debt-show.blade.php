@@ -95,7 +95,16 @@
                 @if ($debt->consortium_group)
                     <div><dt class="text-xs text-slate-400">Grupo e cota</dt><dd class="text-slate-800 dark:text-slate-200">{{ $debt->consortium_group }}</dd></div>
                 @endif
-                <div><dt class="text-xs text-slate-400">Parcela</dt><dd class="text-slate-800 dark:text-slate-200">{{ $debt->is_flex ? 'flex (menor até ser contemplado)' : 'fixa' }}</dd></div>
+                @if ($debt->consortium_contract)
+                    <div><dt class="text-xs text-slate-400">Contrato</dt><dd class="text-slate-800 dark:text-slate-200">{{ $debt->consortium_contract }}</dd></div>
+                @endif
+                <div><dt class="text-xs text-slate-400">Parcela</dt><dd class="text-slate-800 dark:text-slate-200">{{ $debt->flex_percent ? 'flex: '.$debt->flex_percent.'% menor até a contemplação' : ($debt->is_flex ? 'flex (menor até ser contemplado)' : 'fixa') }}</dd></div>
+                @if ($estimativaCheia = $debt->estimatedFullInstallment())
+                    <div><dt class="text-xs text-slate-400">Parcela depois da contemplação (estimativa, sem lance)</dt><dd class="text-slate-800 dark:text-slate-200">{{ Money::format($estimativaCheia) }}<span class="block text-xs text-slate-400">pelo extrato de {{ $debt->statement_on?->format('d/m/Y') ?? 'data não informada' }}</span></dd></div>
+                @endif
+                @if ($quantidadePuladas > 0)
+                    <div><dt class="text-xs text-slate-400">Parcelas puladas</dt><dd class="text-slate-800 dark:text-slate-200">{{ $quantidadePuladas }} (valor diluído nas seguintes)</dd></div>
+                @endif
                 @if ($debt->adjustment_index)
                     <div><dt class="text-xs text-slate-400">Reajuste</dt><dd class="text-slate-800 dark:text-slate-200">{{ $debt->adjustment_index->label() }}, a cada {{ $debt->adjustment_every_months }} {{ $debt->adjustment_every_months === 1 ? 'mês' : 'meses' }}</dd></div>
                     @if ($debt->next_adjustment_on && $debt->status === \App\Enums\DebtStatus::Active)
@@ -143,6 +152,7 @@
     @else
     <section class="card p-5">
         <h2 class="text-sm font-semibold text-slate-900 dark:text-white">Parcelas</h2>
+        @error('skip') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
         <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Cada parcela paga fica ligada a uma despesa do fluxo de caixa, na categoria do momento. Desfazer solta a ligação e não apaga a despesa.</p>
 
         <div class="mt-3 overflow-x-auto">
@@ -170,6 +180,8 @@
                                     @else
                                         <span class="ml-1 text-xs text-slate-400">antes do Cerne</span>
                                     @endif
+                                @elseif ($p->status === \App\Enums\DebtInstallmentStatus::Diluted)
+                                    <span class="badge bg-slate-100 text-slate-600 dark:bg-white/10 dark:text-slate-300" title="Não foi paga: o valor foi diluído nas parcelas seguintes">pulada</span>
                                 @elseif ($p->isOverdue())
                                     <span class="badge bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-300">atrasada</span>
                                 @else
@@ -180,7 +192,12 @@
                                 <span class="inline-flex flex-wrap justify-end gap-1">
                                     @if ($p->isPaid())
                                         <button type="button" wire:click="unlink('{{ $p->id }}')" wire:confirm="Desfazer o pagamento desta parcela? A despesa continua no fluxo de caixa." class="btn-ghost px-2 py-1 text-xs">Desfazer</button>
+                                    @elseif ($p->status === \App\Enums\DebtInstallmentStatus::Diluted)
+                                        <button type="button" wire:click="reopen('{{ $p->id }}')" class="btn-ghost px-2 py-1 text-xs">Reabrir</button>
                                     @else
+                                        @if ($debt->isConsortium() && $p->number < $ultimaPaga)
+                                            <button type="button" wire:click="skip('{{ $p->id }}')" wire:confirm="Marcar esta parcela como pulada? Ela não foi paga e o valor foi diluído nas seguintes." class="btn-ghost px-2 py-1 text-xs">Pulada</button>
+                                        @endif
                                         <button type="button" wire:click="openPay('{{ $p->id }}')" class="btn-secondary px-2 py-1 text-xs">Pagar</button>
                                         <button type="button" wire:click="openLink('{{ $p->id }}')" class="btn-ghost px-2 py-1 text-xs">Vincular despesa</button>
                                         <button type="button" wire:click="openInstallment('{{ $p->id }}')" class="btn-ghost px-2 py-1 text-xs">Ajustar</button>
