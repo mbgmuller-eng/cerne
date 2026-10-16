@@ -1,0 +1,26 @@
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <!-- Cerne — ícone de seção transversal (anéis de crescimento + núcleo esmeralda) -->
+  <!-- background -->
+  <rect x="0" y="0" width="512" height="512" rx="112" fill="#0B1D3A"/>
+
+  <!-- sapwood fill -->
+  <circle cx="256" cy="256" r="225" fill="#0D2240"/>
+
+  <!-- ring 1 — outermost, faintest -->
+  <circle cx="256" cy="256" r="225" stroke="#FFFFFF" stroke-width="7" fill="none" opacity="0.30"/>
+
+  <!-- ring 2 -->
+  <circle cx="256" cy="256" r="182" stroke="#FFFFFF" stroke-width="9" fill="none" opacity="0.50"/>
+
+  <!-- ring 3 -->
+  <circle cx="256" cy="256" r="138" stroke="#FFFFFF" stroke-width="11" fill="none" opacity="0.70"/>
+
+  <!-- ring 4 — heartwood border, strongest ring -->
+  <circle cx="256" cy="256" r="97" stroke="#FFFFFF" stroke-width="13" fill="none" opacity="0.90"/>
+
+  <!-- heartwood core — emerald -->
+  <circle cx="256" cy="256" r="72" fill="#10B981"/>
+
+  <!-- center pith point -->
+  <circle cx="256" cy="256" r="15" fill="#FFFFFF"/>
+</svg>

@@ -113,6 +113,43 @@ class InvoiceService
     }
 
     /**
+     * Baixa da fatura a partir de uma linha de extrato: a fatura passa a paga com a data e o valor do extrato e, quando
+     * o saldo da conta deve mexer, a conta é debitada, tudo na mesma transação. Idempotente: fatura que já está paga
+     * não é paga de novo (o travamento de linha evita a corrida entre duas revisões abertas ao mesmo tempo).
+     *
+     * `$moverSaldo` falso é o relatório antigo de outro aplicativo, cujo saldo já reflete o pagamento: a fatura é
+     * marcada como paga sem conta de origem, então estornar o pagamento depois também não devolve saldo que nunca saiu.
+     *
+     * @return bool verdadeiro se a baixa foi feita agora; falso se a fatura já estava paga
+     */
+    public function payFromStatement(CreditCardInvoice $invoice, ?BankAccount $account, string $amount, CarbonImmutable $paidAt, bool $moverSaldo = true): bool
+    {
+        return DB::transaction(function () use ($invoice, $account, $amount, $paidAt, $moverSaldo): bool {
+            $fatura = CreditCardInvoice::query()->lockForUpdate()->findOrFail($invoice->id);
+
+            if ($fatura->status === InvoiceStatus::Paid) {
+                return false;
+            }
+
+            $debitar = $moverSaldo && $account !== null;
+            $valor = ltrim(Money::parse($amount), '-');
+
+            $fatura->update([
+                'status' => InvoiceStatus::Paid,
+                'paid_at' => $paidAt->toDateString(),
+                'paid_amount' => $valor,
+                'paid_from_account_id' => $debitar ? $account->id : null,
+            ]);
+
+            if ($debitar) {
+                $account->applyToBalance('-'.$valor);
+            }
+
+            return true;
+        });
+    }
+
+    /**
      * Estorna o pagamento: devolve o saldo debitado e volta a fatura pra
      * "fechada" — o estado anterior ao pagamento na sequência normal
      * (Open → Closed → Paid). Único jeito de corrigir uma despesa de

@@ -20,6 +20,7 @@ use App\Models\IncomeRecord;
 use App\Services\Extraction\CategorizationRuleMatcher;
 use App\Services\Extraction\DocumentCommitService;
 use App\Services\Extraction\ExternalReportReview;
+use App\Services\Extraction\InvoicePaymentMatcher;
 use App\Support\Money;
 use App\Support\ProfileContext;
 use Carbon\CarbonImmutable;
@@ -106,6 +107,15 @@ class DocumentsIndex extends Component
 
     /** Texto explicando o casamento com conta fixa/receita recorrente, quando houver. */
     public array $notaPorItem = [];
+
+    /**
+     * Linha que é pagamento de fatura de cartão: '' = não é; o id de uma fatura cadastrada = dá baixa nela; 'sem' = fatura
+     * não cadastrada (só o saldo da conta mexe, nada vira despesa). Ver InvoicePaymentMatcher.
+     */
+    public array $faturaPorItem = [];
+
+    /** @var array<int, list<array{id: string, label: string, sugerida: bool}>> faturas oferecidas na linha */
+    public array $faturaOpcoesPorItem = [];
 
     /**
      * Aviso quando já existe um lançamento com a mesma conta, data e valor
@@ -237,6 +247,8 @@ class DocumentsIndex extends Component
         $this->fixedBillPaymentPorItem = [];
         $this->recurringIncomeOccurrencePorItem = [];
         $this->notaPorItem = [];
+        $this->faturaPorItem = [];
+        $this->faturaOpcoesPorItem = [];
         $this->duplicataPorItem = [];
         $this->criarRegraPorItem = [];
         $this->regraPatternPorItem = [];
@@ -286,6 +298,11 @@ class DocumentsIndex extends Component
 
         if ($documento->document_type === DocumentType::ExternalReport) {
             $this->prepararRelatorioExterno($documento);
+        }
+
+        // Por último: a baixa reconhecida volta a marcar a linha que o relatório de outro app tinha desmarcado.
+        if ($documento->document_type !== DocumentType::CreditCardInvoice) {
+            $this->casarPagamentosDeFatura($documento, $itens);
         }
     }
 
@@ -571,7 +588,8 @@ class DocumentsIndex extends Component
                 continue;
             }
 
-            if ($this->estornoPorItem[$i] ?? false) {
+            // Estorno e pagamento de fatura de cartão não são gasto novo: não pedem categoria.
+            if (($this->estornoPorItem[$i] ?? false) || ($this->faturaPorItem[$i] ?? '') !== '') {
                 $faltando[$i] = false;
 
                 continue;
@@ -588,6 +606,96 @@ class DocumentsIndex extends Component
         }
 
         return $faltando;
+    }
+
+    /**
+     * Procura, entre as linhas de saída do extrato (ou do relatório de outro app), as que são pagamento de uma fatura de
+     * cartão. Com fatura em aberto que bate em valor e data, a linha já vem com a baixa sugerida. Sem fatura, mas com
+     * texto que diz "cartão de crédito", vem como pagamento de fatura não cadastrada (só saldo, fora das despesas). Fatura
+     * já paga vem desmarcada. Tudo continua editável: a pessoa troca a fatura, ou diz que não é pagamento de fatura.
+     *
+     * @param  array<int, array<string, mixed>>  $itens
+     */
+    private function casarPagamentosDeFatura(DocumentUpload $documento, array $itens): void
+    {
+        $matcher = app(InvoicePaymentMatcher::class);
+        $faturas = $matcher->invoices();
+        foreach ($itens as $i => $item) {
+            $data = $this->parseItemDate($item['data'] ?? null);
+
+            if ($data === null || ($item['tipo'] ?? null) === 'receita' || ($this->estornoPorItem[$i] ?? false)) {
+                continue;
+            }
+
+            // A baixa de uma conta fixa que já casou tem prioridade: é outro destino para a mesma linha.
+            if (($this->fixedBillPaymentPorItem[$i] ?? null) !== null) {
+                continue;
+            }
+
+            $res = $matcher->match($faturas, (string) ($item['descricao'] ?? ''), $item['valor'] ?? 0, $data);
+
+            if (! $res['texto'] && $res['sugeridas']->isEmpty() && $res['ja_paga'] === null) {
+                continue;
+            }
+
+            $this->faturaOpcoesPorItem[$i] = $this->opcoesDeFatura($res);
+            $duplicata = isset($this->duplicataPorItem[$i]);
+
+            if ($res['sugeridas']->isNotEmpty()) {
+                $this->faturaPorItem[$i] = $res['sugeridas']->first()->id;
+
+                if (! $duplicata && ! in_array($i, $this->aceitos, true)) {
+                    $this->aceitos[] = $i;
+                }
+            } elseif ($res['ja_paga'] !== null) {
+                $this->faturaPorItem[$i] = $res['ja_paga']->id;
+                $this->notaPorItem[$i] = 'A fatura '.$res['ja_paga']->creditCard->displayName().' de '.$res['ja_paga']->competenceLabel()
+                    .' já está marcada como paga'.($res['ja_paga']->paid_at ? ' em '.$res['ja_paga']->paid_at->format('d/m') : '').'. Não importa de novo.';
+                $this->aceitos = array_values(array_diff($this->aceitos, [$i]));
+            } elseif ($res['forte']) {
+                // Texto claro de cartão de crédito, sem fatura cadastrada que case: o dinheiro saiu da conta, mas o gasto
+                // está (ou estará) nas compras da fatura. A pessoa pode desfazer na linha. Em relatório de outro app a linha
+                // segue desmarcada, como já vinha (ver prepararRelatorioExterno).
+                $this->faturaPorItem[$i] = 'sem';
+            }
+        }
+    }
+
+    /**
+     * @param  array{sugeridas: Collection, abertas: Collection}  $res
+     * @return list<array{id: string, label: string, sugerida: bool}>
+     */
+    private function opcoesDeFatura(array $res): array
+    {
+        return $res['sugeridas']->map(fn ($f) => ['id' => $f->id, 'label' => InvoicePaymentMatcher::label($f), 'sugerida' => true])
+            ->concat($res['abertas']->take(12)->map(fn ($f) => ['id' => $f->id, 'label' => InvoicePaymentMatcher::label($f), 'sugerida' => false]))
+            ->values()
+            ->all();
+    }
+
+    /** "É pagamento de fatura de cartão": a pessoa aponta na linha, quando nada foi reconhecido sozinho. */
+    public function marcarPagamentoFatura(int $i): void
+    {
+        $documento = DocumentUpload::findOrFail($this->revisandoId);
+
+        // Fatura de cartão em PDF já lança as compras no cartão: o pagamento dela não aparece ali.
+        if ($documento->document_type === DocumentType::CreditCardInvoice) {
+            return;
+        }
+
+        $item = $documento->extractedItems()[$i] ?? null;
+        $data = $item === null ? null : $this->parseItemDate($item['data'] ?? null);
+
+        if ($item === null || $data === null || ($item['tipo'] ?? null) === 'receita') {
+            return;
+        }
+
+        $matcher = app(InvoicePaymentMatcher::class);
+        $res = $matcher->match($matcher->invoices(), (string) ($item['descricao'] ?? ''), $item['valor'] ?? 0, $data);
+
+        $this->faturaOpcoesPorItem[$i] = $this->opcoesDeFatura($res);
+        $this->faturaPorItem[$i] = $res['sugeridas']->first()?->id ?? 'sem';
+        $this->estornoPorItem[$i] = false;
     }
 
     /**
@@ -640,6 +748,7 @@ class DocumentsIndex extends Component
                 'necessidade' => $this->necessidadePorItem,
                 'estorno' => $this->estornoPorItem,
                 'fixedBillPayment' => $this->fixedBillPaymentPorItem,
+                'fatura' => $this->faturaPorItem,
                 'recurringIncomeOccurrence' => $this->recurringIncomeOccurrencePorItem,
                 'conta' => $this->contaPorItem,
             ]);

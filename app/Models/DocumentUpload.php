@@ -19,7 +19,7 @@ use Illuminate\Support\Facades\Storage;
     'original_filename', 'storage_path', 'size_bytes', 'institution_name',
     'reference_month', 'reference_year', 'processing_status',
     'records_extracted', 'extraction_summary', 'imported_item_indices',
-    'excluded_item_indices', 'error_message', 'processed_at', 'committed_at', 'dismissed_at',
+    'excluded_item_indices', 'card_payment_log', 'error_message', 'processed_at', 'committed_at', 'dismissed_at',
 ])]
 class DocumentUpload extends Model
 {
@@ -36,6 +36,7 @@ class DocumentUpload extends Model
             'extraction_summary' => 'array',
             'imported_item_indices' => 'array',
             'excluded_item_indices' => 'array',
+            'card_payment_log' => 'array',
             'reference_month' => 'integer',
             'reference_year' => 'integer',
             'records_extracted' => 'integer',

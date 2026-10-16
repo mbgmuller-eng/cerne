@@ -223,7 +223,8 @@
                                     $jaExcluido = in_array($i, $revisando->excluded_item_indices ?? [], true);
                                     $resolvido = $jaImportado || $jaExcluido;
                                     $ehReceita = ($item['tipo'] ?? null) === 'receita';
-                                    $ehEstorno = $estornoPorItem[$i] ?? false;
+                                    $ehFatura = ! $ehReceita && ($faturaPorItem[$i] ?? '') !== '';
+                                    $ehEstorno = ($estornoPorItem[$i] ?? false) || $ehFatura; // sem categoria: nenhum dos dois é gasto novo
                                     $necessidadeItem = $necessidadePorItem[$i] ?? '';
                                     $faltaCategorizar = ! $ehReceita && ($itensFaltandoCategoria[$i] ?? false);
                                     $categoriasDoItem = $necessidadeItem === Necessity::Investment->value
@@ -283,7 +284,9 @@
 
                                     @if ($temCategorizacao)
                                         <td class="px-3 py-2">
-                                            @if ($ehEstorno)
+                                            @if ($ehFatura)
+                                                <span class="text-xs font-medium text-brand-700 dark:text-brand-300">Pagamento de fatura</span>
+                                            @elseif ($ehEstorno)
                                                 <span class="text-xs font-medium text-emerald-700 dark:text-emerald-400">Estorno</span>
                                             @elseif (! $ehReceita)
                                                 <select wire:model.live="necessidadePorItem.{{ $i }}" @class(['select w-full text-xs', 'ring-2 ring-amber-400 dark:ring-amber-500' => $faltaCategorizar && $necessidadeItem === ''])>
@@ -362,6 +365,29 @@
                                                 </div>
                                             @endif
 
+                                            @if ($ehFatura || isset($faturaOpcoesPorItem[$i]))
+                                                <div class="mb-1.5 space-y-1 rounded-lg bg-brand-50 px-3 py-2 dark:bg-white/5">
+                                                    <label class="flex flex-wrap items-center gap-2 text-slate-600 dark:text-slate-300">
+                                                        <span class="font-medium">Pagamento de fatura de cartão:</span>
+                                                        <select wire:model.live="faturaPorItem.{{ $i }}" class="select max-w-full py-1 text-xs">
+                                                            <option value="">Não é pagamento de fatura</option>
+                                                            @foreach ($faturaOpcoesPorItem[$i] ?? [] as $opcao)
+                                                                <option value="{{ $opcao['id'] }}">{{ $opcao['sugerida'] ? 'Sugerida: ' : '' }}{{ $opcao['label'] }}</option>
+                                                            @endforeach
+                                                            <option value="sem">Fatura não cadastrada (só o saldo da conta)</option>
+                                                        </select>
+                                                    </label>
+                                                    @if ($ehFatura)
+                                                        <p class="text-slate-500 dark:text-slate-400">
+                                                            @if (($faturaPorItem[$i] ?? '') === 'sem')
+                                                                Debita a conta, mas não vira despesa: o gasto está nas compras da fatura.
+                                                            @else
+                                                                Dá baixa na fatura e debita a conta uma vez só. Não vira despesa.
+                                                            @endif
+                                                        </p>
+                                                    @endif
+                                                </div>
+                                            @endif
                                             @if ($faltaCategorizar || ($duplicataPorItem[$i] ?? null) || ($regraAplicadaPorItem[$i] ?? null) || ($notaPorItem[$i] ?? null))
                                                 <div class="flex flex-wrap gap-x-3 gap-y-1">
                                                     @if ($faltaCategorizar)
@@ -380,13 +406,18 @@
                                             @endif
 
                                             <div class="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
-                                                @unless ($ehReceita)
+                                                @unless ($ehReceita || $ehFatura)
                                                     <label class="inline-flex items-center gap-1.5 text-emerald-700 dark:text-emerald-400">
                                                         <input type="checkbox" wire:model.live="estornoPorItem.{{ $i }}" class="rounded border-slate-300 dark:border-slate-600 text-emerald-600 focus:ring-emerald-500">
                                                         Estorno / cashback
                                                     </label>
                                                     <span class="text-slate-300 dark:text-slate-600">·</span>
                                                 @endunless
+
+                                                @if (! $ehReceita && ! $ehEstorno && ! isset($faturaOpcoesPorItem[$i]) && $revisando->document_type !== \App\Enums\DocumentType::CreditCardInvoice)
+                                                    <button type="button" wire:click="marcarPagamentoFatura({{ $i }})" class="text-brand-700 hover:underline dark:text-brand-300">É pagamento de fatura de cartão</button>
+                                                    <span class="text-slate-300 dark:text-slate-600">·</span>
+                                                @endif
 
                                                 @unless ($ehEstorno)
                                                     <label class="inline-flex items-center gap-1.5 text-slate-500 dark:text-slate-400">

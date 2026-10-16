@@ -7,6 +7,7 @@ use App\Enums\Necessity;
 use App\Enums\ProcessingStatus;
 use App\Models\BankAccount;
 use App\Models\CreditCard;
+use App\Models\CreditCardInvoice;
 use App\Models\DocumentUpload;
 use App\Models\ExpenseCategory;
 use App\Models\ExpenseRecord;
@@ -162,6 +163,17 @@ class DocumentCommitService
             } else {
                 $estorno = ($overrides['estorno'][$i] ?? false) === true;
 
+                // Pagamento de fatura de cartão: não é um gasto novo (os gastos já estão na fatura), então não vira
+                // despesa. Dá baixa na fatura escolhida ou, sem fatura cadastrada, só mexe no saldo da conta.
+                $destinoFatura = $estorno ? '' : (string) ($overrides['fatura'][$i] ?? '');
+
+                if ($destinoFatura !== '') {
+                    $this->pagamentoDeFatura($documento, $i, $item, $destinoFatura, $valor, $data, $conta, $mexeNoSaldo);
+                    $criados++;
+
+                    continue;
+                }
+
                 // Estorno não dá baixa em conta fixa — não é um vencimento
                 // agendado sendo pago, é um crédito de volta.
                 $pagamento = $estorno ? null : $this->fixedBillPaymentFor($overrides['fixedBillPayment'][$i] ?? null);
@@ -217,6 +229,47 @@ class DocumentCommitService
         }
 
         return $criados;
+    }
+
+    /**
+     * A linha do extrato é o pagamento de uma fatura de cartão.
+     *
+     * Com fatura escolhida: marca a fatura como paga (e debita a conta, se o saldo deve mexer) por
+     * InvoiceService::payFromStatement(), que não paga duas vezes. Sem fatura ('sem'): só o saldo da conta mexe, porque
+     * o dinheiro saiu dela, mas nada vira despesa. Em qualquer caso o rastro fica em document_uploads.card_payment_log.
+     *
+     * @param  array<string, mixed>  $item
+     */
+    private function pagamentoDeFatura(DocumentUpload $documento, int $i, array $item, string $destino, string $valor, CarbonImmutable $data, ?BankAccount $conta, bool $mexeNoSaldo): void
+    {
+        $magnitude = ltrim($valor, '-');
+        $fatura = null;
+        $baixaFeita = false;
+
+        if ($destino !== 'sem') {
+            $fatura = CreditCardInvoice::query()->find($destino);
+
+            if ($fatura === null) {
+                throw new RuntimeException('A fatura escolhida para a linha "'.($item['descricao'] ?? '').'" não existe mais. Revise a linha e escolha de novo.');
+            }
+
+            $baixaFeita = $this->invoiceService->payFromStatement($fatura, $conta, $magnitude, $data, $mexeNoSaldo);
+        } elseif ($mexeNoSaldo && $conta !== null) {
+            $conta->applyToBalance(bcmul($magnitude, '-1', Money::SCALE));
+        }
+
+        $documento->card_payment_log = array_merge($documento->card_payment_log ?? [], [[
+            'item' => $i,
+            'descricao' => $item['descricao'] ?? null,
+            'valor' => $magnitude,
+            'data' => $data->toDateString(),
+            'conta_id' => $conta?->id,
+            'saldo_movido' => $mexeNoSaldo && $conta !== null && ($destino === 'sem' || $baixaFeita),
+            'fatura_id' => $fatura?->id,
+            // Fatura que já estava paga: a linha é só reconhecida, nada é pago nem debitado de novo.
+            'ja_estava_paga' => $fatura !== null && ! $baixaFeita,
+        ]]);
+        $documento->save();
     }
 
     /**

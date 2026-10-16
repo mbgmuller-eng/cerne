@@ -1,0 +1,24 @@
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <!-- Cerne — "C Corte": C aberto cujos terminais planos revelam um corte
+       transversal de madeira (anel esmeralda), como um galho serrado -->
+  <rect x="0" y="0" width="512" height="512" rx="112" fill="#0B1D3A"/>
+
+  <!-- corpo do C (anel grosso com abertura à direita) -->
+  <path d="
+    M 372.9 141.0
+    A 194 194 0 1 0 372.9 371.0
+    L 316.6 322.9
+    A 112 112 0 1 1 316.6 189.1
+    Z"
+    fill="#FFFFFF"/>
+
+  <!-- terminal superior: face de corte, anéis concêntricos -->
+  <circle cx="359.6" cy="176.5" r="49" fill="#FFFFFF"/>
+  <circle cx="359.6" cy="176.5" r="34" fill="#10B981"/>
+  <circle cx="359.6" cy="176.5" r="14" fill="#0B1D3A" opacity="0.9"/>
+
+  <!-- terminal inferior: face de corte, anéis concêntricos -->
+  <circle cx="359.6" cy="335.5" r="49" fill="#FFFFFF"/>
+  <circle cx="359.6" cy="335.5" r="34" fill="#10B981"/>
+  <circle cx="359.6" cy="335.5" r="14" fill="#0B1D3A" opacity="0.9"/>
+</svg>
