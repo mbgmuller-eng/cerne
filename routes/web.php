@@ -170,6 +170,7 @@ Route::middleware(['auth', 'verified'])->group(function (): void {
         Route::get('/contas-fixas', FixedBillsIndex::class)->name('fixedbills.index');
         Route::get('/investimentos', InvestmentsIndex::class)->name('investments.index');
         Route::get('/investimentos/imposto-de-renda', \App\Livewire\Investments\InvestmentTaxReport::class)->name('investments.tax');
+        Route::get('/investimentos/desempenho', \App\Livewire\Investments\InvestmentPerformance::class)->name('investments.performance');
         Route::get('/seguros', InsuranceIndex::class)->name('insurance.index');
         Route::get('/objetivos', GoalsIndex::class)->name('goals.index');
 
