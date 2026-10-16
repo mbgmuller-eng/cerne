@@ -204,3 +204,11 @@ Schedule::call(function (): void {
 
     logger()->info('Roteiros do acompanhamento', ['itens_alterados' => $mudaram]);
 })->dailyAt('06:30')->name('acompanhamento-roteiro')->withoutOverlapping();
+
+// Dívidas: aviso de parcela de financiamento ou empréstimo a vencer (mesma antecedência das contas fixas). Idempotente pelo livro de
+// lembretes (engagement_reminders: usuário + parcela + tipo).
+Schedule::call(function (): void {
+    $avisos = app(\App\Services\DebtReminderService::class)->notifyUpcoming();
+
+    logger()->info('Parcelas de dívidas', ['avisos' => $avisos]);
+})->dailyAt('03:45')->name('parcelas-de-dividas')->withoutOverlapping();

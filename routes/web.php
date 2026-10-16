@@ -168,6 +168,8 @@ Route::middleware(['auth', 'verified'])->group(function (): void {
 
         Route::get('/fluxo-de-caixa', CashFlowIndex::class)->name('cashflow.index');
         Route::get('/contas-fixas', FixedBillsIndex::class)->name('fixedbills.index');
+        Route::get('/dividas', \App\Livewire\Debts\DebtsIndex::class)->name('debts.index');
+        Route::get('/dividas/{debt}', \App\Livewire\Debts\DebtShow::class)->name('debts.show');
         Route::get('/investimentos', InvestmentsIndex::class)->name('investments.index');
         Route::get('/investimentos/imposto-de-renda', \App\Livewire\Investments\InvestmentTaxReport::class)->name('investments.tax');
         Route::get('/investimentos/desempenho', \App\Livewire\Investments\InvestmentPerformance::class)->name('investments.performance');

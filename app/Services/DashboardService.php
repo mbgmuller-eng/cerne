@@ -58,6 +58,8 @@ class DashboardService
                 'alertas' => $alertas,
                 'objetivos' => $this->goalsSummary(),
                 'protecao' => $this->insuranceSummary(),
+                // Financiamentos e empréstimos: só números em texto, que o cache guarda sem problema.
+                'dividas' => app(DebtService::class)->summary($year, $month),
             ];
         });
     }

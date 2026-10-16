@@ -22,6 +22,7 @@
         ['cashflow.index', 'Fluxo de caixa', 'Fluxo', 'flow'],
         ['fixedbills.index', 'Contas fixas', 'Fixas', 'bills'],
         ['accounts.index', 'Contas & Cartões', 'Contas', 'cards'],
+        ['debts.index', 'Dívidas', 'Dívidas', 'debt'],
         ['investments.index', 'Investimentos', 'Invest.', 'invest'],
         ['goals.index', 'Objetivos', 'Metas', 'target'],
         ['documents.index', 'Importar', 'Importar', 'upload'],
@@ -30,7 +31,7 @@
     // Acompanhamento: só quem tem vínculo ativo com um consultor financeiro (cliente), ou o consultor dentro do perfil de um
     // cliente dele. Sem consultor, a área não existe.
     if ($profile && app(\App\Services\EngagementAccess::class)->viewer() !== null) {
-        array_splice($navFinancas, 5, 0, [['engagement.index', 'Acompanhamento', 'Consultoria', 'contact']]);
+        array_splice($navFinancas, 6, 0, [['engagement.index', 'Acompanhamento', 'Consultoria', 'contact']]);
     }
     $navSeguros = [
         ['insurance.index', 'Apólices', 'Seguros', 'shield'],

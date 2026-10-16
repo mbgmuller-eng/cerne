@@ -126,6 +126,22 @@
         </div>
     @endif
 
+    {{-- Dívidas: financiamentos e empréstimos ------------------------------ --}}
+    @if (bccomp($dados['dividas']['total'], '0', 2) > 0 || bccomp($dados['dividas']['month_total'], '0', 2) > 0)
+        <a href="{{ route('debts.index') }}" class="card card-hover flex flex-wrap items-center justify-between gap-x-8 gap-y-3 p-5">
+            <div>
+                <p class="eyebrow">Dívidas</p>
+                <p class="figure mt-1 text-2xl font-medium text-slate-900 dark:text-white">{{ Money::format($dados['dividas']['total']) }}</p>
+                <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">total devedor em financiamentos e empréstimos</p>
+            </div>
+            <div class="text-right">
+                <p class="text-xs text-slate-500 dark:text-slate-400">Parcelas deste mês</p>
+                <p class="figure mt-1 text-lg text-amber-700 dark:text-amber-400">{{ Money::format($dados['dividas']['month_total']) }}</p>
+                <p class="mt-0.5 text-xs text-slate-400">{{ Money::format($dados['dividas']['month_open']) }} a pagar</p>
+            </div>
+        </a>
+    @endif
+
     {{-- Composição, objetivos e proteção ---------------------------------- --}}
     <div class="grid gap-4 lg:grid-cols-3">
         <div class="card p-5">

@@ -22,6 +22,9 @@
         @case('cards')
             <rect x="2" y="6" width="20" height="13" rx="2"/><path d="M2 10h20"/><path d="M6 15h4"/>
             @break
+        @case('debt')
+            <rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 12h5"/><path d="M16 9.5v5"/><path d="M14 12h4"/>
+            @break
         @case('invest')
             <path d="M3 3v18h18"/><path d="M7 15l4-5 3 3 5-7"/>
             @break

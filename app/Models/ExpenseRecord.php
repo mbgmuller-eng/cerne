@@ -112,6 +112,12 @@ class ExpenseRecord extends Model
         return $this->belongsTo(CreditCardInvoice::class, 'credit_card_invoice_id');
     }
 
+    /** A parcela de dívida (financiamento, empréstimo) que esta despesa pagou, quando houver. */
+    public function debtInstallment(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(DebtInstallment::class, 'expense_id');
+    }
+
     public function installmentGroup(): BelongsTo
     {
         return $this->belongsTo(InstallmentGroup::class);

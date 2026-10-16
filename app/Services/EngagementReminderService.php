@@ -11,8 +11,6 @@ use App\Models\FinancialProfile;
 use App\Models\User;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 
 /**
  * Lembretes diários do Acompanhamento: reunião no dia seguinte, tarefa que vence amanhã e tarefa que venceu e continua aberta.
@@ -28,6 +26,7 @@ class EngagementReminderService
     public function __construct(
         private readonly EngagementAccess $access,
         private readonly EngagementNotifier $avisos,
+        private readonly ReminderLedger $livro,
     ) {}
 
     /** @return int quantos lembretes foram enviados */
@@ -91,25 +90,10 @@ class EngagementReminderService
             default => $this->access->clientUsers($perfil)->push($consultor)->filter()->unique('id'),
         };
 
-        $novos = $usuarios->filter(fn (User $u) => $this->claim($u->id, $tipoAssunto, $assuntoId, $tipo))->values();
+        $novos = $usuarios->filter(fn (User $u) => $this->livro->claim($u->id, $tipoAssunto, $assuntoId, $tipo))->values();
 
         $this->avisos->send($novos, $perfil->id, $tipo, $titulo, $mensagem);
 
         return $novos->count();
-    }
-
-    /** Reserva o lembrete: só quem consegue inserir a linha única o envia. */
-    private function claim(string $userId, string $tipoAssunto, string $assuntoId, string $tipo): bool
-    {
-        return DB::table('engagement_reminders')->insertOrIgnore([
-            'id' => (string) Str::uuid(),
-            'user_id' => $userId,
-            'subject_type' => $tipoAssunto,
-            'subject_id' => $assuntoId,
-            'kind' => $tipo,
-            'sent_on' => today()->toDateString(),
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]) === 1;
     }
 }

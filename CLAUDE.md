@@ -116,6 +116,7 @@ Todas idempotentes (regra 4). O cron da Hostinger chama `schedule:run` a cada mi
 | `batimento` | todo minuto | marca que o agendador está vivo (o `cerne:check` confere) |
 | `contas-fixas`, `receitas-recorrentes`, `faturas` | 03:10 a 03:20 | gera vencimentos e avisos |
 | `datas-importantes` | 03:25 | avisos de aniversário e de vencimento de apólice (não avisa apólice que renova sozinha) |
+| `parcelas-de-dividas` | 03:45 | avisa parcela de financiamento ou empréstimo a vencer (índice único por usuário e parcela em `engagement_reminders`, via `ReminderLedger`) |
 | `snapshots` | dia 1, 03:30 | foto mensal dos investimentos |
 | `agenda-saude`, `cuidados-saude` | 03:35 | avisos de saúde |
 | cobrança (`lembrete-pix`, `pix-automatico-*`, `nota-fiscal-pendentes`, `lembrete-fim-do-teste`, `aviso-acesso-encerrando`) | 03:35 a 04:00 | assinatura e Asaas |
@@ -128,6 +129,16 @@ Todas idempotentes (regra 4). O cron da Hostinger chama `schedule:run` a cada mi
 
 A leitura por IA roda em fila do banco (`queue:work --stop-when-empty` no cron):
 `ProcessDocumentJob` (documentos) e `ExtractLeadQuoteJob` (simulação de lead).
+
+### Dívidas (financiamento e empréstimo)
+
+Módulo `Debt` + `DebtInstallment` (consórcio e dívida em aberto vêm nas próximas fases). Regras:
+
+- **Cada parcela paga fica ligada a uma despesa** (`debt_installments.expense_id`, único): o dinheiro sai uma vez só, na despesa, e o saldo da dívida cai junto. A despesa é a parcela **inteira**; a divisão amortização/juros/taxas só aparece na tela da dívida. O contrato guarda a classificação **padrão**, mas é a despesa que carrega a categoria de cada pagamento (reclassificar o contrato só vale para as próximas, a menos que se peça).
+- **Desfazer** um pagamento solta a ligação e **nunca apaga a despesa**.
+- O cronograma vem do contrato (`DebtScheduleCalculator`, bcmath: SAC, Price ou parcelas informadas); a última parcela absorve a sobra de centavos. Saldo devedor e totais em SQL.
+- Dívida **não** altera o "Patrimônio investido" do painel: sem cadastro de bens, subtrair um financiamento mostraria um número enganoso. Ela aparece à parte, em "Dívidas".
+- Fora de produção o projeto **proíbe lazy loading** (`Model::shouldBeStrict` em ambiente local): carregue as relações que a view usa (`with`/`loadMissing`).
 
 ### Acompanhamento (consultor financeiro e cliente)
 
