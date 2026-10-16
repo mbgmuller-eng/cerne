@@ -118,6 +118,7 @@
                 </div>
 
                 @if ($kind === 'consortium')
+                    <div class="contents *:min-w-0" wire:key="campos-consorcio">
                     <div>
                         <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Tipo do consórcio</label>
                         <select wire:model="consortiumType" class="select mt-1.5 w-full">
@@ -221,7 +222,9 @@
                             @endforeach
                         </select>
                     </div>
+                    </div>
                 @elseif ($kind === 'debt')
+                    <div class="contents *:min-w-0" wire:key="campos-divida-aberta">
                     <div class="@sm:col-span-2">
                         <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">O que é</label>
                         <input type="text" wire:model="name" maxlength="120" class="input mt-1.5" placeholder="Ex.: Cartão de crédito atrasado">
@@ -252,7 +255,9 @@
                         <input type="date" wire:model="balanceDate" class="input mt-1.5">
                         @error('balanceDate') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
                     </div>
+                    </div>
                 @else
+                    <div class="contents *:min-w-0" wire:key="campos-{{ $kind }}">
                     @if ($kind === 'financing')
                         <div>
                             <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">O que foi financiado</label>
@@ -359,6 +364,7 @@
                                 <option value="{{ $c->id }}">{{ $c->bank_name }}</option>
                             @endforeach
                         </select>
+                    </div>
                     </div>
                 @endif
 
