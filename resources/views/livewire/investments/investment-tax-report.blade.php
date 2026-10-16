@@ -157,6 +157,8 @@
                                             <span class="tabular-nums {{ bccomp($g['result'], '0', 2) < 0 ? 'text-slate-500 dark:text-slate-400' : 'text-slate-900 dark:text-white' }}">resultado {{ Money::format($g['result']) }}</span>
                                             @if ($g['limit'])
                                                 <span @class(['badge', 'bg-accent-50 text-accent-700 dark:bg-accent-500/15 dark:text-accent-300' => $g['exempt'], 'bg-amber-50 text-amber-900 ring-1 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-300 dark:ring-amber-500/20' => ! $g['exempt']])>{{ $g['exempt'] ? 'dentro do limite' : 'acima do limite' }}</span>
+                                            @elseif ($g['key'] === 'renda_fixa')
+                                                <span class="badge bg-slate-100 text-slate-600 dark:bg-white/10 dark:text-slate-300">imposto já retido</span>
                                             @else
                                                 <span class="badge bg-slate-100 text-slate-600 dark:bg-white/10 dark:text-slate-300">sem isenção</span>
                                             @endif

@@ -269,6 +269,8 @@ ssh -p 65002 -i ~/.ssh/cerne_hostinger u165451165@89.117.7.59 "cd ~/cerne && php
 ssh -p 65002 -i ~/.ssh/cerne_hostinger u165451165@89.117.7.59 "cd ~/cerne && php artisan cerne:import-investments ~/pacote-btg.json --email=EMAIL_DO_DONO --apply && rm ~/pacote-btg.json"
 ```
 
+O pacote também usa a B3 (proventos recebidos e movimentação): a data do provento é a do **pagamento**, não a de aprovação do extrato de preço médio (o imposto de renda conta pelo recebimento). Provento aprovado e ainda não pago vai em `pendentes` e só gera aviso. Título do Tesouro vendido por inteiro vem com `encerrado`, `lotes` e `vendas` e fica inativo; venda parcial ainda não é aceita.
+
 Os proventos entram só no histórico do ativo (não viram receita): quando o extrato da conta de investimento for importado, as linhas de rendimento, JCP e dividendo já registradas aqui ainda precisam ser reconhecidas para não contar duas vezes.
 
 ## Unificar dois clientes como casal

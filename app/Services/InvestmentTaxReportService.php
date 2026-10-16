@@ -210,6 +210,8 @@ class InvestmentTaxReportService
             AssetClass::Acao => 'acao',
             AssetClass::Cripto => 'cripto',
             AssetClass::Fii, AssetClass::FundoInfra => 'fii',
+            // Tesouro e renda fixa: o imposto é retido na fonte no resgate, então não é ganho de capital a recolher por DARF.
+            AssetClass::Tesouro, AssetClass::Cdb, AssetClass::Lca, AssetClass::Lci => 'renda_fixa',
             default => 'outros',
         };
     }
@@ -220,6 +222,7 @@ class InvestmentTaxReportService
             'acao' => 'Ações',
             'cripto' => 'Criptoativos',
             'fii' => 'FII e fundos de infraestrutura',
+            'renda_fixa' => 'Tesouro e renda fixa (imposto retido na fonte)',
             default => 'ETFs e outros ativos',
         };
     }

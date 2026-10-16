@@ -33,6 +33,9 @@ use InvalidArgumentException;
  *  - Idempotente: cada movimentação tem uma chave (nº da nota, ou dia + tipo + ordem no extrato) com índice único por ativo.
  *    Rodar de novo não duplica nada, e um ativo que já existe com o mesmo ticker, cadastrado à mão, não é tocado: vira "conflito"
  *    para uma pessoa decidir.
+ *
+ * Data do provento: é a do PAGAMENTO (IR e fluxo de caixa contam pelo recebimento), não a de aprovação que o extrato de preço
+ * médio traz. Provento aprovado e ainda não pago vem em `pendentes` e não é gravado: só avisa.
  */
 class BrokerPackageImporter
 {
@@ -95,6 +98,10 @@ class BrokerPackageImporter
             $linhas[] = $this->asset($usuario, $perfil, $membro, $ativo, $conta, $corretora, $contaInvestimento);
         }
 
+        if (! empty($pacote['pendentes'])) {
+            $linhas[] = $this->pending($pacote['pendentes']);
+        }
+
         if (! empty($pacote['carteira_mensal'])) {
             $linhas[] = $this->portfolioMonths($perfil, $membro, $pacote['carteira_mensal'], $corretora);
         }
@@ -141,11 +148,11 @@ class BrokerPackageImporter
             'purchase_date' => $ativo['data_inicial'] ?? null,
             'maturity_date' => $ativo['vencimento'] ?? null,
             'return_rate' => $ativo['taxa'] ?? null,
-            'return_rate_type' => ! empty($ativo['taxa']) ? ReturnRateType::PostfixedIpca->value : null,
+            'return_rate_type' => ! empty($ativo['taxa']) ? ReturnRateType::from($ativo['taxa_tipo'] ?? 'postfixed_ipca')->value : null,
             'broker_account_id' => $contaInvestimento?->id,
             'source' => RecordSource::PdfImport->value,
             'external_asset_id' => $chaveExterna,
-            'is_active' => true,
+            'is_active' => empty($ativo['encerrado']),
             'notes' => $ativo['nota'] ?? null,
             'created_by_user_id' => $usuario->id,
         ]);
@@ -250,7 +257,8 @@ class BrokerPackageImporter
     /**
      * Tesouro Direto: o relatório lista cada aporte (lote) com a data, os títulos (frações), o valor aplicado e o saldo de hoje.
      * Cada lote vira uma compra, para a história dos aportes e o custo de aquisição do imposto de renda; a posição do ativo é
-     * o valor aplicado e o saldo atual, porque Tesouro não negocia em cotas no Cerne.
+     * o valor aplicado e o saldo atual, porque Tesouro não negocia em cotas no Cerne. Título já vendido por inteiro (`encerrado`,
+     * com `vendas`) fica inativo e zerado, e as vendas entram no histórico e no relatório de imposto de renda.
      *
      * @param  array<string, mixed>  $linha
      * @param  array<string, mixed>  $ativo
@@ -285,6 +293,46 @@ class BrokerPackageImporter
             ]);
 
             $linha['criadas']++;
+        }
+
+        $qtdComprada = array_sum(array_map(fn (array $l) => (float) $l['quantidade'], $ativo['lotes'] ?? []));
+        $qtdVendida = array_sum(array_map(fn (array $v) => (float) $v['quantidade'], $ativo['vendas'] ?? []));
+
+        if ($qtdVendida > 0 && (empty($ativo['encerrado']) || abs($qtdComprada - $qtdVendida) > 0.0001)) {
+            throw new InvalidArgumentException('Tesouro '.$ativo['chave'].': só há suporte a venda total (título encerrado); venda parcial ainda não.');
+        }
+
+        foreach ($ativo['vendas'] ?? [] as $venda) {
+            if (InvestmentTransaction::withoutProfileScope()->where('investment_id', $registro->id)->where('import_key', $venda['chave'])->exists()) {
+                $linha['puladas']++;
+
+                continue;
+            }
+
+            $valor = Money::parse($venda['valor']);
+
+            InvestmentTransaction::create([
+                'profile_id' => $perfil->id,
+                'member_id' => $membro->id,
+                'investment_id' => $registro->id,
+                'transaction_type' => TransactionType::Sell,
+                'quantity' => $venda['quantidade'],
+                'unit_price' => bcdiv($valor, $venda['quantidade'], 6),
+                'total_amount' => $valor,
+                'net_amount' => $valor,
+                'operation_date' => $venda['data'],
+                'import_key' => $venda['chave'],
+                'created_by_user_id' => $usuario->id,
+            ]);
+
+            $linha['criadas']++;
+        }
+
+        if (! empty($ativo['encerrado'])) {
+            $registro->update(['invested_amount' => '0.00', 'current_amount' => '0.00', 'is_active' => false]);
+            $linha['posicao'] = ['quantidade' => '0', 'preco_medio' => '—', 'custo' => '0.00', 'valor_atual' => '0.00'];
+
+            return $linha;
         }
 
         $registro->update([
@@ -328,6 +376,22 @@ class BrokerPackageImporter
         }
 
         return $diferencas;
+    }
+
+    /**
+     * Provento aprovado e ainda não pago: só avisa, não grava (não é recebimento, nem para o caixa nem para o imposto).
+     *
+     * @param  list<array<string, mixed>>  $pendentes
+     * @return array<string, mixed>
+     */
+    private function pending(array $pendentes): array
+    {
+        $avisos = array_map(
+            fn (array $p) => $p['ativo'].': '.$p['descricao'].' de '.CarbonImmutable::parse($p['data'])->format('d/m/Y').', líquido '.Money::format($p['liquido']).', aprovado e ainda não pago (segundo a B3); não importado.',
+            $pendentes,
+        );
+
+        return ['ativo' => 'Proventos a receber', 'classe' => 'Aviso', 'status' => 'pendentes', 'criadas' => 0, 'puladas' => 0, 'avisos' => $avisos, 'diferencas' => []];
     }
 
     /**

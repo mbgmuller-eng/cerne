@@ -269,6 +269,92 @@ class BrokerPackageImportTest extends TestCase
         $this->importador()->run($this->usuario, $this->pacote(), true, 'ninguem');
     }
 
+    // ---- Tesouro encerrado, proventos a receber e data de pagamento
+
+    private function tesouroEncerrado(): array
+    {
+        return [
+            'chave' => 'Selic 2027', 'classe' => 'tesouro', 'nome' => 'Tesouro Selic 2027', 'taxa' => 'Selic', 'taxa_tipo' => 'variable',
+            'valor_atual' => '0.00', 'data_inicial' => '2024-11-26', 'encerrado' => true,
+            'lotes' => [['chave' => 'b3:Selic 2027:2024-11-26:c1', 'data' => '2024-11-26', 'quantidade' => '0.02', 'aplicado' => '312.85']],
+            'vendas' => [['chave' => 'b3:Selic 2027:2025-04-08:v1', 'data' => '2025-04-08', 'quantidade' => '0.02', 'valor' => '326.60']],
+        ];
+    }
+
+    public function test_tesouro_vendido_por_inteiro_fica_inativo_e_zerado_com_a_venda_no_historico(): void
+    {
+        $pacote = $this->pacote();
+        $pacote['ativos'] = [$this->tesouroEncerrado()];
+
+        $this->importador()->run($this->usuario, $pacote, true);
+        app(ProfileContext::class)->set($this->perfil, $this->membro);
+
+        $titulo = InvestmentRecord::withoutGlobalScopes()->where('name', 'Tesouro Selic 2027')->sole();
+        self::assertFalse($titulo->is_active);
+        self::assertSame('0.00', $titulo->invested_amount);
+        self::assertSame('0.00', $titulo->current_amount);
+        self::assertSame('variable', $titulo->return_rate_type->value);
+
+        $venda = InvestmentTransaction::where('investment_id', $titulo->id)->where('transaction_type', TransactionType::Sell)->sole();
+        self::assertSame('326.60', $venda->net_amount);
+        self::assertSame('b3:Selic 2027:2025-04-08:v1', $venda->import_key);
+
+        // No relatório de imposto de renda o resgate vai para o grupo de renda fixa, com o resultado de 13,75.
+        $abril = collect(app(InvestmentTaxReportService::class)->forYear(2025)['months'])->firstWhere('month', 4);
+        $grupo = collect($abril['groups'])->sole();
+        self::assertSame('renda_fixa', $grupo['key']);
+        self::assertSame('13.75', $grupo['result']);
+        self::assertNull($grupo['limit']);
+    }
+
+    public function test_venda_parcial_de_tesouro_ainda_nao_e_aceita(): void
+    {
+        $titulo = $this->tesouroEncerrado();
+        $titulo['vendas'][0]['quantidade'] = '0.01';
+        $pacote = $this->pacote();
+        $pacote['ativos'] = [$titulo];
+
+        try {
+            $this->importador()->run($this->usuario, $pacote, true);
+            self::fail('deveria recusar a venda parcial');
+        } catch (\InvalidArgumentException $e) {
+            self::assertStringContainsString('venda parcial', $e->getMessage());
+        }
+
+        self::assertTrue($this->nada());
+    }
+
+    public function test_provento_aprovado_e_nao_pago_so_avisa_e_nao_grava(): void
+    {
+        $pacote = $this->pacote();
+        $pacote['pendentes'] = [['ativo' => 'WEGE3', 'descricao' => 'JCP', 'data' => '2026-09-18', 'liquido' => '3.18']];
+
+        $linhas = collect($this->importador()->run($this->usuario, $pacote, true))->keyBy('ativo');
+
+        self::assertSame('pendentes', $linhas['Proventos a receber']['status']);
+        self::assertStringContainsString('WEGE3: JCP de 18/09/2026, líquido R$ 3,18', $linhas['Proventos a receber']['avisos'][0]);
+        self::assertSame(0, $linhas['Proventos a receber']['criadas']);
+        self::assertSame(0, \Illuminate\Support\Facades\DB::table('investment_records')->where('ticker', 'WEGE3')->count());
+    }
+
+    public function test_o_provento_entra_na_data_do_pagamento_e_o_imposto_de_renda_conta_nesse_ano(): void
+    {
+        $pacote = $this->pacote();
+        // Aprovado em 30/12/2025, pago em 30/06/2026: é rendimento de 2026.
+        $pacote['ativos'][0]['movimentos'][] = ['chave' => 'pm:dividendo:2025-12-30:1', 'tipo' => 'dividendo', 'data' => '2026-06-30', 'competencia' => '2025-12-30', 'bruto' => '18.63', 'imposto' => '0.00'];
+
+        $this->importador()->run($this->usuario, $pacote, true);
+        app(ProfileContext::class)->set($this->perfil, $this->membro);
+
+        $dividendo = InvestmentTransaction::where('transaction_type', TransactionType::Dividend)->where('import_key', 'pm:dividendo:2025-12-30:1')->sole();
+        self::assertSame('2026-06-30', $dividendo->operation_date->toDateString());
+
+        $totais2025 = app(InvestmentTaxReportService::class)->forYear(2025)['income_totals'];
+        $totais2026 = app(InvestmentTaxReportService::class)->forYear(2026)['income_totals'];
+        self::assertArrayNotHasKey('dividend', $totais2025);
+        self::assertSame('18.63', $totais2026['dividend']['net']);
+    }
+
     // ---- o comando
 
     public function test_o_comando_simula_por_padrao_e_grava_com_apply(): void
