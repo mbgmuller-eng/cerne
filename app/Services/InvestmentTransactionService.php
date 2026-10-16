@@ -50,6 +50,7 @@ class InvestmentTransactionService
      *     other_fees?: string|float|null,
      *     operation_date: CarbonImmutable,
      *     settlement_date?: ?CarbonImmutable,
+     *     import_key?: ?string,
      * }  $dados
      */
     public function record(InvestmentRecord $investment, array $dados, string $userId): InvestmentTransaction
@@ -81,6 +82,7 @@ class InvestmentTransactionService
                 'net_amount' => $liquido,
                 'operation_date' => $dados['operation_date'],
                 'settlement_date' => $dados['settlement_date'] ?? null,
+                'import_key' => $dados['import_key'] ?? null,
                 'created_by_user_id' => $userId,
             ]);
 
@@ -264,6 +266,7 @@ class InvestmentTransactionService
         CarbonImmutable $data,
         ?BankAccount $conta,
         string $userId,
+        ?string $importKey = null,
     ): InvestmentTransaction {
         if (! $tipo->isIncome()) {
             throw new \InvalidArgumentException('Este tipo de movimentação não é um provento.');
@@ -280,13 +283,14 @@ class InvestmentTransactionService
             throw new \InvalidArgumentException('O imposto retido precisa ser menor que o valor bruto.');
         }
 
-        return DB::transaction(function () use ($investment, $tipo, $bruto, $imposto, $data, $conta, $userId): InvestmentTransaction {
+        return DB::transaction(function () use ($investment, $tipo, $bruto, $imposto, $data, $conta, $userId, $importKey): InvestmentTransaction {
             $transacao = $this->record($investment, [
                 'type' => $tipo,
                 'total_amount' => $bruto,
                 // O imposto retido vai em "outras taxas": o líquido (bruto - taxas) sai do record() sozinho.
                 'other_fees' => $imposto,
                 'operation_date' => $data,
+                'import_key' => $importKey,
             ], $userId);
 
             // A amortização mexeu no custo; um provento antigo lançado depois de movimentações mais novas refaz a posição.
@@ -506,6 +510,7 @@ class InvestmentTransactionService
         ?string $precoMedio,
         CarbonImmutable $data,
         string $userId,
+        ?string $importKey = null,
     ): InvestmentTransaction {
         $quantidade = $this->scale($quantidade);
 
@@ -517,7 +522,7 @@ class InvestmentTransactionService
             throw new \InvalidArgumentException('Este ativo já tem cotas registradas.');
         }
 
-        return DB::transaction(function () use ($investment, $quantidade, $precoMedio, $data, $userId): InvestmentTransaction {
+        return DB::transaction(function () use ($investment, $quantidade, $precoMedio, $data, $userId, $importKey): InvestmentTransaction {
             $valorAtual = Money::parse($investment->current_amount);
 
             $custo = $precoMedio !== null && $precoMedio !== ''
@@ -530,6 +535,7 @@ class InvestmentTransactionService
                 'unit_price' => bcdiv($custo, $quantidade, self::SCALE),
                 'total_amount' => $custo,
                 'operation_date' => $data,
+                'import_key' => $importKey,
             ], $userId);
 
             $investment->refresh();

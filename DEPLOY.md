@@ -258,6 +258,19 @@ Serve também para a **Azos** (e outra seguradora que se acrescente): o leitor d
 
 Só age em clientes **ativos** do consultor. Casamento por CPF, ou por nome (e nascimento quando o cadastro tem); nome só parecido, dois clientes com o mesmo nome ou apólice já cadastrada para outro cliente viram `revisar` e não são aplicados. Apólice existente (mesmo número) é atualizada, não duplicada; rodar de novo não repete apólice nem PDF.
 
+## Carga de investimentos a partir dos documentos da corretora (BTG)
+
+`cerne:import-investments` grava, no perfil de quem o e-mail indica, os ativos (ações, FIIs, Tesouro, fundo), as compras das notas de corretagem, os proventos, desdobramentos e amortizações do extrato de preço médio, e a carteira mês a mês do relatório de performance. O JSON ("pacote") sai da leitura desses três documentos e é conferido contra a posição que a própria corretora declara: toda diferença aparece no relatório da simulação. Formato do JSON: comentário em `App\Services\Investments\BrokerPackageImporter`. Ativo já cadastrado à mão com o mesmo ticker não é tocado (vira `conflito`). Rodar de novo não duplica (chave única por lançamento).
+
+```bash
+scp -P 65002 -i ~/.ssh/cerne_hostinger pacote-btg.json u165451165@89.117.7.59:~/pacote-btg.json
+ssh -p 65002 -i ~/.ssh/cerne_hostinger u165451165@89.117.7.59 "cd ~/cerne && php artisan cerne:import-investments ~/pacote-btg.json --email=EMAIL_DO_DONO [--member=NOME]"
+# conferiu a simulação (nada gravado)? repita com --apply e apague o arquivo:
+ssh -p 65002 -i ~/.ssh/cerne_hostinger u165451165@89.117.7.59 "cd ~/cerne && php artisan cerne:import-investments ~/pacote-btg.json --email=EMAIL_DO_DONO --apply && rm ~/pacote-btg.json"
+```
+
+Os proventos entram só no histórico do ativo (não viram receita): quando o extrato da conta de investimento for importado, as linhas de rendimento, JCP e dividendo já registradas aqui ainda precisam ser reconhecidas para não contar duas vezes.
+
 ## Unificar dois clientes como casal
 
 Quando duas pessoas foram cadastradas como clientes separados (perfis individuais) e na verdade são um casal: `cerne:merge-couple` faz o perfil da **principal** virar o perfil do casal e move a outra pessoa para dentro dele, como cônjuge. Os dois logins continuam e passam a abrir o mesmo perfil; o vínculo da cônjuge sai da Carteira do consultor (o casal aparece uma vez, pelo vínculo da principal).
