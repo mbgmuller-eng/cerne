@@ -79,6 +79,11 @@ final class NotificationPresenter
                 'message' => implode('; ', \App\Notifications\LeadFollowUpDigest::linesFor((int) ($d['quotes_expiring'] ?? 0), (int) ($d['stale_leads'] ?? 0), (int) ($d['overdue_actions'] ?? 0))) ?: null,
                 'url' => route('consultant.leads'),
             ],
+            'debt_adjustment_due' => [
+                'heading' => 'Reajuste do consórcio',
+                'message' => $d['message'] ?? $titulo,
+                'url' => isset($d['debt_id']) ? route('debts.show', $d['debt_id']) : route('debts.index'),
+            ],
             'debt_installment_due_soon' => [
                 'heading' => 'Parcela a vencer',
                 'message' => $titulo.' vence em '.self::dia($d['due_date'] ?? null).self::valor($d['amount'] ?? null),
@@ -118,7 +123,7 @@ final class NotificationPresenter
         $d = $notificacao->data;
 
         // O aviso do Acompanhamento já grava o perfil: o clique abre o perfil do cliente antes de ir para a tela.
-        if (in_array($d['kind'] ?? null, ['engagement_notice', 'debt_installment_due_soon'], true)) {
+        if (in_array($d['kind'] ?? null, ['engagement_notice', 'debt_installment_due_soon', 'debt_adjustment_due'], true)) {
             return $d['profile_id'] ?? null;
         }
 

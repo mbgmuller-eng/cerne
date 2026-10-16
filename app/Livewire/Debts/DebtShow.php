@@ -3,15 +3,20 @@
 namespace App\Livewire\Debts;
 
 use App\Enums\DebtAmortization;
+use App\Enums\ContemplationMode;
 use App\Enums\DebtInstallmentStatus;
+use App\Enums\DebtKind;
+use App\Enums\DebtStatus;
 use App\Enums\Necessity;
 use App\Models\BankAccount;
 use App\Models\Debt;
 use App\Models\DebtInstallment;
 use App\Models\ExpenseCategory;
 use App\Models\ExpenseRecord;
+use App\Models\Goal;
 use App\Models\ProfileMember;
 use App\Services\DebtService;
+use App\Support\Debts\DebtClassification;
 use App\Support\Money;
 use App\Support\ProfileContext;
 use Carbon\CarbonImmutable;
@@ -80,6 +85,57 @@ class DebtShow extends Component
     public string $editNotes = '';
 
     public bool $editReclassify = false;
+
+    // Reajuste da carta (consórcio)
+    public bool $showAdjustment = false;
+
+    public string $adjustmentPercent = '';
+
+    public string $adjustmentDate = '';
+
+    // Contemplação (consórcio)
+    public bool $showContemplation = false;
+
+    public string $contemplatedOn = '';
+
+    public string $contemplationMode = 'draw';
+
+    public string $bidAmount = '';
+
+    public string $creditReleased = '';
+
+    public string $newInstallmentAmount = '';
+
+    public string $remainingInstallments = '';
+
+    public string $contemplationCategoryId = '';
+
+    public string $contemplationSubcategoryId = '';
+
+    public bool $markGoalAchieved = true;
+
+    // Dívida em aberto: atualizar saldo, registrar acordo
+    public bool $showBalance = false;
+
+    public string $balanceAmount = '';
+
+    public string $balanceDate = '';
+
+    public string $balanceStatus = 'open';
+
+    public bool $showAgreement = false;
+
+    public string $agreementTotal = '';
+
+    public string $agreementInstallments = '1';
+
+    public string $agreementFirstDue = '';
+
+    public string $agreementCategoryId = '';
+
+    public string $agreementSubcategoryId = '';
+
+    public string $agreementAccountId = '';
 
     public function mount(Debt $debt): void
     {
@@ -198,6 +254,186 @@ class DebtShow extends Component
         $this->showInstallment = false;
     }
 
+    // ------------------------------------------------------------------ reajuste da carta
+
+    public function openAdjustment(): void
+    {
+        $this->resetValidation();
+        $this->adjustmentPercent = '';
+        $this->adjustmentDate = ($this->debt->next_adjustment_on ?? now())->toDateString();
+        $this->showAdjustment = true;
+    }
+
+    public function saveAdjustment(): void
+    {
+        $dados = $this->validate([
+            'adjustmentPercent' => ['required', 'string', 'max:12'],
+            'adjustmentDate' => ['required', 'date_format:Y-m-d'],
+        ], [], ['adjustmentPercent' => 'percentual', 'adjustmentDate' => 'data do reajuste']);
+
+        try {
+            app(DebtService::class)->registerAdjustment($this->debt, $dados['adjustmentPercent'], CarbonImmutable::createFromFormat('Y-m-d', $dados['adjustmentDate'])->startOfDay());
+        } catch (InvalidArgumentException $e) {
+            $this->addError('adjustmentPercent', $e->getMessage());
+
+            return;
+        }
+
+        $this->showAdjustment = false;
+        $this->debt->refresh();
+    }
+
+    // ------------------------------------------------------------------ contemplação
+
+    public function openContemplation(): void
+    {
+        $sugestao = DebtClassification::consortiumContemplated($this->debt->consortium_type);
+
+        $this->resetValidation();
+        $this->contemplatedOn = now()->toDateString();
+        $this->contemplationMode = ContemplationMode::Draw->value;
+        $this->bidAmount = '';
+        $this->creditReleased = (string) $this->debt->credit_amount;
+        $this->newInstallmentAmount = (string) $this->debt->installment_amount;
+        $this->remainingInstallments = (string) max(1, $this->debt->term - $this->debt->paidCount());
+        $this->contemplationCategoryId = (string) $sugestao['category_id'];
+        $this->contemplationSubcategoryId = (string) $sugestao['subcategory_id'];
+        $this->markGoalAchieved = true;
+        $this->showContemplation = true;
+    }
+
+    public function updatedContemplationCategoryId(): void
+    {
+        $this->contemplationSubcategoryId = '';
+    }
+
+    public function saveContemplation(): void
+    {
+        $dados = $this->validate([
+            'contemplatedOn' => ['required', 'date_format:Y-m-d'],
+            'contemplationMode' => ['required', ContemplationMode::rule()],
+            'bidAmount' => ['nullable', 'string', 'max:20'],
+            'creditReleased' => ['nullable', 'string', 'max:20'],
+            'newInstallmentAmount' => ['required', 'string', 'max:20'],
+            'remainingInstallments' => ['required', 'integer', 'min:1', 'max:480'],
+            'contemplationCategoryId' => ['required', 'string'],
+            'contemplationSubcategoryId' => ['nullable', 'string'],
+        ], [], [
+            'contemplatedOn' => 'data da contemplação', 'newInstallmentAmount' => 'nova parcela',
+            'remainingInstallments' => 'parcelas restantes', 'contemplationCategoryId' => 'categoria',
+        ]);
+
+        try {
+            app(DebtService::class)->contemplate($this->debt, [
+                'contemplated_on' => $dados['contemplatedOn'], 'mode' => $dados['contemplationMode'],
+                'bid_amount' => $dados['bidAmount'] ?: null, 'credit_released' => $dados['creditReleased'] ?: null,
+                'new_installment_amount' => $dados['newInstallmentAmount'], 'remaining_installments' => $dados['remainingInstallments'],
+                'category_id' => $dados['contemplationCategoryId'], 'subcategory_id' => $dados['contemplationSubcategoryId'] ?: null,
+                'mark_goal_achieved' => $this->markGoalAchieved,
+            ]);
+        } catch (InvalidArgumentException $e) {
+            $this->addError('newInstallmentAmount', $e->getMessage());
+
+            return;
+        }
+
+        $this->showContemplation = false;
+        $this->debt->refresh();
+    }
+
+    // ------------------------------------------------------------------ dívida em aberto
+
+    public function openBalance(): void
+    {
+        $this->resetValidation();
+        $this->balanceAmount = (string) $this->debt->current_balance;
+        $this->balanceDate = now()->toDateString();
+        $this->balanceStatus = $this->debt->status->value;
+        $this->showBalance = true;
+    }
+
+    public function saveBalance(): void
+    {
+        $dados = $this->validate([
+            'balanceAmount' => ['required', 'string', 'max:20'],
+            'balanceDate' => ['required', 'date_format:Y-m-d'],
+            'balanceStatus' => ['required', 'in:'.DebtStatus::Open->value.','.DebtStatus::Negotiating->value],
+        ], [], ['balanceAmount' => 'saldo', 'balanceDate' => 'data']);
+
+        try {
+            app(DebtService::class)->updateBalance(
+                $this->debt, $dados['balanceAmount'], CarbonImmutable::createFromFormat('Y-m-d', $dados['balanceDate'])->startOfDay(), DebtStatus::from($dados['balanceStatus']),
+            );
+        } catch (InvalidArgumentException $e) {
+            $this->addError('balanceAmount', $e->getMessage());
+
+            return;
+        }
+
+        $this->showBalance = false;
+        $this->debt->refresh();
+    }
+
+    public function openAgreement(): void
+    {
+        $sugestao = DebtClassification::suggest(DebtKind::Debt);
+
+        $this->resetValidation();
+        $this->agreementTotal = (string) $this->debt->current_balance;
+        $this->agreementInstallments = '1';
+        $this->agreementFirstDue = now()->addMonth()->toDateString();
+        $this->agreementCategoryId = (string) $sugestao['category_id'];
+        $this->agreementSubcategoryId = (string) $sugestao['subcategory_id'];
+        $this->agreementAccountId = '';
+        $this->showAgreement = true;
+    }
+
+    public function updatedAgreementCategoryId(): void
+    {
+        $this->agreementSubcategoryId = '';
+    }
+
+    public function saveAgreement(): void
+    {
+        $dados = $this->validate([
+            'agreementTotal' => ['required', 'string', 'max:20'],
+            'agreementInstallments' => ['required', 'integer', 'min:1', 'max:480'],
+            'agreementFirstDue' => ['required', 'date_format:Y-m-d'],
+            'agreementCategoryId' => ['required', 'string'],
+            'agreementSubcategoryId' => ['nullable', 'string'],
+            'agreementAccountId' => ['nullable', 'string'],
+        ], [], [
+            'agreementTotal' => 'valor negociado', 'agreementInstallments' => 'parcelas',
+            'agreementFirstDue' => 'primeiro vencimento', 'agreementCategoryId' => 'categoria',
+        ]);
+
+        try {
+            app(DebtService::class)->registerAgreement($this->debt, [
+                'total' => $dados['agreementTotal'], 'installments' => $dados['agreementInstallments'], 'first_due_date' => $dados['agreementFirstDue'],
+                'category_id' => $dados['agreementCategoryId'], 'subcategory_id' => $dados['agreementSubcategoryId'] ?: null,
+                'bank_account_id' => $dados['agreementAccountId'] ?: null,
+            ]);
+        } catch (InvalidArgumentException $e) {
+            $this->addError('agreementTotal', $e->getMessage());
+
+            return;
+        }
+
+        $this->showAgreement = false;
+        $this->debt->refresh();
+    }
+
+    public function markPaidOff(): void
+    {
+        try {
+            app(DebtService::class)->markPaidOff($this->debt);
+        } catch (InvalidArgumentException) {
+            return;
+        }
+
+        $this->debt->refresh();
+    }
+
     // ------------------------------------------------------------------ contrato
 
     public function openEdit(): void
@@ -205,7 +441,7 @@ class DebtShow extends Component
         $this->resetValidation();
         $this->editName = $this->debt->name;
         $this->editCreditor = (string) $this->debt->creditor;
-        $this->editNecessity = $this->debt->necessity->value;
+        $this->editNecessity = in_array($this->debt->necessity->value, [Necessity::Essential->value, Necessity::Discretionary->value], true) ? $this->debt->necessity->value : Necessity::Essential->value;
         $this->editCategoryId = (string) $this->debt->category_id;
         $this->editSubcategoryId = (string) $this->debt->subcategory_id;
         $this->editAccountId = (string) $this->debt->bank_account_id;
@@ -226,8 +462,8 @@ class DebtShow extends Component
         $dados = $this->validate([
             'editName' => ['required', 'string', 'max:120'],
             'editCreditor' => ['nullable', 'string', 'max:120'],
-            'editNecessity' => ['required', 'in:'.Necessity::Essential->value.','.Necessity::Discretionary->value],
-            'editCategoryId' => ['required', 'string'],
+            'editNecessity' => [$this->semCategoria() ? 'nullable' : 'required', 'in:'.Necessity::Essential->value.','.Necessity::Discretionary->value],
+            'editCategoryId' => [$this->semCategoria() ? 'nullable' : 'required', 'string'],
             'editSubcategoryId' => ['nullable', 'string'],
             'editAccountId' => ['nullable', 'string'],
             'editNotes' => ['nullable', 'string', 'max:2000'],
@@ -237,11 +473,10 @@ class DebtShow extends Component
 
         try {
             app(DebtService::class)->update($this->debt, [
-                'name' => $dados['editName'], 'creditor' => $dados['editCreditor'] ?: null, 'necessity' => $dados['editNecessity'],
-                'category_id' => $dados['editCategoryId'], 'subcategory_id' => $dados['editSubcategoryId'] ?: null,
+                'name' => $dados['editName'], 'creditor' => $dados['editCreditor'] ?: null,
                 'bank_account_id' => $dados['editAccountId'] ?: null, 'notes' => $dados['editNotes'] ?: null,
                 'member_id' => $membro, 'is_private' => $membro !== null && $this->editPrivate,
-            ], $this->editReclassify);
+            ] + ($this->semCategoria() ? [] : ['necessity' => $dados['editNecessity'], 'category_id' => $dados['editCategoryId'], 'subcategory_id' => $dados['editSubcategoryId'] ?: null]), $this->editReclassify);
         } catch (InvalidArgumentException $e) {
             $this->addError('editCategoryId', $e->getMessage());
 
@@ -257,6 +492,12 @@ class DebtShow extends Component
         app(DebtService::class)->delete($this->debt);
 
         return $this->redirectRoute('debts.index');
+    }
+
+    /** Consórcio antes da contemplação (investimento "Consórcio") e dívida sem acordo não têm categoria de despesa para trocar. */
+    private function semCategoria(): bool
+    {
+        return $this->debt->isSavingForCredit() || $this->debt->status->isUnscheduled();
     }
 
     /** @return Collection<int, ProfileMember> */
@@ -314,6 +555,11 @@ class DebtShow extends Component
             'contas' => BankAccount::query()->where('is_active', true)->orderBy('bank_name')->get(),
             'membros' => $this->membros(),
             'candidatas' => $this->candidatas(),
+            'semCategoria' => $this->semCategoria(),
+            'emCarta' => $this->debt->isSavingForCredit(),
+            'ajustes' => $this->debt->isConsortium() ? $this->debt->adjustments()->orderByDesc('applied_on')->orderByDesc('created_at')->get() : collect(),
+            'objetivo' => Goal::query()->where('linked_debt_id', $this->debt->id)->first(),
+            'modosContemplacao' => ContemplationMode::options(),
         ]);
     }
 }

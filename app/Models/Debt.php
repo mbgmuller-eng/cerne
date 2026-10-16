@@ -2,6 +2,9 @@
 
 namespace App\Models;
 
+use App\Enums\AdjustmentIndex;
+use App\Enums\ConsortiumType;
+use App\Enums\ContemplationMode;
 use App\Enums\DebtAmortization;
 use App\Enums\DebtInstallmentStatus;
 use App\Enums\DebtKind;
@@ -31,6 +34,9 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'profile_id', 'member_id', 'is_private', 'kind', 'status', 'name', 'creditor', 'principal', 'amortization', 'rate',
     'rate_basis', 'term', 'first_due_date', 'installment_amount', 'monthly_fees', 'paid_before', 'necessity',
     'category_id', 'subcategory_id', 'bank_account_id', 'notes', 'created_by_user_id',
+    'consortium_type', 'consortium_group', 'credit_amount', 'is_flex', 'adjustment_index', 'adjustment_every_months',
+    'adjustment_first_after_months', 'next_adjustment_on', 'contemplated_on', 'contemplation_mode', 'bid_amount', 'credit_released',
+    'current_balance', 'balance_updated_on', 'agreement_on', 'agreement_total', 'agreement_discount',
 ])]
 class Debt extends Model
 {
@@ -52,6 +58,22 @@ class Debt extends Model
             'term' => 'integer',
             'paid_before' => 'integer',
             'is_private' => 'boolean',
+            'consortium_type' => ConsortiumType::class,
+            'credit_amount' => 'decimal:2',
+            'is_flex' => 'boolean',
+            'adjustment_index' => AdjustmentIndex::class,
+            'adjustment_every_months' => 'integer',
+            'adjustment_first_after_months' => 'integer',
+            'next_adjustment_on' => 'date',
+            'contemplated_on' => 'date',
+            'contemplation_mode' => ContemplationMode::class,
+            'bid_amount' => 'decimal:2',
+            'credit_released' => 'decimal:2',
+            'current_balance' => 'decimal:2',
+            'balance_updated_on' => 'date',
+            'agreement_on' => 'date',
+            'agreement_total' => 'decimal:2',
+            'agreement_discount' => 'decimal:2',
         ];
     }
 
@@ -96,6 +118,11 @@ class Debt extends Model
      */
     public function balance(): string
     {
+        // Dívida em aberto, ainda sem acordo: não há parcelas, o saldo é o que a pessoa informou.
+        if ($this->status->isUnscheduled()) {
+            return number_format((float) $this->current_balance, 2, '.', '');
+        }
+
         $coluna = $this->amortization === DebtAmortization::Fixed ? 'amount' : 'principal_amount';
 
         return number_format((float) $this->installments()->where('status', DebtInstallmentStatus::Open)->sum($coluna), 2, '.', '');
@@ -106,6 +133,27 @@ class Debt extends Model
         return $this->installments()->where('status', DebtInstallmentStatus::Paid)->count();
     }
 
+    public function isConsortium(): bool
+    {
+        return $this->kind === DebtKind::Consortium;
+    }
+
+    public function isContemplated(): bool
+    {
+        return $this->contemplated_on !== null;
+    }
+
+    /** Consórcio ainda não contemplado: é dinheiro sendo juntado para a carta, não uma dívida. */
+    public function isSavingForCredit(): bool
+    {
+        return $this->isConsortium() && ! $this->isContemplated();
+    }
+
+    public function adjustments(): HasMany
+    {
+        return $this->hasMany(DebtAdjustment::class)->orderByDesc('applied_on');
+    }
+
     public function isOpen(): bool
     {
         return $this->status === DebtStatus::Active;
@@ -114,6 +162,10 @@ class Debt extends Model
     /** A etiqueta de "como o saldo foi calculado" para a tela: devedor de verdade ou total a pagar. */
     public function balanceLabel(): string
     {
+        if ($this->status->isUnscheduled()) {
+            return 'Saldo atual';
+        }
+
         return $this->amortization === DebtAmortization::Fixed ? 'Total a pagar' : 'Saldo devedor';
     }
 }

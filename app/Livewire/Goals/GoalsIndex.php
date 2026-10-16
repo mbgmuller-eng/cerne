@@ -30,7 +30,7 @@ class GoalsIndex extends Component
         return Goal::query()
             ->active()
             ->byPriority()
-            ->with('member', 'linkedInvestment')
+            ->with('member', 'linkedInvestment', 'linkedDebt')
             ->get();
     }
 

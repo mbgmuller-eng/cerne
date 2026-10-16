@@ -9,6 +9,8 @@ use App\Models\DebtInstallment;
 use App\Models\FinancialProfile;
 use App\Models\ProfileMember;
 use App\Models\User;
+use App\Enums\DebtKind;
+use App\Notifications\DebtAdjustmentDue;
 use App\Notifications\DebtInstallmentDueSoon;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
@@ -37,7 +39,7 @@ class DebtReminderService
             ->with(['debt' => fn ($q) => $q->withoutGlobalScopes()])
             ->chunkById(200, function ($parcelas) use (&$enviados): void {
                 foreach ($parcelas as $parcela) {
-                    foreach ($this->recipientsFor($parcela) as $usuario) {
+                    foreach ($this->recipientsFor($parcela->profile_id, $parcela->member_id, $parcela->is_private) as $usuario) {
                         if (! $this->livro->claim($usuario->id, 'debt_installment', $parcela->id, 'due_soon')) {
                             continue;
                         }
@@ -51,15 +53,47 @@ class DebtReminderService
         return $enviados;
     }
 
-    /** @return Collection<int, User> */
-    private function recipientsFor(DebtInstallment $parcela): Collection
+    /**
+     * Chegou (ou passou) a data do reajuste da carta de um consórcio ativo: avisa uma vez por data prevista. Quem registra o
+     * reajuste move a data para a frente (DebtService::registerAdjustment), então o aviso seguinte é de outra data.
+     *
+     * @return int quantos avisos foram enviados
+     */
+    public function notifyAdjustments(?CarbonImmutable $hoje = null): int
     {
-        if ($parcela->member_id === null || ! $parcela->is_private) {
-            return FinancialProfile::find($parcela->profile_id)
+        $hoje ??= CarbonImmutable::now();
+        $enviados = 0;
+
+        Debt::withoutGlobalScopes()
+            ->where('kind', DebtKind::Consortium)
+            ->where('status', DebtStatus::Active)
+            ->whereNotNull('next_adjustment_on')
+            ->whereDate('next_adjustment_on', '<=', $hoje->toDateString())
+            ->chunkById(200, function ($dividas) use (&$enviados): void {
+                foreach ($dividas as $divida) {
+                    foreach ($this->recipientsFor($divida->profile_id, $divida->member_id, $divida->is_private) as $usuario) {
+                        if (! $this->livro->claim($usuario->id, 'debt_adjust', $divida->id, 'adjust_'.$divida->next_adjustment_on->toDateString())) {
+                            continue;
+                        }
+
+                        $usuario->notify(new DebtAdjustmentDue($divida->profile_id, $divida->id, $divida->name, $divida->adjustment_index?->label() ?? 'índice', $divida->next_adjustment_on->toDateString()));
+                        $enviados++;
+                    }
+                }
+            });
+
+        return $enviados;
+    }
+
+    /** @return Collection<int, User> */
+    private function recipientsFor(string $profileId, ?string $memberId, bool $privada): Collection
+    {
+        if ($memberId === null || ! $privada) {
+            return FinancialProfile::find($profileId)
                 ?->activeMembers()->whereNotNull('user_id')->with('user')->get()
                 ->pluck('user')->filter()->values() ?? collect();
         }
 
-        return collect([ProfileMember::find($parcela->member_id)?->user])->filter();
+        return collect([ProfileMember::find($memberId)?->user])->filter();
     }
 }

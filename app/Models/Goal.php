@@ -18,7 +18,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 #[Fillable([
     'profile_id', 'member_id', 'name', 'priority', 'estimated_value', 'target_date',
-    'funding_method', 'installment_amount', 'current_amount', 'linked_investment_id',
+    'funding_method', 'installment_amount', 'current_amount', 'linked_investment_id', 'linked_debt_id',
     'status', 'notes', 'created_by_user_id', 'is_private',
 ])]
 class Goal extends Model
@@ -49,6 +49,23 @@ class Goal extends Model
         return $this->belongsTo(InvestmentRecord::class, 'linked_investment_id');
     }
 
+    /** O consórcio que financia este objetivo: o progresso é pelas parcelas pagas, não pelo dinheiro. */
+    public function linkedDebt(): BelongsTo
+    {
+        return $this->belongsTo(Debt::class, 'linked_debt_id');
+    }
+
+    public function usesInstallments(): bool
+    {
+        return $this->linked_debt_id !== null && $this->linkedDebt !== null && $this->linkedDebt->term > 0;
+    }
+
+    /** @return array{paid: int, total: int} */
+    public function installmentProgress(): array
+    {
+        return ['paid' => $this->linkedDebt->paidCount(), 'total' => (int) $this->linkedDebt->term];
+    }
+
     public function scopeActive(Builder $query): Builder
     {
         return $query->where('status', GoalStatus::Active);
@@ -65,6 +82,14 @@ class Goal extends Model
      */
     public function accumulated(): string
     {
+        // Objetivo ligado a consórcio: o avanço é a fração das parcelas já pagas, aplicada ao valor do objetivo. Não é dinheiro
+        // guardado (o que se paga no consórcio não vira patrimônio); serve para o progresso e os totais seguirem coerentes.
+        if ($this->usesInstallments()) {
+            $p = $this->installmentProgress();
+
+            return $p['total'] > 0 ? Money::parse(bcdiv(bcmul($this->estimated_value, (string) $p['paid'], 4), (string) $p['total'], 4)) : '0.00';
+        }
+
         return $this->linkedInvestment?->current_amount ?? $this->current_amount;
     }
 
@@ -100,6 +125,12 @@ class Goal extends Model
 
     public function isAchieved(): bool
     {
+        if ($this->usesInstallments() && $this->status !== GoalStatus::Achieved) {
+            $p = $this->installmentProgress();
+
+            return $p['total'] > 0 && $p['paid'] >= $p['total'];
+        }
+
         return $this->status === GoalStatus::Achieved
             || bccomp($this->accumulated(), $this->estimated_value, 2) >= 0;
     }

@@ -6,20 +6,59 @@
             <p class="text-xs text-slate-500 dark:text-slate-400">{{ $debt->kind->label() }}{{ $debt->creditor ? ' · '.$debt->creditor : '' }}</p>
             <h1 class="font-display text-3xl font-semibold tracking-tight text-slate-900 dark:text-white">{{ $debt->name }}</h1>
             <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                Parcelas em <strong class="font-medium">{{ $debt->category?->name }}{{ $debt->subcategory ? ' › '.$debt->subcategory->name : '' }}</strong>
-                @if ($debt->status === \App\Enums\DebtStatus::PaidOff) · <span class="text-accent-700 dark:text-accent-400">quitada</span> @endif
+                @if ($debt->status->isUnscheduled())
+                    <span>{{ $debt->status->label() }}: sem parcelas até o acordo, mas já conta no total devedor.</span>
+                @else
+                    Parcelas em <strong class="font-medium">{{ $debt->category?->name }}{{ $debt->subcategory ? ' › '.$debt->subcategory->name : '' }}</strong>
+                    @if ($debt->isConsortium()) · {{ $debt->consortium_type?->label() }} · <span>{{ $emCarta ? 'não contemplado' : 'contemplado' }}</span> @endif
+                    @if ($debt->status === \App\Enums\DebtStatus::PaidOff) · <span class="text-accent-700 dark:text-accent-400">quitada</span> @endif
+                @endif
             </p>
         </div>
         <div class="flex flex-wrap gap-2">
             <a href="{{ route('debts.index') }}" class="btn-ghost px-3 py-1.5 text-sm">Voltar</a>
+            @if ($debt->isConsortium() && $debt->status === \App\Enums\DebtStatus::Active)
+                @if ($debt->adjustment_index)
+                    <button type="button" wire:click="openAdjustment" class="btn-secondary px-3 py-1.5 text-sm">Registrar reajuste</button>
+                @endif
+                @if ($emCarta)
+                    <button type="button" wire:click="openContemplation" class="btn-secondary px-3 py-1.5 text-sm">Registrar contemplação</button>
+                @endif
+            @endif
+            @if ($debt->status->isUnscheduled())
+                <button type="button" wire:click="openBalance" class="btn-secondary px-3 py-1.5 text-sm">Atualizar saldo</button>
+                <button type="button" wire:click="openAgreement" class="btn-secondary px-3 py-1.5 text-sm">Registrar acordo</button>
+                <button type="button" wire:click="markPaidOff" wire:confirm="Dar esta dívida como quitada? Use quando ela foi paga por fora, perdoada ou prescreveu." class="btn-ghost px-3 py-1.5 text-sm">Marcar como quitada</button>
+            @endif
             <button type="button" wire:click="openEdit" class="btn-secondary px-3 py-1.5 text-sm">Editar contrato</button>
         </div>
     </div>
 
+    @if ($debt->status->isUnscheduled())
+        <div class="grid gap-4 sm:grid-cols-3">
+            <div class="card p-5">
+                <p class="eyebrow">Saldo atual</p>
+                <p class="figure mt-2 text-2xl font-medium text-slate-900 dark:text-white">{{ Money::format($saldo) }}</p>
+                <p class="mt-1 text-xs text-slate-400">informado em {{ $debt->balance_updated_on?->format('d/m/Y') ?? '—' }}</p>
+            </div>
+            <div class="card p-5">
+                <p class="eyebrow">Valor original</p>
+                <p class="figure mt-2 text-2xl font-medium text-slate-900 dark:text-white">{{ Money::format($debt->principal) }}</p>
+            </div>
+            <div class="card p-5">
+                <p class="eyebrow">Situação</p>
+                <p class="mt-2 text-2xl font-medium text-amber-700 dark:text-amber-400">{{ $debt->status->label() }}</p>
+                <p class="mt-1 text-xs text-slate-400">as parcelas só existem depois do acordo</p>
+            </div>
+        </div>
+    @else
     <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <div class="card p-5">
-            <p class="eyebrow">{{ $debt->balanceLabel() }}</p>
-            <p class="figure mt-2 text-2xl font-medium text-slate-900 dark:text-white">{{ Money::format($saldo) }}</p>
+            <p class="eyebrow">{{ $emCarta ? 'Carta' : $debt->balanceLabel() }}</p>
+            <p class="figure mt-2 text-2xl font-medium text-slate-900 dark:text-white">{{ Money::format($emCarta ? $debt->credit_amount : $saldo) }}</p>
+            @if ($emCarta)
+                <p class="mt-1 text-xs text-slate-400">não é dívida nem patrimônio; é o que o consórcio vai liberar</p>
+            @endif
         </div>
         <div class="card p-5">
             <p class="eyebrow">Parcelas pagas</p>
@@ -46,6 +85,62 @@
         </div>
     </div>
 
+    @endif
+
+    @if ($debt->isConsortium())
+        <section class="card p-5">
+            <h2 class="text-sm font-semibold text-slate-900 dark:text-white">Consórcio</h2>
+            <dl class="mt-3 grid gap-x-6 gap-y-3 text-sm sm:grid-cols-2 lg:grid-cols-3">
+                <div><dt class="text-xs text-slate-400">Carta</dt><dd class="text-slate-800 dark:text-slate-200">{{ Money::format($debt->credit_amount) }}</dd></div>
+                @if ($debt->consortium_group)
+                    <div><dt class="text-xs text-slate-400">Grupo e cota</dt><dd class="text-slate-800 dark:text-slate-200">{{ $debt->consortium_group }}</dd></div>
+                @endif
+                <div><dt class="text-xs text-slate-400">Parcela</dt><dd class="text-slate-800 dark:text-slate-200">{{ $debt->is_flex ? 'flex (menor até ser contemplado)' : 'fixa' }}</dd></div>
+                @if ($debt->adjustment_index)
+                    <div><dt class="text-xs text-slate-400">Reajuste</dt><dd class="text-slate-800 dark:text-slate-200">{{ $debt->adjustment_index->label() }}, a cada {{ $debt->adjustment_every_months }} {{ $debt->adjustment_every_months === 1 ? 'mês' : 'meses' }}</dd></div>
+                    @if ($debt->next_adjustment_on && $debt->status === \App\Enums\DebtStatus::Active)
+                        <div><dt class="text-xs text-slate-400">Próximo reajuste</dt><dd class="{{ $debt->next_adjustment_on->isPast() ? 'text-red-700 dark:text-red-400' : 'text-slate-800 dark:text-slate-200' }}">{{ $debt->next_adjustment_on->format('d/m/Y') }}</dd></div>
+                    @endif
+                @endif
+                @if ($debt->contemplated_on)
+                    <div><dt class="text-xs text-slate-400">Contemplado em</dt><dd class="text-slate-800 dark:text-slate-200">{{ $debt->contemplated_on->format('d/m/Y') }} · {{ $debt->contemplation_mode?->label() }}{{ $debt->bid_amount ? ' de '.Money::format($debt->bid_amount) : '' }}</dd></div>
+                    <div><dt class="text-xs text-slate-400">Crédito liberado</dt><dd class="text-slate-800 dark:text-slate-200">{{ Money::format($debt->credit_released ?? $debt->credit_amount) }}</dd></div>
+                @endif
+                @if ($objetivo)
+                    <div><dt class="text-xs text-slate-400">Objetivo</dt><dd class="text-slate-800 dark:text-slate-200">{{ $objetivo->name }}: {{ $quantidadePagas }} de {{ $debt->term }} parcelas</dd></div>
+                @endif
+            </dl>
+
+            @if ($ajustes->isNotEmpty())
+                <h3 class="mt-5 text-xs font-semibold text-slate-500 dark:text-slate-400">Reajustes registrados</h3>
+                <ul class="mt-2 divide-y divide-slate-100 text-sm dark:divide-white/10">
+                    @foreach ($ajustes as $a)
+                        <li wire:key="ajuste-{{ $a->id }}" class="flex flex-wrap justify-between gap-2 py-2 text-slate-700 dark:text-slate-300">
+                            <span>{{ $a->applied_on->format('d/m/Y') }} · {{ number_format((float) $a->percent, 2, ',', '.') }}%</span>
+                            <span class="tabular-nums text-xs text-slate-500 dark:text-slate-400">carta {{ Money::format($a->credit_before) }} → {{ Money::format($a->credit_after) }} · parcela {{ Money::format($a->installment_before) }} → {{ Money::format($a->installment_after) }}</span>
+                        </li>
+                    @endforeach
+                </ul>
+            @endif
+        </section>
+    @endif
+
+    @if ($debt->agreement_on)
+        <section class="card p-5">
+            <h2 class="text-sm font-semibold text-slate-900 dark:text-white">Acordo</h2>
+            <p class="mt-2 text-sm text-slate-700 dark:text-slate-300">
+                Fechado em {{ $debt->agreement_on->format('d/m/Y') }} por {{ Money::format($debt->agreement_total) }}
+                @if (bccomp((string) $debt->agreement_discount, '0', 2) > 0) · desconto de <strong class="font-medium">{{ Money::format($debt->agreement_discount) }}</strong> sobre o saldo da época @endif
+            </p>
+        </section>
+    @endif
+
+    @if ($debt->status->isUnscheduled())
+        <section class="card p-5">
+            <h2 class="text-sm font-semibold text-slate-900 dark:text-white">Sem parcelas ainda</h2>
+            <p class="mt-1 text-sm text-slate-600 dark:text-slate-300">Atualize o saldo quando o credor informar o valor corrigido. Quando houver acordo, use "Registrar acordo": o Cerne cria as parcelas, que passam a aparecer nas parcelas do mês e viram despesa ao serem pagas.</p>
+        </section>
+    @else
     <section class="card p-5">
         <h2 class="text-sm font-semibold text-slate-900 dark:text-white">Parcelas</h2>
         <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Cada parcela paga fica ligada a uma despesa do fluxo de caixa, na categoria do momento. Desfazer solta a ligação e não apaga a despesa.</p>
@@ -98,6 +193,7 @@
             </table>
         </div>
     </section>
+    @endif
 
     @if ($debt->notes)
         <section class="card p-5">
@@ -193,6 +289,190 @@
         </form>
     </x-modal>
 
+    {{-- Reajuste da carta --}}
+    <x-modal wire-model="showAdjustment">
+        <form wire:submit="saveAdjustment" class="space-y-4">
+            <div class="flex items-baseline justify-between">
+                <h2 class="text-sm font-semibold text-slate-900 dark:text-white">Registrar reajuste</h2>
+                <button type="button" wire:click="$set('showAdjustment', false)" class="btn-ghost px-2 py-1 text-xs">Cancelar</button>
+            </div>
+            <div class="grid gap-4 @sm:grid-cols-2 *:min-w-0">
+                <div>
+                    <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Percentual do {{ $debt->adjustment_index?->label() }} (%)</label>
+                    <input type="text" wire:model="adjustmentPercent" inputmode="decimal" class="input mt-1.5" placeholder="Ex.: 4,5">
+                    @error('adjustmentPercent') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Data do reajuste</label>
+                    <input type="date" wire:model="adjustmentDate" class="input mt-1.5">
+                    @error('adjustmentDate') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                </div>
+            </div>
+            <p class="text-xs text-slate-400">A carta e as parcelas em aberto sobem nesse percentual{{ $objetivo ? ', e o valor do objetivo "'.$objetivo->name.'" também' : '' }}. O Cerne avisa na data, mas o percentual é o que a administradora aplicou.</p>
+            <div class="flex justify-end"><button type="submit" class="btn-primary px-4 py-2 text-sm">Aplicar reajuste</button></div>
+        </form>
+    </x-modal>
+
+    {{-- Contemplação --}}
+    <x-modal wire-model="showContemplation" max-width="2xl">
+        <form wire:submit="saveContemplation" class="space-y-4">
+            <div class="flex items-baseline justify-between">
+                <h2 class="text-sm font-semibold text-slate-900 dark:text-white">Registrar contemplação</h2>
+                <button type="button" wire:click="$set('showContemplation', false)" class="btn-ghost px-2 py-1 text-xs">Cancelar</button>
+            </div>
+            <div class="grid gap-4 @sm:grid-cols-2 *:min-w-0">
+                <div>
+                    <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Data da contemplação</label>
+                    <input type="date" wire:model="contemplatedOn" class="input mt-1.5">
+                    @error('contemplatedOn') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Como foi</label>
+                    <select wire:model.live="contemplationMode" class="select mt-1.5 w-full">
+                        @foreach ($modosContemplacao as $valor => $rotulo)
+                            <option value="{{ $valor }}">{{ $rotulo }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                @if ($contemplationMode !== 'draw')
+                    <div>
+                        <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Valor do lance</label>
+                        <input type="text" wire:model="bidAmount" inputmode="decimal" class="input mt-1.5">
+                        @error('bidAmount') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                    </div>
+                @endif
+                <div>
+                    <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Crédito liberado <span class="font-normal text-slate-400">(opcional)</span></label>
+                    <input type="text" wire:model="creditReleased" inputmode="decimal" class="input mt-1.5">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Valor da parcela daqui em diante</label>
+                    <input type="text" wire:model="newInstallmentAmount" inputmode="decimal" class="input mt-1.5">
+                    @error('newInstallmentAmount') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Parcelas que ainda faltam</label>
+                    <input type="number" wire:model="remainingInstallments" min="1" max="480" class="input mt-1.5">
+                    @error('remainingInstallments') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Categoria das parcelas a partir de agora</label>
+                    <select wire:model.live="contemplationCategoryId" class="select mt-1.5 w-full">
+                        <option value="">Escolha</option>
+                        @foreach ($categorias as $cat)
+                            <option value="{{ $cat->id }}">{{ $cat->name }}</option>
+                        @endforeach
+                    </select>
+                    @error('contemplationCategoryId') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Subcategoria</label>
+                    <select wire:model="contemplationSubcategoryId" class="select mt-1.5 w-full">
+                        <option value="">Nenhuma</option>
+                        @foreach ($categorias->firstWhere('id', $contemplationCategoryId)?->subcategories ?? [] as $sub)
+                            <option value="{{ $sub->id }}">{{ $sub->name }}</option>
+                        @endforeach
+                    </select>
+                </div>
+            </div>
+            @if ($objetivo)
+                <label class="inline-flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
+                    <input type="checkbox" wire:model="markGoalAchieved" class="rounded border-slate-300">
+                    Marcar o objetivo "{{ $objetivo->name }}" como alcançado
+                </label>
+            @endif
+            <p class="text-xs text-slate-400">As parcelas em aberto são refeitas com o novo valor e a quantidade que falta (o lance pode baixar a parcela; o sorteio, numa parcela flex, pode aumentá-la). As parcelas já pagas continuam como investimento. Daqui em diante, o que falta pagar passa a contar como dívida.</p>
+            <div class="flex justify-end"><button type="submit" class="btn-primary px-4 py-2 text-sm">Registrar contemplação</button></div>
+        </form>
+    </x-modal>
+
+    {{-- Atualizar saldo da dívida em aberto --}}
+    <x-modal wire-model="showBalance">
+        <form wire:submit="saveBalance" class="space-y-4">
+            <div class="flex items-baseline justify-between">
+                <h2 class="text-sm font-semibold text-slate-900 dark:text-white">Atualizar saldo</h2>
+                <button type="button" wire:click="$set('showBalance', false)" class="btn-ghost px-2 py-1 text-xs">Cancelar</button>
+            </div>
+            <div class="grid gap-4 @sm:grid-cols-2 *:min-w-0">
+                <div>
+                    <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Saldo atual</label>
+                    <input type="text" wire:model="balanceAmount" inputmode="decimal" class="input mt-1.5">
+                    @error('balanceAmount') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Informado em</label>
+                    <input type="date" wire:model="balanceDate" class="input mt-1.5">
+                    @error('balanceDate') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                </div>
+                <div class="@sm:col-span-2">
+                    <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Situação</label>
+                    <select wire:model="balanceStatus" class="select mt-1.5 w-full">
+                        <option value="open">Em aberto</option>
+                        <option value="negotiating">Em negociação</option>
+                    </select>
+                </div>
+            </div>
+            <div class="flex justify-end"><button type="submit" class="btn-primary px-4 py-2 text-sm">Salvar</button></div>
+        </form>
+    </x-modal>
+
+    {{-- Acordo --}}
+    <x-modal wire-model="showAgreement" max-width="2xl">
+        <form wire:submit="saveAgreement" class="space-y-4">
+            <div class="flex items-baseline justify-between">
+                <h2 class="text-sm font-semibold text-slate-900 dark:text-white">Registrar acordo</h2>
+                <button type="button" wire:click="$set('showAgreement', false)" class="btn-ghost px-2 py-1 text-xs">Cancelar</button>
+            </div>
+            <div class="grid gap-4 @sm:grid-cols-2 *:min-w-0">
+                <div>
+                    <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Valor negociado (total a pagar)</label>
+                    <input type="text" wire:model="agreementTotal" inputmode="decimal" class="input mt-1.5">
+                    @error('agreementTotal') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Em quantas parcelas</label>
+                    <input type="number" wire:model="agreementInstallments" min="1" max="480" class="input mt-1.5">
+                    @error('agreementInstallments') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Vencimento da 1ª parcela</label>
+                    <input type="date" wire:model="agreementFirstDue" class="input mt-1.5">
+                    @error('agreementFirstDue') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Conta de pagamento <span class="font-normal text-slate-400">(opcional)</span></label>
+                    <select wire:model="agreementAccountId" class="select mt-1.5 w-full">
+                        <option value="">Nenhuma</option>
+                        @foreach ($contas as $c)
+                            <option value="{{ $c->id }}">{{ $c->bank_name }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Categoria das parcelas</label>
+                    <select wire:model.live="agreementCategoryId" class="select mt-1.5 w-full">
+                        <option value="">Escolha</option>
+                        @foreach ($categorias as $cat)
+                            <option value="{{ $cat->id }}">{{ $cat->name }}</option>
+                        @endforeach
+                    </select>
+                    @error('agreementCategoryId') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Subcategoria</label>
+                    <select wire:model="agreementSubcategoryId" class="select mt-1.5 w-full">
+                        <option value="">Nenhuma</option>
+                        @foreach ($categorias->firstWhere('id', $agreementCategoryId)?->subcategories ?? [] as $sub)
+                            <option value="{{ $sub->id }}">{{ $sub->name }}</option>
+                        @endforeach
+                    </select>
+                </div>
+            </div>
+            <p class="text-xs text-slate-400">O saldo de hoje ({{ Money::format($debt->current_balance) }}) fica guardado e a diferença para o valor negociado é registrada como desconto obtido. As parcelas passam a contar no mês.</p>
+            <div class="flex justify-end"><button type="submit" class="btn-primary px-4 py-2 text-sm">Registrar acordo</button></div>
+        </form>
+    </x-modal>
+
     {{-- Editar o contrato --}}
     <x-modal wire-model="showEdit" max-width="2xl">
         <form wire:submit="saveEdit" class="space-y-4">
@@ -210,6 +490,7 @@
                     <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Credor</label>
                     <input type="text" wire:model="editCreditor" maxlength="120" class="input mt-1.5">
                 </div>
+                @unless ($semCategoria)
                 <div>
                     <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Categoria das parcelas</label>
                     <select wire:model.live="editCategoryId" class="select mt-1.5 w-full">
@@ -229,6 +510,7 @@
                         @endforeach
                     </select>
                 </div>
+                @endunless
                 <div>
                     <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Conta de pagamento</label>
                     <select wire:model="editAccountId" class="select mt-1.5 w-full">

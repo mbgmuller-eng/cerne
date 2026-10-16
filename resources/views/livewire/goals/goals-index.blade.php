@@ -44,6 +44,7 @@
                                 @if ($objetivo->target_date) · até {{ $objetivo->target_date->format('m/Y') }} @endif
                                 @if ($objetivo->member) · {{ $objetivo->member->name }} @else · do casal @endif
                                 @if ($objetivo->linkedInvestment) · vinculado a {{ $objetivo->linkedInvestment->name }} @endif
+                                @if ($objetivo->linkedDebt) · consórcio {{ $objetivo->linkedDebt->name }} @endif
                             </p>
                         </div>
 
@@ -60,14 +61,27 @@
                     </div>
 
                     <div class="mt-2 flex items-baseline justify-between">
-                        <p class="text-sm text-slate-700 dark:text-slate-300">
-                            {{ Money::format($objetivo->accumulated()) }}
-                            <span class="text-slate-400">· {{ number_format($objetivo->progressPercentage(), 1, ',', '.') }}%</span>
-                        </p>
-                        @if ($objetivo->isAchieved())
-                            <span class="text-xs text-brand-700 dark:text-brand-300">objetivo alcançado</span>
+                        @if ($objetivo->usesInstallments())
+                            @php($parcelas = $objetivo->installmentProgress())
+                            <p class="text-sm text-slate-700 dark:text-slate-300">
+                                {{ $parcelas['paid'] }} de {{ $parcelas['total'] }} parcelas
+                                <span class="text-slate-400">· {{ number_format($objetivo->progressPercentage(), 1, ',', '.') }}%</span>
+                            </p>
+                            @if ($objetivo->isAchieved())
+                                <span class="text-xs text-brand-700 dark:text-brand-300">objetivo alcançado</span>
+                            @else
+                                <span class="text-xs text-slate-400">faltam {{ $parcelas['total'] - $parcelas['paid'] }} parcelas</span>
+                            @endif
                         @else
-                            <span class="text-xs text-slate-400">faltam {{ Money::format($objetivo->remaining()) }}</span>
+                            <p class="text-sm text-slate-700 dark:text-slate-300">
+                                {{ Money::format($objetivo->accumulated()) }}
+                                <span class="text-slate-400">· {{ number_format($objetivo->progressPercentage(), 1, ',', '.') }}%</span>
+                            </p>
+                            @if ($objetivo->isAchieved())
+                                <span class="text-xs text-brand-700 dark:text-brand-300">objetivo alcançado</span>
+                            @else
+                                <span class="text-xs text-slate-400">faltam {{ Money::format($objetivo->remaining()) }}</span>
+                            @endif
                         @endif
                     </div>
                 </li>

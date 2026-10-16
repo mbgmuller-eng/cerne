@@ -208,7 +208,9 @@ Schedule::call(function (): void {
 // Dívidas: aviso de parcela de financiamento ou empréstimo a vencer (mesma antecedência das contas fixas). Idempotente pelo livro de
 // lembretes (engagement_reminders: usuário + parcela + tipo).
 Schedule::call(function (): void {
-    $avisos = app(\App\Services\DebtReminderService::class)->notifyUpcoming();
+    $lembretes = app(\App\Services\DebtReminderService::class);
+    $avisos = $lembretes->notifyUpcoming();
+    $reajustes = $lembretes->notifyAdjustments();
 
-    logger()->info('Parcelas de dívidas', ['avisos' => $avisos]);
+    logger()->info('Parcelas de dívidas', ['avisos' => $avisos, 'reajustes' => $reajustes]);
 })->dailyAt('03:45')->name('parcelas-de-dividas')->withoutOverlapping();

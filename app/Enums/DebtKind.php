@@ -13,10 +13,10 @@ enum DebtKind: string
     case Consortium = 'consortium';
     case Debt = 'debt';
 
-    /** Os tipos que já podem ser cadastrados. Consórcio e dívida em aberto chegam na próxima fase. */
+    /** Os tipos que podem ser cadastrados. */
     public static function creatable(): array
     {
-        return [self::Financing, self::Loan];
+        return self::cases();
     }
 
     public function label(): string
