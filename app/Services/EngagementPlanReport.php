@@ -6,6 +6,7 @@ use App\Enums\EngagementMeetingStatus;
 use App\Enums\EngagementTaskStatus;
 use App\Models\EngagementMeeting;
 use App\Models\EngagementNote;
+use App\Models\EngagementPlanStage;
 use App\Models\EngagementRequest;
 use App\Models\EngagementTask;
 use App\Models\FinancialProfile;
@@ -22,7 +23,7 @@ class EngagementPlanReport
 {
     public function hasData(string $profileId, string $consultantId): bool
     {
-        foreach ([EngagementMeeting::class, EngagementTask::class, EngagementRequest::class] as $modelo) {
+        foreach ([EngagementMeeting::class, EngagementTask::class, EngagementRequest::class, EngagementPlanStage::class] as $modelo) {
             if ($modelo::withoutGlobalScopes()->where('profile_id', $profileId)->where('consultant_id', $consultantId)->exists()) {
                 return true;
             }
@@ -44,6 +45,7 @@ class EngagementPlanReport
         return [
             'profileName' => $perfil->profile_name,
             'consultantName' => $consultor->name,
+            'stages' => $relacao(EngagementPlanStage::class)->with(['items' => fn ($q) => $q->withoutGlobalScopes()->orderBy('position')])->orderBy('position')->get(),
             'nextMeeting' => $relacao(EngagementMeeting::class)->where('status', EngagementMeetingStatus::Scheduled)->where('scheduled_at', '>=', now())->orderBy('scheduled_at')->first(),
             'openTasks' => $tarefas->filter(fn (EngagementTask $t) => $t->status !== EngagementTaskStatus::Done)->values(),
             'doneTasks' => $tarefas->filter(fn (EngagementTask $t) => $t->status === EngagementTaskStatus::Done)->values(),

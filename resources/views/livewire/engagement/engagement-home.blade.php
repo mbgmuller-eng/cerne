@@ -20,6 +20,8 @@
 
     <livewire:engagement.engagement-meetings />
 
+    <livewire:engagement.engagement-plan />
+
     <div class="grid gap-6 lg:grid-cols-2 *:min-w-0">
         <livewire:engagement.engagement-tasks />
         <livewire:engagement.engagement-requests />

@@ -196,3 +196,11 @@ Schedule::call(function (): void {
 
     logger()->info('Lembretes do acompanhamento', ['enviados' => $enviados]);
 })->dailyAt('07:45')->name('acompanhamento-lembretes')->withoutOverlapping();
+
+// Acompanhamento: reavalia os itens automáticos do passo a passo (o que o cliente cadastrou no app) e grava o que mudou. Idempotente:
+// só grava quando o estado de um item muda.
+Schedule::call(function (): void {
+    $mudaram = app(\App\Services\EngagementPlanService::class)->syncAll();
+
+    logger()->info('Roteiros do acompanhamento', ['itens_alterados' => $mudaram]);
+})->dailyAt('06:30')->name('acompanhamento-roteiro')->withoutOverlapping();

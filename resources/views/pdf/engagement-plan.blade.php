@@ -30,6 +30,19 @@
         @endif
     @endif
 
+    @if ($stages->isNotEmpty())
+        <h2>Passo a passo</h2>
+        @foreach ($stages as $etapa)
+            @php $feitos = $etapa->items->whereNotNull('done_at')->count(); @endphp
+            <div class="bloco">
+                <p><strong>{{ $loop->iteration }}. {{ $etapa->title }}</strong> · {{ $feitos }} de {{ $etapa->items->count() }} itens</p>
+                @foreach ($etapa->items as $item)
+                    <p class="nota">{{ $item->done_at ? '[x]' : '[ ]' }} {{ $item->title }}</p>
+                @endforeach
+            </div>
+        @endforeach
+    @endif
+
     <h2>Tarefas em aberto</h2>
     @if ($openTasks->isEmpty())
         <p class="nota">Nenhuma tarefa em aberto.</p>

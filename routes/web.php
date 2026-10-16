@@ -215,6 +215,7 @@ Route::middleware(['auth', 'verified'])->group(function (): void {
         Route::get('/carteira/investimentos', PortfolioInvestments::class)->name('consultant.portfolio.investments');
         Route::get('/carteira/datas-importantes', ImportantDates::class)->name('consultant.portfolio.important-dates');
         Route::get('/semana', \App\Livewire\Consultant\EngagementWeek::class)->name('consultant.week');
+        Route::get('/modelos-de-roteiro', \App\Livewire\Consultant\EngagementTemplates::class)->name('consultant.plan-templates');
         Route::get('/leads', LeadsIndex::class)->name('consultant.leads');
         Route::get('/leads/metricas', \App\Livewire\Consultant\LeadMetrics::class)->name('consultant.leads.metrics');
         // Anexo de lead (simulação em PDF etc.): só o dono do lead abre — a checagem é no controlador.

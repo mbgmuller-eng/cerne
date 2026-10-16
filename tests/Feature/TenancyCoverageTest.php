@@ -7,6 +7,7 @@ use App\Models\Concerns\BelongsToProfileOrShared;
 use App\Models\BillingDetail;
 use App\Models\ConsultantClient;
 use App\Models\ConsultantInvite;
+use App\Models\EngagementPlanTemplate;
 use App\Models\EngagementReminder;
 use App\Models\FinancialProfile;
 use App\Models\GymExerciseSuggestion;
@@ -52,6 +53,9 @@ class TenancyCoverageTest extends TestCase
         SubscriptionCharge::class => 'cobrança mensal do Pix Automático da assinatura do usuário (subscription_id) — não existe por perfil; sustenta o índice único por ciclo',
         SubscriptionNotice::class => 'registro de aviso de cobrança já enviado — sustenta um índice único (assinatura, tipo, data), pertence à assinatura do usuário, não a um perfil',
         SubscriptionWebhookEvent::class => 'log de idempotência do webhook da Asaas — só existe pra sustentar um índice único em asaas_event_id, nunca consultado por perfil nenhum',
+
+        // Metodologia do consultor: não é dado de cliente nem de perfil algum; o escopo do próprio model restringe ao consultor logado.
+        EngagementPlanTemplate::class => 'modelo de passo a passo do consultor (consultant_id) — metodologia dele, sem perfil; o escopo do model só deixa o próprio consultor ver',
 
         // Registro técnico do envio de lembretes do acompanhamento.
         EngagementReminder::class => 'lembrete do acompanhamento já enviado a um usuário (user_id): só sustenta o índice único (usuário, assunto, tipo), nunca é consultado por perfil',

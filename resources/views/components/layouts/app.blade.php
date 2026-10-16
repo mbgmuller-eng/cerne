@@ -161,6 +161,7 @@
                 ['consultant.portfolio', 'Painel da carteira', 'Carteira', 'invest'],
                 ['consultant.portfolio.investments', 'Investimentos da carteira', 'Invest.', 'flow'],
                 ['consultant.week', 'Minha semana', 'Semana', 'calendar'],
+                ['consultant.plan-templates', 'Modelos de roteiro', 'Modelos', 'bills'],
             ],
         ],
         [
