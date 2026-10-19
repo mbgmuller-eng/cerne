@@ -60,6 +60,38 @@ final class DebtSimulator
     }
 
     /**
+     * Lance no consórcio: abate o saldo que falta pagar. Duas formas de usar: baixar a parcela (mantém o prazo) ou terminar antes
+     * (mantém a parcela cheia). A parcela cheia é o saldo dividido pelas parcelas que restam, mais o seguro. É estimativa: a
+     * administradora define as regras do lance e do abatimento.
+     *
+     * @return array{paid_off: bool, full_installment: string, reduce_installment: array{term: int, installment: string}, reduce_term: array{term: int, installment: string}}
+     */
+    public static function bid(string $balance, int $remaining, string $insurance, string $bid): array
+    {
+        if ($remaining < 1 || bccomp($balance, '0', 2) <= 0) {
+            throw new InvalidArgumentException('Informe o saldo e as parcelas que faltam.');
+        }
+
+        $base = bcdiv($balance, (string) $remaining, 6);
+        $cheia = bcadd(bcadd($base, $insurance, 6), '0.005', 2);
+
+        if (bccomp($bid, $balance, 2) >= 0) {
+            return ['paid_off' => true, 'full_installment' => $cheia, 'reduce_installment' => ['term' => 0, 'installment' => '0.00'], 'reduce_term' => ['term' => 0, 'installment' => '0.00']];
+        }
+
+        $depois = bcsub($balance, $bid, 2);
+        $parcelaMenor = bcadd(bcadd(bcdiv($depois, (string) $remaining, 6), $insurance, 6), '0.005', 2);
+        $prazoMenor = max(1, (int) ceil((float) bcdiv($depois, $base, 8)));
+
+        return [
+            'paid_off' => false,
+            'full_installment' => $cheia,
+            'reduce_installment' => ['term' => $remaining, 'installment' => $parcelaMenor],
+            'reduce_term' => ['term' => $prazoMenor, 'installment' => $cheia],
+        ];
+    }
+
+    /**
      * Portabilidade ou refinanciamento: o mesmo saldo, com taxa, prazo e taxas fixas novos. O custo da operação entra no total.
      *
      * @return array{term: int, first_installment: string, total_to_pay: string, interest: string, upfront: string}

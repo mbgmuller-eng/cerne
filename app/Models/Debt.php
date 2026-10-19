@@ -157,6 +157,70 @@ class Debt extends Model
         return bcadd(bcadd($base, $seguro, 6), '0.005', 2);
     }
 
+    /**
+     * O que falta pagar do consórcio, para simular o lance: o saldo a pagar e as parcelas que restam, do último extrato da
+     * administradora; sem extrato, a soma das parcelas em aberto (uma estimativa, que num consórcio flex fica abaixo do real).
+     * O seguro por parcela vem do percentual do extrato aplicado à carta.
+     *
+     * @return array{balance: string, remaining: int, insurance: string, source: string}|null
+     */
+    public function contemplationBase(): ?array
+    {
+        if (! $this->isSavingForCredit()) {
+            return null;
+        }
+
+        if ($this->statement_balance !== null && $this->statement_remaining) {
+            $saldo = (string) $this->statement_balance;
+            $restantes = (int) $this->statement_remaining;
+            $origem = 'extrato';
+        } else {
+            $abertas = $this->installments()->where('status', DebtInstallmentStatus::Open);
+            $restantes = (clone $abertas)->count();
+            $saldo = number_format((float) (clone $abertas)->sum('amount'), 2, '.', '');
+            $origem = 'parcelas';
+        }
+
+        if ($restantes < 1 || bccomp($saldo, '0', 2) <= 0) {
+            return null;
+        }
+
+        $seguro = $this->insurance_percent !== null
+            ? bcadd(bcmul(bcdiv((string) $this->insurance_percent, '100', 8), (string) $this->credit_amount, 6), '0.005', 2)
+            : '0.00';
+
+        return ['balance' => $saldo, 'remaining' => $restantes, 'insurance' => $seguro, 'source' => $origem];
+    }
+
+    /**
+     * O último reajuste que se vê nas parcelas pagas: o ponto em que o valor pago subiu mais de 1,5% de uma parcela para a
+     * seguinte. Serve de ponto de partida quando ainda não há reajuste registrado (o índice de verdade é o da administradora).
+     *
+     * @return array{percent: string, number: int, on: ?string}|null
+     */
+    public function observedAdjustment(): ?array
+    {
+        $pagas = $this->installments()->where('status', DebtInstallmentStatus::Paid)->orderBy('number')->get(['number', 'amount', 'paid_on']);
+        $achado = null;
+
+        for ($i = 1; $i < $pagas->count(); $i++) {
+            $antes = (string) $pagas[$i - 1]->amount;
+            $agora = (string) $pagas[$i]->amount;
+
+            if (bccomp($antes, '0', 2) <= 0) {
+                continue;
+            }
+
+            $percentual = bcmul(bcsub(bcdiv($agora, $antes, 6), '1', 6), '100', 2);
+
+            if (bccomp($percentual, '1.5', 2) >= 0 && bccomp($percentual, '60', 2) <= 0) {
+                $achado = ['percent' => $percentual, 'number' => (int) $pagas[$i]->number, 'on' => $pagas[$i]->paid_on?->toDateString()];
+            }
+        }
+
+        return $achado;
+    }
+
     public function isConsortium(): bool
     {
         return $this->kind === DebtKind::Consortium;

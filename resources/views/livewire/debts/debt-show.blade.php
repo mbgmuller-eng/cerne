@@ -320,7 +320,7 @@
             <div class="grid gap-4 @sm:grid-cols-2 *:min-w-0">
                 <div>
                     <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Percentual do {{ $debt->adjustment_index?->label() }} (%)</label>
-                    <input type="text" wire:model="adjustmentPercent" inputmode="decimal" class="input mt-1.5" placeholder="Ex.: 4,5">
+                    <input type="text" wire:model.live.debounce.400ms="adjustmentPercent" inputmode="decimal" class="input mt-1.5" placeholder="Ex.: 4,5">
                     @error('adjustmentPercent') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
                 </div>
                 <div>
@@ -329,6 +329,30 @@
                     @error('adjustmentDate') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
                 </div>
             </div>
+            @if ($sugestaoReajuste)
+                <div class="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600 dark:bg-white/5 dark:text-slate-300">
+                    <span>
+                        @if ($sugestaoReajuste['source'] === 'registrado')
+                            Último reajuste registrado: {{ str_replace('.', ',', $sugestaoReajuste['percent']) }}% em {{ $sugestaoReajuste['on'] }}.
+                        @else
+                            Pelas parcelas pagas, a parcela subiu {{ str_replace('.', ',', $sugestaoReajuste['percent']) }}% na parcela {{ $sugestaoReajuste['number'] }}{{ $sugestaoReajuste['on'] ? ' ('.$sugestaoReajuste['on'].')' : '' }}.
+                        @endif
+                        O índice do reajuste novo é o que a administradora aplicou.
+                    </span>
+                    <button type="button" wire:click="useSuggestedAdjustment" class="btn-ghost px-2 py-1 text-xs">Usar este percentual</button>
+                </div>
+            @endif
+            @if ($previaReajuste)
+                <dl class="grid gap-3 rounded-lg border border-slate-200 p-3 text-xs sm:grid-cols-3 dark:border-white/10">
+                    <div><dt class="text-slate-400">Carta</dt><dd class="text-slate-800 dark:text-slate-200">{{ Money::format($previaReajuste['credit_before']) }} → <strong class="font-medium">{{ Money::format($previaReajuste['credit_after']) }}</strong></dd></div>
+                    @if ($previaReajuste['installment_before'])
+                        <div><dt class="text-slate-400">Próxima parcela</dt><dd class="text-slate-800 dark:text-slate-200">{{ Money::format($previaReajuste['installment_before']) }} → <strong class="font-medium">{{ Money::format($previaReajuste['installment_after']) }}</strong></dd></div>
+                    @endif
+                    @if ($previaReajuste['goal_before'])
+                        <div><dt class="text-slate-400">Objetivo</dt><dd class="text-slate-800 dark:text-slate-200">{{ Money::format($previaReajuste['goal_before']) }} → <strong class="font-medium">{{ Money::format($previaReajuste['goal_after']) }}</strong></dd></div>
+                    @endif
+                </dl>
+            @endif
             <p class="text-xs text-slate-400">A carta e as parcelas em aberto sobem nesse percentual{{ $objetivo ? ', e o valor do objetivo "'.$objetivo->name.'" também' : '' }}. O Cerne avisa na data, mas o percentual é o que a administradora aplicou.</p>
             <div class="flex justify-end"><button type="submit" class="btn-primary px-4 py-2 text-sm">Aplicar reajuste</button></div>
         </form>
@@ -358,7 +382,7 @@
                 @if ($contemplationMode !== 'draw')
                     <div>
                         <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Valor do lance</label>
-                        <input type="text" wire:model="bidAmount" inputmode="decimal" class="input mt-1.5">
+                        <input type="text" wire:model.live.debounce.500ms="bidAmount" inputmode="decimal" class="input mt-1.5">
                         @error('bidAmount') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
                     </div>
                 @endif
@@ -396,6 +420,32 @@
                     </select>
                 </div>
             </div>
+            @if ($previaLance)
+                <div class="space-y-3 rounded-xl border border-slate-200 p-4 text-sm dark:border-white/10">
+                    <p class="text-xs font-semibold text-slate-500 dark:text-slate-400">O que o lance de {{ Money::format($previaLance['bid']) }} faz</p>
+                    @if ($previaLance['paid_off'])
+                        <p class="text-slate-700 dark:text-slate-300">Esse lance cobre tudo o que falta pagar ({{ Money::format($previaLance['base']['balance']) }}).</p>
+                    @else
+                        <div class="grid gap-3 sm:grid-cols-2">
+                            <div class="rounded-lg bg-slate-50 p-3 dark:bg-white/5">
+                                <p class="text-xs text-slate-400">Baixar a parcela e manter o prazo</p>
+                                <p class="mt-1 text-slate-800 dark:text-slate-200">{{ Money::format($previaLance['reduce_installment']['installment']) }} por mês, {{ $previaLance['reduce_installment']['term'] }} parcelas</p>
+                                <button type="button" wire:click="useBidOption('installment')" class="btn-secondary mt-2 px-2.5 py-1 text-xs">Usar esta</button>
+                            </div>
+                            <div class="rounded-lg bg-slate-50 p-3 dark:bg-white/5">
+                                <p class="text-xs text-slate-400">Manter a parcela e terminar antes</p>
+                                <p class="mt-1 text-slate-800 dark:text-slate-200">{{ Money::format($previaLance['reduce_term']['installment']) }} por mês, {{ $previaLance['reduce_term']['term'] }} parcelas</p>
+                                <button type="button" wire:click="useBidOption('term')" class="btn-secondary mt-2 px-2.5 py-1 text-xs">Usar esta</button>
+                            </div>
+                        </div>
+                    @endif
+                    <p class="text-xs text-slate-400">
+                        Pelo que falta pagar: {{ Money::format($previaLance['base']['balance']) }} em {{ $previaLance['base']['remaining'] }} parcelas
+                        ({{ $previaLance['base']['source'] === 'extrato' ? 'do último extrato' : 'estimado pelas parcelas em aberto' }}).
+                        Sem lance, a parcela cheia seria cerca de {{ Money::format($previaLance['full_installment']) }}. A administradora define como o lance é abatido: confirme com ela.
+                    </p>
+                </div>
+            @endif
             @if ($objetivo)
                 <label class="inline-flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
                     <input type="checkbox" wire:model="markGoalAchieved" class="rounded border-slate-300">

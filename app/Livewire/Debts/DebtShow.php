@@ -431,6 +431,88 @@ class DebtShow extends Component
 
     // ------------------------------------------------------------------ contemplação
 
+    /** O reajuste anterior, como ponto de partida: o registrado aqui ou, na falta dele, o que se vê nas parcelas pagas. */
+    private function adjustmentSuggestion(): ?array
+    {
+        if (! $this->debt->isConsortium()) {
+            return null;
+        }
+
+        $anterior = $this->debt->adjustments()->first();
+
+        if ($anterior !== null) {
+            return ['percent' => rtrim(rtrim((string) $anterior->percent, '0'), '.'), 'on' => $anterior->applied_on->format('d/m/Y'), 'source' => 'registrado', 'number' => null];
+        }
+
+        $observado = $this->debt->observedAdjustment();
+
+        return $observado === null ? null : [
+            'percent' => rtrim(rtrim($observado['percent'], '0'), '.'), 'on' => $observado['on'] ? CarbonImmutable::parse($observado['on'])->format('m/Y') : null,
+            'source' => 'parcelas', 'number' => $observado['number'],
+        ];
+    }
+
+    public function useSuggestedAdjustment(): void
+    {
+        $sugestao = $this->adjustmentSuggestion();
+
+        if ($sugestao !== null) {
+            $this->adjustmentPercent = str_replace('.', ',', $sugestao['percent']);
+        }
+    }
+
+    /** Lance embutido sai da própria carta: o crédito liberado é a carta menos o lance. */
+    public function updatedBidAmount(): void
+    {
+        $this->syncReleasedCredit();
+    }
+
+    public function updatedContemplationMode(): void
+    {
+        $this->syncReleasedCredit();
+    }
+
+    private function syncReleasedCredit(): void
+    {
+        $lance = preg_match('/^[0-9.,\s]+$/', $this->bidAmount) ? Money::parse($this->bidAmount) : '0.00';
+        $carta = (string) $this->debt->credit_amount;
+
+        $this->creditReleased = $this->contemplationMode === ContemplationMode::EmbeddedBid->value && bccomp($lance, '0', 2) > 0 && bccomp($lance, $carta, 2) < 0
+            ? bcsub($carta, $lance, 2)
+            : $carta;
+    }
+
+    /** Preenche a parcela e o prazo da contemplação com a opção escolhida na simulação do lance. */
+    public function useBidOption(string $which): void
+    {
+        $previa = $this->bidPreview();
+
+        if ($previa === null || $previa['paid_off'] || ! in_array($which, ['installment', 'term'], true)) {
+            return;
+        }
+
+        $opcao = $which === 'installment' ? $previa['reduce_installment'] : $previa['reduce_term'];
+        $this->newInstallmentAmount = $opcao['installment'];
+        $this->remainingInstallments = (string) $opcao['term'];
+    }
+
+    /** @return array<string, mixed>|null a simulação do lance digitado, com a base de onde veio */
+    private function bidPreview(): ?array
+    {
+        if (! $this->showContemplation || $this->contemplationMode === ContemplationMode::Draw->value || ! preg_match('/^[0-9.,\s]+$/', $this->bidAmount)) {
+            return null;
+        }
+
+        $base = $this->debt->contemplationBase();
+        $lance = Money::parse($this->bidAmount);
+
+        if ($base === null || bccomp($lance, '0', 2) <= 0) {
+            return null;
+        }
+
+        return DebtSimulator::bid($base['balance'], $base['remaining'], $base['insurance'], $lance) + ['base' => $base, 'bid' => $lance];
+    }
+
     public function openContemplation(): void
     {
         $sugestao = DebtClassification::consortiumContemplated($this->debt->consortium_type);
@@ -786,6 +868,9 @@ class DebtShow extends Component
             'semCategoria' => $this->semCategoria(),
             'emCarta' => $this->debt->isSavingForCredit(),
             'podeSimular' => $this->podeSimular(),
+            'sugestaoReajuste' => $this->showAdjustment ? $this->adjustmentSuggestion() : null,
+            'previaReajuste' => $this->showAdjustment ? app(DebtService::class)->previewAdjustment($this->debt, $this->adjustmentPercent) : null,
+            'previaLance' => $this->bidPreview(),
             'podeSimularAcordo' => $this->debt->status->isUnscheduled(),
             'basesTaxa' => DebtRateBasis::options(),
             'ultimaPaga' => (int) $parcelas->where('status', DebtInstallmentStatus::Paid)->max('number'),

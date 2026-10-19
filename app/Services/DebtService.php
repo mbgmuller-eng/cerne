@@ -438,6 +438,42 @@ class DebtService
     }
 
     /**
+     * O que o reajuste faria, sem gravar: carta, próxima parcela e valor do objetivo ligado, antes e depois. Nulo quando o
+     * percentual ainda não é um número válido (a prévia aparece enquanto a pessoa digita).
+     *
+     * @return array{percent: string, credit_before: string, credit_after: string, installment_before: ?string, installment_after: ?string, goal_before: ?string, goal_after: ?string}|null
+     */
+    public function previewAdjustment(Debt $divida, string $percentual): ?array
+    {
+        $texto = str_replace(',', '.', trim($percentual));
+
+        if (! $divida->isConsortium() || $texto === '' || ! preg_match('/^-?[0-9]+(\.[0-9]+)?$/', $texto)) {
+            return null;
+        }
+
+        $p = bcadd($texto, '0', 4);
+
+        if (bccomp($p, '-50', 4) < 0 || bccomp($p, '200', 4) > 0) {
+            return null;
+        }
+
+        $fator = bcadd('1', bcdiv($p, '100', 8), 8);
+        $escalar = fn (string $v) => bcadd(bcmul($v, $fator, 8), '0.005', 2);
+        $parcela = DebtInstallment::query()->where('debt_id', $divida->id)->where('status', DebtInstallmentStatus::Open)->orderBy('number')->value('amount');
+        $objetivo = Goal::query()->where('linked_debt_id', $divida->id)->first();
+
+        return [
+            'percent' => $p,
+            'credit_before' => (string) $divida->credit_amount,
+            'credit_after' => $escalar((string) $divida->credit_amount),
+            'installment_before' => $parcela !== null ? (string) $parcela : null,
+            'installment_after' => $parcela !== null ? $escalar((string) $parcela) : null,
+            'goal_before' => $objetivo !== null ? (string) $objetivo->estimated_value : null,
+            'goal_after' => $objetivo !== null ? $escalar((string) $objetivo->estimated_value) : null,
+        ];
+    }
+
+    /**
      * Registra a contemplação. A partir dela o consórcio passa a ser dívida: as parcelas em aberto são refeitas com o NOVO valor
      * da parcela e a quantidade restante informados (o lance pode baixar a parcela ou encurtar o prazo; o sorteio, numa parcela
      * flex, pode aumentá-la bastante), e a classificação passa de investimento para a despesa do bem (casa, carro...).
