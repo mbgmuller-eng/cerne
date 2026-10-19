@@ -178,6 +178,14 @@ Schedule::call(function (): void {
     logger()->info('Honorários previstos', $resultado);
 })->dailyAt('04:05')->name('honorarios-previstos')->withoutOverlapping();
 
+// Recebimentos: vincula as apólices que cada profissional vendeu e refaz a previsão de comissão e agenciamento de seguros.
+// Idempotente pela chave `origin_key` (e pelo índice único do vínculo).
+Schedule::call(function (): void {
+    $resultado = app(\App\Services\InsuranceCommissionService::class)->runDailyMaintenance();
+
+    logger()->info('Comissões de seguros', $resultado);
+})->dailyAt('04:07')->name('comissoes-de-seguros')->withoutOverlapping();
+
 // Leads: anexos de contatos perdidos há mais do prazo de retenção saem do servidor.
 // Idempotente: o que já foi apagado não aparece de novo.
 Schedule::command('cerne:purge-lead-files')->dailyAt('04:10')->name('anexos-de-leads')->withoutOverlapping();

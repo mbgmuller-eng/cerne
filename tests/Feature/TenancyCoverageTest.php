@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Concerns\BelongsToProfile;
 use App\Models\Concerns\BelongsToProfileOrShared;
 use App\Models\BillingDetail;
+use App\Models\CommissionRule;
 use App\Models\ConsultantClient;
 use App\Models\ConsultantInvite;
 use App\Models\EngagementPlanTemplate;
@@ -22,6 +23,7 @@ use App\Models\LeadQuote;
 use App\Models\LeadSuggestionDismissal;
 use App\Models\PartnerInvite;
 use App\Models\ProfessionalInvite;
+use App\Models\PolicyCommission;
 use App\Models\ProfileMember;
 use App\Models\Subscription;
 use App\Models\SubscriptionCharge;
@@ -67,6 +69,8 @@ class TenancyCoverageTest extends TestCase
 
         // Renda do profissional: é dele (professional_id) e de mais ninguém, nem do cliente nem do outro profissional do cliente.
         IncomeEntry::class => 'recebimento do profissional (professional_id) — sigiloso: nem o cliente nem outro profissional do mesmo cliente podem ver; o profile_id é só o cliente de origem, sem escopo de perfil',
+        CommissionRule::class => 'regra de comissionamento do profissional (professional_id) — sigilosa como o resto dos recebimentos; não existe por perfil',
+        PolicyCommission::class => 'liga o profissional a uma apólice em que ele tem comissão (professional_id) — sigiloso; a apólice em si segue isolada por perfil',
         FeeAgreement::class => 'honorário que o profissional combinou com um cliente (professional_id) — mesmo sigilo de IncomeEntry; o profile_id aponta o cliente, não isola o dado',
 
         // Vínculos consultor-cliente: ligam dois usuários, sem profile_id.

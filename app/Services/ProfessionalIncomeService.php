@@ -153,7 +153,7 @@ class ProfessionalIncomeService
     public function saveEntry(User $professional, ?string $id, array $dados): IncomeEntry
     {
         $entry = $id !== null
-            ? IncomeEntry::query()->ownedBy($professional)->whereNull('fee_agreement_id')->findOrFail($id)
+            ? IncomeEntry::query()->ownedBy($professional)->whereNull('fee_agreement_id')->whereNull('origin_key')->findOrFail($id)
             : new IncomeEntry(['professional_id' => $professional->id]);
 
         $recebido = ($dados['status'] ?? null) === IncomeStatus::Received->value;
@@ -203,7 +203,7 @@ class ProfessionalIncomeService
     /** Só lançamento manual some de vez; o gerado por contrato se cancela. */
     public function delete(User $professional, string $id): bool
     {
-        return IncomeEntry::query()->ownedBy($professional)->whereNull('fee_agreement_id')->whereKey($id)->delete() > 0;
+        return IncomeEntry::query()->ownedBy($professional)->whereNull('fee_agreement_id')->whereNull('origin_key')->whereKey($id)->delete() > 0;
     }
 
     /** @return Collection<int, FeeAgreement> */

@@ -18,7 +18,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * sempre filtra por `ownedBy()`.
  */
 #[Fillable([
-    'professional_id', 'profile_id', 'fee_agreement_id', 'source', 'status', 'description', 'due_on', 'amount',
+    'professional_id', 'profile_id', 'fee_agreement_id', 'origin_key', 'source', 'status', 'description', 'due_on', 'amount',
     'received_amount', 'received_on', 'notes',
 ])]
 class IncomeEntry extends Model
@@ -57,6 +57,12 @@ class IncomeEntry extends Model
     public function agreement(): BelongsTo
     {
         return $this->belongsTo(FeeAgreement::class, 'fee_agreement_id');
+    }
+
+    /** Nasceu de um contrato ou de uma regra (não foi lançado à mão): só se dá baixa ou se cancela, não se edita nem exclui. */
+    public function isGenerated(): bool
+    {
+        return $this->fee_agreement_id !== null || $this->origin_key !== null;
     }
 
     /** Previsto que já passou do vencimento sem ser marcado como recebido. */

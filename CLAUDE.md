@@ -124,6 +124,7 @@ Todas idempotentes (regra 4). O cron da Hostinger chama `schedule:run` a cada mi
 | `acompanhamento-roteiro` | 06:30 | reavalia os itens automáticos do passo a passo dos clientes com vínculo ativo (só grava o que mudou de estado) |
 | `acompanhamento-lembretes` | 07:45 | lembrete de reunião no dia seguinte e de tarefa que vence amanhã ou venceu (só com vínculo ativo; índice único em `engagement_reminders`) |
 | `honorarios-previstos` | 04:05 | estende, para cada contrato de honorário ativo, os recebimentos previstos (12 meses à frente; índice único `fee_agreement_id` + `due_on`) |
+| `comissoes-de-seguros` | 04:07 | vincula as apólices que cada profissional vendeu e refaz a previsão de comissão e agenciamento (chave `origin_key` única por profissional) |
 | `anexos-de-leads` | 04:10 | apaga arquivos de leads perdidos há mais de 12 meses |
 | `leads-de-renovacao` | 07:30 | cria lead para apólice que vence (preferências em `users.renewal_lead_*`) |
 | `resumo-de-leads` | 08:00 | uma notificação por profissional com o que pede atenção nos leads |
@@ -170,8 +171,16 @@ e o honorário fixo por cliente é `FeeAgreement` (mensal, trimestral, semestral
   "atrasado"); editar ou pausar refaz só o que ainda é previsão; o recebido e o cancelado ficam. Lançamento gerado por
   contrato não se edita nem exclui, só se dá baixa ou se cancela; o manual se edita e exclui.
 - Somas em SQL. Contrato de honorário é só do consultor; o corretor usa o livro com lançamentos manuais.
-- **Fases seguintes (combinadas)**: 2) regras de comissionamento por seguradora (percentual por ano de vigência, agenciamento)
-  e previsão a partir das apólices; 3) percentual sobre patrimônio por periodicidade e por produto/empresa de investimento;
+- **Comissão de seguros (fase 2)**: aba "Regras de comissionamento" (`CommissionRules`, `InsuranceCommissionService`,
+  `InsuranceCommissionCalculator`). A regra (`CommissionRule`) é por seguradora (nome canônico via `Insurer::canonicalizer()`) e,
+  opcionalmente, por tipo de seguro (a do tipo vale mais): percentual do 1º ano, percentual da renovação (vazio = igual ao 1º ano),
+  agenciamento (percentual do prêmio do 1º ano ou valor fixo) e prazo de pagamento em dias (a seguradora só paga depois que o cliente
+  paga a parcela). A comissão é o percentual do ano da apólice sobre **cada parcela** (mensal, trimestral ou anual); o agenciamento só
+  existe para apólice que começa do mês atual em diante. Apólice entra em `PolicyCommission` sozinha quando é do corretor
+  (`broker_id`) ou nasceu de cotação de lead do profissional; o consultor inclui outras de clientes ativos à mão. Um vínculo desligado
+  não é reativado pela rotina. A previsão (`reconcile`) cria o que falta, corrige o valor do previsto e tira o que deixou de valer;
+  recebido e cancelado ficam. Lançamento gerado (`origin_key`) só recebe baixa ou cancelamento (`IncomeEntry::isGenerated()`).
+- **Fases seguintes (combinadas)**: 3) percentual sobre patrimônio por periodicidade e por produto/empresa de investimento;
   4) consórcio por administradora (ex.: 3,5% da carta nas parcelas 2, 4 e 6); 5) conferência por extrato de comissão (IA com revisão).
 
 ### Calendário (Saúde e agenda do profissional)

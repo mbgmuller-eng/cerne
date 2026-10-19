@@ -89,14 +89,14 @@ class ProfessionalIncome extends Component
         $this->ano = $this->ano >= 2000 && $this->ano <= 2100 ? $this->ano : (int) $hoje->format('Y');
         $this->mes = $this->mes >= 1 && $this->mes <= 12 ? $this->mes : (int) $hoje->format('n');
 
-        if (! in_array($this->aba, ['recebimentos', 'contratos'], true) || ($this->aba === 'contratos' && ! auth()->user()->isConsultant())) {
+        if (! in_array($this->aba, ['recebimentos', 'contratos', 'regras'], true) || ($this->aba === 'contratos' && ! auth()->user()->isConsultant())) {
             $this->aba = 'recebimentos';
         }
     }
 
     public function setAba(string $aba): void
     {
-        if ($aba === 'recebimentos' || ($aba === 'contratos' && auth()->user()->isConsultant())) {
+        if ($aba === 'recebimentos' || $aba === 'regras' || ($aba === 'contratos' && auth()->user()->isConsultant())) {
             $this->aba = $aba;
         }
     }
@@ -129,7 +129,7 @@ class ProfessionalIncome extends Component
         $this->entryDueOn = ($hoje->year === $this->ano && $hoje->month === $this->mes ? $hoje : $this->referencia())->toDateString();
 
         if ($id !== null) {
-            $entry = IncomeEntry::query()->ownedBy(auth()->user())->whereNull('fee_agreement_id')->findOrFail($id);
+            $entry = IncomeEntry::query()->ownedBy(auth()->user())->whereNull('fee_agreement_id')->whereNull('origin_key')->findOrFail($id);
             $this->entryId = $entry->id;
             $this->entrySource = $entry->source->value;
             $this->entryProfileId = (string) $entry->profile_id;

@@ -37,17 +37,20 @@
         <div class="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm text-emerald-800 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-300" role="status">{{ $aviso }}</div>
     @endif
 
-    @if ($ehConsultor)
-        <div class="flex gap-1 rounded-lg bg-slate-100 p-1 dark:bg-white/5" role="tablist" aria-label="Recebimentos">
-            @foreach (['recebimentos' => 'Recebimentos', 'contratos' => 'Contratos de honorário'] as $chave => $rotulo)
-                <button type="button" role="tab" wire:click="setAba('{{ $chave }}')" @class([
-                    'flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition',
-                    'bg-white text-slate-900 shadow-sm dark:bg-slate-700 dark:text-white' => $aba === $chave,
-                    'text-slate-500 dark:text-slate-400' => $aba !== $chave,
-                ])>{{ $rotulo }}</button>
-            @endforeach
-        </div>
-    @endif
+    @php
+        $abas = $ehConsultor
+            ? ['recebimentos' => 'Recebimentos', 'contratos' => 'Contratos de honorário', 'regras' => 'Regras de comissionamento']
+            : ['recebimentos' => 'Recebimentos', 'regras' => 'Regras de comissionamento'];
+    @endphp
+    <div class="flex gap-1 rounded-lg bg-slate-100 p-1 dark:bg-white/5" role="tablist" aria-label="Recebimentos">
+        @foreach ($abas as $chave => $rotulo)
+            <button type="button" role="tab" wire:click="setAba('{{ $chave }}')" @class([
+                'flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition',
+                'bg-white text-slate-900 shadow-sm dark:bg-slate-700 dark:text-white' => $aba === $chave,
+                'text-slate-500 dark:text-slate-400' => $aba !== $chave,
+            ])>{{ $rotulo }}</button>
+        @endforeach
+    </div>
 
     @if ($aba === 'recebimentos')
         {{-- Totais ------------------------------------------------------- --}}
@@ -124,7 +127,7 @@
                     @foreach ($entradas as $e)
                         @php
                             $cliente = $e->profile ? \App\Support\ClientDisplayName::forProfile($e->profile) : null;
-                            $manual = $e->fee_agreement_id === null;
+                            $manual = ! $e->isGenerated();
                         @endphp
                         <div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-5 py-3" wire:key="entrada-{{ $e->id }}">
                             <div class="flex min-w-0 items-center gap-3">
@@ -224,6 +227,8 @@
                 </div>
             </div>
         @endif
+    @elseif ($aba === 'regras')
+        <livewire:consultant.commission-rules />
     @else
         {{-- Contratos de honorário --------------------------------------- --}}
         <section>
