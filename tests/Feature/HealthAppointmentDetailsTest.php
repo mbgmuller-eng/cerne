@@ -166,9 +166,11 @@ class HealthAppointmentDetailsTest extends TestCase
     {
         $this->preencher(Livewire::test(HealthAppointmentIndex::class), ['title' => ''])->call('save');
 
+        // Na lista de próximas (o calendário mostra o título dele, que é outra tela): o título e quem atende são a mesma coisa.
         $html = Livewire::test(HealthAppointmentIndex::class)->html();
+        $lista = substr($html, (int) strpos($html, '<p class="eyebrow">Próximas</p>'), (int) strpos($html, '<p class="eyebrow">Histórico</p>') - (int) strpos($html, '<p class="eyebrow">Próximas</p>'));
 
-        self::assertSame(1, substr_count($html, 'Otorrinolaringologia · Dr. João Silva'));
+        self::assertSame(1, substr_count($lista, 'Otorrinolaringologia · Dr. João Silva'));
     }
 
     public function test_o_formulario_de_exame_nao_pergunta_pelo_profissional(): void

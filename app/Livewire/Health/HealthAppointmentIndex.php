@@ -3,34 +3,34 @@
 namespace App\Livewire\Health;
 
 use App\Enums\AgendaLayout;
+use App\Livewire\Concerns\HasCalendar;
 use App\Livewire\Concerns\RequiresActiveProfile;
 use App\Livewire\Concerns\RequiresPersonalHealth;
 use App\Models\HealthAppointment;
 use App\Models\HealthCareItem;
 use App\Models\ProfileMember;
 use App\Services\HealthAppointmentService;
+use App\Support\Calendar\CalendarEvent;
 use App\Support\MemberPalette;
 use App\Support\ProfileContext;
 use Carbon\CarbonImmutable;
-use Carbon\CarbonInterface;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Layout;
-use Livewire\Attributes\Url;
 use Livewire\Component;
 
 /**
  * Agenda de consulta/exame do casal — mesma visibilidade da Ficha de
  * Saúde (CoupleHealthScope): os dois veem tudo, consultor não vê nada.
  *
- * A tela mostra a lista (próximas e histórico) e o calendário do mês; a preferência da pessoa
- * (AgendaLayout, guardada na conta) só decide qual vem primeiro. No calendário, cada pessoa do
- * perfil tem a sua cor (ProfileMember::calendarColor), editável por qualquer uma das duas.
+ * A tela mostra a lista (próximas e histórico) e o calendário em mês, semana ou dia (HasCalendar); a
+ * preferência da pessoa (AgendaLayout, guardada na conta) só decide qual vem primeiro. No calendário,
+ * cada pessoa do perfil tem a sua cor (ProfileMember::calendarColor), editável por qualquer uma das duas.
  */
 #[Layout('components.layouts.app')]
 class HealthAppointmentIndex extends Component
 {
-    use RequiresActiveProfile, RequiresPersonalHealth;
+    use HasCalendar, RequiresActiveProfile, RequiresPersonalHealth;
 
     public bool $showForm = false;
     public ?string $editingId = null;
@@ -49,26 +49,12 @@ class HealthAppointmentIndex extends Component
     public string $scheduledTime = '';
     public string $notes = '';
 
-    /** Mês mostrado no calendário ("2026-10"); na URL para o mês visto sobreviver ao recarregar. */
-    #[Url(as: 'mes')]
-    public string $calMonth = '';
-
-    /** Dia tocado no calendário ("2026-10-20"), cujos compromissos aparecem logo abaixo. */
-    public ?string $selectedDate = null;
-
     public bool $showColors = false;
 
     public function mount(): void
     {
         $this->redirectOrAbortWithoutProfile();
         $this->abortUnlessPersonalHealthOwner();
-
-        $this->calMonth = $this->validMonth($this->calMonth);
-    }
-
-    public function updatedCalMonth(): void
-    {
-        $this->calMonth = $this->validMonth($this->calMonth);
     }
 
     // -----------------------------------------------------------------
@@ -82,42 +68,6 @@ class HealthAppointmentIndex extends Component
         if ($escolha !== null) {
             auth()->user()->update(['agenda_layout' => $escolha]);
         }
-    }
-
-    public function previousMonth(): void
-    {
-        $this->calMonth = $this->monthStart()->subMonth()->format('Y-m');
-        $this->selectedDate = null;
-    }
-
-    public function nextMonth(): void
-    {
-        $this->calMonth = $this->monthStart()->addMonth()->format('Y-m');
-        $this->selectedDate = null;
-    }
-
-    public function goToday(): void
-    {
-        $this->calMonth = CarbonImmutable::today()->format('Y-m');
-        $this->selectedDate = CarbonImmutable::today()->toDateString();
-    }
-
-    public function selectDay(string $date): void
-    {
-        $dia = $this->parseDay($date);
-
-        if ($dia === null) {
-            return;
-        }
-
-        $this->selectedDate = $dia->toDateString();
-        // Tocar num dia do mês vizinho (as pontas da grade) leva para o mês dele.
-        $this->calMonth = $dia->format('Y-m');
-    }
-
-    public function clearDay(): void
-    {
-        $this->selectedDate = null;
     }
 
     public function toggleColors(): void
@@ -146,18 +96,6 @@ class HealthAppointmentIndex extends Component
         }
     }
 
-    private function validMonth(string $mes): string
-    {
-        return preg_match('/^\d{4}-(0[1-9]|1[0-2])$/', $mes) === 1 && (int) substr($mes, 0, 4) >= 2000
-            ? $mes
-            : CarbonImmutable::today()->format('Y-m');
-    }
-
-    private function monthStart(): CarbonImmutable
-    {
-        return CarbonImmutable::createFromFormat('!Y-m', $this->validMonth($this->calMonth));
-    }
-
     private function parseDay(string $date): ?CarbonImmutable
     {
         if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $date) !== 1) {
@@ -170,93 +108,75 @@ class HealthAppointmentIndex extends Component
     }
 
     /**
-     * Semanas do mês (domingo a sábado) com, em cada dia, as marcas de compromisso (bolinha cheia: consulta
-     * ou exame) e de item de cuidado (bolinha vazada), na cor de quem é.
+     * Os compromissos do período: consulta e exame com horário, na cor de quem é, e item de cuidado como compromisso de dia
+     * inteiro (vazado). Cada compromisso já traz o que a pessoa precisa ver sem abrir: o título, o horário, quem é e onde.
      *
-     * @param  Collection<int, ProfileMember>  $membros
-     * @return array{semanas: list<list<array<string, mixed>>>, rotulo: string, primeiro: CarbonImmutable}
+     * @return Collection<int, CalendarEvent>
      */
-    private function calendario(Collection $membros): array
+    protected function calendarEvents(CarbonImmutable $inicio, CarbonImmutable $fim): Collection
     {
         $profileId = app(ProfileContext::class)->profileId();
-        $primeiro = $this->monthStart();
-        $inicio = $primeiro->startOfWeek(CarbonInterface::SUNDAY);
-        $fim = $primeiro->endOfMonth()->endOfWeek(CarbonInterface::SATURDAY);
+        $membros = $this->membros();
+        $ehCasal = $membros->count() > 1;
         $cores = $membros->mapWithKeys(fn (ProfileMember $m) => [$m->id => $m->calendarColor()]);
         $padrao = MemberPalette::defaultFor(null);
 
         $consultas = HealthAppointment::query()
             ->where('profile_id', $profileId)
             ->whereBetween('scheduled_at', [$inicio->startOfDay(), $fim->endOfDay()])
+            ->with('member')
             ->orderBy('scheduled_at')
             ->get()
-            ->groupBy(fn (HealthAppointment $c) => $c->scheduled_at->toDateString());
+            ->map(function (HealthAppointment $c) use ($cores, $padrao, $ehCasal): CalendarEvent {
+                $quemAtende = implode(' · ', array_filter([$c->specialty, $c->professional_name]));
+
+                return new CalendarEvent(
+                    key: 'consulta:'.$c->id,
+                    title: $c->title,
+                    start: CarbonImmutable::instance($c->scheduled_at),
+                    color: $cores[$c->member_id] ?? $padrao,
+                    tag: $c->kind->label(),
+                    lines: array_values(array_filter([
+                        $ehCasal ? $c->member->name : null,
+                        $quemAtende !== '' && $quemAtende !== $c->title ? $quemAtende : null,
+                        $c->location,
+                    ])),
+                    muted: $c->isPast(),
+                    // O detalhe já mostra quem atende, onde e como falar (x-appointment-details): aqui só entra de quem é.
+                    detailLines: $ehCasal ? [$c->member->name] : [],
+                );
+            });
 
         $cuidados = HealthCareItem::query()
             ->where('profile_id', $profileId)
             ->where('is_active', true)
             ->whereBetween('next_due_on', [$inicio->toDateString(), $fim->toDateString()])
+            ->with('member')
             ->get()
-            ->groupBy(fn (HealthCareItem $i) => $i->next_due_on->toDateString());
+            ->map(fn (HealthCareItem $i): CalendarEvent => new CalendarEvent(
+                key: 'cuidado:'.$i->id,
+                title: 'Trocar ou revisar: '.$i->name,
+                start: CarbonImmutable::parse($i->next_due_on->toDateString())->startOfDay(),
+                allDay: true,
+                color: $cores[$i->member_id] ?? $padrao,
+                tag: 'Item de cuidado',
+                lines: array_values(array_filter([$ehCasal ? $i->member->name : null, $i->device_name, $i->frequencyLabel()])),
+                hollow: true,
+                shortTitle: $i->name,
+                detailLines: array_values(array_filter([$ehCasal ? $i->member->name : null, $i->device_name, $i->frequencyLabel()])),
+            ));
 
-        $hoje = CarbonImmutable::today();
-        $semanas = [];
-        $posicao = 0;
-
-        for ($dia = $inicio; $dia <= $fim; $dia = $dia->addDay()) {
-            $data = $dia->toDateString();
-            $marcas = [];
-
-            foreach ($consultas->get($data, collect()) as $consulta) {
-                $marcas[] = ['cor' => $cores[$consulta->member_id] ?? $padrao, 'tipo' => 'consulta'];
-            }
-            foreach ($cuidados->get($data, collect()) as $item) {
-                $marcas[] = ['cor' => $cores[$item->member_id] ?? $padrao, 'tipo' => 'cuidado'];
-            }
-
-            $semanas[intdiv($posicao++, 7)][] = [
-                'data' => $data,
-                'dia' => $dia->day,
-                'doMes' => $dia->month === $primeiro->month,
-                'hoje' => $dia->isSameDay($hoje),
-                'selecionado' => $data === $this->selectedDate,
-                'marcas' => $marcas,
-                'rotulo' => $dia->translatedFormat('j \d\e F').(count($marcas) > 0 ? ', '.count($marcas).' '.(count($marcas) === 1 ? 'compromisso' : 'compromissos') : ''),
-            ];
-        }
-
-        return [
-            'semanas' => array_values($semanas),
-            'rotulo' => $primeiro->translatedFormat('F \d\e Y'),
-            'primeiro' => $primeiro,
-        ];
+        return $consultas->concat($cuidados)->values();
     }
 
-    /** Compromissos e itens de cuidado do dia tocado no calendário. */
-    private function diaSelecionado(): ?array
+    /** A consulta ou o item de cuidado aberto no detalhe do calendário, para a tela mostrar o que é próprio de cada um. */
+    private function compromissoAberto(): array
     {
-        $dia = $this->selectedDate !== null ? $this->parseDay($this->selectedDate) : null;
-
-        if ($dia === null) {
-            return null;
-        }
-
-        $profileId = app(ProfileContext::class)->profileId();
+        [$tipo, $id] = array_pad(explode(':', (string) $this->openEvent, 2), 2, null);
 
         return [
-            'data' => $dia,
-            'consultas' => HealthAppointment::query()
-                ->where('profile_id', $profileId)
-                ->whereBetween('scheduled_at', [$dia->startOfDay(), $dia->endOfDay()])
-                ->orderBy('scheduled_at')
-                ->with('member')
-                ->get(),
-            'cuidados' => HealthCareItem::query()
-                ->where('profile_id', $profileId)
-                ->where('is_active', true)
-                ->whereDate('next_due_on', $dia->toDateString())
-                ->with('member')
-                ->get(),
+            'consultaAberta' => $tipo === 'consulta' && $id !== null ? HealthAppointment::query()->with('member')->find($id) : null,
+            'cuidadoAberto' => $tipo === 'cuidado' && $id !== null ? HealthCareItem::query()->with('member')->find($id) : null,
         ];
     }
 
@@ -272,6 +192,7 @@ class HealthAppointmentIndex extends Component
         $consulta = HealthAppointment::query()->findOrFail($appointmentId);
 
         $this->resetForm();
+        $this->closeEvent();
         $this->editingId = $consulta->id;
         $this->memberId = $consulta->member_id;
         $this->kind = $consulta->kind->value;
@@ -349,6 +270,7 @@ class HealthAppointmentIndex extends Component
     public function delete(string $appointmentId, HealthAppointmentService $service): void
     {
         $service->delete(HealthAppointment::query()->findOrFail($appointmentId));
+        $this->closeEvent();
     }
 
     public function render()
@@ -361,12 +283,11 @@ class HealthAppointmentIndex extends Component
             'layout' => auth()->user()->agenda_layout ?? AgendaLayout::List,
             'coresDosMembros' => $membros->mapWithKeys(fn (ProfileMember $m) => [$m->id => $m->calendarColor()])->all(),
             'paleta' => MemberPalette::COLORS,
-            'calendario' => $this->calendario($membros),
-            'dia' => $this->diaSelecionado(),
+            'calendario' => $this->calendarData(),
             'upcoming' => HealthAppointment::query()->where('profile_id', $profileId)->upcoming()->with('member')->get(),
             'past' => HealthAppointment::query()->where('profile_id', $profileId)->past()->with('member')->get(),
             'editingExisting' => $this->editingId !== null,
-        ]);
+        ] + $this->compromissoAberto());
     }
 
     private function membros(): Collection
