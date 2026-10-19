@@ -123,6 +123,7 @@ Todas idempotentes (regra 4). O cron da Hostinger chama `schedule:run` a cada mi
 | cobrança (`lembrete-pix`, `pix-automatico-*`, `nota-fiscal-pendentes`, `lembrete-fim-do-teste`, `aviso-acesso-encerrando`) | 03:35 a 04:00 | assinatura e Asaas |
 | `acompanhamento-roteiro` | 06:30 | reavalia os itens automáticos do passo a passo dos clientes com vínculo ativo (só grava o que mudou de estado) |
 | `acompanhamento-lembretes` | 07:45 | lembrete de reunião no dia seguinte e de tarefa que vence amanhã ou venceu (só com vínculo ativo; índice único em `engagement_reminders`) |
+| `honorarios-previstos` | 04:05 | estende, para cada contrato de honorário ativo, os recebimentos previstos (12 meses à frente; índice único `fee_agreement_id` + `due_on`) |
 | `anexos-de-leads` | 04:10 | apaga arquivos de leads perdidos há mais de 12 meses |
 | `leads-de-renovacao` | 07:30 | cria lead para apólice que vence (preferências em `users.renewal_lead_*`) |
 | `resumo-de-leads` | 08:00 | uma notificação por profissional com o que pede atenção nos leads |
@@ -153,6 +154,25 @@ Módulo `Debt` + `DebtInstallment` + `DebtAdjustment` (reajustes do consórcio).
 - **Consórcio assistido**: a prévia do reajuste (`DebtService::previewAdjustment`) usa a mesma conta do registro; a sugestão de percentual vem do último reajuste registrado ou, sem histórico, do salto visto nas parcelas pagas (`Debt::observedAdjustment`). O lance na contemplação (`DebtSimulator::bid`, base em `Debt::contemplationBase`: extrato ou parcelas em aberto) mostra "baixar a parcela" x "encurtar o prazo" e só preenche o formulário; lance embutido sai da carta.
 - **Objetivos** têm cadastro próprio (`GoalsIndex`): avançam pelo dinheiro informado, pelo saldo de um investimento ou pelas parcelas pagas de um consórcio (um consórcio, um objetivo).
 - Fora de produção o projeto **proíbe lazy loading** (`Model::shouldBeStrict` em ambiente local): carregue as relações que a view usa (`with`/`loadMissing`).
+
+### Recebimentos do profissional (consultor e corretor)
+
+Tela `/recebimentos` (`ProfessionalIncome`, serviço `ProfessionalIncomeService`): quanto o profissional recebe por mês.
+O livro é `IncomeEntry` (previsto, recebido ou cancelado; competência = `due_on`, com `year`/`month` por `HasCompetence`)
+e o honorário fixo por cliente é `FeeAgreement` (mensal, trimestral, semestral ou anual). Regras:
+
+- **Sigilo**: o dado é do profissional (`professional_id`), nunca do cliente nem do outro profissional do mesmo cliente.
+  Os dois models não usam `BelongsToProfile` (estão em `EXEMPT` do `TenancyCoverageTest`, com o motivo) e toda leitura
+  passa por `ownedBy()`. Não crie caminho que mostre recebimento a quem não é o dono.
+- **Previsto vs recebido**: o Cerne só *prevê*; quem recebe confirma ("Dar baixa", com valor e data reais). Nada vira
+  "recebido" sozinho. Cancelar mantém a linha (o índice único do contrato depende dela e o previsto não ressuscita).
+- **Contrato gera previsto** (`FeeForecastService`): só do mês atual em diante (histórico se lança à mão, senão tudo nasceria
+  "atrasado"); editar ou pausar refaz só o que ainda é previsão; o recebido e o cancelado ficam. Lançamento gerado por
+  contrato não se edita nem exclui, só se dá baixa ou se cancela; o manual se edita e exclui.
+- Somas em SQL. Contrato de honorário é só do consultor; o corretor usa o livro com lançamentos manuais.
+- **Fases seguintes (combinadas)**: 2) regras de comissionamento por seguradora (percentual por ano de vigência, agenciamento)
+  e previsão a partir das apólices; 3) percentual sobre patrimônio por periodicidade e por produto/empresa de investimento;
+  4) consórcio por administradora (ex.: 3,5% da carta nas parcelas 2, 4 e 6); 5) conferência por extrato de comissão (IA com revisão).
 
 ### Calendário (Saúde e agenda do profissional)
 

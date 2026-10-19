@@ -170,6 +170,14 @@ Schedule::call(function (): void {
     logger()->info('Resumo de leads', ['avisados' => $avisados]);
 })->dailyAt('08:00')->name('resumo-de-leads')->withoutOverlapping();
 
+// Recebimentos: estende, para cada contrato de honorário ativo, os vencimentos previstos (12 meses à frente).
+// Idempotente pelo índice único (contrato, vencimento).
+Schedule::call(function (): void {
+    $resultado = app(\App\Services\FeeForecastService::class)->runDailyMaintenance();
+
+    logger()->info('Honorários previstos', $resultado);
+})->dailyAt('04:05')->name('honorarios-previstos')->withoutOverlapping();
+
 // Leads: anexos de contatos perdidos há mais do prazo de retenção saem do servidor.
 // Idempotente: o que já foi apagado não aparece de novo.
 Schedule::command('cerne:purge-lead-files')->dailyAt('04:10')->name('anexos-de-leads')->withoutOverlapping();

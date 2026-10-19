@@ -9,7 +9,9 @@ use App\Models\ConsultantClient;
 use App\Models\ConsultantInvite;
 use App\Models\EngagementPlanTemplate;
 use App\Models\EngagementReminder;
+use App\Models\FeeAgreement;
 use App\Models\FinancialProfile;
+use App\Models\IncomeEntry;
 use App\Models\GymExerciseSuggestion;
 use App\Models\InsurancePolicyRenewal;
 use App\Models\Lead;
@@ -62,6 +64,10 @@ class TenancyCoverageTest extends TestCase
 
         // Treino é dado de Saúde: a fila de sugestões ao catálogo é anônima por desenho.
         GymExerciseSuggestion::class => 'fila anônima de sugestões de exercício ao catálogo — de propósito NÃO guarda perfil, membro nem usuário (treino é dado de Saúde); só nome, grupo, tipo e contador',
+
+        // Renda do profissional: é dele (professional_id) e de mais ninguém, nem do cliente nem do outro profissional do cliente.
+        IncomeEntry::class => 'recebimento do profissional (professional_id) — sigiloso: nem o cliente nem outro profissional do mesmo cliente podem ver; o profile_id é só o cliente de origem, sem escopo de perfil',
+        FeeAgreement::class => 'honorário que o profissional combinou com um cliente (professional_id) — mesmo sigilo de IncomeEntry; o profile_id aponta o cliente, não isola o dado',
 
         // Vínculos consultor-cliente: ligam dois usuários, sem profile_id.
         ConsultantClient::class => 'liga consultor e cliente por user_id — não tem profile_id',

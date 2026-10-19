@@ -174,6 +174,7 @@
             'chave' => 'gestao', 'label' => 'Gestão', 'icone' => 'calendar',
             'items' => [
                 ['consultant.calendar', 'Agenda', 'Agenda', 'calendar'],
+                ['consultant.income', 'Recebimentos', 'Receb.', 'coins'],
                 ['consultant.portfolio.important-dates', 'Datas importantes', 'Datas', 'bell'],
                 ['consultant.leads', 'Leads', 'Leads', 'contact'],
             ],

@@ -16,6 +16,9 @@
         @case('flow')
             <path d="M3 17l5-6 4 3 5-7 4 4"/><path d="M3 21h18"/>
             @break
+        @case('coins')
+            <circle cx="9" cy="9" r="6"/><path d="M18.09 10.37A6 6 0 1 1 10.34 18"/><path d="M7 6h2v4"/><path d="m16.71 13.88.7.71-2.82 2.82"/>
+            @break
         @case('bills')
             <rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/>
             @break
