@@ -226,8 +226,8 @@
                     @error('bookedByName') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
                 </div>
                 <div>
-                    <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Agendado com <span class="font-normal text-slate-400">(secretária ou atendente)</span></label>
-                    <input type="text" wire:model="bookedWithName" class="input mt-1.5" placeholder="Ex.: Maria, secretária" maxlength="120">
+                    <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Agendado com</label>
+                    <input type="text" wire:model="bookedWithName" class="input mt-1.5" placeholder="Secretária ou atendente" maxlength="120">
                     @error('bookedWithName') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
                 </div>
                 <div class="@sm:col-span-2">

@@ -376,7 +376,7 @@
                     @error('remainingInstallments') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
                 </div>
                 <div>
-                    <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Categoria das parcelas a partir de agora</label>
+                    <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Categoria das parcelas</label>
                     <select wire:model.live="contemplationCategoryId" class="select mt-1.5 w-full">
                         <option value="">Escolha</option>
                         @foreach ($categorias as $cat)
@@ -597,8 +597,9 @@
                     <input type="text" wire:model="editCreditor" maxlength="120" class="input mt-1.5">
                 </div>
                 <div>
-                    <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">CPF ou CNPJ do credor <span class="font-normal text-slate-400">(para o imposto de renda; opcional)</span></label>
+                    <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">CPF/CNPJ do credor <span class="font-normal text-slate-400">(opcional)</span></label>
                     <input type="text" wire:model="editCreditorDocument" maxlength="20" class="input mt-1.5" placeholder="Ex.: 00.000.000/0001-00">
+                <p class="mt-1 text-xs text-slate-400">Aparece no relatório de imposto de renda.</p>
                     @error('editCreditorDocument') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
                 </div>
                 <div>

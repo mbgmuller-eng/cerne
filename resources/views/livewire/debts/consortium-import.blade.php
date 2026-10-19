@@ -181,21 +181,23 @@
                         @error('row.installment_amount') <p class="{{ $erro }}">{{ $message }}</p> @enderror
                     </div>
                     <div>
-                        <label class="{{ $campo }}">Parcela flex: quanto a parcela é menor até a contemplação</label>
+                        <label class="{{ $campo }}">Parcela flex</label>
                         <select wire:model="row.flex_percent" class="select mt-1.5 w-full">
                             <option value="">Não é flex</option>
                             @foreach ([10, 20, 30, 40, 50] as $pct)
                                 <option value="{{ $pct }}">{{ $pct }}%</option>
                             @endforeach
                         </select>
+                        <p class="mt-1 text-xs text-slate-400">Quanto a parcela é menor até a contemplação.</p>
                         @error('row.flex_percent') <p class="{{ $erro }}">{{ $message }}</p> @enderror
                     </div>
                     <div>
-                        <label class="{{ $campo }}">Parcela de referência (número) <span class="font-normal text-slate-400">e o vencimento dela</span></label>
+                        <label class="{{ $campo }}">Parcela de referência</label>
                         <div class="mt-1.5 grid grid-cols-2 gap-2">
                             <input type="number" wire:model="row.anchor_number" min="1" class="input" aria-label="Número da parcela de referência">
                             <input type="date" wire:model="row.anchor_due" class="input" aria-label="Vencimento da parcela de referência">
                         </div>
+                        <p class="mt-1 text-xs text-slate-400">Número da parcela e o vencimento dela.</p>
                         @error('row.anchor_number') <p class="{{ $erro }}">{{ $message }}</p> @enderror
                         @error('row.anchor_due') <p class="{{ $erro }}">{{ $message }}</p> @enderror
                     </div>

@@ -94,6 +94,7 @@ automáticas: a linha vem sugerida e a pessoa confirma.
 | Soft delete | Flag `is_active` (é o que a spec define), não `SoftDeletes`. |
 | Idioma do código | Nomes em inglês, comentários e textos de tela em português. |
 | Comentários | Explicam **por que**, não o que. Se o código já diz, não comente. |
+| Formulários | Campos lado a lado ficam alinhados: o rótulo cabe em **uma linha** (até 38 caracteres) e a explicação vai numa dica abaixo do campo (`<p class="mt-1 text-xs text-slate-400">`). Rótulo comprido na coluna da metade empurra o campo para baixo. `FormLayoutTest` barra o que escapar. |
 
 ## Estrutura
 
