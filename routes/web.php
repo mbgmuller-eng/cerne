@@ -221,6 +221,7 @@ Route::middleware(['auth', 'verified'])->group(function (): void {
         Route::get('/carteira/dividas', \App\Livewire\Consultant\PortfolioDebts::class)->name('consultant.portfolio.debts');
         Route::get('/carteira/datas-importantes', ImportantDates::class)->name('consultant.portfolio.important-dates');
         Route::get('/semana', \App\Livewire\Consultant\EngagementWeek::class)->name('consultant.week');
+        Route::get('/agenda', \App\Livewire\Consultant\ConsultantCalendar::class)->name('consultant.calendar');
         Route::get('/modelos-de-roteiro', \App\Livewire\Consultant\EngagementTemplates::class)->name('consultant.plan-templates');
         Route::get('/leads', LeadsIndex::class)->name('consultant.leads');
         Route::get('/leads/metricas', \App\Livewire\Consultant\LeadMetrics::class)->name('consultant.leads.metrics');

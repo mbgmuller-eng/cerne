@@ -154,6 +154,18 @@ Módulo `Debt` + `DebtInstallment` + `DebtAdjustment` (reajustes do consórcio).
 - **Objetivos** têm cadastro próprio (`GoalsIndex`): avançam pelo dinheiro informado, pelo saldo de um investimento ou pelas parcelas pagas de um consórcio (um consórcio, um objetivo).
 - Fora de produção o projeto **proíbe lazy loading** (`Model::shouldBeStrict` em ambiente local): carregue as relações que a view usa (`with`/`loadMissing`).
 
+### Calendário (Saúde e agenda do profissional)
+
+Um módulo só desenha o calendário: `<x-calendar>` (mês, semana e dia, no estilo de uma agenda) alimentado por `CalendarBuilder` e
+`CalendarEvent`, e controlado pelo trait `HasCalendar` (visão e data na URL; a visão escolhida fica em `users.calendar_view`).
+
+- **Quem usa só traduz o seu model para `CalendarEvent`** (título, horário, cor, linhas de apoio, `shortTitle` para etiqueta apertada)
+  e implementa `calendarEvents($inicio, $fim)`. O calendário não conhece Saúde nem consultor. Cor só passa se for `#RRGGBB`.
+- **Saúde** (`HealthAppointmentIndex`): consulta e exame com horário, na cor de quem é; item de cuidado como dia inteiro, vazado.
+  A privacidade é a da Agenda de Saúde (consultor não vê nada).
+- **Agenda do profissional** (`ConsultantCalendar`, `ConsultantAgendaService`, rota `/agenda`): reuniões, prazos de tarefas e retornos de
+  leads (`leads.next_action_at`), só do que é do profissional e dos clientes com vínculo ativo. Corretor só vê leads. É só leitura.
+- Celular: a grade de horários vira lista por dia e o mês mostra pontos. Classe de layout nova exige `npm run build` (assets versionados).
 ### Acompanhamento (consultor financeiro e cliente)
 
 Reuniões, tarefas, demandas e notas (`Engagement*`). Regras que não se quebram:

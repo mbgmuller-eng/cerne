@@ -187,7 +187,7 @@
                                         @class(['absolute z-[5] overflow-hidden rounded-md px-1.5 py-1 text-left text-[11px] leading-4 text-slate-800 shadow-sm hover:brightness-95 dark:text-slate-100', 'opacity-60' => $e->muted])
                                         style="top: {{ $slot['top'] }}rem; height: calc({{ $slot['height'] }}rem - 2px); left: calc({{ $slot['left'] }}% + 1px); width: calc({{ $slot['width'] }}% - 3px); {{ $estilo($e) }}"
                                     >
-                                        <span class="block truncate font-semibold">{{ $e->title }}</span>
+                                        <span class="block truncate font-semibold">{{ $ehDia ? $e->title : $e->chipTitle() }}</span>
                                         <span class="block truncate tabular-nums text-slate-600 dark:text-slate-300">{{ $e->timeLabel() }}</span>
                                         @if ($slot['height'] >= 3.5)
                                             @foreach (array_slice($e->lines, 0, $ehDia ? 4 : 2) as $linha)

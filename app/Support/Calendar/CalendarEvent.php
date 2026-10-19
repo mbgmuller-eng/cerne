@@ -23,6 +23,7 @@ final class CalendarEvent
      * @param  bool  $muted  esmaecido: o que já passou ou foi concluído
      * @param  string|null  $shortTitle  o título curto das etiquetas apertadas (mês, semana); o título inteiro fica no detalhe
      * @param  list<string>|null  $detailLines  as linhas do detalhe, quando a tela mostra o resto por conta própria; nulo = as mesmas de $lines
+     * @param  array<string, mixed>  $meta  o que a tela dona do calendário precisa para montar o detalhe (não é desenhado pelo calendário)
      */
     public function __construct(
         public readonly string $key,
@@ -37,6 +38,7 @@ final class CalendarEvent
         public readonly bool $muted = false,
         public readonly ?string $shortTitle = null,
         public readonly ?array $detailLines = null,
+        public readonly array $meta = [],
     ) {
         // A cor vai para o atributo style: nada fora de #RRGGBB passa.
         $this->color = preg_match('/^#[0-9A-Fa-f]{6}$/', $color) === 1 ? strtoupper($color) : '#64748B';
