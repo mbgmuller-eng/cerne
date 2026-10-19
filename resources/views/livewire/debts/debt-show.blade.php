@@ -27,6 +27,7 @@
             @endif
             @if ($debt->status->isUnscheduled())
                 <button type="button" wire:click="openBalance" class="btn-secondary px-3 py-1.5 text-sm">Atualizar saldo</button>
+                <button type="button" wire:click="openAgreementSim" class="btn-secondary px-3 py-1.5 text-sm">Simular acordo</button>
                 <button type="button" wire:click="openAgreement" class="btn-secondary px-3 py-1.5 text-sm">Registrar acordo</button>
                 <button type="button" wire:click="markPaidOff" wire:confirm="Dar esta dívida como quitada? Use quando ela foi paga por fora, perdoada ou prescreveu." class="btn-ghost px-3 py-1.5 text-sm">Marcar como quitada</button>
             @endif
@@ -436,6 +437,107 @@
         </form>
     </x-modal>
 
+    {{-- Simulador de acordo --}}
+    <x-modal wire-model="showAgreementSim" max-width="2xl">
+        <div class="space-y-4">
+            <div class="flex items-baseline justify-between">
+                <h2 class="text-sm font-semibold text-slate-900 dark:text-white">Simular acordo</h2>
+                <button type="button" wire:click="$set('showAgreementSim', false)" class="btn-ghost px-2 py-1 text-xs">Fechar</button>
+            </div>
+
+            <p class="text-sm text-slate-600 dark:text-slate-300">
+                Compare o que o credor propôs. O saldo hoje é <strong class="font-medium">{{ Money::format($debt->current_balance) }}</strong>. Em cada proposta, informe o valor total que você vai pagar e em quantas parcelas.
+            </p>
+
+            <form wire:submit="simulateAgreement" class="space-y-4">
+                <div class="space-y-3">
+                    @foreach ($agSimRows as $i => $linha)
+                        <div class="grid gap-3 @sm:grid-cols-[1fr_1fr_7rem_auto] *:min-w-0" wire:key="ag-linha-{{ $i }}">
+                            <div>
+                                <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Proposta</label>
+                                <input type="text" wire:model="agSimRows.{{ $i }}.label" maxlength="40" class="input mt-1.5">
+                                @error('agSimRows.'.$i.'.label') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Total a pagar</label>
+                                <input type="text" wire:model="agSimRows.{{ $i }}.total" inputmode="decimal" class="input mt-1.5" placeholder="Ex.: 3000,00">
+                                @error('agSimRows.'.$i.'.total') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Parcelas</label>
+                                <input type="number" wire:model="agSimRows.{{ $i }}.installments" min="1" max="480" class="input mt-1.5">
+                                @error('agSimRows.'.$i.'.installments') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                            </div>
+                            <div class="flex items-end">
+                                @if (count($agSimRows) > 1)
+                                    <button type="button" wire:click="removeAgreementSimRow({{ $i }})" class="btn-ghost px-2 py-2 text-xs text-red-700 dark:text-red-400" aria-label="Remover proposta">Remover</button>
+                                @endif
+                            </div>
+                        </div>
+                    @endforeach
+                </div>
+
+                <div class="grid gap-3 @sm:grid-cols-2 *:min-w-0">
+                    <div>
+                        <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Juros por mês se não negociar <span class="font-normal text-slate-400">(%)</span></label>
+                        <input type="text" wire:model="agSimGrowth" inputmode="decimal" class="input mt-1.5" placeholder="Ex.: 8">
+                        <p class="mt-1 text-xs text-slate-400">Opcional: mostra quanto a dívida chegaria a ser em 12 meses.</p>
+                        @error('agSimGrowth') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                    </div>
+                </div>
+
+                <div class="flex flex-wrap items-center justify-between gap-3">
+                    @if (count($agSimRows) < 4)
+                        <button type="button" wire:click="addAgreementSimRow" class="btn-ghost px-3 py-1.5 text-xs">Adicionar proposta</button>
+                    @else
+                        <span></span>
+                    @endif
+                    <button type="submit" class="btn-primary px-4 py-2 text-sm">Comparar</button>
+                </div>
+            </form>
+
+            @if ($agSimResult !== [])
+                <div class="space-y-3 rounded-xl border border-slate-200 p-4 dark:border-white/10">
+                    <ul class="divide-y divide-slate-100 dark:divide-white/10">
+                        @foreach ($agSimResult['proposals'] as $i => $p)
+                            <li class="space-y-1 py-3 first:pt-0 last:pb-0" wire:key="ag-res-{{ $i }}">
+                                <div class="flex flex-wrap items-center justify-between gap-2">
+                                    <p class="text-sm font-medium text-slate-800 dark:text-slate-200">
+                                        {{ $p['label'] }}
+                                        @if ($agSimResult['best_total'] === $i) <span class="badge ml-1 bg-accent-50 text-accent-700 dark:bg-accent-500/15 dark:text-accent-300">menor custo</span> @endif
+                                        @if ($agSimResult['lightest_month'] === $i && $agSimResult['best_total'] !== $i) <span class="badge ml-1 bg-slate-100 text-slate-600 dark:bg-white/10 dark:text-slate-300">menor parcela</span> @endif
+                                    </p>
+                                    <button type="button" wire:click="useAgreementProposal({{ $i }})" class="btn-secondary px-2.5 py-1 text-xs">Usar esta proposta</button>
+                                </div>
+                                <p class="text-sm tabular-nums text-slate-700 dark:text-slate-300">
+                                    {{ Money::format($p['total']) }} em {{ $p['installments'] }} {{ $p['installments'] === 1 ? 'vez' : 'vezes' }}
+                                    @if ($p['installments'] > 1) · {{ Money::format($p['monthly']) }} por mês @endif
+                                </p>
+                                <p class="text-xs {{ bccomp($p['discount'], '0', 2) > 0 ? 'text-accent-700 dark:text-accent-400' : 'text-red-700 dark:text-red-400' }}">
+                                    @if (bccomp($p['discount'], '0', 2) > 0)
+                                        Desconto de {{ Money::format($p['discount']) }} ({{ number_format($p['discount_percent'], 1, ',', '.') }}%) sobre o saldo de hoje.
+                                    @elseif (bccomp($p['discount'], '0', 2) === 0)
+                                        Sem desconto: paga o saldo de hoje.
+                                    @else
+                                        Paga {{ Money::format(bcsub('0', $p['discount'], 2)) }} a mais que o saldo de hoje.
+                                    @endif
+                                </p>
+                                @if ($p['implicit_rate'] !== null)
+                                    <p class="text-xs text-slate-400">Parcelar em vez de pagar "{{ $p['reference'] }}" custa cerca de {{ number_format($p['implicit_rate'], 2, ',', '.') }}% ao mês.</p>
+                                @endif
+                            </li>
+                        @endforeach
+                    </ul>
+                    @if ($agSimResult['if_nothing'])
+                        <p class="border-t border-slate-100 pt-3 text-xs text-slate-500 dark:border-white/10 dark:text-slate-400">
+                            Sem acordo, com {{ $agSimGrowth }}% ao mês, o saldo iria de {{ Money::format($agSimResult['balance']) }} para cerca de {{ Money::format($agSimResult['if_nothing']) }} em 12 meses.
+                        </p>
+                    @endif
+                    <p class="text-xs text-slate-400">É uma comparação das propostas que você informou, sem considerar o que o dinheiro renderia em outro lugar. Confira tudo no contrato do acordo.</p>
+                </div>
+            @endif
+        </div>
+    </x-modal>
     {{-- Acordo --}}
     <x-modal wire-model="showAgreement" max-width="2xl">
         <form wire:submit="saveAgreement" class="space-y-4">

@@ -17,6 +17,7 @@ use App\Models\ExpenseRecord;
 use App\Models\Goal;
 use App\Models\ProfileMember;
 use App\Services\DebtService;
+use App\Support\Debts\DebtAgreementSimulator;
 use App\Support\Debts\DebtClassification;
 use App\Support\Debts\DebtScheduleCalculator;
 use App\Support\Debts\DebtSimulator;
@@ -165,6 +166,17 @@ class DebtShow extends Component
 
     /** @var array<string, mixed> */
     public array $simResult = [];
+
+    // Simulador de acordo (dívida em aberto): compara propostas antes de registrar o acordo
+    public bool $showAgreementSim = false;
+
+    /** @var list<array{label: string, total: string, installments: string}> */
+    public array $agSimRows = [];
+
+    public string $agSimGrowth = '';
+
+    /** @var array<string, mixed> */
+    public array $agSimResult = [];
 
     public function mount(Debt $debt): void
     {
@@ -509,6 +521,82 @@ class DebtShow extends Component
         $this->debt->refresh();
     }
 
+    public function openAgreementSim(): void
+    {
+        abort_unless($this->debt->status->isUnscheduled(), 404);
+
+        $this->resetValidation();
+        $this->agSimResult = [];
+        $this->agSimGrowth = '';
+        $this->agSimRows = [
+            ['label' => 'À vista', 'total' => '', 'installments' => '1'],
+            ['label' => 'Parcelado', 'total' => '', 'installments' => '12'],
+        ];
+        $this->showAgreementSim = true;
+    }
+
+    public function addAgreementSimRow(): void
+    {
+        if (count($this->agSimRows) < 4) {
+            $this->agSimRows[] = ['label' => 'Proposta '.(count($this->agSimRows) + 1), 'total' => '', 'installments' => '12'];
+        }
+    }
+
+    public function removeAgreementSimRow(int $i): void
+    {
+        if (count($this->agSimRows) > 1) {
+            unset($this->agSimRows[$i]);
+            $this->agSimRows = array_values($this->agSimRows);
+            $this->agSimResult = [];
+        }
+    }
+
+    public function simulateAgreement(): void
+    {
+        abort_unless($this->debt->status->isUnscheduled(), 404);
+
+        $this->validate([
+            'agSimRows' => ['required', 'array', 'min:1', 'max:4'],
+            'agSimRows.*.label' => ['required', 'string', 'max:40'],
+            'agSimRows.*.total' => ['required', 'string', 'max:20', 'regex:/^[0-9.,\s]+$/'],
+            'agSimRows.*.installments' => ['required', 'integer', 'min:1', 'max:480'],
+            'agSimGrowth' => ['nullable', 'string', 'max:8', 'regex:/^[0-9.,\s]*$/'],
+        ], [
+            'agSimRows.*.total.required' => 'Informe o valor total da proposta.',
+            'agSimRows.*.total.regex' => 'Informe o valor só com números (ex.: 3000,00).',
+            'agSimRows.*.installments.required' => 'Informe em quantas parcelas.',
+        ], ['agSimRows.*.label' => 'nome da proposta', 'agSimRows.*.installments' => 'parcelas', 'agSimGrowth' => 'juros por mês']);
+
+        $saldo = Money::parse($this->debt->current_balance);
+        $propostas = array_map(fn (array $r) => ['label' => $r['label'], 'total' => Money::parse($r['total']), 'installments' => (int) $r['installments']], $this->agSimRows);
+
+        if (bccomp($saldo, '0', 2) <= 0) {
+            $this->addError('agSimRows', 'A dívida não tem saldo para simular.');
+
+            return;
+        }
+
+        $this->agSimResult = DebtAgreementSimulator::compare($saldo, $propostas) + [
+            'balance' => $saldo,
+            'if_nothing' => $this->agSimGrowth !== '' ? DebtAgreementSimulator::ifNothingIsDone($saldo, str_replace(',', '.', trim($this->agSimGrowth))) : null,
+        ];
+    }
+
+    /** Leva a proposta escolhida para o "Registrar acordo", já preenchido. */
+    public function useAgreementProposal(int $i): void
+    {
+        $p = $this->agSimResult['proposals'][$i] ?? null;
+
+        if ($p === null) {
+            return;
+        }
+
+        $this->showAgreementSim = false;
+        $this->openAgreement();
+        $this->agreementTotal = $p['total'];
+        $this->agreementInstallments = (string) $p['installments'];
+    }
+
     public function openAgreement(): void
     {
         $sugestao = DebtClassification::suggest(DebtKind::Debt);
@@ -698,6 +786,7 @@ class DebtShow extends Component
             'semCategoria' => $this->semCategoria(),
             'emCarta' => $this->debt->isSavingForCredit(),
             'podeSimular' => $this->podeSimular(),
+            'podeSimularAcordo' => $this->debt->status->isUnscheduled(),
             'basesTaxa' => DebtRateBasis::options(),
             'ultimaPaga' => (int) $parcelas->where('status', DebtInstallmentStatus::Paid)->max('number'),
             'quantidadePuladas' => $parcelas->where('status', DebtInstallmentStatus::Diluted)->count(),
