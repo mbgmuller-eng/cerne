@@ -232,7 +232,8 @@
                                     $ehReceita = ($item['tipo'] ?? null) === 'receita';
                                     $ehFatura = ! $ehReceita && ($faturaPorItem[$i] ?? '') !== '';
                                     $ehTransferencia = ! $ehFatura && ($transferenciaPorItem[$i] ?? false);
-                                    $ehEstorno = ($estornoPorItem[$i] ?? false) || $ehFatura || $ehTransferencia; // sem categoria: nenhum dos dois é gasto novo
+                                    $ehParcelaDivida = ! $ehReceita && ! $ehFatura && ! $ehTransferencia && ($parcelaDividaPorItem[$i] ?? '') !== '';
+                                    $ehEstorno = ($estornoPorItem[$i] ?? false) || $ehFatura || $ehTransferencia || $ehParcelaDivida; // sem categoria: nenhum dos dois é gasto novo; a parcela herda a categoria da dívida
                                     $necessidadeItem = $necessidadePorItem[$i] ?? '';
                                     $faltaCategorizar = ! $ehReceita && ($itensFaltandoCategoria[$i] ?? false);
                                     $categoriasDoItem = $necessidadeItem === Necessity::Investment->value
@@ -395,6 +396,22 @@
                                                                 Dá baixa na fatura e debita a conta uma vez só. Não vira despesa.
                                                             @endif
                                                         </p>
+                                                    @endif
+                                                </div>
+                                            @endif
+                                            @if (isset($parcelaDividaOpcoesPorItem[$i]))
+                                                <div class="mb-1.5 space-y-1 rounded-lg bg-brand-50 px-3 py-2 dark:bg-white/5">
+                                                    <label class="flex flex-wrap items-center gap-2 text-slate-600 dark:text-slate-300">
+                                                        <span class="font-medium">Parcela de dívida:</span>
+                                                        <select wire:model.live="parcelaDividaPorItem.{{ $i }}" class="select max-w-full py-1 text-xs">
+                                                            <option value="">Não é parcela de dívida</option>
+                                                            @foreach ($parcelaDividaOpcoesPorItem[$i] as $opcao)
+                                                                <option value="{{ $opcao['id'] }}">{{ $opcao['sugerida'] ? 'Sugerida: ' : '' }}{{ $opcao['label'] }}</option>
+                                                            @endforeach
+                                                        </select>
+                                                    </label>
+                                                    @if ($ehParcelaDivida)
+                                                        <p class="text-slate-500 dark:text-slate-400">Vira a despesa da parcela, na categoria da dívida, e a parcela fica paga. O dinheiro conta uma vez só.</p>
                                                     @endif
                                                 </div>
                                             @endif

@@ -20,6 +20,7 @@ use App\Models\IncomeRecord;
 use App\Services\Extraction\CategorizationRuleMatcher;
 use App\Services\Extraction\DocumentCommitService;
 use App\Services\Extraction\ExternalReportReview;
+use App\Services\Extraction\DebtInstallmentMatcher;
 use App\Services\Extraction\InvoicePaymentMatcher;
 use App\Services\Extraction\OwnTransferMatcher;
 use App\Support\Money;
@@ -105,6 +106,11 @@ class DocumentsIndex extends Component
     public array $fixedBillPaymentPorItem = [];
 
     public array $recurringIncomeOccurrencePorItem = [];
+
+    /** Parcela de dívida (financiamento, empréstimo, consórcio) que a saída paga, por item, e as opções para trocar. */
+    public array $parcelaDividaPorItem = [];
+
+    public array $parcelaDividaOpcoesPorItem = [];
 
     /** Texto explicando o casamento com conta fixa/receita recorrente, quando houver. */
     public array $notaPorItem = [];
@@ -253,6 +259,8 @@ class DocumentsIndex extends Component
         $this->regraAplicadaPorItem = [];
         $this->fixedBillPaymentPorItem = [];
         $this->recurringIncomeOccurrencePorItem = [];
+        $this->parcelaDividaPorItem = [];
+        $this->parcelaDividaOpcoesPorItem = [];
         $this->notaPorItem = [];
         $this->faturaPorItem = [];
         $this->faturaOpcoesPorItem = [];
@@ -313,6 +321,11 @@ class DocumentsIndex extends Component
         if ($documento->document_type !== DocumentType::CreditCardInvoice) {
             $this->casarPagamentosDeFatura($documento, $itens);
             $this->casarTransferencias($documento, $itens);
+        }
+
+        // Só extrato bancário: é a conta de onde a parcela foi debitada. A baixa de conta fixa, fatura e transferência têm prioridade.
+        if ($documento->document_type === DocumentType::BankStatement) {
+            $this->casarParcelasDeDividas($itens);
         }
     }
 
@@ -499,7 +512,7 @@ class DocumentsIndex extends Component
         $this->reset(
             'revisandoId', 'aceitos', 'categoriaPorItem', 'subcategoriaPorItem', 'novaSubcategoriaPorItem',
             'necessidadePorItem', 'estornoPorItem', 'regraAplicadaPorItem', 'fixedBillPaymentPorItem',
-            'recurringIncomeOccurrencePorItem', 'notaPorItem', 'duplicataPorItem',
+            'recurringIncomeOccurrencePorItem', 'parcelaDividaPorItem', 'parcelaDividaOpcoesPorItem', 'notaPorItem', 'duplicataPorItem',
             'criarRegraPorItem', 'regraPatternPorItem', 'regraValorExatoPorItem',
             'contaPorItem', 'dicasPorItem', 'grupoCategoria', 'grupoNecessidade',
             'confirmandoExclusaoItem',
@@ -599,7 +612,7 @@ class DocumentsIndex extends Component
             }
 
             // Estorno e pagamento de fatura de cartão não são gasto novo: não pedem categoria.
-            if (($this->estornoPorItem[$i] ?? false) || ($this->faturaPorItem[$i] ?? '') !== '' || ($this->transferenciaPorItem[$i] ?? false)) {
+            if (($this->estornoPorItem[$i] ?? false) || ($this->faturaPorItem[$i] ?? '') !== '' || ($this->transferenciaPorItem[$i] ?? false) || ($this->parcelaDividaPorItem[$i] ?? '') !== '') {
                 $faltando[$i] = false;
 
                 continue;
@@ -705,6 +718,7 @@ class DocumentsIndex extends Component
 
         $this->faturaOpcoesPorItem[$i] = $this->opcoesDeFatura($res);
         $this->faturaPorItem[$i] = $res['sugeridas']->first()?->id ?? 'sem';
+        $this->parcelaDividaPorItem[$i] = '';
         $this->estornoPorItem[$i] = false;
         $this->transferenciaPorItem[$i] = false;
     }
@@ -752,6 +766,7 @@ class DocumentsIndex extends Component
         $this->transferenciaPorItem[$i] = true;
         $this->transferenciaMotivoPorItem[$i] ??= '';
         $this->faturaPorItem[$i] = '';
+        $this->parcelaDividaPorItem[$i] = '';
         $this->estornoPorItem[$i] = false;
     }
 
@@ -782,11 +797,70 @@ class DocumentsIndex extends Component
         }
     }
 
+    /**
+     * Saídas do extrato que parecem o pagamento de uma parcela de dívida em aberto (valor e data perto, ou o nome do credor na
+     * descrição). A linha vem sugerida, com as outras parcelas próximas para trocar, e a pessoa confirma ao importar (regra 5 do
+     * CLAUDE.md). Linhas que já têm outro destino (conta fixa, fatura, transferência, estorno) ficam como estão.
+     *
+     * @param  array<int, array<string, mixed>>  $itens
+     */
+    private function casarParcelasDeDividas(array $itens): void
+    {
+        $datas = collect($itens)->map(fn (array $item) => $this->parseItemDate($item['data'] ?? null))->filter()->sortBy(fn (CarbonImmutable $d) => $d->getTimestamp())->values();
+
+        if ($datas->isEmpty()) {
+            return;
+        }
+
+        $matcher = app(DebtInstallmentMatcher::class);
+        $parcelas = $matcher->candidates($datas->first(), $datas->last());
+
+        if ($parcelas->isEmpty()) {
+            return;
+        }
+
+        foreach ($itens as $i => $item) {
+            $data = $this->parseItemDate($item['data'] ?? null);
+
+            if ($data === null
+                || ($item['tipo'] ?? null) === 'receita'
+                || ($this->estornoPorItem[$i] ?? false)
+                || ($this->faturaPorItem[$i] ?? '') !== ''
+                || ($this->transferenciaPorItem[$i] ?? false)
+                || ($this->fixedBillPaymentPorItem[$i] ?? null) !== null) {
+                continue;
+            }
+
+            $res = $matcher->match($parcelas, (string) ($item['descricao'] ?? ''), $item['valor'] ?? 0, $data);
+
+            if ($res['sugerida'] === null) {
+                continue;
+            }
+
+            $this->parcelaDividaOpcoesPorItem[$i] = $res['opcoes']->map(fn ($p) => [
+                'id' => $p->id, 'label' => DebtInstallmentMatcher::label($p), 'sugerida' => $p->id === $res['sugerida']->id,
+            ])->all();
+            $this->parcelaDividaPorItem[$i] = $res['sugerida']->id;
+            $this->notaPorItem[$i] = 'Vai dar baixa na parcela '.$res['sugerida']->number.' de "'.$res['sugerida']->debt->name.'" (venc. '.$res['sugerida']->due_date->format('d/m').').';
+        }
+    }
+
+    /** Escolher uma parcela de dívida desfaz os outros destinos da mesma linha. */
+    public function updatedParcelaDividaPorItem(mixed $valor, string $chave): void
+    {
+        if ($valor !== '' && $valor !== null) {
+            $this->faturaPorItem[(int) $chave] = '';
+            $this->transferenciaPorItem[(int) $chave] = false;
+            $this->estornoPorItem[(int) $chave] = false;
+        }
+    }
+
     /** Uma linha é pagamento de fatura OU transferência, nunca as duas. */
     public function updatedTransferenciaPorItem(mixed $valor, string $chave): void
     {
         if ($valor) {
             $this->faturaPorItem[(int) $chave] = '';
+            $this->parcelaDividaPorItem[(int) $chave] = '';
             $this->estornoPorItem[(int) $chave] = false;
         }
     }
@@ -795,6 +869,7 @@ class DocumentsIndex extends Component
     {
         if ($valor !== '' && $valor !== null) {
             $this->transferenciaPorItem[(int) $chave] = false;
+            $this->parcelaDividaPorItem[(int) $chave] = '';
         }
     }
 
@@ -849,6 +924,7 @@ class DocumentsIndex extends Component
                 'estorno' => $this->estornoPorItem,
                 'fixedBillPayment' => $this->fixedBillPaymentPorItem,
                 'fatura' => $this->faturaPorItem,
+                'dividaParcela' => $this->parcelaDividaPorItem,
                 'transferencia' => $this->transferenciaPorItem,
                 'recurringIncomeOccurrence' => $this->recurringIncomeOccurrencePorItem,
                 'conta' => $this->contaPorItem,

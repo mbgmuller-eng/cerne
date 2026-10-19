@@ -2,12 +2,14 @@
 
 namespace App\Services\Extraction;
 
+use App\Enums\DebtInstallmentStatus;
 use App\Enums\DocumentType;
 use App\Enums\Necessity;
 use App\Enums\ProcessingStatus;
 use App\Models\BankAccount;
 use App\Models\CreditCard;
 use App\Models\CreditCardInvoice;
+use App\Models\DebtInstallment;
 use App\Models\DocumentUpload;
 use App\Models\ExpenseCategory;
 use App\Models\ExpenseRecord;
@@ -15,6 +17,7 @@ use App\Models\FixedBillPayment;
 use App\Models\IncomeCategory;
 use App\Models\IncomeRecord;
 use App\Models\RecurringIncomeOccurrence;
+use App\Services\DebtService;
 use App\Services\FixedBillService;
 use App\Services\InvoiceService;
 use App\Services\RecurringIncomeService;
@@ -38,6 +41,7 @@ class DocumentCommitService
         private readonly FixedBillService $fixedBillService,
         private readonly RecurringIncomeService $recurringIncomeService,
         private readonly InvoiceService $invoiceService,
+        private readonly DebtService $debtService,
     ) {}
 
     /**
@@ -178,6 +182,17 @@ class DocumentCommitService
 
                 if ($destinoFatura !== '') {
                     $this->pagamentoDeFatura($documento, $i, $item, $destinoFatura, $valor, $data, $conta, $mexeNoSaldo);
+                    $criados++;
+
+                    continue;
+                }
+
+                // Pagamento de parcela de dívida: a linha vira a despesa da parcela, ligada a ela (o dinheiro conta uma vez só). Se a
+                // parcela mudou de situação desde a revisão, a linha segue o caminho normal, como despesa comum.
+                $parcelaDivida = $estorno ? null : $this->debtInstallmentFor($overrides['dividaParcela'][$i] ?? null);
+
+                if ($parcelaDivida !== null) {
+                    $this->pagamentoDeParcela($documento, $item, $parcelaDivida, $valor, $data, $conta, $mexeNoSaldo, $userId);
                     $criados++;
 
                     continue;
@@ -379,6 +394,51 @@ class DocumentCommitService
     }
 
     /** Busca de novo em vez de confiar no que a revisão viu — status pode ter mudado nesse meio-tempo. */
+    /** A parcela escolhida na revisão, só se ainda estiver em aberto: dado de revisão velho não baixa parcela já paga. */
+    private function debtInstallmentFor(?string $id): ?DebtInstallment
+    {
+        if (blank($id)) {
+            return null;
+        }
+
+        $parcela = DebtInstallment::query()->with('debt')->find($id);
+
+        return $parcela !== null && $parcela->status === DebtInstallmentStatus::Open ? $parcela : null;
+    }
+
+    /**
+     * Cria a despesa da parcela (na categoria da dívida, que é a do momento), debita a conta como em qualquer despesa do extrato
+     * e liga a parcela a ela.
+     *
+     * @param  array<string, mixed>  $item
+     */
+    private function pagamentoDeParcela(DocumentUpload $documento, array $item, DebtInstallment $parcela, string $valor, CarbonImmutable $data, ?BankAccount $conta, bool $mexeNoSaldo, string $userId): void
+    {
+        $divida = $parcela->debt;
+        $pago = ltrim($valor, '-');
+
+        $despesa = ExpenseRecord::create([
+            'member_id' => $documento->member_id,
+            'description' => $item['descricao'] ?? 'Importado',
+            'necessity' => $divida->necessity,
+            'category_id' => $divida->category_id,
+            'subcategory_id' => $divida->subcategory_id,
+            'amount' => $pago,
+            'expense_date' => $data,
+            'bank_account_id' => $conta?->id,
+            'affects_balance' => $mexeNoSaldo,
+            'notes' => $this->notaDeOrigem($documento, $item),
+            'source_document_id' => $documento->id,
+            'created_by_user_id' => $userId,
+        ]);
+
+        if ($mexeNoSaldo) {
+            $conta?->applyToBalance(bcmul($pago, '-1', Money::SCALE));
+        }
+
+        $this->debtService->linkExpense($parcela, $despesa, false);
+    }
+
     private function fixedBillPaymentFor(?string $id): ?FixedBillPayment
     {
         return $id !== null ? FixedBillPayment::query()->find($id) : null;
