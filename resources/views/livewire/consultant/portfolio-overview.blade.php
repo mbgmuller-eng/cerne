@@ -225,6 +225,15 @@
                             @endforeach
                         </select>
                     </label>
+                    <select wire:model.live="sentidoSemSeguro" aria-label="Sentido da ordenação" class="rounded-lg border-slate-200 bg-white py-1 text-xs dark:border-white/10 dark:bg-slate-800 dark:text-slate-200">
+                        <option value="asc">{{ $rotulosSentido[$ordenarSemSeguro]['asc'] ?? 'Crescente' }}</option>
+                        <option value="desc">{{ $rotulosSentido[$ordenarSemSeguro]['desc'] ?? 'Decrescente' }}</option>
+                    </select>
+                    @if ($semSeguroEhPadrao)
+                        <span class="text-slate-400">Ordem padrão</span>
+                    @else
+                        <button type="button" wire:click="salvarPadraoSemSeguro" class="underline hover:text-slate-700 dark:hover:text-slate-200">Salvar como padrão</button>
+                    @endif
                 </div>
             </div>
 
@@ -294,6 +303,15 @@
                             @endforeach
                         </select>
                     </label>
+                    <select wire:model.live="sentidoClientes" aria-label="Sentido da ordenação" class="rounded-lg border-slate-200 bg-white py-1 text-xs dark:border-white/10 dark:bg-slate-800 dark:text-slate-200">
+                        <option value="asc">{{ $rotulosSentido[$ordenarClientes]['asc'] ?? 'Crescente' }}</option>
+                        <option value="desc">{{ $rotulosSentido[$ordenarClientes]['desc'] ?? 'Decrescente' }}</option>
+                    </select>
+                    @if ($clientesEhPadrao)
+                        <span class="text-slate-400">Ordem padrão</span>
+                    @else
+                        <button type="button" wire:click="salvarPadraoClientes" class="underline hover:text-slate-700 dark:hover:text-slate-200">Salvar como padrão</button>
+                    @endif
                 </div>
             @endif
         </div>

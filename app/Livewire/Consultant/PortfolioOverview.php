@@ -71,10 +71,35 @@ class PortfolioOverview extends Component
         'desde' => 'Cliente desde',
     ];
 
+    /** Sentido que cada critério tinha antes de a pessoa poder escolher: é o que vale até ela inverter. */
+    private const SENTIDO_NATURAL = [
+        'atencao' => 'asc', 'nome' => 'asc', 'email' => 'asc', 'status' => 'asc',
+        'patrimonio' => 'desc', 'desde' => 'desc',
+    ];
+
+    /** @var array<string, array{asc: string, desc: string}> como o sentido se lê em cada critério */
+    private const ROTULOS_SENTIDO = [
+        'atencao' => ['asc' => 'Mais urgentes primeiro', 'desc' => 'Menos urgentes primeiro'],
+        'nome' => ['asc' => 'A a Z', 'desc' => 'Z a A'],
+        'email' => ['asc' => 'A a Z', 'desc' => 'Z a A'],
+        'status' => ['asc' => 'Ativos primeiro', 'desc' => 'Inativos primeiro'],
+        'patrimonio' => ['asc' => 'Do menor ao maior', 'desc' => 'Do maior ao menor'],
+        'desde' => ['asc' => 'Do mais antigo ao mais novo', 'desc' => 'Do mais novo ao mais antigo'],
+    ];
+
+    /** Padrão de quem nunca escolheu um. */
+    private const PADRAO_CLIENTES = ['sort' => 'atencao', 'dir' => 'asc'];
+
+    private const PADRAO_SEM_SEGURO = ['sort' => 'nome', 'dir' => 'asc'];
+
     // Tudo com #[Url] pra a ordenação/filtro sobreviver a compartilhar o
-    // link ou voltar no navegador — não é só estado de sessão.
+    // link ou voltar no navegador — não é só estado de sessão. Critério e
+    // sentido vazios na URL caem no padrão salvo na conta (ver mount()).
     #[Url]
-    public string $ordenarClientes = 'atencao';
+    public string $ordenarClientes = '';
+
+    #[Url]
+    public string $sentidoClientes = '';
 
     #[Url]
     public string $statusClientes = 'todos';
@@ -83,7 +108,10 @@ class PortfolioOverview extends Component
     public string $buscaClientes = '';
 
     #[Url]
-    public string $ordenarSemSeguro = 'nome';
+    public string $ordenarSemSeguro = '';
+
+    #[Url]
+    public string $sentidoSemSeguro = '';
 
     #[Url]
     public string $buscaSemSeguro = '';
@@ -91,6 +119,86 @@ class PortfolioOverview extends Component
     public function mount(): void
     {
         abort_unless(auth()->user()?->isConsultant(), 403);
+
+        [$this->ordenarClientes, $this->sentidoClientes] = $this->ordemInicial(
+            'clients', $this->ordenarClientes, $this->sentidoClientes, self::ORDENS_CLIENTES, self::PADRAO_CLIENTES,
+        );
+        [$this->ordenarSemSeguro, $this->sentidoSemSeguro] = $this->ordemInicial(
+            'no_life', $this->ordenarSemSeguro, $this->sentidoSemSeguro, self::ORDENS_SEM_SEGURO, self::PADRAO_SEM_SEGURO,
+        );
+    }
+
+    /** Trocar o critério volta ao sentido que a pessoa guardou para ele, ou ao natural. */
+    public function updatedOrdenarClientes(): void
+    {
+        $this->sentidoClientes = $this->sentidoPadraoDe('clients', $this->ordenarClientes);
+    }
+
+    public function updatedOrdenarSemSeguro(): void
+    {
+        $this->sentidoSemSeguro = $this->sentidoPadraoDe('no_life', $this->ordenarSemSeguro);
+    }
+
+    public function salvarPadraoClientes(): void
+    {
+        $this->salvarPadrao('clients', $this->ordenarClientes, $this->sentidoClientes, self::ORDENS_CLIENTES);
+    }
+
+    public function salvarPadraoSemSeguro(): void
+    {
+        $this->salvarPadrao('no_life', $this->ordenarSemSeguro, $this->sentidoSemSeguro, self::ORDENS_SEM_SEGURO);
+    }
+
+    /**
+     * @param  array<string, string>  $ordens
+     * @param  array{sort: string, dir: string}  $padraoDoSistema
+     * @return array{0: string, 1: string}
+     */
+    private function ordemInicial(string $lista, string $chave, string $sentido, array $ordens, array $padraoDoSistema): array
+    {
+        if (! isset($ordens[$chave])) {
+            $salvo = auth()->user()->portfolio_prefs[$lista] ?? [];
+            $chave = isset($ordens[$salvo['sort'] ?? '']) ? $salvo['sort'] : $padraoDoSistema['sort'];
+            $sentido = '';
+        }
+
+        return [$chave, in_array($sentido, ['asc', 'desc'], true) ? $sentido : $this->sentidoPadraoDe($lista, $chave)];
+    }
+
+    private function sentidoPadraoDe(string $lista, string $chave): string
+    {
+        $salvo = auth()->user()->portfolio_prefs[$lista] ?? [];
+
+        if (($salvo['sort'] ?? null) === $chave && in_array($salvo['dir'] ?? null, ['asc', 'desc'], true)) {
+            return $salvo['dir'];
+        }
+
+        return self::SENTIDO_NATURAL[$chave] ?? 'asc';
+    }
+
+    /** @param  array<string, string>  $ordens */
+    private function salvarPadrao(string $lista, string $chave, string $sentido, array $ordens): void
+    {
+        if (! isset($ordens[$chave]) || ! in_array($sentido, ['asc', 'desc'], true)) {
+            return;
+        }
+
+        $usuario = auth()->user();
+        $prefs = $usuario->portfolio_prefs ?? [];
+        $prefs[$lista] = ['sort' => $chave, 'dir' => $sentido];
+        $usuario->update(['portfolio_prefs' => $prefs]);
+    }
+
+    /**
+     * O que está na tela já é o que a conta guarda (ou, sem nada guardado, o padrão do sistema)?
+     *
+     * @param  array{sort: string, dir: string}  $padraoDoSistema
+     */
+    private function ehOPadrao(string $lista, string $chave, string $sentido, array $padraoDoSistema): bool
+    {
+        $guardado = auth()->user()->portfolio_prefs[$lista] ?? $padraoDoSistema;
+
+        return ($guardado['sort'] ?? null) === $chave && ($guardado['dir'] ?? null) === $sentido;
     }
 
     public function limparFiltrosClientes(): void
@@ -269,6 +377,9 @@ class PortfolioOverview extends Component
             'dados' => $dados,
             'ordensClientes' => self::ORDENS_CLIENTES,
             'ordensSemSeguro' => self::ORDENS_SEM_SEGURO,
+            'rotulosSentido' => self::ROTULOS_SENTIDO,
+            'clientesEhPadrao' => $this->ehOPadrao('clients', $this->ordenarClientes, $this->sentidoClientes, self::PADRAO_CLIENTES),
+            'semSeguroEhPadrao' => $this->ehOPadrao('no_life', $this->ordenarSemSeguro, $this->sentidoSemSeguro, self::PADRAO_SEM_SEGURO),
         ]);
     }
 
@@ -291,23 +402,7 @@ class PortfolioOverview extends Component
 
         $lista = $this->filtrarPorBusca($lista, $this->buscaClientes);
 
-        return (match ($this->ordenarClientes) {
-            'nome' => $lista->sortBy(fn (array $l) => mb_strtolower($l['name'])),
-            'email' => $lista->sortBy(fn (array $l) => mb_strtolower($l['email'])),
-            'patrimonio' => $lista->sortByDesc(fn (array $l) => $l['patrimonio'] !== null ? (float) $l['patrimonio'] : -INF),
-            'status' => $lista->sortBy(fn (array $l) => match ($l['status']) {
-                ConsultantClientStatus::Active => 0,
-                ConsultantClientStatus::Pending => 1,
-                ConsultantClientStatus::Inactive => 2,
-            }),
-            'desde' => $lista->sortByDesc(fn (array $l) => $l['since']?->getTimestamp() ?? 0),
-            default => $lista->sortBy(fn (array $l) => match (true) {
-                $l['status'] === ConsultantClientStatus::Active && ! $l['seguro_vida'] => 0,
-                $l['status'] === ConsultantClientStatus::Active => 1,
-                $l['status'] === ConsultantClientStatus::Pending => 2,
-                default => 3,
-            }),
-        })->values()->all();
+        return $this->ordenar($lista, $this->ordenarClientes, $this->sentidoClientes)->all();
     }
 
     /**
@@ -322,12 +417,46 @@ class PortfolioOverview extends Component
     {
         $colecao = $this->filtrarPorBusca(collect($lista), $this->buscaSemSeguro);
 
-        return (match ($this->ordenarSemSeguro) {
-            'email' => $colecao->sortBy(fn (array $l) => mb_strtolower($l['email'])),
-            'patrimonio' => $colecao->sortByDesc(fn (array $l) => (float) $l['patrimonio']),
-            'desde' => $colecao->sortByDesc(fn (array $l) => $l['since']?->getTimestamp() ?? 0),
-            default => $colecao->sortBy(fn (array $l) => mb_strtolower($l['name'])),
-        })->values()->all();
+        return $this->ordenar($colecao, $this->ordenarSemSeguro, $this->sentidoSemSeguro)->all();
+    }
+
+    /**
+     * Quem não tem o dado do critério (pendente sem patrimônio, vínculo sem data) fica sempre no fim, nos dois
+     * sentidos: no ascendente ele subiria ao topo e empurraria os clientes de verdade para baixo.
+     *
+     * @param  \Illuminate\Support\Collection<int, array>  $lista
+     * @return \Illuminate\Support\Collection<int, array>
+     */
+    private function ordenar(\Illuminate\Support\Collection $lista, string $criterio, string $sentido): \Illuminate\Support\Collection
+    {
+        $valor = fn (array $l) => $this->valorDeOrdem($criterio, $l);
+        [$com, $sem] = $lista->partition(fn (array $l) => $valor($l) !== null);
+
+        $com = $sentido === 'desc' ? $com->sortByDesc($valor) : $com->sortBy($valor);
+
+        return $com->concat($sem)->values();
+    }
+
+    private function valorDeOrdem(string $criterio, array $l): string|float|int|null
+    {
+        return match ($criterio) {
+            'email' => mb_strtolower($l['email']),
+            'patrimonio' => $l['patrimonio'] !== null ? (float) $l['patrimonio'] : null,
+            'desde' => $l['since']?->getTimestamp(),
+            'status' => match ($l['status']) {
+                ConsultantClientStatus::Active => 0,
+                ConsultantClientStatus::Pending => 1,
+                ConsultantClientStatus::Inactive => 2,
+            },
+            // Ativo sem seguro de vida > ativo coberto > pendente > inativo.
+            'atencao' => match (true) {
+                $l['status'] === ConsultantClientStatus::Active && ! $l['seguro_vida'] => 0,
+                $l['status'] === ConsultantClientStatus::Active => 1,
+                $l['status'] === ConsultantClientStatus::Pending => 2,
+                default => 3,
+            },
+            default => mb_strtolower($l['name']),
+        };
     }
 
     /** @param  \Illuminate\Support\Collection<int, array>  $lista */
