@@ -112,6 +112,67 @@
         @endforeach
     @endif
 
+    @if ($estrategia->count() >= 2)
+        <section class="card p-5">
+            <div class="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                    <h2 class="text-sm font-semibold text-slate-900 dark:text-white">Qual quitar primeiro</h2>
+                    <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                        @if ($ordem === 'balance')
+                            Pelo menor saldo: acaba com uma dívida mais rápido e libera a parcela dela no orçamento.
+                        @else
+                            Pela maior taxa de juros: é o que mais economiza em juros ao longo do tempo.
+                        @endif
+                        Antes de antecipar, veja se o banco cobra tarifa ou perde-se algum benefício.
+                    </p>
+                </div>
+                <div class="inline-flex rounded-lg border border-slate-200 p-0.5 text-xs dark:border-white/10" role="group" aria-label="Ordem">
+                    <button type="button" wire:click="$set('ordem', 'rate')" @class(['rounded-md px-2.5 py-1', 'bg-slate-100 font-medium text-slate-900 dark:bg-white/10 dark:text-white' => $ordem !== 'balance', 'text-slate-500 dark:text-slate-400' => $ordem === 'balance'])>Maior taxa</button>
+                    <button type="button" wire:click="$set('ordem', 'balance')" @class(['rounded-md px-2.5 py-1', 'bg-slate-100 font-medium text-slate-900 dark:bg-white/10 dark:text-white' => $ordem === 'balance', 'text-slate-500 dark:text-slate-400' => $ordem !== 'balance'])>Menor saldo</button>
+                </div>
+            </div>
+
+            <ol class="mt-3 divide-y divide-slate-100 dark:divide-white/10">
+                @foreach ($estrategia as $i => $linha)
+                    <li class="flex flex-wrap items-center justify-between gap-3 py-2.5" wire:key="estrategia-{{ $linha['debt']->id }}">
+                        <div class="flex min-w-0 items-center gap-3">
+                            <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-medium text-slate-600 dark:bg-white/10 dark:text-slate-300">{{ $i + 1 }}</span>
+                            <div class="min-w-0">
+                                <a href="{{ route('debts.show', $linha['debt']) }}" class="truncate text-sm font-medium text-slate-800 hover:underline dark:text-slate-200">{{ $linha['debt']->name }}</a>
+                                <p class="text-xs text-slate-400">
+                                    @if ($linha['annual_percent'] !== null)
+                                        {{ number_format($linha['annual_percent'], 1, ',', '.') }}% ao ano ({{ number_format((float) $linha['monthly_rate'] * 100, 2, ',', '.') }}% ao mês){{ $linha['rate_source'] === 'parcelas' ? ', calculada pelas parcelas' : '' }}
+                                    @else
+                                        taxa não informada: confira os juros cobrados
+                                    @endif
+                                </p>
+                            </div>
+                        </div>
+                        <div class="shrink-0 text-right">
+                            <p class="figure text-sm text-slate-800 dark:text-slate-200">{{ Money::format($linha['balance']) }}</p>
+                            <p class="text-xs text-slate-400">{{ $linha['installment'] ? Money::format($linha['installment']).' por mês' : 'sem parcela' }}</p>
+                        </div>
+                    </li>
+                @endforeach
+            </ol>
+        </section>
+    @endif
+
+    @if (count($projecao['labels']) >= 2)
+        <section class="card p-5">
+            <h2 class="text-sm font-semibold text-slate-900 dark:text-white">Como as dívidas caem</h2>
+            <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Pelo cronograma de cada contrato, sem contar consórcio nem dívida sem acordo. O atrasado entra no mês atual.</p>
+
+            <h3 class="mt-4 text-xs font-medium text-slate-500 dark:text-slate-400">Saldo devedor ao fim de cada mês</h3>
+            <x-timeseries-chart class="mt-2 text-amber-700 dark:text-amber-400" :labels="$projecao['labels']" :series="[['valores' => $projecao['balance'], 'tipo' => 'area', 'rotulo' => 'Saldo devedor']]" formato="moeda" />
+
+            <h3 class="mt-5 text-xs font-medium text-slate-500 dark:text-slate-400">Parcelas a pagar em cada mês</h3>
+            <x-timeseries-chart class="mt-2 text-slate-400" :labels="array_slice($projecao['labels'], 0, 24)" :series="[['valores' => array_slice($projecao['installments'], 0, 24), 'tipo' => 'barra', 'classe' => 'text-accent-600 dark:text-accent-400', 'rotulo' => 'Parcelas']]" formato="moeda" />
+            @if (count($projecao['labels']) > 24)
+                <p class="mt-1 text-xs text-slate-400">Os próximos 24 meses; o saldo acima vai até o fim dos contratos.</p>
+            @endif
+        </section>
+    @endif
     <x-modal wire-model="showForm" max-width="2xl">
         <form wire:submit="save" class="space-y-4">
             <div class="flex items-baseline justify-between">

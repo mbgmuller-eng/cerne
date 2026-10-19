@@ -16,12 +16,14 @@ use App\Models\Goal;
 use App\Models\IncomeRecord;
 use App\Models\ProfileMember;
 use App\Services\DebtService;
+use App\Services\DebtStrategyService;
 use App\Support\Debts\DebtClassification;
 use App\Support\Money;
 use App\Support\ProfileContext;
 use Illuminate\Support\Collection;
 use InvalidArgumentException;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\Url;
 use Livewire\Component;
 
 /**
@@ -96,6 +98,10 @@ class DebtsIndex extends Component
     public string $goalChoice = '';
 
     public string $goalName = '';
+
+    /** Como ordenar "qual quitar primeiro": por taxa (economiza mais juros) ou por saldo (libera parcela mais rápido). */
+    #[Url]
+    public string $ordem = DebtStrategyService::BY_RATE;
 
     // Dívida em aberto
     public string $currentBalance = '';
@@ -323,7 +329,7 @@ class DebtsIndex extends Component
             ->get();
     }
 
-    public function render(DebtService $dividas)
+    public function render(DebtService $dividas, DebtStrategyService $estrategia)
     {
         $resumo = $dividas->summary();
 
@@ -341,6 +347,8 @@ class DebtsIndex extends Component
         return view('livewire.debts.debts-index', [
             'resumo' => $resumo,
             'proximas' => $proximas,
+            'estrategia' => $estrategia->ranking($this->ordem === DebtStrategyService::BY_BALANCE ? DebtStrategyService::BY_BALANCE : DebtStrategyService::BY_RATE),
+            'projecao' => $estrategia->projection(),
             'comprometido' => bccomp(Money::parse($receitasDoMes), '0', 2) > 0 ? Money::percentageOf($resumo['month_total'], $receitasDoMes) : null,
             'financiamentos' => $contratos->where('kind', DebtKind::Financing)->values(),
             'emprestimos' => $contratos->where('kind', DebtKind::Loan)->values(),

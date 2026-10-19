@@ -345,7 +345,7 @@ class DebtService
                 'is_private' => ($d['member_id'] ?? null) !== null && ! empty($d['is_private']),
                 'kind' => DebtKind::Consortium,
                 'status' => DebtStatus::Active,
-                'name' => $d['name'] ?: 'Consórcio de '.mb_strtolower($tipo->label()),
+                'name' => ! empty($d['name']) ? $d['name'] : 'Consórcio de '.mb_strtolower($tipo->label()),
                 'creditor' => $d['creditor'] ?? null,
                 'consortium_type' => $tipo,
                 'consortium_group' => $d['consortium_group'] ?? null,

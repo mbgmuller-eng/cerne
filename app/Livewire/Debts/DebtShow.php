@@ -6,6 +6,7 @@ use App\Enums\DebtAmortization;
 use App\Enums\ContemplationMode;
 use App\Enums\DebtInstallmentStatus;
 use App\Enums\DebtKind;
+use App\Enums\DebtRateBasis;
 use App\Enums\DebtStatus;
 use App\Enums\Necessity;
 use App\Models\BankAccount;
@@ -17,6 +18,8 @@ use App\Models\Goal;
 use App\Models\ProfileMember;
 use App\Services\DebtService;
 use App\Support\Debts\DebtClassification;
+use App\Support\Debts\DebtScheduleCalculator;
+use App\Support\Debts\DebtSimulator;
 use App\Support\Money;
 use App\Support\ProfileContext;
 use Carbon\CarbonImmutable;
@@ -137,6 +140,28 @@ class DebtShow extends Component
 
     public string $agreementAccountId = '';
 
+    // Simulador: antecipar parte do saldo ou fazer a portabilidade para outra taxa
+    public bool $showSim = false;
+
+    public string $simTab = 'prepay';
+
+    public string $simExtra = '';
+
+    public string $simMode = 'term';
+
+    public string $simRate = '';
+
+    public string $simRateBasis = 'annual_effective';
+
+    public string $simTerm = '';
+
+    public string $simFees = '';
+
+    public string $simCost = '';
+
+    /** @var array<string, mixed> */
+    public array $simResult = [];
+
     public function mount(Debt $debt): void
     {
         abort_if(auth()->user()?->isBroker(), 403);
@@ -178,6 +203,87 @@ class DebtShow extends Component
 
         $this->showPay = false;
         $this->debt->refresh();
+    }
+
+    // ------------------------------------------------------------------ simulador
+
+    /** Só financiamento e empréstimo com taxa cadastrada e parcelas em aberto: parcelas informadas não têm juros para simular. */
+    private function podeSimular(): bool
+    {
+        return in_array($this->debt->kind, [DebtKind::Financing, DebtKind::Loan], true)
+            && $this->debt->amortization !== DebtAmortization::Fixed
+            && $this->debt->rate !== null && $this->debt->rate_basis !== null
+            && $this->debt->status === DebtStatus::Active
+            && $this->debt->installments()->where('status', DebtInstallmentStatus::Open)->exists();
+    }
+
+    public function openSim(): void
+    {
+        abort_unless($this->podeSimular(), 404);
+
+        $this->resetValidation();
+        $this->simResult = [];
+        $this->simTab = 'prepay';
+        $this->simExtra = '';
+        $this->simMode = 'term';
+        $this->simRate = '';
+        $this->simRateBasis = $this->debt->rate_basis->value;
+        $this->simTerm = (string) $this->debt->installments()->where('status', DebtInstallmentStatus::Open)->count();
+        $this->simFees = (string) ($this->debt->monthly_fees ?? '0.00');
+        $this->simCost = '';
+        $this->showSim = true;
+    }
+
+    public function updatedSimTab(): void
+    {
+        $this->simResult = [];
+        $this->resetValidation();
+    }
+
+    public function simular(): void
+    {
+        abort_unless($this->podeSimular(), 404);
+
+        $abertas = $this->debt->installments()->where('status', DebtInstallmentStatus::Open);
+        $primeira = (clone $abertas)->first();
+        $totais = (clone $abertas)->selectRaw('COUNT(*) as n, SUM(amount) as total, SUM(interest_amount) as juros')->first();
+        $saldo = $this->debt->balance();
+        $taxaAtual = DebtScheduleCalculator::monthlyRate((string) $this->debt->rate, $this->debt->rate_basis);
+        $taxasFixas = Money::parse($this->debt->monthly_fees ?? 0);
+        $restantes = (int) $totais->n;
+        $totalAtual = Money::parse($totais->total);
+        $jurosAtuais = Money::parse($totais->juros);
+
+        try {
+            if ($this->simTab === 'prepay') {
+                $this->validate(['simExtra' => ['required', 'string', 'max:20'], 'simMode' => ['required', 'in:term,installment']], [], ['simExtra' => 'valor a antecipar']);
+                $extra = Money::parse($this->simExtra);
+
+                $r = DebtSimulator::prepay($this->debt->amortization, $saldo, $taxaAtual, $taxasFixas, $restantes, (string) $primeira->principal_amount, (string) $primeira->amount, $extra, $this->simMode);
+                $this->simResult = $r + [
+                    'tab' => 'prepay', 'extra' => $extra, 'old_term' => $restantes, 'old_installment' => (string) $primeira->amount,
+                    'old_total' => $totalAtual, 'old_interest' => $jurosAtuais,
+                    'saving' => bcsub($totalAtual, bcadd($extra, $r['total_to_pay'], 2), 2),
+                ];
+
+                return;
+            }
+
+            $this->validate([
+                'simRate' => ['required', 'string', 'max:12'], 'simRateBasis' => ['required', 'in:'.implode(',', array_keys(DebtRateBasis::options()))],
+                'simTerm' => ['required', 'integer', 'min:1', 'max:480'], 'simFees' => ['nullable', 'string', 'max:20'], 'simCost' => ['nullable', 'string', 'max:20'],
+            ], [], ['simRate' => 'taxa nova', 'simTerm' => 'prazo novo', 'simFees' => 'taxas por parcela', 'simCost' => 'custo da operação']);
+
+            $novaTaxa = DebtScheduleCalculator::monthlyRate(str_replace(',', '.', trim($this->simRate)), DebtRateBasis::from($this->simRateBasis));
+            $r = DebtSimulator::port($this->debt->amortization, $saldo, $novaTaxa, (int) $this->simTerm, Money::parse($this->simFees ?: 0), Money::parse($this->simCost ?: 0));
+            $this->simResult = $r + [
+                'tab' => 'port', 'old_term' => $restantes, 'old_installment' => (string) $primeira->amount, 'old_total' => $totalAtual,
+                'old_interest' => $jurosAtuais, 'saving' => bcsub($totalAtual, $r['total_to_pay'], 2), 'balance' => $saldo,
+            ];
+        } catch (InvalidArgumentException $e) {
+            $this->simResult = [];
+            $this->addError($this->simTab === 'prepay' ? 'simExtra' : 'simRate', $e->getMessage());
+        }
     }
 
     // ------------------------------------------------------------------ parcela pulada
@@ -582,6 +688,8 @@ class DebtShow extends Component
             'candidatas' => $this->candidatas(),
             'semCategoria' => $this->semCategoria(),
             'emCarta' => $this->debt->isSavingForCredit(),
+            'podeSimular' => $this->podeSimular(),
+            'basesTaxa' => DebtRateBasis::options(),
             'ultimaPaga' => (int) $parcelas->where('status', DebtInstallmentStatus::Paid)->max('number'),
             'quantidadePuladas' => $parcelas->where('status', DebtInstallmentStatus::Diluted)->count(),
             'ajustes' => $this->debt->isConsortium() ? $this->debt->adjustments()->orderByDesc('applied_on')->orderByDesc('created_at')->get() : collect(),

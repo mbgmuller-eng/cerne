@@ -30,6 +30,9 @@
                 <button type="button" wire:click="openAgreement" class="btn-secondary px-3 py-1.5 text-sm">Registrar acordo</button>
                 <button type="button" wire:click="markPaidOff" wire:confirm="Dar esta dívida como quitada? Use quando ela foi paga por fora, perdoada ou prescreveu." class="btn-ghost px-3 py-1.5 text-sm">Marcar como quitada</button>
             @endif
+            @if ($podeSimular)
+                <button type="button" wire:click="openSim" class="btn-secondary px-3 py-1.5 text-sm">Simular antecipação ou portabilidade</button>
+            @endif
             <button type="button" wire:click="openEdit" class="btn-secondary px-3 py-1.5 text-sm">Editar contrato</button>
         </div>
     </div>
@@ -490,6 +493,92 @@
         </form>
     </x-modal>
 
+    {{-- Simulador --}}
+    <x-modal wire-model="showSim" max-width="2xl">
+        <div class="space-y-4">
+            <div class="flex items-baseline justify-between">
+                <h2 class="text-sm font-semibold text-slate-900 dark:text-white">Simular</h2>
+                <button type="button" wire:click="$set('showSim', false)" class="btn-ghost px-2 py-1 text-xs">Fechar</button>
+            </div>
+
+            <div class="inline-flex rounded-lg border border-slate-200 p-0.5 text-xs dark:border-white/10" role="group">
+                <button type="button" wire:click="$set('simTab', 'prepay')" @class(['rounded-md px-3 py-1', 'bg-slate-100 font-medium text-slate-900 dark:bg-white/10 dark:text-white' => $simTab === 'prepay', 'text-slate-500 dark:text-slate-400' => $simTab !== 'prepay'])>Antecipar parte do saldo</button>
+                <button type="button" wire:click="$set('simTab', 'port')" @class(['rounded-md px-3 py-1', 'bg-slate-100 font-medium text-slate-900 dark:bg-white/10 dark:text-white' => $simTab === 'port', 'text-slate-500 dark:text-slate-400' => $simTab !== 'port'])>Portabilidade</button>
+            </div>
+
+            <form wire:submit="simular" class="space-y-4">
+                <div class="grid gap-4 @sm:grid-cols-2 *:min-w-0">
+                    @if ($simTab === 'prepay')
+                        <div>
+                            <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Quanto você pagaria agora a mais</label>
+                            <input type="text" wire:model="simExtra" inputmode="decimal" class="input mt-1.5" placeholder="Ex.: 20000,00">
+                            @error('simExtra') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">O que prefere</label>
+                            <select wire:model="simMode" class="select mt-1.5 w-full">
+                                <option value="term">Manter a parcela e terminar antes</option>
+                                <option value="installment">Manter o prazo e baixar a parcela</option>
+                            </select>
+                        </div>
+                    @else
+                        <div>
+                            <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Taxa de juros nova (%)</label>
+                            <input type="text" wire:model="simRate" inputmode="decimal" class="input mt-1.5" placeholder="Ex.: 9,5">
+                            @error('simRate') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">A taxa é</label>
+                            <select wire:model="simRateBasis" class="select mt-1.5 w-full">
+                                @foreach ($basesTaxa as $valor => $rotulo)
+                                    <option value="{{ $valor }}">{{ $rotulo }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Prazo novo (parcelas)</label>
+                            <input type="number" wire:model="simTerm" min="1" max="480" class="input mt-1.5">
+                            @error('simTerm') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Seguro e taxas por parcela</label>
+                            <input type="text" wire:model="simFees" inputmode="decimal" class="input mt-1.5">
+                            @error('simFees') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                        </div>
+                        <div class="@sm:col-span-2">
+                            <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Custo da operação <span class="font-normal text-slate-400">(tarifas, avaliação, IOF; opcional)</span></label>
+                            <input type="text" wire:model="simCost" inputmode="decimal" class="input mt-1.5" placeholder="Ex.: 1500,00">
+                            @error('simCost') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                        </div>
+                    @endif
+                </div>
+                <div class="flex justify-end"><button type="submit" class="btn-primary px-4 py-2 text-sm">Simular</button></div>
+            </form>
+
+            @if ($simResult !== [] && $simResult['tab'] === $simTab)
+                @php $r = $simResult; $economiza = bccomp($r['saving'], '0', 2) > 0; @endphp
+                <div class="rounded-xl border border-slate-200 p-4 text-sm dark:border-white/10">
+                    @if ($r['tab'] === 'prepay' && $r['paid_off'])
+                        <p class="text-slate-700 dark:text-slate-300">Esse valor quita o saldo de {{ Money::format($saldo) }}. Você deixa de pagar {{ Money::format($r['old_interest']) }} de juros dos contratos restantes.</p>
+                    @else
+                        <dl class="grid gap-3 sm:grid-cols-3">
+                            <div><dt class="text-xs text-slate-400">Parcelas que faltam</dt><dd class="text-slate-800 dark:text-slate-200">{{ $r['old_term'] }} → <strong class="font-medium">{{ $r['term'] }}</strong></dd></div>
+                            <div><dt class="text-xs text-slate-400">Primeira parcela</dt><dd class="text-slate-800 dark:text-slate-200">{{ Money::format($r['old_installment']) }} → <strong class="font-medium">{{ Money::format($r['first_installment']) }}</strong></dd></div>
+                            <div><dt class="text-xs text-slate-400">Juros que faltam</dt><dd class="text-slate-800 dark:text-slate-200">{{ Money::format($r['old_interest']) }} → <strong class="font-medium">{{ Money::format($r['interest']) }}</strong></dd></div>
+                        </dl>
+                        <p class="mt-3 {{ $economiza ? 'text-accent-700 dark:text-accent-400' : 'text-red-700 dark:text-red-400' }}">
+                            @if ($r['tab'] === 'prepay')
+                                {{ $economiza ? 'Você economiza cerca de '.Money::format($r['saving']).' no total.' : 'Não há economia nessa simulação.' }}
+                            @else
+                                {{ $economiza ? 'A portabilidade economiza cerca de '.Money::format($r['saving']).' no total, já contando o custo da operação.' : 'Não compensa: você pagaria '.Money::format(bcsub('0', $r['saving'], 2)).' a mais no total.' }}
+                            @endif
+                        </p>
+                    @endif
+                    <p class="mt-2 text-xs text-slate-400">Estimativa pelo contrato cadastrado (taxa, saldo e parcelas em aberto). O banco pode cobrar tarifas, IOF ou correção que mudam o resultado: confirme com a proposta dele antes de decidir.</p>
+                </div>
+            @endif
+        </div>
+    </x-modal>
     {{-- Editar o contrato --}}
     <x-modal wire-model="showEdit" max-width="2xl">
         <form wire:submit="saveEdit" class="space-y-4">
