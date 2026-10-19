@@ -78,6 +78,8 @@ class DebtService
                 'status' => DebtStatus::Active,
                 'name' => $d['name'],
                 'creditor' => $d['creditor'] ?? null,
+                'creditor_document' => $d['creditor_document'] ?? null,
+                'contracted_on' => $d['contracted_on'] ?? null,
                 'principal' => isset($d['principal']) && $d['principal'] !== '' ? Money::parse($d['principal']) : null,
                 'amortization' => $sistema,
                 'rate' => $sistema === DebtAmortization::Fixed ? null : $d['rate'],
@@ -135,7 +137,7 @@ class DebtService
         }
 
         return DB::transaction(function () use ($divida, $d, $reclassificarPagas): Debt {
-            $divida->update(collect($d)->only(['name', 'creditor', 'necessity', 'category_id', 'subcategory_id', 'bank_account_id', 'notes', 'member_id', 'is_private'])->all());
+            $divida->update(collect($d)->only(['name', 'creditor', 'creditor_document', 'contracted_on', 'necessity', 'category_id', 'subcategory_id', 'bank_account_id', 'notes', 'member_id', 'is_private'])->all());
 
             if ($reclassificarPagas) {
                 $this->reclassifyLinkedExpenses($divida);
@@ -736,6 +738,7 @@ class DebtService
             'status' => $situacao,
             'name' => $d['name'],
             'creditor' => $d['creditor'] ?? null,
+            'creditor_document' => $d['creditor_document'] ?? null,
             'principal' => ! empty($d['principal']) ? Money::parse($d['principal']) : $saldo,
             'amortization' => DebtAmortization::Fixed,
             'term' => 0,

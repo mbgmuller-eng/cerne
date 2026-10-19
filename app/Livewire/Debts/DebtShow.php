@@ -73,6 +73,10 @@ class DebtShow extends Component
 
     public string $editCreditor = '';
 
+    public string $editCreditorDocument = '';
+
+    public string $editContractedOn = '';
+
     public string $editNecessity = 'essential';
 
     public string $editCategoryId = '';
@@ -572,6 +576,8 @@ class DebtShow extends Component
         $this->resetValidation();
         $this->editName = $this->debt->name;
         $this->editCreditor = (string) $this->debt->creditor;
+        $this->editCreditorDocument = (string) $this->debt->creditor_document;
+        $this->editContractedOn = (string) $this->debt->contracted_on?->toDateString();
         $this->editNecessity = in_array($this->debt->necessity->value, [Necessity::Essential->value, Necessity::Discretionary->value], true) ? $this->debt->necessity->value : Necessity::Essential->value;
         $this->editCategoryId = (string) $this->debt->category_id;
         $this->editSubcategoryId = (string) $this->debt->subcategory_id;
@@ -593,6 +599,8 @@ class DebtShow extends Component
         $dados = $this->validate([
             'editName' => ['required', 'string', 'max:120'],
             'editCreditor' => ['nullable', 'string', 'max:120'],
+            'editCreditorDocument' => ['nullable', 'string', 'max:20'],
+            'editContractedOn' => ['nullable', 'date_format:Y-m-d'],
             'editNecessity' => [$this->semCategoria() ? 'nullable' : 'required', 'in:'.Necessity::Essential->value.','.Necessity::Discretionary->value],
             'editCategoryId' => [$this->semCategoria() ? 'nullable' : 'required', 'string'],
             'editSubcategoryId' => ['nullable', 'string'],
@@ -605,6 +613,7 @@ class DebtShow extends Component
         try {
             app(DebtService::class)->update($this->debt, [
                 'name' => $dados['editName'], 'creditor' => $dados['editCreditor'] ?: null,
+                'creditor_document' => $dados['editCreditorDocument'] ?: null, 'contracted_on' => $dados['editContractedOn'] ?: null,
                 'bank_account_id' => $dados['editAccountId'] ?: null, 'notes' => $dados['editNotes'] ?: null,
                 'member_id' => $membro, 'is_private' => $membro !== null && $this->editPrivate,
             ] + ($this->semCategoria() ? [] : ['necessity' => $dados['editNecessity'], 'category_id' => $dados['editCategoryId'], 'subcategory_id' => $dados['editSubcategoryId'] ?: null]), $this->editReclassify);

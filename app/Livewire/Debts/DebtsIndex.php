@@ -103,6 +103,10 @@ class DebtsIndex extends Component
     #[Url]
     public string $ordem = DebtStrategyService::BY_RATE;
 
+    public string $creditorDocument = '';
+
+    public string $contractedOn = '';
+
     // Dívida em aberto
     public string $currentBalance = '';
 
@@ -121,7 +125,7 @@ class DebtsIndex extends Component
         $this->resetValidation();
         $this->reset(
             'name', 'creditor', 'principal', 'rate', 'term', 'firstDueDate', 'installmentAmount', 'monthlyFees', 'paidBefore', 'bankAccountId', 'isPrivate', 'notes',
-            'consortiumGroup', 'creditAmount', 'flexPercent', 'skippedInstallments', 'goalChoice', 'goalName', 'currentBalance',
+            'consortiumGroup', 'creditAmount', 'flexPercent', 'skippedInstallments', 'creditorDocument', 'contractedOn', 'goalChoice', 'goalName', 'currentBalance',
         );
         $this->paidBefore = '0';
         $this->kind = 'financing';
@@ -193,6 +197,8 @@ class DebtsIndex extends Component
             'kind' => ['required', 'in:financing,loan'],
             'name' => ['required', 'string', 'max:120'],
             'creditor' => ['nullable', 'string', 'max:120'],
+            'creditorDocument' => ['nullable', 'string', 'max:20'],
+            'contractedOn' => ['nullable', 'date_format:Y-m-d'],
             'amortization' => ['required', DebtAmortization::rule()],
             'principal' => [$emCalculo ? 'required' : 'nullable', 'string', 'max:20'],
             'rate' => [$emCalculo ? 'required' : 'nullable', 'numeric', 'min:0', 'max:1000'],
@@ -214,6 +220,7 @@ class DebtsIndex extends Component
 
         $this->persist(fn () => app(DebtService::class)->create([
             'kind' => $dados['kind'], 'name' => $dados['name'], 'creditor' => $dados['creditor'] ?: null,
+            'creditor_document' => $dados['creditorDocument'] ?: null, 'contracted_on' => $dados['contractedOn'] ?: null,
             'amortization' => $dados['amortization'], 'principal' => $dados['principal'] ?: null,
             'rate' => $emCalculo ? $dados['rate'] : null, 'rate_basis' => $emCalculo ? $dados['rateBasis'] : null,
             'term' => $dados['term'], 'first_due_date' => $dados['firstDueDate'],
@@ -272,6 +279,7 @@ class DebtsIndex extends Component
         $dados = $this->validate([
             'name' => ['required', 'string', 'max:120'],
             'creditor' => ['nullable', 'string', 'max:120'],
+            'creditorDocument' => ['nullable', 'string', 'max:20'],
             'principal' => ['nullable', 'string', 'max:20'],
             'currentBalance' => ['required', 'string', 'max:20'],
             'balanceDate' => ['required', 'date_format:Y-m-d'],
@@ -280,7 +288,7 @@ class DebtsIndex extends Component
         ], [], $this->attributeNames());
 
         $this->persist(fn () => app(DebtService::class)->createOpenDebt([
-            'name' => $dados['name'], 'creditor' => $dados['creditor'] ?: null, 'principal' => $dados['principal'] ?: null,
+            'name' => $dados['name'], 'creditor' => $dados['creditor'] ?: null, 'creditor_document' => $dados['creditorDocument'] ?: null, 'principal' => $dados['principal'] ?: null,
             'current_balance' => $dados['currentBalance'], 'balance_updated_on' => $dados['balanceDate'], 'status' => $dados['openStatus'],
             'notes' => $dados['notes'] ?: null, 'member_id' => $this->resolvedMember(), 'is_private' => $this->isPrivate,
         ]));
@@ -313,7 +321,7 @@ class DebtsIndex extends Component
         return [
             'name' => 'nome', 'creditor' => 'credor', 'principal' => 'valor', 'rate' => 'taxa', 'rateBasis' => 'base da taxa',
             'term' => 'prazo', 'firstDueDate' => 'primeiro vencimento', 'installmentAmount' => 'valor da parcela', 'paidBefore' => 'parcelas já pagas',
-            'categoryId' => 'categoria', 'creditAmount' => 'valor da carta', 'flexPercent' => 'flex da parcela', 'skippedInstallments' => 'parcelas puladas', 'consortiumType' => 'tipo do consórcio',
+            'categoryId' => 'categoria', 'creditAmount' => 'valor da carta', 'creditorDocument' => 'CPF ou CNPJ do credor', 'contractedOn' => 'data da contratação', 'flexPercent' => 'flex da parcela', 'skippedInstallments' => 'parcelas puladas', 'consortiumType' => 'tipo do consórcio',
             'adjustmentEvery' => 'periodicidade do reajuste', 'adjustmentFirstAfter' => 'prazo do primeiro reajuste', 'goalName' => 'nome do objetivo',
             'currentBalance' => 'saldo atual', 'balanceDate' => 'data do saldo', 'openStatus' => 'situação',
         ];

@@ -37,7 +37,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'consortium_type', 'consortium_group', 'credit_amount', 'is_flex', 'adjustment_index', 'adjustment_every_months',
     'adjustment_first_after_months', 'next_adjustment_on', 'contemplated_on', 'contemplation_mode', 'bid_amount', 'credit_released',
     'current_balance', 'balance_updated_on', 'agreement_on', 'agreement_total', 'agreement_discount',
-    'flex_percent', 'consortium_contract', 'statement_on', 'statement_balance', 'statement_remaining', 'insurance_percent', 'last_adjustment_on',
+    'creditor_document', 'contracted_on', 'flex_percent', 'consortium_contract', 'statement_on', 'statement_balance', 'statement_remaining', 'insurance_percent', 'last_adjustment_on',
 ])]
 class Debt extends Model
 {
@@ -56,6 +56,7 @@ class Debt extends Model
             'installment_amount' => 'decimal:2',
             'monthly_fees' => 'decimal:2',
             'first_due_date' => 'date',
+            'contracted_on' => 'date',
             'term' => 'integer',
             'paid_before' => 'integer',
             'is_private' => 'boolean',

@@ -596,6 +596,16 @@
                     <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Credor</label>
                     <input type="text" wire:model="editCreditor" maxlength="120" class="input mt-1.5">
                 </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">CPF ou CNPJ do credor <span class="font-normal text-slate-400">(para o imposto de renda; opcional)</span></label>
+                    <input type="text" wire:model="editCreditorDocument" maxlength="20" class="input mt-1.5" placeholder="Ex.: 00.000.000/0001-00">
+                    @error('editCreditorDocument') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Data da contratação <span class="font-normal text-slate-400">(opcional)</span></label>
+                    <input type="date" wire:model="editContractedOn" class="input mt-1.5">
+                    @error('editContractedOn') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                </div>
                 @unless ($semCategoria)
                 <div>
                     <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Categoria das parcelas</label>

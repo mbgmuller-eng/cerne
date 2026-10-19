@@ -18,6 +18,7 @@
             <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Financiamentos, empréstimos, consórcios e dívidas em aberto, com as parcelas ligadas às suas despesas.</p>
         </div>
         <div class="flex flex-wrap gap-2">
+            <a href="{{ route('debts.tax') }}" class="btn-ghost px-3 py-1.5 text-sm">Imposto de renda</a>
             <button type="button" wire:click="$dispatch('open-consortium-import')" class="btn-secondary px-3 py-1.5 text-sm">Importar extrato do consórcio</button>
             <button type="button" wire:click="openForm" class="btn-secondary px-3 py-1.5 text-sm">Nova dívida</button>
         </div>
@@ -318,6 +319,11 @@
                         <input type="text" wire:model="creditor" maxlength="120" class="input mt-1.5" placeholder="Banco, loja ou pessoa">
                     </div>
                     <div>
+                        <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">CPF ou CNPJ do credor <span class="font-normal text-slate-400">(para o imposto de renda; opcional)</span></label>
+                        <input type="text" wire:model="creditorDocument" maxlength="20" class="input mt-1.5" placeholder="Ex.: 00.000.000/0001-00">
+                        @error('creditorDocument') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                    </div>
+                    <div>
                         <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Situação</label>
                         <select wire:model="openStatus" class="select mt-1.5 w-full">
                             <option value="open">Em aberto</option>
@@ -359,6 +365,16 @@
                     <div>
                         <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Credor <span class="font-normal text-slate-400">(opcional)</span></label>
                         <input type="text" wire:model="creditor" maxlength="120" class="input mt-1.5" placeholder="Banco ou financeira">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">CPF ou CNPJ do credor <span class="font-normal text-slate-400">(para o imposto de renda; opcional)</span></label>
+                        <input type="text" wire:model="creditorDocument" maxlength="20" class="input mt-1.5" placeholder="Ex.: 00.000.000/0001-00">
+                        @error('creditorDocument') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Data da contratação <span class="font-normal text-slate-400">(opcional)</span></label>
+                        <input type="date" wire:model="contractedOn" class="input mt-1.5">
+                        @error('contractedOn') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
                     </div>
                     <div>
                         <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Como as parcelas são calculadas</label>
