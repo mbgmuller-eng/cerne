@@ -194,6 +194,14 @@ Schedule::call(function (): void {
     logger()->info('Percentual sobre patrimônio', $resultado);
 })->dailyAt('04:09')->name('percentual-patrimonio')->withoutOverlapping();
 
+// Recebimentos: refaz a previsão da comissão de consórcio dos consultores (percentual da carta nas parcelas combinadas).
+// Idempotente pela chave `origin_key`.
+Schedule::call(function (): void {
+    $resultado = app(\App\Services\ConsortiumCommissionService::class)->runDailyMaintenance();
+
+    logger()->info('Comissões de consórcio', $resultado);
+})->dailyAt('04:11')->name('comissoes-de-consorcio')->withoutOverlapping();
+
 // Leads: anexos de contatos perdidos há mais do prazo de retenção saem do servidor.
 // Idempotente: o que já foi apagado não aparece de novo.
 Schedule::command('cerne:purge-lead-files')->dailyAt('04:10')->name('anexos-de-leads')->withoutOverlapping();

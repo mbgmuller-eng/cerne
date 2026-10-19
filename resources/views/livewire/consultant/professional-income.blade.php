@@ -232,6 +232,7 @@
 
         @if ($ehConsultor)
             <livewire:consultant.investment-rules />
+            <livewire:consultant.consortium-commissions />
         @endif
     @else
         {{-- Contratos de honorário --------------------------------------- --}}

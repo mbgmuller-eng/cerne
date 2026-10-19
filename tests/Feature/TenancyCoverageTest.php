@@ -9,6 +9,7 @@ use App\Models\AssetFeeAgreement;
 use App\Models\CommissionRule;
 use App\Models\ConsultantClient;
 use App\Models\ConsultantInvite;
+use App\Models\DebtCommission;
 use App\Models\EngagementPlanTemplate;
 use App\Models\EngagementReminder;
 use App\Models\FeeAgreement;
@@ -73,6 +74,7 @@ class TenancyCoverageTest extends TestCase
         CommissionRule::class => 'regra de comissionamento do profissional (professional_id) — sigilosa como o resto dos recebimentos; não existe por perfil',
         PolicyCommission::class => 'liga o profissional a uma apólice em que ele tem comissão (professional_id) — sigiloso; a apólice em si segue isolada por perfil',
         AssetFeeAgreement::class => 'percentual sobre patrimônio que o consultor cobra de um cliente (professional_id) — mesmo sigilo de IncomeEntry; o profile_id aponta o cliente, não isola o dado',
+        DebtCommission::class => 'liga o consultor a um consórcio de cliente em que ele tem comissão (professional_id) — sigiloso; o consórcio em si segue isolado por perfil',
         FeeAgreement::class => 'honorário que o profissional combinou com um cliente (professional_id) — mesmo sigilo de IncomeEntry; o profile_id aponta o cliente, não isola o dado',
 
         // Vínculos consultor-cliente: ligam dois usuários, sem profile_id.

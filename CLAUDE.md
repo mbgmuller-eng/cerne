@@ -126,6 +126,7 @@ Todas idempotentes (regra 4). O cron da Hostinger chama `schedule:run` a cada mi
 | `honorarios-previstos` | 04:05 | estende, para cada contrato de honorário ativo, os recebimentos previstos (12 meses à frente; índice único `fee_agreement_id` + `due_on`) |
 | `comissoes-de-seguros` | 04:07 | vincula as apólices que cada profissional vendeu e refaz a previsão de comissão e agenciamento (chave `origin_key` única por profissional) |
 | `percentual-patrimonio` | 04:09 | refaz a previsão do percentual sobre patrimônio de cada consultor (estimativa com o patrimônio de hoje) |
+| `comissoes-de-consorcio` | 04:11 | refaz a previsão da comissão de consórcio dos consultores (percentual da carta nas parcelas combinadas) |
 | `anexos-de-leads` | 04:10 | apaga arquivos de leads perdidos há mais de 12 meses |
 | `leads-de-renovacao` | 07:30 | cria lead para apólice que vence (preferências em `users.renewal_lead_*`) |
 | `resumo-de-leads` | 08:00 | uma notificação por profissional com o que pede atenção nos leads |
@@ -189,8 +190,14 @@ e o honorário fixo por cliente é `FeeAgreement` (mensal, trimestral, semestral
   Os períodos contam da data de início do contrato e cobram no último dia; só valem os que terminam do mês atual em diante e os que o término do
   contrato completa. Cobrança de período já encerrado deixa de ser recalculada (o valor fica o último estimado até dar baixa). Só cliente com
   vínculo ativo gera previsão (ler o patrimônio exige o vínculo). Rotina `percentual-patrimonio` (04:09), chave `origin_key` `asset:{contrato}:{fim}`.
-- **Fases seguintes (combinadas)**: 4) consórcio por administradora (ex.: 3,5% da carta nas parcelas 2, 4 e 6);
-  5) conferência por extrato de comissão (IA com revisão).
+- **Comissão de consórcio (fase 4)**: regra por administradora (`CommissionRule` com `kind = consortium`: `credit_percent` da carta e
+  `installment_schedule`, que `ConsortiumSchedule` lê como "2, 4, 6" = partes iguais ou "2:40, 4:30, 6:30" = divisão em %; os centavos que
+  sobram ficam na última parcela) e `DebtCommission` ligando o consultor a um consórcio de cliente ativo, **incluído à mão** (o Cerne não
+  sabe quem vendeu): `sold` usa a regra da administradora (casada pelo credor do consórcio, sem acento nem maiúscula) e `third_party` só vale
+  o percentual informado no vínculo (que também pode trazer parcelas próprias). Cada parte cai no vencimento da parcela (mais o prazo da
+  regra), do mês atual em diante; a carta é a de hoje, então reajuste muda a previsão. Consórcio quitado ou de cliente sem vínculo ativo não
+  gera previsão. Rotina `comissoes-de-consorcio` (04:11), chave `origin_key` `consortium:{consórcio}:{parcela}`. Componente `ConsortiumCommissions`.
+- **Fase seguinte (combinada)**: 5) conferência por extrato de comissão (IA com revisão), ainda não feita.
 
 ### Calendário (Saúde e agenda do profissional)
 
