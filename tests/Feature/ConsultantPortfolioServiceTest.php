@@ -124,6 +124,31 @@ class ConsultantPortfolioServiceTest extends TestCase
         self::assertFalse($porNome[$semSeguroDeVida->id]['seguro_vida']);
     }
 
+    public function test_cliente_desde_vale_a_apolice_mais_antiga_quando_ela_vem_antes_do_aceite(): void
+    {
+        $consultor = User::factory()->consultant()->create();
+
+        [$antiga, $clienteAntigo] = $this->criarClienteVinculado($consultor);
+        ConsultantClient::query()->where('client_id', $clienteAntigo->id)->update(['accepted_at' => '2026-09-10 10:00:00']);
+        InsurancePolicy::factory()->life()->create(['profile_id' => $antiga->id, 'start_date' => '2021-03-15']);
+        InsurancePolicy::factory()->create(['profile_id' => $antiga->id, 'start_date' => '2024-01-10']);
+
+        // Apólice que começa depois do aceite não adianta o "desde".
+        [$recente, $clienteRecente] = $this->criarClienteVinculado($consultor);
+        ConsultantClient::query()->where('client_id', $clienteRecente->id)->update(['accepted_at' => '2026-09-10 10:00:00']);
+        InsurancePolicy::factory()->life()->create(['profile_id' => $recente->id, 'start_date' => '2026-10-01']);
+
+        // Sem apólice, continua o aceite do vínculo.
+        [$semApolice, $clienteSem] = $this->criarClienteVinculado($consultor);
+        ConsultantClient::query()->where('client_id', $clienteSem->id)->update(['accepted_at' => '2026-08-05 10:00:00']);
+
+        $porPerfil = collect(app(ConsultantPortfolioService::class)->overview($consultor)['por_cliente'])->keyBy('profile_id');
+
+        self::assertSame('2021-03-15', $porPerfil[$antiga->id]['since']->toDateString());
+        self::assertSame('2026-09-10', $porPerfil[$recente->id]['since']->toDateString());
+        self::assertSame('2026-08-05', $porPerfil[$semApolice->id]['since']->toDateString());
+    }
+
     public function test_sem_clientes_vinculados_devolve_zeros_em_vez_de_erro(): void
     {
         $consultor = User::factory()->consultant()->create();

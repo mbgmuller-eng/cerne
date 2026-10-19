@@ -395,7 +395,7 @@ class ConsultantPortfolioService
                 'name' => $exibicao['name'],
                 'email' => $link->client->email,
                 'status' => $link->status,
-                'since' => $link->accepted_at,
+                'since' => $this->clientSince($link, $apolicesDoCliente),
                 'profile_id' => $profileId,
                 'patrimonio' => $profileId ? ($patrimonioPorPerfil[$profileId] ?? '0.00') : null,
                 'seguro_vida' => $apolicesDoCliente->contains(fn (InsurancePolicy $p) => $p->insurance_type === InsuranceType::Vida),
@@ -413,6 +413,26 @@ class ConsultantPortfolioService
                 'sem_convite_enviado' => $ativo && ! isset($emailsComConvite[mb_strtolower($link->client->email)]),
             ];
         })->all();
+    }
+
+    /**
+     * "Cliente desde": o aceite do vínculo só marca quando a pessoa entrou no Cerne, e carteira importada em lote tem
+     * quase todo mundo no mesmo mês. A relação com o profissional começa, na prática, na apólice mais antiga que ele
+     * acompanha, então vale a data mais antiga entre as duas.
+     *
+     * @param  Collection<int, InsurancePolicy>  $apolices
+     */
+    private function clientSince(ConsultantClient $link, Collection $apolices): ?\Carbon\CarbonInterface
+    {
+        $primeiraApolice = $apolices->pluck('start_date')->filter()->min();
+
+        if ($primeiraApolice === null) {
+            return $link->accepted_at;
+        }
+
+        return $link->accepted_at === null || $primeiraApolice->lt($link->accepted_at)
+            ? $primeiraApolice
+            : $link->accepted_at;
     }
 
     /**
