@@ -292,6 +292,16 @@
                 <p class="mt-1 truncate text-xs text-white/50">{{ $profile->profile_name }}</p>
             </div>
 
+            @if ($voltarAoPainel)
+                <a href="{{ route($voltarAoPainel['rota']) }}" class="mx-3 mb-3 flex items-center gap-3 rounded-xl bg-white/10 px-3 py-2.5 text-white transition hover:bg-white/15">
+                    <x-nav-icon name="back" />
+                    <span class="min-w-0 leading-tight">
+                        <span class="block text-[10px] font-semibold tracking-wide text-white/50 uppercase">Voltar para</span>
+                        <span class="block truncate text-sm font-medium">{{ $voltarAoPainel['nome'] }}</span>
+                    </span>
+                </a>
+            @endif
+
             <nav class="flex-1 space-y-0.5 overflow-y-auto px-3">
                 @foreach ($navSections as $secao)
                     <div @class(['pt-4' => ! $loop->first])>
@@ -309,6 +319,35 @@
                         @endforeach
                     </div>
                 @endforeach
+
+                {{-- Os atalhos do profissional ficam recolhidos: o menu do cliente é o que se usa aqui, e o do profissional
+                     inteiro no rodapé espremia o do cliente numa faixa minúscula com rolagem. --}}
+                @if ($user->isLinkedProfessional() || $user->isPlatformAdmin())
+                    <div class="pt-4" x-data="{ aberto: false }">
+                        <button type="button" @click="aberto = ! aberto" :aria-expanded="aberto" class="flex w-full items-center justify-between px-3 pb-1 text-[10px] font-semibold tracking-wide text-white/50 uppercase transition hover:text-white/80">
+                            <span>Área do profissional</span>
+                            <svg class="h-3 w-3 transition" :class="aberto ? 'rotate-180' : ''" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd" /></svg>
+                        </button>
+                        <div x-show="aberto" x-cloak class="space-y-0.5">
+                            @if ($user->isLinkedProfessional())
+                                @foreach ($navConsultor as [$route, $label, $curto, $icone])
+                                    @if ($route !== 'admin.users')
+                                        <a href="{{ route($route) }}" class="nav-item-chrome">
+                                            <x-nav-icon :name="$icone" />
+                                            <span>{{ $label }}</span>
+                                        </a>
+                                    @endif
+                                @endforeach
+                            @endif
+                            @if ($user->isPlatformAdmin())
+                                <a href="{{ route('admin.users') }}" class="nav-item-chrome">
+                                    <x-nav-icon name="admin" />
+                                    <span>Painel admin</span>
+                                </a>
+                            @endif
+                        </div>
+                    </div>
+                @endif
             </nav>
 
             <div class="border-t border-white/10 p-3">
@@ -345,24 +384,6 @@
                         <livewire:notifications.notification-center direction="up" />
                     </div>
                 </div>
-
-                @if ($user->isLinkedProfessional())
-                    @foreach ($navConsultor as [$route, $label, $curto, $icone])
-                        @if ($route !== 'admin.users')
-                            <a href="{{ route($route) }}" @class(['nav-item-chrome', 'mt-1' => $loop->first])>
-                                <x-nav-icon :name="$icone" />
-                                <span>{{ $label }}</span>
-                            </a>
-                        @endif
-                    @endforeach
-                @endif
-
-                @if ($user->isPlatformAdmin())
-                    <a href="{{ route('admin.users') }}" class="nav-item-chrome mt-1">
-                        <x-nav-icon name="admin" />
-                        <span>Painel admin</span>
-                    </a>
-                @endif
 
                 <div class="mt-2 flex justify-center">
                     <x-theme-switcher :current="$theme" />

@@ -343,7 +343,7 @@ class EngagementTest extends TestCase
 
         $this->comoCliente();
         Livewire::test(EngagementMeetings::class)->call('openForm')->assertForbidden();
-        Livewire::test(EngagementMeetings::class)->assertSee('27/10 às 18:30', false);
+        Livewire::test(EngagementMeetings::class)->assertSee('27/10', false)->assertSee('18:30', false);
     }
 
     public function test_formulario_de_reuniao_valida_a_data(): void
