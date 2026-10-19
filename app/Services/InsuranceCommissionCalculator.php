@@ -14,7 +14,7 @@ use Carbon\CarbonImmutable;
  * esperar nos próximos meses.
  *
  * - Comissão: percentual sobre cada parcela que o cliente paga, no percentual do ano da apólice (1º ano ou renovação).
- * - Agenciamento: uma vez só, no início de uma apólice nova (percentual do prêmio do 1º ano ou valor fixo).
+ * - Agenciamento: uma vez só, no início de uma apólice nova (percentual do prêmio do 1º mês, que é a primeira parcela, ou valor fixo).
  *
  * Só olha do mês atual em diante, como o honorário: o que já passou o profissional lança à mão. Dinheiro em bcmath,
  * com meio centavo para cima (a comissão é dinheiro e bcmul/bcdiv truncam).
@@ -79,11 +79,12 @@ class InsuranceCommissionCalculator
             ];
         }
 
-        // Agenciamento: só de apólice que começa de agora em diante; a antiga não gera fechamento retroativo.
+        // Agenciamento: só de apólice que começa de agora em diante; a antiga não gera fechamento retroativo. O percentual incide
+        // sobre o prêmio do 1º mês, ou seja, a primeira parcela (nunca o prêmio do ano todo).
         if ($rule->hasAgency() && $inicio->gte($primeiroMes) && $inicio->lte($limite)) {
             $valor = $rule->agency_type === CommissionType::Amount
                 ? number_format((float) $rule->agency_amount, 2, '.', '')
-                : $this->percentOf($this->firstYearPremium($policy, $frequencia, $parcela), (string) $rule->agency_percent);
+                : $this->percentOf($parcela, (string) $rule->agency_percent);
 
             if (bccomp($valor, '0', 2) > 0) {
                 $itens[] = [
@@ -110,15 +111,6 @@ class InsuranceCommissionCalculator
         }
 
         return (string) $policy->monthly_premium;
-    }
-
-    private function firstYearPremium(InsurancePolicy $policy, PaymentFrequency $frequencia, string $parcela): string
-    {
-        if ($policy->annual_premium !== null) {
-            return (string) $policy->annual_premium;
-        }
-
-        return bcmul($parcela, (string) $frequencia->chargesPerYear(), 2);
     }
 
     private function percentOf(string $valor, string $percentual): string

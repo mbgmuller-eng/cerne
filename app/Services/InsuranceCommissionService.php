@@ -129,20 +129,43 @@ class InsuranceCommissionService
     /** Consultor inclui uma apólice de um cliente ativo dele que não nasceu de uma venda registrada no Cerne. */
     public function includePolicy(User $professional, string $policyId): PolicyCommission
     {
-        $apolice = InsurancePolicy::withoutGlobalScopes()->where('is_active', true)->findOrFail($policyId);
+        $this->includePolicies($professional, [$policyId]);
 
-        abort_unless(array_key_exists($apolice->profile_id, $this->income->clientOptions($professional)), 403);
-
-        $vinculo = PolicyCommission::query()->firstOrCreate(
-            ['professional_id' => $professional->id, 'insurance_policy_id' => $apolice->id],
-            ['origin' => 'manual'],
-        );
-        $vinculo->update(['is_active' => true]);
-        $this->reconcile($professional);
-
-        return $vinculo;
+        return PolicyCommission::query()->where('professional_id', $professional->id)->where('insurance_policy_id', $policyId)->firstOrFail();
     }
 
+    /**
+     * Inclui várias apólices de uma vez (ou reativa as que ele tinha desligado) e refaz a previsão uma vez só. Todas
+     * precisam ser de clientes ativos do consultor: uma fora disso recusa o lote inteiro.
+     *
+     * @param  list<string>  $policyIds
+     * @return int quantas apólices ficaram com comissão
+     */
+    public function includePolicies(User $professional, array $policyIds): int
+    {
+        $ids = array_values(array_unique($policyIds));
+
+        if ($ids === []) {
+            return 0;
+        }
+
+        $apolices = InsurancePolicy::withoutGlobalScopes()->where('is_active', true)->whereIn('id', $ids)->get();
+        $clientes = $this->income->clientOptions($professional);
+
+        abort_unless($apolices->count() === count($ids) && $apolices->every(fn (InsurancePolicy $p) => array_key_exists($p->profile_id, $clientes)), 403);
+
+        foreach ($apolices as $apolice) {
+            $vinculo = PolicyCommission::query()->firstOrCreate(
+                ['professional_id' => $professional->id, 'insurance_policy_id' => $apolice->id],
+                ['origin' => 'manual'],
+            );
+            $vinculo->update(['is_active' => true]);
+        }
+
+        $this->reconcile($professional);
+
+        return $apolices->count();
+    }
     public function setLinkActive(User $professional, string $id, bool $ativo): void
     {
         PolicyCommission::query()->where('professional_id', $professional->id)->findOrFail($id)->update(['is_active' => $ativo]);

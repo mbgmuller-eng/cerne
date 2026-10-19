@@ -52,7 +52,7 @@
                                 1º ano {{ $pct($r->first_year_percent) }}
                                 · renovação {{ $r->renewal_percent !== null ? $pct($r->renewal_percent) : 'igual' }}
                                 @if ($r->hasAgency())
-                                    · agenciamento {{ $r->agency_type === CommissionType::Percent ? $pct($r->agency_percent).' do prêmio' : Money::format($r->agency_amount) }}
+                                    · agenciamento {{ $r->agency_type === CommissionType::Percent ? $pct($r->agency_percent).' do 1º mês' : Money::format($r->agency_amount) }}
                                 @endif
                                 @if ($r->payout_delay_days > 0)
                                     · paga {{ $r->payout_delay_days }} dias depois
@@ -179,9 +179,9 @@
 
                 <div>
                     @if ($ruleAgencyType === 'percent')
-                        <label class="{{ $campo }}">Agenciamento (% do prêmio)</label>
+                        <label class="{{ $campo }}">Agenciamento (% do 1º mês)</label>
                         <input type="number" step="0.001" min="0" wire:model="ruleAgencyPercent" class="input mt-1.5">
-                        <p class="mt-1 text-xs text-slate-400">Sobre o prêmio do 1º ano.</p>
+                        <p class="mt-1 text-xs text-slate-400">Sobre o prêmio do 1º mês (a primeira parcela).</p>
                         @error('ruleAgencyPercent') <p class="{{ $erro }}">{{ $message }}</p> @enderror
                     @elseif ($ruleAgencyType === 'amount')
                         <label class="{{ $campo }}">Agenciamento (R$)</label>
@@ -217,28 +217,48 @@
     {{-- Incluir apólice ---------------------------------------------------- --}}
     @if ($ehConsultor)
         <x-modal wire-model="showIncludeForm" max-width="lg">
-            <form wire:submit="includePolicy" class="space-y-4">
+            <form wire:submit="includePolicies" class="space-y-4">
                 <div class="flex items-baseline justify-between">
-                    <h2 class="text-sm font-semibold text-slate-900 dark:text-white">Incluir apólice com comissão</h2>
+                    <h2 class="text-sm font-semibold text-slate-900 dark:text-white">Incluir apólices com comissão</h2>
                     <button type="button" wire:click="$set('showIncludeForm', false)" class="btn-ghost px-2 py-1 text-xs">Cancelar</button>
                 </div>
 
                 <div>
-                    <label class="{{ $campo }}">Apólice de um cliente seu</label>
-                    <select wire:model="includePolicyId" class="select mt-1.5 w-full">
-                        <option value="">Escolha a apólice</option>
-                        @foreach ($incluiveis as $id => $rotulo)
-                            <option value="{{ $id }}">{{ $rotulo }}</option>
-                        @endforeach
-                    </select>
-                    @error('includePolicyId') <p class="{{ $erro }}">{{ $message }}</p> @enderror
-                    @if ($incluiveis === [])
-                        <p class="mt-1 text-xs text-slate-400">Todas as apólices dos seus clientes já estão na lista.</p>
-                    @endif
+                    <label class="{{ $campo }}">Buscar apólice</label>
+                    <input type="search" wire:model.live.debounce.250ms="includeSearch" class="input mt-1.5" placeholder="Cliente, seguradora, tipo ou número">
                 </div>
 
+                @if ($totalIncluiveis === 0)
+                    <p class="rounded-lg bg-slate-50 px-3 py-3 text-xs text-slate-500 dark:bg-white/5 dark:text-slate-400">Todas as apólices dos seus clientes já estão na lista.</p>
+                @else
+                    <div class="flex flex-wrap items-center justify-between gap-2 text-xs">
+                        <span class="text-slate-500 dark:text-slate-400">
+                            {{ count($includePolicyIds) }} marcada(s) de {{ count($incluiveis) }}@if ($includeSearch !== '') (filtradas) @endif
+                        </span>
+                        <span class="flex items-center gap-1">
+                            <button type="button" wire:click="selectAllIncludable" class="btn-secondary px-3 py-1 text-xs">Marcar todas{{ $includeSearch !== '' ? ' da busca' : '' }}</button>
+                            <button type="button" wire:click="clearIncludeSelection" class="btn-ghost px-3 py-1 text-xs">Limpar</button>
+                        </span>
+                    </div>
+
+                    <div class="max-h-72 divide-y divide-slate-100 overflow-y-auto rounded-xl border border-slate-200 dark:divide-white/10 dark:border-white/10">
+                        @forelse ($incluiveis as $id => $rotulo)
+                            <label class="flex cursor-pointer items-start gap-3 px-3 py-2.5 text-sm text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-white/5" wire:key="incluivel-{{ $id }}">
+                                <input type="checkbox" wire:model.live="includePolicyIds" value="{{ $id }}" class="mt-0.5 h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500">
+                                <span>{{ $rotulo }}</span>
+                            </label>
+                        @empty
+                            <p class="px-3 py-4 text-center text-xs text-slate-400">Nenhuma apólice bate com a busca.</p>
+                        @endforelse
+                    </div>
+                @endif
+                @error('includePolicyIds') <p class="{{ $erro }}">{{ $message }}</p> @enderror
+                @error('includePolicyIds.*') <p class="{{ $erro }}">{{ $message }}</p> @enderror
+
                 <div class="flex justify-end">
-                    <button type="submit" class="btn-primary px-4 py-2 text-sm">Incluir</button>
+                    <button type="submit" class="btn-primary px-4 py-2 text-sm" @disabled($totalIncluiveis === 0)>
+                        Incluir {{ count($includePolicyIds) > 0 ? count($includePolicyIds).' apólice(s)' : '' }}
+                    </button>
                 </div>
             </form>
         </x-modal>

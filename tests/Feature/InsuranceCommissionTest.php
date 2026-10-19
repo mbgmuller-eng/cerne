@@ -167,8 +167,8 @@ class InsuranceCommissionTest extends TestCase
         self::assertNull($agenciamento($calc->entries($antiga, $fixo)), 'apólice antiga não gera fechamento retroativo');
 
         $percentual = $this->regra(['counterparty' => 'Outra', 'counterparty_key' => 'outra', 'agency_type' => CommissionType::Percent, 'agency_percent' => '10.000']);
-        // 10% do prêmio do 1º ano (200 x 12 = 2.400).
-        self::assertSame('240.00', $agenciamento($calc->entries($nova, $percentual))['amount']);
+        // 10% do prêmio do 1º mês (a primeira parcela, R$ 200), e não do ano inteiro (12 x 200).
+        self::assertSame('20.00', $agenciamento($calc->entries($nova, $percentual))['amount']);
     }
 
     public function test_arredonda_meio_centavo_para_cima(): void
@@ -275,6 +275,110 @@ class InsuranceCommissionTest extends TestCase
         $this->service()->includePolicy($consultor, $alheia->id);
     }
 
+    /** @return array{0: User, 1: list<InsurancePolicy>} consultor com 3 apólices de clientes ativos dele (uma de outro consultor fica de fora) */
+    private function consultorComApolices(): array
+    {
+        $consultor = User::factory()->consultant()->create();
+        $perfilA = $this->perfil;
+        $perfilB = $this->perfilDeCliente('Bruno Lima');
+        foreach ([$perfilA, $perfilB] as $p) {
+            ConsultantClient::factory()->create(['consultant_id' => $consultor->id, 'client_id' => $p->owner_user_id, 'status' => ConsultantClientStatus::Active, 'accepted_at' => now()]);
+        }
+
+        $apolices = [
+            $this->apolice(['broker_id' => null, 'insurer_name' => 'Porto Seguro', 'policy_number' => 'P-1']),
+            $this->apolice(['broker_id' => null, 'insurer_name' => 'Azos', 'policy_number' => 'A-1', 'profile_id' => $perfilB->id]),
+            $this->apolice(['broker_id' => null, 'insurer_name' => 'Allianz', 'policy_number' => 'Z-1', 'profile_id' => $perfilB->id]),
+        ];
+        $this->apolice(['broker_id' => null, 'profile_id' => $this->perfilDeCliente('Alheio')->id, 'policy_number' => 'X-9']);
+
+        return [$consultor, $apolices];
+    }
+
+    public function test_inclui_varias_apolices_de_uma_vez_e_refaz_a_previsao_uma_vez(): void
+    {
+        [$consultor, $apolices] = $this->consultorComApolices();
+        $this->service()->saveRule($consultor, null, ['counterparty' => 'Porto Seguro', 'insurance_type' => '', 'first_year_percent' => '30']);
+
+        $n = $this->service()->includePolicies($consultor, array_map(fn ($a) => $a->id, $apolices));
+
+        self::assertSame(3, $n);
+        self::assertSame(3, PolicyCommission::query()->where('professional_id', $consultor->id)->where('origin', 'manual')->count());
+        self::assertSame(0, $this->service()->includePolicies($consultor, []));
+        self::assertGreaterThan(0, IncomeEntry::query()->where('professional_id', $consultor->id)->count());
+    }
+
+    public function test_lote_com_uma_apolice_de_fora_recusa_tudo(): void
+    {
+        [$consultor, $apolices] = $this->consultorComApolices();
+        $alheia = InsurancePolicy::query()->withoutGlobalScopes()->where('policy_number', 'X-9')->firstOrFail();
+
+        try {
+            $this->service()->includePolicies($consultor, [$apolices[0]->id, $alheia->id]);
+            self::fail('aceitou apólice de cliente que não é dele');
+        } catch (\Symfony\Component\HttpKernel\Exception\HttpException $e) {
+            self::assertSame(403, $e->getStatusCode());
+        }
+
+        self::assertSame(0, PolicyCommission::query()->count(), 'nenhuma do lote foi incluída');
+    }
+
+    public function test_reincluir_reativa_a_apolice_que_tinha_sido_desligada(): void
+    {
+        [$consultor, $apolices] = $this->consultorComApolices();
+        $this->service()->includePolicies($consultor, [$apolices[0]->id]);
+        $vinculo = PolicyCommission::query()->sole();
+        $this->service()->setLinkActive($consultor, $vinculo->id, false);
+
+        $this->service()->includePolicies($consultor, [$apolices[0]->id, $apolices[1]->id]);
+
+        self::assertTrue($vinculo->fresh()->is_active);
+        self::assertSame(2, PolicyCommission::query()->count());
+    }
+
+    public function test_tela_marca_todas_filtra_pela_busca_e_inclui_as_marcadas(): void
+    {
+        [$consultor, $apolices] = $this->consultorComApolices();
+        $this->actingAs($consultor);
+
+        $c = Livewire::test(CommissionRules::class)->call('openIncludeForm')
+            ->assertSee('Helen Ferry')->assertSee('Bruno Lima')->assertDontSee('Alheio')
+            ->call('selectAllIncludable');
+        self::assertCount(3, $c->get('includePolicyIds'));
+
+        $c->call('clearIncludeSelection');
+        self::assertSame([], $c->get('includePolicyIds'));
+
+        // Busca sem acento nem maiúscula: só as do Bruno.
+        $c->set('includeSearch', 'BRUNO')->call('selectAllIncludable');
+        self::assertCount(2, $c->get('includePolicyIds'));
+
+        $c->call('includePolicies')->assertHasNoErrors()->assertSet('showIncludeForm', false)->assertSee('2 apólices incluídas');
+        self::assertSame(2, PolicyCommission::query()->where('professional_id', $consultor->id)->count());
+    }
+
+    public function test_tela_exige_ao_menos_uma_apolice_e_recusa_id_de_fora(): void
+    {
+        [$consultor] = $this->consultorComApolices();
+        $alheia = InsurancePolicy::query()->withoutGlobalScopes()->where('policy_number', 'X-9')->firstOrFail();
+        $this->actingAs($consultor);
+
+        Livewire::test(CommissionRules::class)->call('openIncludeForm')->call('includePolicies')->assertHasErrors('includePolicyIds');
+        Livewire::test(CommissionRules::class)->call('openIncludeForm')->set('includePolicyIds', [$alheia->id])->call('includePolicies')->assertHasErrors('includePolicyIds.0');
+
+        self::assertSame(0, PolicyCommission::query()->count());
+    }
+
+    public function test_agenciamento_percentual_incide_so_na_primeira_parcela_mesmo_em_apolice_trimestral(): void
+    {
+        $regra = $this->regra(['agency_type' => CommissionType::Percent, 'agency_percent' => '100.000']);
+        $apolice = $this->apolice(['payment_frequency' => PaymentFrequency::Quarterly, 'monthly_premium' => '600.00', 'annual_premium' => '2400.00', 'start_date' => '2026-11-12']);
+
+        $itens = collect(app(InsuranceCommissionCalculator::class)->entries($apolice, $regra));
+
+        // A primeira parcela (R$ 600) e não o prêmio do ano (R$ 2.400).
+        self::assertSame('600.00', $itens->firstWhere('source', IncomeSource::InsuranceAgency)['amount']);
+    }
     public function test_vinculo_desligado_nao_e_reativado_pela_rotina(): void
     {
         $apolice = $this->apolice();

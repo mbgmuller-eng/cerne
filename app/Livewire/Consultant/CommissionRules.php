@@ -41,7 +41,10 @@ class CommissionRules extends Component
 
     public bool $showIncludeForm = false;
 
-    public string $includePolicyId = '';
+    /** @var list<string> */
+    public array $includePolicyIds = [];
+
+    public string $includeSearch = '';
 
     public function mount(): void
     {
@@ -131,22 +134,41 @@ class CommissionRules extends Component
         abort_unless(auth()->user()->isConsultant(), 403);
 
         $this->resetErrorBag();
-        $this->includePolicyId = '';
+        $this->includePolicyIds = [];
+        $this->includeSearch = '';
         $this->showIncludeForm = true;
     }
 
-    public function includePolicy(InsuranceCommissionService $service): void
+    /** Marca todas as que estão na lista (respeitando a busca): é como se inclui "todas as que já tenho cadastradas". */
+    public function selectAllIncludable(InsuranceCommissionService $service): void
+    {
+        $this->includePolicyIds = array_keys($this->filteredIncludable($service));
+    }
+
+    public function clearIncludeSelection(): void
+    {
+        $this->includePolicyIds = [];
+    }
+
+    public function includePolicies(InsuranceCommissionService $service): void
     {
         abort_unless(auth()->user()->isConsultant(), 403);
 
-        $this->validate(['includePolicyId' => ['required', Rule::in(array_keys($service->includablePolicies(auth()->user())))]], attributes: ['includePolicyId' => 'apólice']);
+        $permitidas = array_keys($service->includablePolicies(auth()->user()));
 
-        $service->includePolicy(auth()->user(), $this->includePolicyId);
+        $this->validate([
+            'includePolicyIds' => ['required', 'array', 'min:1', 'max:500'],
+            'includePolicyIds.*' => ['string', Rule::in($permitidas)],
+        ], messages: [
+            'includePolicyIds.required' => 'Marque ao menos uma apólice.',
+            'includePolicyIds.min' => 'Marque ao menos uma apólice.',
+        ], attributes: ['includePolicyIds' => 'apólices']);
+
+        $n = $service->includePolicies(auth()->user(), $this->includePolicyIds);
 
         $this->showIncludeForm = false;
-        $this->aviso = 'Apólice incluída.';
+        $this->aviso = $n === 1 ? 'Apólice incluída.' : "{$n} apólices incluídas.";
     }
-
     public function recalculate(InsuranceCommissionService $service): void
     {
         $service->linkSoldPolicies(auth()->user());
@@ -163,10 +185,23 @@ class CommissionRules extends Component
             'regras' => $service->rules($usuario),
             'apolices' => $service->policyRows($usuario),
             'semRegra' => $service->insurersWithoutRule($usuario),
-            'incluiveis' => $ehConsultor && $this->showIncludeForm ? $service->includablePolicies($usuario) : [],
+            'incluiveis' => $ehConsultor && $this->showIncludeForm ? $this->filteredIncludable($service) : [],
+            'totalIncluiveis' => $ehConsultor && $this->showIncludeForm ? count($service->includablePolicies($usuario)) : 0,
             'tipos' => InsuranceType::options(),
             'seguradoras' => Insurer::names(),
             'ehConsultor' => $ehConsultor,
         ]);
     }
-}
+
+    /**
+     * As apólices que ainda podem ser incluídas, filtradas pela busca (cliente, seguradora, tipo ou número, sem acento nem maiúscula).
+     *
+     * @return array<string, string> id => rótulo
+     */
+    private function filteredIncludable(InsuranceCommissionService $service): array
+    {
+        $todas = $service->includablePolicies(auth()->user());
+        $busca = Insurer::normalizeName($this->includeSearch);
+
+        return $busca === '' ? $todas : array_filter($todas, fn (string $rotulo) => str_contains(Insurer::normalizeName($rotulo), $busca));
+    }}

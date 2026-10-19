@@ -176,7 +176,7 @@ e o honorário fixo por cliente é `FeeAgreement` (mensal, trimestral, semestral
 - **Comissão de seguros (fase 2)**: aba "Regras de comissionamento" (`CommissionRules`, `InsuranceCommissionService`,
   `InsuranceCommissionCalculator`). A regra (`CommissionRule`) é por seguradora (nome canônico via `Insurer::canonicalizer()`) e,
   opcionalmente, por tipo de seguro (a do tipo vale mais): percentual do 1º ano, percentual da renovação (vazio = igual ao 1º ano),
-  agenciamento (percentual do prêmio do 1º ano ou valor fixo) e prazo de pagamento em dias (a seguradora só paga depois que o cliente
+  agenciamento (percentual do prêmio do **1º mês**, a primeira parcela, nunca o do ano todo; ou valor fixo) e prazo de pagamento em dias (a seguradora só paga depois que o cliente
   paga a parcela). A comissão é o percentual do ano da apólice sobre **cada parcela** (mensal, trimestral ou anual); o agenciamento só
   existe para apólice que começa do mês atual em diante. Apólice entra em `PolicyCommission` sozinha quando é do corretor
   (`broker_id`) ou nasceu de cotação de lead do profissional; o consultor inclui outras de clientes ativos à mão. Um vínculo desligado
