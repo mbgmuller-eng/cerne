@@ -211,6 +211,7 @@ Schedule::call(function (): void {
     $lembretes = app(\App\Services\DebtReminderService::class);
     $avisos = $lembretes->notifyUpcoming();
     $reajustes = $lembretes->notifyAdjustments();
+    $atrasadas = $lembretes->notifyOverdue();
 
-    logger()->info('Parcelas de dívidas', ['avisos' => $avisos, 'reajustes' => $reajustes]);
+    logger()->info('Parcelas de dívidas', ['avisos' => $avisos, 'reajustes' => $reajustes, 'atrasadas' => $atrasadas]);
 })->dailyAt('03:45')->name('parcelas-de-dividas')->withoutOverlapping();

@@ -117,7 +117,7 @@ Todas idempotentes (regra 4). O cron da Hostinger chama `schedule:run` a cada mi
 | `batimento` | todo minuto | marca que o agendador está vivo (o `cerne:check` confere) |
 | `contas-fixas`, `receitas-recorrentes`, `faturas` | 03:10 a 03:20 | gera vencimentos e avisos |
 | `datas-importantes` | 03:25 | avisos de aniversário e de vencimento de apólice (não avisa apólice que renova sozinha) |
-| `parcelas-de-dividas` | 03:45 | avisa parcela de financiamento, empréstimo ou consórcio a vencer e a data de reajuste da carta do consórcio (índice único por usuário e parcela em `engagement_reminders`, via `ReminderLedger`) |
+| `parcelas-de-dividas` | 03:45 | avisa parcela de financiamento, empréstimo ou consórcio a vencer, a em atraso (a quem deve no 1º dia e uma semana depois; ao consultor do cliente uma vez, com uma semana; até 45 dias de atraso) e a data de reajuste da carta do consórcio (índice único por usuário e parcela em `engagement_reminders`, via `ReminderLedger`) |
 | `snapshots` | dia 1, 03:30 | foto mensal dos investimentos |
 | `agenda-saude`, `cuidados-saude` | 03:35 | avisos de saúde |
 | cobrança (`lembrete-pix`, `pix-automatico-*`, `nota-fiscal-pendentes`, `lembrete-fim-do-teste`, `aviso-acesso-encerrando`) | 03:35 a 04:00 | assinatura e Asaas |
@@ -149,6 +149,9 @@ Módulo `Debt` + `DebtInstallment` + `DebtAdjustment` (reajustes do consórcio).
 - **Imposto de renda (`DebtTaxReportService`)**: saldo em 31/12 por dívida, pelo que o cronograma ainda não tinha quitado na data (parcela em aberto ou paga depois dela; pulada não conta). A data do contrato é `contracted_on`, ou, sem ela, um mês antes do 1º vencimento (estimativa, sinalizada); consórcio só conta depois de contemplado. `creditor_document` guarda o CPF/CNPJ do credor.
 - **Carteira do consultor (`ConsultantPortfolioService::debtOverview`)**: dívidas dos clientes com vínculo ativo, somas em SQL; `Debt` está em `PrivacyGovernedModels`.
 - **Extrato bancário**: saída que parece parcela de dívida (valor e data perto, ou o credor na descrição) vem **sugerida** (`DebtInstallmentMatcher`) e só vira baixa quando a pessoa confirma; vira a despesa da parcela, ligada a ela, e o saldo da conta cai uma vez só. Estorno e linhas com outro destino (conta fixa, fatura, transferência) ficam de fora.
+- **Acordo de dívida em aberto (`DebtAgreementSimulator`)**: compara até 4 propostas (total, parcelas, desconto sobre o saldo, taxa implícita de parcelar em vez de pagar à vista) e leva a escolhida ao "Registrar acordo". Não grava nada.
+- **Consórcio assistido**: a prévia do reajuste (`DebtService::previewAdjustment`) usa a mesma conta do registro; a sugestão de percentual vem do último reajuste registrado ou, sem histórico, do salto visto nas parcelas pagas (`Debt::observedAdjustment`). O lance na contemplação (`DebtSimulator::bid`, base em `Debt::contemplationBase`: extrato ou parcelas em aberto) mostra "baixar a parcela" x "encurtar o prazo" e só preenche o formulário; lance embutido sai da carta.
+- **Objetivos** têm cadastro próprio (`GoalsIndex`): avançam pelo dinheiro informado, pelo saldo de um investimento ou pelas parcelas pagas de um consórcio (um consórcio, um objetivo).
 - Fora de produção o projeto **proíbe lazy loading** (`Model::shouldBeStrict` em ambiente local): carregue as relações que a view usa (`with`/`loadMissing`).
 
 ### Acompanhamento (consultor financeiro e cliente)

@@ -10,7 +10,11 @@ use App\Models\FinancialProfile;
 use App\Models\ProfileMember;
 use App\Models\User;
 use App\Enums\DebtKind;
+use App\Enums\ConsultantClientStatus;
+use App\Models\ConsultantClient;
 use App\Notifications\DebtAdjustmentDue;
+use App\Notifications\DebtInstallmentOverdue;
+use App\Support\ClientDisplayName;
 use App\Notifications\DebtInstallmentDueSoon;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
@@ -83,6 +87,91 @@ class DebtReminderService
             });
 
         return $enviados;
+    }
+
+    /** Dias de atraso do primeiro aviso, do lembrete e do aviso ao consultor; passado o limite, a pessoa já sabe e não se insiste. */
+    private const OVERDUE_FIRST_DAY = 1;
+
+    private const OVERDUE_REMINDER_DAY = 7;
+
+    private const OVERDUE_CONSULTANT_DAY = 7;
+
+    private const OVERDUE_MAX_DAYS = 45;
+
+    /**
+     * Avisa a parcela em aberto que passou do vencimento: quem deve é avisado no primeiro dia de atraso e de novo na semana
+     * seguinte; o consultor do cliente, uma vez, quando chega a uma semana. Acima de 45 dias de atraso não avisa mais. Parcela
+     * pulada (diluída) não está em aberto, então não entra. Idempotente pelo livro de lembretes.
+     *
+     * @return int quantos avisos foram enviados
+     */
+    public function notifyOverdue(?CarbonImmutable $hoje = null): int
+    {
+        $hoje = ($hoje ?? CarbonImmutable::now())->startOfDay();
+        $enviados = 0;
+        $consultores = [];
+
+        DebtInstallment::withoutGlobalScopes()
+            ->where('status', DebtInstallmentStatus::Open)
+            ->whereDate('due_date', '<=', $hoje->subDays(self::OVERDUE_FIRST_DAY)->toDateString())
+            ->whereDate('due_date', '>=', $hoje->subDays(self::OVERDUE_MAX_DAYS)->toDateString())
+            ->whereIn('debt_id', Debt::withoutGlobalScopes()->where('status', DebtStatus::Active)->select('id'))
+            ->with(['debt' => fn ($q) => $q->withoutGlobalScopes()])
+            ->chunkById(200, function ($parcelas) use (&$enviados, &$consultores, $hoje): void {
+                foreach ($parcelas as $parcela) {
+                    $dias = (int) CarbonImmutable::instance($parcela->due_date)->startOfDay()->diffInDays($hoje);
+
+                    foreach ($this->recipientsFor($parcela->profile_id, $parcela->member_id, $parcela->is_private) as $usuario) {
+                        $primeiro = $this->livro->claim($usuario->id, 'debt_installment', $parcela->id, 'overdue_1');
+                        $lembrete = $dias >= self::OVERDUE_REMINDER_DAY && $this->livro->claim($usuario->id, 'debt_installment', $parcela->id, 'overdue_7');
+
+                        // Quem só vê a parcela depois de uma semana de atraso recebe um aviso, não dois.
+                        if ($primeiro || $lembrete) {
+                            $usuario->notify(DebtInstallmentOverdue::forInstallment($parcela, $dias));
+                            $enviados++;
+                        }
+                    }
+
+                    if ($dias < self::OVERDUE_CONSULTANT_DAY) {
+                        continue;
+                    }
+
+                    $consultores[$parcela->profile_id] ??= $this->consultantsFor($parcela->profile_id);
+
+                    foreach ($consultores[$parcela->profile_id]['users'] as $consultor) {
+                        if ($this->livro->claim($consultor->id, 'debt_installment', $parcela->id, 'overdue_consultant')) {
+                            $consultor->notify(DebtInstallmentOverdue::forInstallment($parcela, $dias, $consultores[$parcela->profile_id]['name']));
+                            $enviados++;
+                        }
+                    }
+                }
+            });
+
+        return $enviados;
+    }
+
+    /**
+     * Os consultores com vínculo ativo com o dono do perfil e o nome do cliente para o aviso.
+     *
+     * @return array{users: Collection<int, User>, name: string}
+     */
+    private function consultantsFor(string $profileId): array
+    {
+        $perfil = FinancialProfile::with(['owner', 'members.user'])->find($profileId);
+
+        if ($perfil === null) {
+            return ['users' => collect(), 'name' => ''];
+        }
+
+        $ids = ConsultantClient::query()
+            ->where('client_id', $perfil->owner_user_id)
+            ->where('status', ConsultantClientStatus::Active)
+            ->pluck('consultant_id');
+
+        return [
+            'users' => User::query()->whereIn('id', $ids)->get()->filter(fn (User $u) => $u->isConsultant())->values(),
+            'name' => ClientDisplayName::forProfile($perfil),
+        ];
     }
 
     /** @return Collection<int, User> */
