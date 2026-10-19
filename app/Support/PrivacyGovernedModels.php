@@ -4,6 +4,7 @@ namespace App\Support;
 
 use App\Models\BankAccount;
 use App\Models\CreditCard;
+use App\Models\Debt;
 use App\Models\ExpenseRecord;
 use App\Models\FixedBill;
 use App\Models\Goal;
@@ -40,6 +41,7 @@ class PrivacyGovernedModels
         CreditCard::class,
         InsurancePolicy::class,
         Goal::class,
+        Debt::class,
     ];
 
     /**

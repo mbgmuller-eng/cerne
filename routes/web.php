@@ -218,6 +218,7 @@ Route::middleware(['auth', 'verified'])->group(function (): void {
         Route::get('/carteira', PortfolioOverview::class)->name('consultant.portfolio');
         Route::get('/carteira/seguros', PortfolioInsurance::class)->name('consultant.portfolio.insurance');
         Route::get('/carteira/investimentos', PortfolioInvestments::class)->name('consultant.portfolio.investments');
+        Route::get('/carteira/dividas', \App\Livewire\Consultant\PortfolioDebts::class)->name('consultant.portfolio.debts');
         Route::get('/carteira/datas-importantes', ImportantDates::class)->name('consultant.portfolio.important-dates');
         Route::get('/semana', \App\Livewire\Consultant\EngagementWeek::class)->name('consultant.week');
         Route::get('/modelos-de-roteiro', \App\Livewire\Consultant\EngagementTemplates::class)->name('consultant.plan-templates');

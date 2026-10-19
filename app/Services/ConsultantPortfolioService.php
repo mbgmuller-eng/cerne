@@ -3,6 +3,9 @@
 namespace App\Services;
 
 use App\Enums\ConsultantClientStatus;
+use App\Enums\DebtAmortization;
+use App\Enums\DebtInstallmentStatus;
+use App\Enums\DebtStatus;
 use App\Enums\InsuranceType;
 use App\Enums\MemberRole;
 use App\Enums\ProfileType;
@@ -11,6 +14,8 @@ use App\Models\ConsultantClient;
 use App\Models\ConsultantInvite;
 use App\Models\CreditCard;
 use App\Models\CreditCardInvoice;
+use App\Models\Debt;
+use App\Models\DebtInstallment;
 use App\Models\FinancialProfile;
 use App\Models\InsurancePolicy;
 use App\Models\InvestmentRecord;
@@ -22,6 +27,7 @@ use App\Support\Money;
 use App\Support\PrivacyGovernedModels;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Panorama da carteira do consultor: agregados através de TODOS os
@@ -162,6 +168,89 @@ class ConsultantPortfolioService
                 'client_name' => $nomes[$i->profile_id] ?? '—',
                 'member_name' => $i->member?->name,
             ]);
+    }
+
+    /**
+     * As dívidas de todos os clientes ativos, por cliente: total devedor, parcelas do mês e as dívidas com o saldo de cada uma.
+     * Consórcio ainda não contemplado não é dívida: entra só como carta. Somas em SQL (regra 3); aqui só se agrupa por cliente.
+     *
+     * @return array{clients: Collection<string, array<string, mixed>>, totals: array{balance: string, month: string, credit: string, clients_with_debt: int}}
+     */
+    public function debtOverview(User $consultant): array
+    {
+        $vazio = ['clients' => collect(), 'totals' => ['balance' => '0.00', 'month' => '0.00', 'credit' => '0.00', 'clients_with_debt' => 0]];
+        $profiles = $this->activeClientProfiles($consultant);
+
+        if ($profiles->isEmpty()) {
+            return $vazio;
+        }
+
+        $nomes = $this->clientNamesByProfile($profiles);
+
+        $dividas = Debt::withoutProfileScope()
+            ->whereIn('profile_id', $profiles->pluck('id'))
+            ->whereIn('status', [DebtStatus::Active->value, DebtStatus::Open->value, DebtStatus::Negotiating->value])
+            ->with('member')
+            ->orderBy('name')
+            ->get();
+
+        if ($dividas->isEmpty()) {
+            return $vazio;
+        }
+
+        $abertas = DebtInstallment::withoutProfileScope()
+            ->whereIn('debt_id', $dividas->pluck('id'))
+            ->where('status', DebtInstallmentStatus::Open->value)
+            ->select('debt_id', DB::raw('SUM(amount) as total'), DB::raw('SUM(principal_amount) as principal'), DB::raw('MIN(due_date) as next_due'))
+            ->groupBy('debt_id')
+            ->get()
+            ->keyBy('debt_id');
+
+        $hoje = CarbonImmutable::now();
+        $doMes = DebtInstallment::withoutProfileScope()
+            ->whereIn('debt_id', $dividas->pluck('id'))
+            ->whereIn('status', [DebtInstallmentStatus::Open->value, DebtInstallmentStatus::Paid->value])
+            ->whereYear('due_date', $hoje->year)->whereMonth('due_date', $hoje->month)
+            ->select('debt_id', DB::raw('SUM(amount) as total'))
+            ->groupBy('debt_id')
+            ->get()
+            ->keyBy('debt_id');
+
+        $clientes = [];
+
+        foreach ($dividas as $d) {
+            $a = $abertas->get($d->id);
+            $emCarta = $d->isSavingForCredit();
+            $saldo = match (true) {
+                $emCarta => '0.00',
+                $d->status->isUnscheduled() => Money::parse($d->current_balance),
+                default => Money::parse($a === null ? 0 : ($d->amortization === DebtAmortization::Fixed ? (string) $a->total : (string) $a->principal)),
+            };
+            $mes = Money::parse($doMes->get($d->id)?->total ?? 0);
+            $c = &$clientes[$d->profile_id];
+            $c ??= ['client_name' => $nomes[$d->profile_id] ?? '—', 'profile_id' => $d->profile_id, 'balance' => '0.00', 'month' => '0.00', 'credit' => '0.00', 'rows' => []];
+
+            $c['balance'] = bcadd($c['balance'], $saldo, 2);
+            $c['month'] = bcadd($c['month'], $mes, 2);
+            $c['credit'] = $emCarta ? bcadd($c['credit'], Money::parse($d->credit_amount), 2) : $c['credit'];
+            $c['rows'][] = [
+                'debt' => $d, 'balance' => $saldo, 'credit' => $emCarta ? Money::parse($d->credit_amount) : null,
+                'month' => $mes, 'next_due' => $a?->next_due ? CarbonImmutable::parse($a->next_due) : null, 'member_name' => $d->member?->name,
+            ];
+            unset($c);
+        }
+
+        $clients = collect($clientes)->sortByDesc(fn (array $c) => (float) $c['balance'])->values()->keyBy('client_name');
+
+        return [
+            'clients' => $clients,
+            'totals' => [
+                'balance' => Money::sum($clients->pluck('balance')),
+                'month' => Money::sum($clients->pluck('month')),
+                'credit' => Money::sum($clients->pluck('credit')),
+                'clients_with_debt' => $clients->filter(fn (array $c) => bccomp($c['balance'], '0', 2) > 0)->count(),
+            ],
+        ];
     }
 
     /** @return Collection<int, FinancialProfile> perfis dos clientes com vínculo ativo, com o dono carregado */

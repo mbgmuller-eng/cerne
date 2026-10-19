@@ -161,6 +161,7 @@
             'items' => [
                 ['consultant.portfolio', 'Painel da carteira', 'Carteira', 'invest'],
                 ['consultant.portfolio.investments', 'Investimentos da carteira', 'Invest.', 'flow'],
+                ['consultant.portfolio.debts', 'Dívidas da carteira', 'Dívidas', 'debt'],
                 ['consultant.week', 'Minha semana', 'Semana', 'calendar'],
                 ['consultant.plan-templates', 'Modelos de roteiro', 'Modelos', 'bills'],
             ],
