@@ -384,6 +384,20 @@ class ConsortiumImportTest extends TestCase
             ->assertSet('newInstallmentAmount', '730.59')->assertSet('remainingInstallments', '189');
     }
 
+    public function test_lista_mostra_pagas_puladas_flex_e_a_proxima_parcela_de_cada_contrato(): void
+    {
+        $this->consorcioManual(['paid_before' => 29, 'skipped_installments' => [3, 12], 'flex_percent' => 50, 'term' => 220]);
+        app(DebtService::class)->create([
+            'kind' => 'loan', 'name' => 'Empréstimo pessoal', 'amortization' => 'fixed', 'installment_amount' => '650.00', 'term' => 6,
+            'first_due_date' => '2026-10-25', 'paid_before' => 0, 'category_id' => \App\Models\ExpenseCategory::available()->where('name', 'Financeiros')->firstOrFail()->id,
+        ]);
+
+        Livewire::test(DebtsIndex::class)
+            ->assertSee('29 de 220 pagas')->assertSee('2 puladas')->assertSee('flex de 50%')
+            ->assertSee('próxima: parcela 32')
+            ->assertSee('0 de 6 pagas')->assertSee('próxima: parcela 1');
+    }
+
     // ------------------------------------------------------------------ tela de importação
 
     public function test_envio_do_pdf_cria_a_leitura_e_dispara_o_job(): void

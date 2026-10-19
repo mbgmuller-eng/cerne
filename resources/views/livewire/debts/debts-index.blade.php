@@ -63,7 +63,7 @@
                     <ul class="mt-2 divide-y divide-slate-100 dark:divide-white/10">
                         @foreach ($g['contratos'] as $d)
                             @php
-                                $proxima = $d->installments->first();
+                                $proxima = $proximas->get($d->id);
                                 $juntando = $d->isSavingForCredit();
                             @endphp
                             <li wire:key="divida-{{ $d->id }}">
@@ -82,8 +82,16 @@
                                         <p class="text-xs text-slate-500 dark:text-slate-400">
                                             {{ implode(' · ', array_filter([$d->creditor, $d->isConsortium() ? $d->consortium_type?->label() : null, $d->category ? $d->category->name.($d->subcategory ? ' › '.$d->subcategory->name : '') : null])) }}
                                         </p>
-                                        @if ($proxima)
-                                            <p class="mt-0.5 text-xs text-slate-400">Parcela {{ $proxima->number }} de {{ $d->term }} · {{ $proxima->due_date->format('d/m/Y') }} · {{ Money::format($proxima->amount) }}</p>
+                                        @if ($d->term > 0)
+                                            <p class="mt-0.5 text-xs text-slate-400">
+                                                {{ $d->paid_count }} de {{ $d->term }} pagas{{ $d->skipped_count > 0 ? ' · '.$d->skipped_count.' '.($d->skipped_count === 1 ? 'pulada' : 'puladas') : '' }}
+                                                @if ($proxima) · próxima: parcela {{ $proxima->number }}, {{ $proxima->due_date->format('d/m/Y') }}, {{ Money::format($proxima->amount) }} @endif
+                                            </p>
+                                        @endif
+                                        @if ($d->isConsortium() && ($d->flex_percent || ($d->adjustment_index && $d->next_adjustment_on)))
+                                            <p class="text-xs text-slate-400">
+                                                {{ implode(' · ', array_filter([$d->flex_percent ? 'flex de '.$d->flex_percent.'%' : null, ($d->adjustment_index && $d->next_adjustment_on) ? 'próximo reajuste em '.$d->next_adjustment_on->format('d/m/Y') : null])) }}
+                                            </p>
                                         @endif
                                     </div>
                                     <div class="shrink-0 text-right">

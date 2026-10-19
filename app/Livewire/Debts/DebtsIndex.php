@@ -10,6 +10,7 @@ use App\Enums\DebtRateBasis;
 use App\Enums\Necessity;
 use App\Models\BankAccount;
 use App\Models\Debt;
+use App\Models\DebtInstallment;
 use App\Models\ExpenseCategory;
 use App\Models\Goal;
 use App\Models\IncomeRecord;
@@ -328,11 +329,18 @@ class DebtsIndex extends Component
 
         $receitasDoMes = (string) IncomeRecord::query()->forPeriod(now()->year, now()->month)->sum('amount');
 
-        $contratos = Debt::query()->with(['category', 'subcategory', 'installments' => fn ($q) => $q->where('status', 'open')->orderBy('number')->limit(1)])
+        $contratos = Debt::query()->with(['category', 'subcategory'])
+            ->withCount(['installments as paid_count' => fn ($q) => $q->where('status', 'paid'), 'installments as skipped_count' => fn ($q) => $q->where('status', 'diluted')])
             ->orderByRaw("status = 'paid_off'")->orderBy('name')->get();
+
+        // A próxima parcela de CADA contrato. Um limit(1) dentro do with() valeria para a consulta inteira, não para cada dívida.
+        $proximas = DebtInstallment::query()->whereIn('debt_id', $contratos->pluck('id'))->where('status', 'open')
+            ->whereRaw('number = (select min(i.number) from debt_installments i where i.debt_id = debt_installments.debt_id and i.status = ?)', ['open'])
+            ->get()->keyBy('debt_id');
 
         return view('livewire.debts.debts-index', [
             'resumo' => $resumo,
+            'proximas' => $proximas,
             'comprometido' => bccomp(Money::parse($receitasDoMes), '0', 2) > 0 ? Money::percentageOf($resumo['month_total'], $receitasDoMes) : null,
             'financiamentos' => $contratos->where('kind', DebtKind::Financing)->values(),
             'emprestimos' => $contratos->where('kind', DebtKind::Loan)->values(),
