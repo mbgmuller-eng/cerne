@@ -125,6 +125,7 @@ Todas idempotentes (regra 4). O cron da Hostinger chama `schedule:run` a cada mi
 | `acompanhamento-lembretes` | 07:45 | lembrete de reunião no dia seguinte e de tarefa que vence amanhã ou venceu (só com vínculo ativo; índice único em `engagement_reminders`) |
 | `honorarios-previstos` | 04:05 | estende, para cada contrato de honorário ativo, os recebimentos previstos (12 meses à frente; índice único `fee_agreement_id` + `due_on`) |
 | `comissoes-de-seguros` | 04:07 | vincula as apólices que cada profissional vendeu e refaz a previsão de comissão e agenciamento (chave `origin_key` única por profissional) |
+| `percentual-patrimonio` | 04:09 | refaz a previsão do percentual sobre patrimônio de cada consultor (estimativa com o patrimônio de hoje) |
 | `anexos-de-leads` | 04:10 | apaga arquivos de leads perdidos há mais de 12 meses |
 | `leads-de-renovacao` | 07:30 | cria lead para apólice que vence (preferências em `users.renewal_lead_*`) |
 | `resumo-de-leads` | 08:00 | uma notificação por profissional com o que pede atenção nos leads |
@@ -180,8 +181,16 @@ e o honorário fixo por cliente é `FeeAgreement` (mensal, trimestral, semestral
   (`broker_id`) ou nasceu de cotação de lead do profissional; o consultor inclui outras de clientes ativos à mão. Um vínculo desligado
   não é reativado pela rotina. A previsão (`reconcile`) cria o que falta, corrige o valor do previsto e tira o que deixou de valer;
   recebido e cancelado ficam. Lançamento gerado (`origin_key`) só recebe baixa ou cancelamento (`IncomeEntry::isGenerated()`).
-- **Fases seguintes (combinadas)**: 3) percentual sobre patrimônio por periodicidade e por produto/empresa de investimento;
-  4) consórcio por administradora (ex.: 3,5% da carta nas parcelas 2, 4 e 6); 5) conferência por extrato de comissão (IA com revisão).
+- **Percentual sobre patrimônio (fase 3)**: contrato `AssetFeeAgreement` por cliente (`AssetFeeContracts`, na aba Contratos) e regras de
+  investimento (`InvestmentRules`, na aba Regras; são `CommissionRule` com `kind = investment`, `type_key` = escopo produto, empresa ou tipo de
+  ativo, `annual_percent`). O percentual é **ao ano**; cada cobrança vale `percentual × meses do período ÷ 12` (mensal, trimestral, semestral
+  ou anual) sobre o patrimônio de **hoje** (`current_amount` dos investimentos ativos, sem consórcio): é estimativa. Modo "total" = um
+  percentual para tudo; modo "regras" = cada produto paga a regra mais específica (produto > empresa > tipo) e o que não tem regra fica fora.
+  Os períodos contam da data de início do contrato e cobram no último dia; só valem os que terminam do mês atual em diante e os que o término do
+  contrato completa. Cobrança de período já encerrado deixa de ser recalculada (o valor fica o último estimado até dar baixa). Só cliente com
+  vínculo ativo gera previsão (ler o patrimônio exige o vínculo). Rotina `percentual-patrimonio` (04:09), chave `origin_key` `asset:{contrato}:{fim}`.
+- **Fases seguintes (combinadas)**: 4) consórcio por administradora (ex.: 3,5% da carta nas parcelas 2, 4 e 6);
+  5) conferência por extrato de comissão (IA com revisão).
 
 ### Calendário (Saúde e agenda do profissional)
 

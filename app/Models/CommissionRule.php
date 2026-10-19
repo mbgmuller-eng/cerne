@@ -15,7 +15,7 @@ use Illuminate\Database\Eloquent\Model;
  * investimento). Dado DELE (professional_id), sigiloso como o resto dos recebimentos: ver TenancyCoverageTest::EXEMPT.
  */
 #[Fillable([
-    'professional_id', 'kind', 'counterparty', 'counterparty_key', 'insurance_type', 'type_key', 'first_year_percent', 'renewal_percent',
+    'professional_id', 'kind', 'counterparty', 'counterparty_key', 'insurance_type', 'type_key', 'first_year_percent', 'renewal_percent', 'annual_percent',
     'agency_type', 'agency_percent', 'agency_amount', 'payout_delay_days', 'is_active', 'notes',
 ])]
 class CommissionRule extends Model
@@ -24,6 +24,9 @@ class CommissionRule extends Model
 
     public const KIND_INSURANCE = 'insurance';
 
+    /** Percentual sobre patrimônio (ao ano) por produto, empresa ou tipo de ativo: `type_key` guarda o escopo (InvestmentRuleScope). */
+    public const KIND_INVESTMENT = 'investment';
+
     protected function casts(): array
     {
         return [
@@ -31,6 +34,7 @@ class CommissionRule extends Model
             'agency_type' => CommissionType::class,
             'first_year_percent' => 'decimal:3',
             'renewal_percent' => 'decimal:3',
+            'annual_percent' => 'decimal:4',
             'agency_percent' => 'decimal:3',
             'agency_amount' => 'decimal:2',
             'payout_delay_days' => 'integer',

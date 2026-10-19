@@ -229,6 +229,10 @@
         @endif
     @elseif ($aba === 'regras')
         <livewire:consultant.commission-rules />
+
+        @if ($ehConsultor)
+            <livewire:consultant.investment-rules />
+        @endif
     @else
         {{-- Contratos de honorário --------------------------------------- --}}
         <section>
@@ -270,6 +274,8 @@
                 </div>
             @endif
         </section>
+
+        <livewire:consultant.asset-fee-contracts />
     @endif
 
     {{-- Lançamento ------------------------------------------------------- --}}

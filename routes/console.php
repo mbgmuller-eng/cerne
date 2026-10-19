@@ -186,6 +186,14 @@ Schedule::call(function (): void {
     logger()->info('Comissões de seguros', $resultado);
 })->dailyAt('04:07')->name('comissoes-de-seguros')->withoutOverlapping();
 
+// Recebimentos: refaz a previsão do percentual sobre patrimônio de cada consultor (estimativa com o patrimônio de hoje).
+// Idempotente pela chave `origin_key`.
+Schedule::call(function (): void {
+    $resultado = app(\App\Services\AssetFeeService::class)->runDailyMaintenance();
+
+    logger()->info('Percentual sobre patrimônio', $resultado);
+})->dailyAt('04:09')->name('percentual-patrimonio')->withoutOverlapping();
+
 // Leads: anexos de contatos perdidos há mais do prazo de retenção saem do servidor.
 // Idempotente: o que já foi apagado não aparece de novo.
 Schedule::command('cerne:purge-lead-files')->dailyAt('04:10')->name('anexos-de-leads')->withoutOverlapping();
