@@ -178,4 +178,67 @@ class ConsultantDebtPortfolioTest extends TestCase
 
         self::assertTrue(PrivacyGovernedModels::anyPrivate($this->perfilA->id, [Debt::class]));
     }
+
+    // --- Um clique até a dívida ---------------------------------------------------------------------------------------------
+
+    public function test_cada_contrato_da_carteira_e_um_botao_que_leva_direto_para_a_divida(): void
+    {
+        $this->como($this->clienteA, $this->perfilA, $this->membroA);
+        $divida = $this->emprestimo('Empréstimo A');
+
+        $this->actingAs($this->consultor);
+        app(ProfileContext::class)->clear();
+
+        Livewire::test(PortfolioDebts::class)
+            ->assertSee('Empréstimo A')
+            ->assertSeeHtml('action="'.route('profile.switch', $this->perfilA->id).'"')
+            ->assertSeeHtml('name="destino" value="dividas"')
+            ->assertSeeHtml('name="divida" value="'.$divida->id.'"');
+    }
+
+    public function test_o_atalho_entra_no_perfil_do_cliente_e_abre_a_divida(): void
+    {
+        $this->como($this->clienteA, $this->perfilA, $this->membroA);
+        $divida = $this->emprestimo('Empréstimo A');
+
+        $this->actingAs($this->consultor);
+        app(ProfileContext::class)->clear();
+
+        $this->post(route('profile.switch', $this->perfilA->id), ['destino' => 'dividas', 'divida' => $divida->id])
+            ->assertRedirect(route('debts.show', $divida));
+
+        app(ProfileContext::class)->clear();
+        $this->get(route('debts.show', $divida))->assertOk()->assertSee('Empréstimo A');
+    }
+
+    public function test_sem_id_valido_o_atalho_cai_na_lista_de_dividas_do_cliente(): void
+    {
+        $this->actingAs($this->consultor);
+
+        $this->post(route('profile.switch', $this->perfilA->id), ['destino' => 'dividas'])->assertRedirect(route('debts.index'));
+        $this->post(route('profile.switch', $this->perfilA->id), ['destino' => 'dividas', 'divida' => 'x/../admin'])->assertRedirect(route('debts.index'));
+    }
+
+    public function test_divida_de_outro_cliente_nao_abre_pelo_atalho(): void
+    {
+        [$outro, $perfilB, $membroB] = $this->cliente('Cliente sem vínculo');
+        $this->como($outro, $perfilB, $membroB);
+        $alheia = $this->emprestimo('Alheia');
+
+        $this->actingAs($this->consultor);
+        app(ProfileContext::class)->clear();
+
+        // Entra no perfil do cliente dele com o id da dívida de outro: a tela só resolve dívida do perfil ativo.
+        $this->post(route('profile.switch', $this->perfilA->id), ['destino' => 'dividas', 'divida' => $alheia->id])->assertRedirect(route('debts.show', $alheia));
+        app(ProfileContext::class)->clear();
+        $this->get(route('debts.show', $alheia))->assertNotFound();
+    }
+
+    public function test_consultor_so_entra_no_perfil_de_cliente_com_vinculo_ativo_mesmo_pelo_atalho(): void
+    {
+        [$outro, $perfilB] = $this->cliente('Cliente sem vínculo');
+        $this->actingAs($this->consultor);
+
+        $this->post(route('profile.switch', $perfilB->id), ['destino' => 'dividas'])->assertForbidden();
+    }
 }

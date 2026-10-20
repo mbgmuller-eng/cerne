@@ -29,9 +29,15 @@
             </div>
         </div>
 
-        <div class="space-y-3">
+        <div class="space-y-3" x-data="{ todos: true }">
+            <div class="flex items-center justify-between gap-3 text-xs text-slate-500 dark:text-slate-400">
+                <p>Clique em um contrato para abrir a dívida do cliente.</p>
+                <button type="button" @click="todos = ! todos" class="btn-ghost px-3 py-1 text-xs" x-text="todos ? 'Recolher todos' : 'Expandir todos'"></button>
+            </div>
+
             @foreach ($clientes as $nome => $c)
-                <div x-data="{ open: false }" class="card overflow-hidden" wire:key="cliente-{{ $c['profile_id'] }}">
+                {{-- Abre já expandido: o contrato está a um clique. O botão do topo recolhe ou expande todos de uma vez. --}}
+                <div x-data="{ open: true }" x-effect="open = todos" class="card overflow-hidden" wire:key="cliente-{{ $c['profile_id'] }}">
                     <button type="button" @click="open = ! open" class="flex w-full flex-wrap items-center justify-between gap-3 px-5 py-4 text-left">
                         <p class="font-display text-lg font-semibold text-slate-900 dark:text-white sm:text-xl">{{ $nome }}</p>
                         <div class="text-right">
@@ -45,30 +51,41 @@
 
                     <ul x-show="open" x-cloak class="divide-y divide-slate-100 border-t border-slate-100 px-5 dark:divide-white/10 dark:border-white/10">
                         @foreach ($c['rows'] as $l)
-                            <li class="flex flex-wrap items-center justify-between gap-3 py-3" wire:key="divida-{{ $l['debt']->id }}">
-                                <div class="min-w-0">
-                                    <p class="truncate text-sm font-medium text-slate-800 dark:text-slate-200">
-                                        {{ $l['debt']->name }}
-                                        @if ($l['debt']->status->isUnscheduled())
-                                            <span class="badge ml-1 bg-amber-50 text-amber-900 dark:bg-amber-500/10 dark:text-amber-300">{{ $l['debt']->status->label() }}</span>
-                                        @endif
-                                    </p>
-                                    <p class="text-xs text-slate-500 dark:text-slate-400">
-                                        {{ implode(' · ', array_filter([$l['debt']->kind->label(), $l['debt']->creditor, $l['member_name']])) }}
-                                    </p>
-                                    @if ($l['next_due'])
-                                        <p class="text-xs text-slate-400">próxima parcela em {{ $l['next_due']->format('d/m/Y') }}</p>
-                                    @endif
-                                </div>
-                                <div class="shrink-0 text-right">
-                                    @if ($l['credit'] !== null)
-                                        <p class="figure text-sm text-slate-800 dark:text-slate-200">{{ Money::format($l['credit']) }}</p>
-                                        <p class="text-xs text-slate-400">carta (não contemplado)</p>
-                                    @else
-                                        <p class="figure text-sm text-slate-800 dark:text-slate-200">{{ Money::format($l['balance']) }}</p>
-                                        <p class="text-xs text-slate-400">{{ $l['debt']->balanceLabel() }}</p>
-                                    @endif
-                                </div>
+                            <li wire:key="divida-{{ $l['debt']->id }}">
+                                {{-- POST puro (como "Abrir perfil"): entra no perfil do cliente e cai direto na dívida. --}}
+                                <form method="POST" action="{{ route('profile.switch', $c['profile_id']) }}">
+                                    @csrf
+                                    <input type="hidden" name="destino" value="dividas">
+                                    <input type="hidden" name="divida" value="{{ $l['debt']->id }}">
+                                    <button type="submit" class="-mx-3 flex w-[calc(100%+1.5rem)] flex-wrap items-center justify-between gap-3 rounded-lg px-3 py-3 text-left transition hover:bg-slate-50 focus-visible:bg-slate-50 dark:hover:bg-white/5 dark:focus-visible:bg-white/5">
+                                        <span class="min-w-0">
+                                            <span class="block truncate text-sm font-medium text-slate-800 dark:text-slate-200">
+                                                {{ $l['debt']->name }}
+                                                @if ($l['debt']->status->isUnscheduled())
+                                                    <span class="badge ml-1 bg-amber-50 text-amber-900 dark:bg-amber-500/10 dark:text-amber-300">{{ $l['debt']->status->label() }}</span>
+                                                @endif
+                                            </span>
+                                            <span class="block text-xs text-slate-500 dark:text-slate-400">
+                                                {{ implode(' · ', array_filter([$l['debt']->kind->label(), $l['debt']->creditor, $l['member_name']])) }}
+                                            </span>
+                                            @if ($l['next_due'])
+                                                <span class="block text-xs text-slate-400">próxima parcela em {{ $l['next_due']->format('d/m/Y') }}</span>
+                                            @endif
+                                        </span>
+                                        <span class="flex shrink-0 items-center gap-3">
+                                            <span class="text-right">
+                                                @if ($l['credit'] !== null)
+                                                    <span class="figure block text-sm text-slate-800 dark:text-slate-200">{{ Money::format($l['credit']) }}</span>
+                                                    <span class="block text-xs text-slate-400">carta (não contemplada)</span>
+                                                @else
+                                                    <span class="figure block text-sm text-slate-800 dark:text-slate-200">{{ Money::format($l['balance']) }}</span>
+                                                    <span class="block text-xs text-slate-400">{{ $l['debt']->balanceLabel() }}</span>
+                                                @endif
+                                            </span>
+                                            <x-nav-icon name="chevron" class="h-4 w-4 -rotate-90 text-slate-400" />
+                                        </span>
+                                    </button>
+                                </form>
                             </li>
                         @endforeach
                     </ul>

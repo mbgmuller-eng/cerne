@@ -58,6 +58,16 @@ class ProfileSwitchController extends Controller
             return redirect()->route('engagement.index');
         }
 
+        // Atalho da carteira de dívidas: cai direto na dívida (ou na lista de dívidas do cliente). Só consultor tem a área;
+        // o id da dívida é conferido pela própria tela, que só resolve dívida do perfil ativo (404 se for de outro).
+        if ($request->input('destino') === 'dividas' && $request->user()->isConsultant()) {
+            $divida = (string) $request->input('divida');
+
+            return preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', $divida) === 1
+                ? redirect()->route('debts.show', $divida)
+                : redirect()->route('debts.index');
+        }
+
         // Corretor não tem Visão geral (é tela financeira, ver Dashboard::
         // mount()) — cai direto em Seguros, a única tela dele dentro do perfil.
         return redirect()->route($request->user()->isBroker() ? 'insurance.index' : 'dashboard');
