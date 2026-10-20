@@ -10,6 +10,7 @@ use App\Models\GymExerciseCatalog;
 use App\Models\GymExerciseSuggestion;
 use App\Models\GymPlan;
 use App\Models\GymSession;
+use App\Models\GymSetLog;
 use App\Models\GymWorkout;
 use App\Models\GymWorkoutExercise;
 use DomainException;
@@ -264,6 +265,154 @@ class GymPlanService
         $indice = $treinos->search(fn (GymWorkout $t) => $t->id === $ultima->workout_id);
 
         return $treinos[(($indice === false ? -1 : $indice) + 1) % $treinos->count()];
+    }
+
+    /**
+     * Salva o rascunho do treino automático (já revisado pela pessoa) como uma fase nova: encerra a ativa, cria os treinos e
+     * os exercícios, que passam a existir para ela com a foto do catálogo. Tudo ou nada.
+     *
+     * @param  array{name: string, workouts: list<array{name: string, focus: ?string, exercises: list<array<string, mixed>>}>}  $rascunho
+     */
+    public function createPlanFromDraft(array $rascunho): GymPlan
+    {
+        return DB::transaction(function () use ($rascunho): GymPlan {
+            $plano = $this->createPlan(mb_substr($rascunho['name'], 0, 80));
+
+            foreach ($rascunho['workouts'] as $w) {
+                if ($w['exercises'] === []) {
+                    continue;
+                }
+
+                $treino = $this->addWorkout($plano, $w['name'], $w['focus'] ?? null);
+
+                foreach ($w['exercises'] as $e) {
+                    [$exercicio, $equipamento] = $this->resolveSwapChoice('catalog:'.$e['catalog_id']);
+
+                    $this->addExercise($treino, $exercicio, [
+                        'target_sets' => $e['sets'], 'target_reps_min' => $e['reps_min'], 'target_reps_max' => $e['reps_max'],
+                        'target_duration_seconds' => $e['duration'], 'rest_seconds' => $e['rest'],
+                        'default_equipment_id' => $this->findOrCreateEquipment($equipamento !== null ? mb_substr($equipamento, 0, 80) : null)?->id,
+                        'notes' => $e['notes'] ?? null,
+                    ]);
+                }
+            }
+
+            return $plano;
+        });
+    }
+
+    // --- Troca de exercício ------------------------------------------------------------------------------------------
+
+    /**
+     * Opções para trocar o exercício de um item do treino: os que a pessoa já usa e os do catálogo, do mesmo grupo muscular
+     * (de qualquer grupo, se ela procurar por nome), sem os que já estão neste treino. Os do mesmo tipo de medida vêm primeiro
+     * (carga por carga, tempo por tempo) e, entre iguais, os que ela já conhece.
+     *
+     * @return list<array{key: string, name: string, group: string, equipment: ?string, photo: bool, own: bool}>
+     */
+    public function swapOptions(GymWorkoutExercise $item, string $busca = '', bool $todosGrupos = false, int $limite = 40): array
+    {
+        $atual = $item->exercise;
+        $busca = GymExerciseCatalog::normalizeName($busca);
+        $todos = $todosGrupos || $busca !== '';
+        $excluidos = GymWorkoutExercise::query()->where('workout_id', $item->workout_id)->with('exercise')->get()
+            ->map(fn (GymWorkoutExercise $i) => GymExerciseCatalog::normalizeName($i->exercise->name))
+            ->all();
+
+        $proprios = GymExercise::query()->where('id', '!=', $atual->id)
+            ->when(! $todos, fn ($q) => $q->where('muscle_group', $atual->muscle_group->value))
+            ->get()
+            ->map(fn (GymExercise $e) => [
+                'key' => 'own:'.$e->id, 'name' => $e->name, 'group' => $e->muscle_group->label(), 'equipment' => null,
+                'photo' => $e->image_path !== null, 'own' => true, 'same_type' => $e->measure_type === $atual->measure_type,
+            ]);
+
+        $nomesProprios = $proprios->map(fn (array $o) => GymExerciseCatalog::normalizeName($o['name']))->all();
+
+        $catalogo = GymExerciseCatalog::query()->active()
+            ->when(! $todos, fn ($q) => $q->where('muscle_group', $atual->muscle_group->value))
+            ->get()
+            ->reject(fn (GymExerciseCatalog $c) => in_array(GymExerciseCatalog::normalizeName($c->name), $nomesProprios, true))
+            ->map(fn (GymExerciseCatalog $c) => [
+                'key' => 'catalog:'.$c->id, 'name' => $c->name, 'group' => $c->muscle_group->label(), 'equipment' => $c->equipment_hint,
+                'photo' => $c->image_path !== null, 'own' => false, 'same_type' => $c->measure_type === $atual->measure_type,
+            ]);
+
+        return $proprios->concat($catalogo)
+            ->reject(fn (array $o) => in_array(GymExerciseCatalog::normalizeName($o['name']), $excluidos, true))
+            ->when($busca !== '', fn ($c) => $c->filter(fn (array $o) => str_contains(GymExerciseCatalog::normalizeName($o['name'].' '.$o['equipment']), $busca)))
+            ->sortBy([['same_type', 'desc'], ['own', 'desc'], ['name', 'asc']])
+            ->take($limite)
+            ->map(fn (array $o) => collect($o)->except('same_type')->all())
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Resolve a opção escolhida na lista de troca: um exercício que a pessoa já tem ou um do catálogo (que passa a existir
+     * para ela, com a foto copiada). Devolve também o equipamento sugerido pelo catálogo.
+     *
+     * @return array{0: GymExercise, 1: ?string}
+     */
+    public function resolveSwapChoice(string $chave): array
+    {
+        [$tipo, $id] = array_pad(explode(':', $chave, 2), 2, null);
+
+        if ($tipo === 'own' && $id !== null) {
+            return [GymExercise::query()->findOrFail($id), null];
+        }
+
+        if ($tipo === 'catalog' && $id !== null) {
+            $catalogo = GymExerciseCatalog::query()->active()->findOrFail($id);
+            $exercicio = $this->findOrCreateExercise($catalogo->name, $catalogo->muscle_group, $catalogo->measure_type);
+            $this->copyCatalogImage($exercicio, $catalogo);
+
+            return [$exercicio, $catalogo->equipment_hint];
+        }
+
+        throw new DomainException('Escolha um exercício da lista.');
+    }
+
+    /**
+     * Troca o exercício de um item do treino e MANTÉM o treino assim para as próximas vezes: séries, repetições, pausa e
+     * observação continuam; o equipamento passa a ser o do exercício novo. O histórico não muda, porque cada série gravada
+     * guarda o exercício que foi feito.
+     *
+     * Treino em andamento com série já feita no exercício atual não troca: ela ficaria sem lugar na tela.
+     */
+    public function swapExercise(GymWorkoutExercise $item, GymExercise $novo, ?string $equipamento = null): GymWorkoutExercise
+    {
+        if ($novo->id === $item->exercise_id) {
+            return $item;
+        }
+
+        $emAndamento = GymSession::query()->inProgress()->where('workout_id', $item->workout_id)->first();
+
+        if ($emAndamento !== null && GymSetLog::query()->where('session_id', $emAndamento->id)->where('exercise_id', $item->exercise_id)->exists()) {
+            throw new DomainException('Este exercício já tem séries no treino em andamento. Termine ou descarte o treino antes de trocar.');
+        }
+
+        $duplicado = GymWorkoutExercise::query()->where('workout_id', $item->workout_id)->where('exercise_id', $novo->id)->where('id', '!=', $item->id)->exists();
+
+        if ($duplicado) {
+            throw new DomainException('Este exercício já está neste treino.');
+        }
+
+        $tempo = $novo->measure_type->usesStopwatch();
+        $meta = [
+            'target_sets' => $item->target_sets,
+            'target_reps_min' => $item->target_reps_min ?? ($tempo ? null : 8),
+            'target_reps_max' => $item->target_reps_max ?? ($tempo ? null : 12),
+            'target_duration_seconds' => $item->target_duration_seconds ?? ($tempo ? 30 : null),
+            'rest_seconds' => $item->rest_seconds ?? ($tempo ? null : 60),
+            'default_equipment_id' => $this->findOrCreateEquipment($equipamento)?->id,
+            'notes' => $item->notes,
+        ];
+
+        $item->update($this->sanitize($novo, $meta) + ['exercise_id' => $novo->id]);
+        $item->setRelation('exercise', $novo);
+
+        return $item;
     }
 
     /**

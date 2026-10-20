@@ -51,6 +51,10 @@
 
         @error('workout') <p class="text-sm text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
 
+        @if ($swapNotice)
+            <p class="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm text-emerald-800 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-300" role="status">{{ $swapNotice }}</p>
+        @endif
+
         @foreach ($workouts as $treino)
             <section class="card p-5" wire:key="w-{{ $treino->id }}">
                 <div class="flex flex-wrap items-start justify-between gap-2">
@@ -100,6 +104,7 @@
                                 <div class="flex shrink-0 items-center gap-1">
                                     <button type="button" wire:click="moveExercise('{{ $item->id }}', -1)" @disabled($loop->first) class="btn-ghost px-2 py-1 text-xs disabled:opacity-30" aria-label="Subir exercício">↑</button>
                                     <button type="button" wire:click="moveExercise('{{ $item->id }}', 1)" @disabled($loop->last) class="btn-ghost px-2 py-1 text-xs disabled:opacity-30" aria-label="Descer exercício">↓</button>
+                                    <button type="button" wire:click="openSwap('{{ $item->id }}')" class="btn-ghost px-2 py-1 text-xs">Trocar</button>
                                     <button type="button" wire:click="editExercise('{{ $item->id }}')" class="btn-ghost px-2 py-1 text-xs">Editar</button>
                                     <button type="button" wire:click="removeExercise('{{ $item->id }}')" wire:confirm="Remover {{ $item->exercise->name }} deste treino?" class="btn-ghost px-2 py-1 text-xs text-red-700 dark:text-red-400">Remover</button>
                                 </div>
@@ -112,6 +117,59 @@
             </section>
         @endforeach
     @endif
+
+    {{-- Trocar exercício: a troca fica no treino, para as próximas vezes. --}}
+    <x-modal wire-model="showSwap" max-width="lg">
+        @if ($swapItem)
+            <div class="space-y-4">
+                <div class="flex items-baseline justify-between">
+                    <div>
+                        <h2 class="text-sm font-semibold text-slate-900 dark:text-white">Trocar exercício</h2>
+                        <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+                            Saindo: {{ $swapItem->exercise->name }} · {{ $swapItem->exercise->muscle_group->label() }}. Séries, repetições e pausa continuam.
+                        </p>
+                    </div>
+                    <button type="button" wire:click="closeSwap" class="btn-ghost px-2 py-1 text-xs">Cancelar</button>
+                </div>
+
+                @error('swap') <p class="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-800 dark:bg-red-500/10 dark:text-red-300">{{ $message }}</p> @enderror
+
+                <div class="flex flex-wrap items-center gap-3">
+                    <input type="search" wire:model.live.debounce.250ms="swapSearch" class="input min-w-0 flex-1" placeholder="Buscar por nome ou equipamento">
+                    <label class="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+                        <input type="checkbox" wire:model.live="swapAllGroups" class="h-4 w-4 rounded border-slate-300">
+                        Todos os grupos
+                    </label>
+                </div>
+
+                <div class="max-h-80 divide-y divide-slate-100 overflow-y-auto rounded-xl border border-slate-200 dark:divide-white/10 dark:border-white/10">
+                    @forelse ($swapOptions as $opcao)
+                        <button type="button" wire:click="swapTo('{{ $opcao['key'] }}')" wire:key="troca-{{ $opcao['key'] }}"
+                            class="flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left hover:bg-slate-50 dark:hover:bg-white/5">
+                            <span class="min-w-0">
+                                <span class="block truncate text-sm text-slate-800 dark:text-slate-200">{{ $opcao['name'] }}</span>
+                                <span class="block text-xs text-slate-500 dark:text-slate-400">
+                                    {{ $opcao['group'] }}@if ($opcao['equipment']) · {{ $opcao['equipment'] }}@endif
+                                </span>
+                            </span>
+                            <span class="shrink-0 text-xs {{ $opcao['own'] ? 'text-saude-800 dark:text-saude-200' : 'text-slate-400' }}">{{ $opcao['own'] ? 'Você já usa' : 'Catálogo' }}</span>
+                        </button>
+                    @empty
+                        <p class="px-3 py-6 text-center text-xs text-slate-400">Nenhum exercício bate com a busca.</p>
+                    @endforelse
+                </div>
+
+                <form wire:submit="swapToCustom" class="flex flex-wrap items-end gap-2">
+                    <div class="min-w-0 flex-1">
+                        <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Não achou? Digite o nome</label>
+                        <input type="text" wire:model="swapCustomName" class="input mt-1.5" placeholder="Ex.: Supino na máquina Smith">
+                        @error('swapCustomName') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                    </div>
+                    <button type="submit" class="btn-secondary">Usar este</button>
+                </form>
+            </div>
+        @endif
+    </x-modal>
 
     <x-modal wire-model="showExerciseForm">
         <form wire:submit="saveExercise" class="space-y-4">

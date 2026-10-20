@@ -60,6 +60,14 @@ class GymPlanEditor extends Component
     public ?string $catalogMatchId = null;
     public ?string $catalogHint = null;
 
+    // Troca de exercício (fica salva no treino, para as próximas vezes)
+    public bool $showSwap = false;
+    public ?string $swapItemId = null;
+    public string $swapSearch = '';
+    public bool $swapAllGroups = false;
+    public string $swapCustomName = '';
+    public ?string $swapNotice = null;
+
     public function mount(): void
     {
         $this->redirectOrAbortWithoutProfile();
@@ -138,6 +146,47 @@ class GymPlanEditor extends Component
         $this->exNotes = (string) $item->notes;
         $this->exImageUrl = $item->exercise->imageUrl();
         $this->showExerciseForm = true;
+    }
+
+    public function openSwap(string $itemId): void
+    {
+        $this->swapItemId = GymWorkoutExercise::query()->findOrFail($itemId)->id;
+        $this->reset('swapSearch', 'swapAllGroups', 'swapCustomName');
+        $this->resetErrorBag();
+        $this->showSwap = true;
+    }
+
+    public function closeSwap(): void
+    {
+        $this->showSwap = false;
+    }
+
+    /** Escolheu uma das opções da lista (um exercício que já usa ou do catálogo). */
+    public function swapTo(string $chave, GymPlanService $service): void
+    {
+        $item = GymWorkoutExercise::query()->with('exercise')->findOrFail($this->swapItemId);
+
+        try {
+            [$novo, $equipamento] = $service->resolveSwapChoice($chave);
+            $this->finishSwap($item, $service->swapExercise($item, $novo, $equipamento));
+        } catch (DomainException $e) {
+            $this->addError('swap', $e->getMessage());
+        }
+    }
+
+    /** Digitou um exercício que não está na lista: nasce no grupo e no tipo do que está saindo. */
+    public function swapToCustom(GymPlanService $service): void
+    {
+        $this->validate(['swapCustomName' => ['required', 'string', 'max:120']], attributes: ['swapCustomName' => 'nome do exercício']);
+
+        $item = GymWorkoutExercise::query()->with('exercise')->findOrFail($this->swapItemId);
+
+        try {
+            $novo = $service->findOrCreateExercise($this->swapCustomName, $item->exercise->muscle_group, $item->exercise->measure_type, sugerirAoCatalogo: true);
+            $this->finishSwap($item, $service->swapExercise($item, $novo));
+        } catch (DomainException $e) {
+            $this->addError('swap', $e->getMessage());
+        }
     }
 
     public function closeExerciseForm(): void
@@ -273,9 +322,16 @@ class GymPlanEditor extends Component
         }
     }
 
+    private function finishSwap(GymWorkoutExercise $antes, GymWorkoutExercise $depois): void
+    {
+        $this->showSwap = false;
+        $this->swapNotice = 'Exercício trocado. O treino já ficou salvo assim para as próximas vezes.';
+    }
+
     public function render(GymPlanService $service)
     {
         $plan = $service->activePlan();
+        $swapItem = $this->showSwap && $this->swapItemId !== null ? GymWorkoutExercise::query()->with('exercise')->find($this->swapItemId) : null;
 
         return view('livewire.health.gym.gym-plan-editor', [
             'plan' => $plan,
@@ -287,6 +343,8 @@ class GymPlanEditor extends Component
                 ->merge(GymExerciseCatalog::query()->active()->pluck('name'))
                 ->unique()->sort()->values(),
             'equipmentNames' => GymEquipment::query()->orderBy('name')->pluck('name'),
+            'swapItem' => $swapItem,
+            'swapOptions' => $swapItem ? $service->swapOptions($swapItem, $this->swapSearch, $this->swapAllGroups) : [],
             'editingExisting' => $this->editingItemId !== null,
             'timed' => GymMeasureType::tryFrom($this->exType)?->usesStopwatch() ?? false,
         ]);

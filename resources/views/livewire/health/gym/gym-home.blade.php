@@ -8,8 +8,9 @@
                 Só você vê estes dados.
             </p>
         </div>
-        <div class="flex gap-2">
+        <div class="flex flex-wrap gap-2">
             <a href="{{ route('health.gym.progress') }}" wire:navigate class="btn-secondary">Evolução</a>
+            <a href="{{ route('health.gym.generate') }}" wire:navigate class="btn-secondary">Treino automático</a>
             <a href="{{ route('health.gym.plan') }}" wire:navigate class="btn-secondary">
                 {{ $plan ? 'Editar plano' : 'Montar plano' }}
             </a>
@@ -40,9 +41,12 @@
                 {{ $plan ? 'Sua fase ainda não tem treinos.' : 'Você ainda não montou um plano de treino.' }}
             </p>
             <p class="mt-1 text-xs text-slate-400">Crie a fase, os treinos (A, B, C…) e os exercícios de cada um.</p>
-            <a href="{{ route('health.gym.plan') }}" wire:navigate class="btn-primary mt-4 inline-flex">
-                {{ $plan ? 'Adicionar treinos' : 'Montar plano' }}
-            </a>
+            <div class="mt-4 flex flex-wrap justify-center gap-2">
+                <a href="{{ route('health.gym.generate') }}" wire:navigate class="btn-primary inline-flex">Criar treino automático</a>
+                <a href="{{ route('health.gym.plan') }}" wire:navigate class="btn-secondary inline-flex">
+                    {{ $plan ? 'Adicionar treinos' : 'Montar plano' }}
+                </a>
+            </div>
         </div>
     @else
         @if ($next)

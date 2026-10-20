@@ -42,6 +42,7 @@ use App\Livewire\Goals\GoalsIndex;
 use App\Livewire\Health\Gym\GymExerciseHistory;
 use App\Livewire\Health\Gym\GymHome;
 use App\Livewire\Health\Gym\GymPlanEditor;
+use App\Livewire\Health\Gym\GymPlanGenerator;
 use App\Livewire\Health\Gym\GymProgress;
 use App\Livewire\Health\Gym\GymSessionHistory;
 use App\Livewire\Health\Gym\GymSessionRun;
@@ -190,6 +191,7 @@ Route::middleware(['auth', 'verified'])->group(function (): void {
         // e corretor levam 403 mesmo com o cliente aberto.
         Route::get('/saude/academia', GymHome::class)->name('health.gym.index');
         Route::get('/saude/academia/plano', GymPlanEditor::class)->name('health.gym.plan');
+        Route::get('/saude/academia/treino-automatico', GymPlanGenerator::class)->name('health.gym.generate');
         // Plural de propósito: "treino/{session}" (abaixo) é a SESSÃO em andamento;
         // "treinos/{workout}" é o treino do PLANO, só pra consultar antes de começar.
         Route::get('/saude/academia/treinos/{workout}', GymWorkoutShow::class)->name('health.gym.workout');

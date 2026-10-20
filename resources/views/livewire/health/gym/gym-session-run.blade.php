@@ -90,9 +90,15 @@
                     @endisset
                     </div>
                 </div>
-                <span class="shrink-0 text-xs tabular-nums {{ $qtd >= $item->target_sets ? 'text-emerald-700 dark:text-emerald-400' : 'text-slate-400' }}">
-                    {{ $qtd }}/{{ $item->target_sets }}
-                </span>
+                <div class="flex shrink-0 flex-col items-end gap-1">
+                    <span class="text-xs tabular-nums {{ $qtd >= $item->target_sets ? 'text-emerald-700 dark:text-emerald-400' : 'text-slate-400' }}">
+                        {{ $qtd }}/{{ $item->target_sets }}
+                    </span>
+                    {{-- Só antes da primeira série: depois dela o exercício já tem registro neste treino. --}}
+                    @if ($emAndamento && $qtd === 0)
+                        <button type="button" wire:click="openSwap('{{ $item->id }}')" class="btn-ghost px-2 py-1 text-xs">Trocar</button>
+                    @endif
+                </div>
             </div>
 
             @if ($feitas->isNotEmpty())
@@ -191,6 +197,71 @@
             @endif
         </section>
     @endforeach
+
+    {{-- Trocar exercício: para as próximas vezes (muda o treino) ou só por hoje. --}}
+    @if ($emAndamento)
+        <x-modal wire-model="showSwap" max-width="lg">
+            @if ($swapItem)
+                <div class="space-y-4">
+                    <div class="flex items-baseline justify-between">
+                        <div>
+                            <h2 class="text-sm font-semibold text-slate-900 dark:text-white">Trocar exercício</h2>
+                            <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+                                Saindo: {{ $swapItem->exercise->name }} · {{ $swapItem->exercise->muscle_group->label() }}. Séries, repetições e pausa continuam.
+                            </p>
+                        </div>
+                        <button type="button" wire:click="closeSwap" class="btn-ghost px-2 py-1 text-xs">Cancelar</button>
+                    </div>
+
+                    @error('swap') <p class="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-800 dark:bg-red-500/10 dark:text-red-300">{{ $message }}</p> @enderror
+
+                    <fieldset class="grid gap-2 sm:grid-cols-2">
+                        <legend class="sr-only">Até quando vale a troca</legend>
+                        <label class="flex cursor-pointer items-start gap-2 rounded-xl border border-slate-200 p-3 text-xs dark:border-white/10 {{ $swapScope === 'plan' ? 'ring-2 ring-saude-800/60' : '' }}">
+                            <input type="radio" wire:model.live="swapScope" value="plan" class="mt-0.5">
+                            <span><span class="block text-sm font-medium text-slate-800 dark:text-slate-200">Salvar no treino</span><span class="text-slate-500 dark:text-slate-400">Vale também nas próximas vezes.</span></span>
+                        </label>
+                        <label class="flex cursor-pointer items-start gap-2 rounded-xl border border-slate-200 p-3 text-xs dark:border-white/10 {{ $swapScope === 'today' ? 'ring-2 ring-saude-800/60' : '' }}">
+                            <input type="radio" wire:model.live="swapScope" value="today" class="mt-0.5">
+                            <span><span class="block text-sm font-medium text-slate-800 dark:text-slate-200">Só por hoje</span><span class="text-slate-500 dark:text-slate-400">O treino volta ao normal depois.</span></span>
+                        </label>
+                    </fieldset>
+
+                    <div class="flex flex-wrap items-center gap-3">
+                        <input type="search" wire:model.live.debounce.250ms="swapSearch" class="input min-w-0 flex-1" placeholder="Buscar por nome ou equipamento">
+                        <label class="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+                            <input type="checkbox" wire:model.live="swapAllGroups" class="h-4 w-4 rounded border-slate-300">
+                            Todos os grupos
+                        </label>
+                    </div>
+
+                    <div class="max-h-72 divide-y divide-slate-100 overflow-y-auto rounded-xl border border-slate-200 dark:divide-white/10 dark:border-white/10">
+                        @forelse ($swapOptions as $opcao)
+                            <button type="button" wire:click="swapTo('{{ $opcao['key'] }}')" wire:key="troca-{{ $opcao['key'] }}"
+                                class="flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left hover:bg-slate-50 dark:hover:bg-white/5">
+                                <span class="min-w-0">
+                                    <span class="block truncate text-sm text-slate-800 dark:text-slate-200">{{ $opcao['name'] }}</span>
+                                    <span class="block text-xs text-slate-500 dark:text-slate-400">{{ $opcao['group'] }}@if ($opcao['equipment']) · {{ $opcao['equipment'] }}@endif</span>
+                                </span>
+                                <span class="shrink-0 text-xs {{ $opcao['own'] ? 'text-saude-800 dark:text-saude-200' : 'text-slate-400' }}">{{ $opcao['own'] ? 'Você já usa' : 'Catálogo' }}</span>
+                            </button>
+                        @empty
+                            <p class="px-3 py-6 text-center text-xs text-slate-400">Nenhum exercício bate com a busca.</p>
+                        @endforelse
+                    </div>
+
+                    <form wire:submit="swapToCustom" class="flex flex-wrap items-end gap-2">
+                        <div class="min-w-0 flex-1">
+                            <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Não achou? Digite o nome</label>
+                            <input type="text" wire:model="swapCustomName" class="input mt-1.5" placeholder="Ex.: Supino na máquina Smith">
+                            @error('swapCustomName') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                        </div>
+                        <button type="submit" class="btn-secondary">Usar este</button>
+                    </form>
+                </div>
+            @endif
+        </x-modal>
+    @endif
 
     @if ($emAndamento)
         <div class="flex flex-col gap-2 sm:flex-row">

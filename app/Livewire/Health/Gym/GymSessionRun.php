@@ -7,12 +7,15 @@ use App\Enums\GymMeasureType;
 use App\Livewire\Concerns\RequiresActiveProfile;
 use App\Livewire\Concerns\RequiresPersonalHealth;
 use App\Models\GymEquipment;
+use App\Models\GymExercise;
 use App\Models\GymSession;
 use App\Models\GymSetLog;
 use App\Models\GymWorkoutExercise;
+use App\Services\GymPlanService;
 use App\Services\GymProgressService;
 use App\Services\GymSessionService;
 use DomainException;
+use Illuminate\Support\Collection;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
@@ -50,6 +53,14 @@ class GymSessionRun extends Component
     /** @var array<string, array{type: string, message: string}> sugestão de progressão por id do item */
     public array $hint = [];
 
+    // Troca de exercício: para as próximas vezes (muda o treino) ou só por hoje (só esta sessão).
+    public bool $showSwap = false;
+    public ?string $swapItemId = null;
+    public string $swapSearch = '';
+    public bool $swapAllGroups = false;
+    public string $swapScope = 'plan';
+    public string $swapCustomName = '';
+
     public bool $keepAwake = true;
     public bool $vibrate = false;
     public bool $sound = false;
@@ -67,31 +78,38 @@ class GymSessionRun extends Component
         $this->vibrate = (bool) $usuario->gym_vibrate;
         $this->sound = (bool) $usuario->gym_sound;
 
-        foreach ($sessao->workout->workoutExercises as $item) {
-            $ultima = $service->lastPerformance($item->exercise, $sessao);
-            // Treino retomado/recarregado: a carga já usada HOJE vale mais que a da última vez.
-            $hoje = $service->lastPerformance($item->exercise, only: $sessao) ?? $ultima;
-
-            $this->draft[$item->id] = [
-                'load' => $hoje['load'] ?? '',
-                'mode' => $hoje['mode'] ?? GymLoadMode::Total->value,
-                'reps' => (string) ($item->target_reps_max ?? $item->target_reps_min ?? ''),
-                'equipment' => $hoje['equipment_id'] ?? $item->default_equipment_id ?? '',
-                'distance' => '',
-            ];
-
-            // Progressão dupla / platô, calculados só com treinos JÁ finalizados.
-            $sugestao = $progress->analyze($item->exercise, $item)['suggestion'];
-            if ($sugestao !== null) {
-                $this->hint[$item->id] = ['type' => $sugestao['type'], 'message' => $sugestao['message']];
-            }
-
-            if ($ultima !== null && $ultima['label'] !== '') {
-                $this->lastLabel[$item->id] = $ultima['label'].' · '.$ultima['date'];
-            }
+        foreach ($service->applySwaps($sessao, $sessao->workout->workoutExercises) as $item) {
+            $this->prepareItem($item, $sessao, $service, $progress);
         }
     }
 
+    /** Carga, última vez e sugestão de progressão do exercício que o item mostra agora (o de hoje, se houve troca). */
+    private function prepareItem(GymWorkoutExercise $item, GymSession $sessao, GymSessionService $service, GymProgressService $progress): void
+    {
+        $ultima = $service->lastPerformance($item->exercise, $sessao);
+        // Treino retomado/recarregado: a carga já usada HOJE vale mais que a da última vez.
+        $hoje = $service->lastPerformance($item->exercise, only: $sessao) ?? $ultima;
+
+        $this->draft[$item->id] = [
+            'load' => $hoje['load'] ?? '',
+            'mode' => $hoje['mode'] ?? GymLoadMode::Total->value,
+            'reps' => (string) ($item->target_reps_max ?? $item->target_reps_min ?? ''),
+            'equipment' => $hoje['equipment_id'] ?? $item->default_equipment_id ?? '',
+            'distance' => '',
+        ];
+
+        unset($this->hint[$item->id], $this->lastLabel[$item->id]);
+
+        // Progressão dupla / platô, calculados só com treinos JÁ finalizados.
+        $sugestao = $progress->analyze($item->exercise, $item)['suggestion'];
+        if ($sugestao !== null) {
+            $this->hint[$item->id] = ['type' => $sugestao['type'], 'message' => $sugestao['message']];
+        }
+
+        if ($ultima !== null && $ultima['label'] !== '') {
+            $this->lastLabel[$item->id] = $ultima['label'].' · '.$ultima['date'];
+        }
+    }
     public function completeSet(string $itemId, int $setNumber, GymSessionService $service): void
     {
         $item = $this->item($itemId);
@@ -170,6 +188,83 @@ class GymSessionRun extends Component
         $this->redirect(route('health.gym.index'), navigate: true);
     }
 
+    // --- Troca de exercício ---------------------------------------------------------------------------------------
+
+    public function openSwap(string $itemId, GymSessionService $service): void
+    {
+        $sessao = $this->session();
+        abort_unless($sessao->isInProgress(), 422);
+
+        $item = $this->item($itemId);
+
+        if (GymSetLog::query()->where('session_id', $sessao->id)->where('exercise_id', $item->exercise_id)->exists()) {
+            $this->addError('session', 'Este exercício já tem séries neste treino. Desfaça as séries antes de trocar.');
+
+            return;
+        }
+
+        $this->resetErrorBag();
+        $this->reset('swapSearch', 'swapAllGroups', 'swapCustomName');
+        $this->swapScope = 'plan';
+        $this->swapItemId = $item->id;
+        $this->showSwap = true;
+    }
+
+    public function closeSwap(): void
+    {
+        $this->showSwap = false;
+    }
+
+    public function swapTo(string $chave, GymPlanService $plano, GymSessionService $service, GymProgressService $progress): void
+    {
+        try {
+            [$novo, $equipamento] = $plano->resolveSwapChoice($chave);
+        } catch (DomainException $e) {
+            $this->addError('swap', $e->getMessage());
+
+            return;
+        }
+
+        $this->applySwap($novo, $equipamento, $plano, $service, $progress);
+    }
+
+    /** Digitou um exercício que não está na lista: nasce no grupo e no tipo do que está saindo. */
+    public function swapToCustom(GymPlanService $plano, GymSessionService $service, GymProgressService $progress): void
+    {
+        $this->validate(['swapCustomName' => ['required', 'string', 'max:120']], attributes: ['swapCustomName' => 'nome do exercício']);
+
+        $atual = $this->item((string) $this->swapItemId);
+        $novo = $plano->findOrCreateExercise($this->swapCustomName, $atual->exercise->muscle_group, $atual->exercise->measure_type, sugerirAoCatalogo: true);
+
+        $this->applySwap($novo, null, $plano, $service, $progress);
+    }
+
+    private function applySwap(GymExercise $novo, ?string $equipamento, GymPlanService $plano, GymSessionService $service, GymProgressService $progress): void
+    {
+        $sessao = $this->session();
+        $doTreino = $this->planItem((string) $this->swapItemId);
+
+        $ok = $this->swapScope === 'today'
+            ? $this->guard(fn () => $service->swapToday($sessao, $doTreino, $novo) ?? true)
+            : $this->guard(function () use ($plano, $service, $sessao, $doTreino, $novo, $equipamento): bool {
+                $plano->swapExercise($doTreino, $novo, $equipamento);
+                // A troca definitiva substitui a de hoje, se havia.
+                $service->clearSwap($sessao, $doTreino);
+
+                return true;
+            });
+
+        if ($ok === false) {
+            $this->addError('swap', $this->getErrorBag()->first('session'));
+            $this->resetErrorBag('session');
+
+            return;
+        }
+
+        $this->showSwap = false;
+        $this->prepareItem($this->item($doTreino->id), $sessao, $service, $progress);
+    }
+
     /** Interruptores globais: salvam na conta assim que mudam. */
     public function updatedKeepAwake(): void
     {
@@ -190,6 +285,7 @@ class GymSessionRun extends Component
     {
         $sessao = $this->session();
         $sessao->load('workout.workoutExercises.exercise', 'workout.workoutExercises.defaultEquipment');
+        $servico = app(GymSessionService::class);
 
         $series = GymSetLog::query()
             ->where('session_id', $sessao->id)
@@ -198,9 +294,19 @@ class GymSessionRun extends Component
             ->get()
             ->groupBy('exercise_id');
 
+        // Em andamento: o treino de hoje (com as trocas só por hoje). Finalizado: o que foi feito de fato, pelas séries
+        // gravadas, porque o plano pode ter mudado depois (troca de exercício) e o histórico não pode mudar junto.
+        $itens = $sessao->isInProgress()
+            ? $servico->applySwaps($sessao, $sessao->workout->workoutExercises)
+            : $this->historyRows($sessao, $series);
+
+        $swapItem = $this->showSwap && $this->swapItemId !== null ? $itens->firstWhere('id', $this->swapItemId) : null;
+
         return view('livewire.health.gym.gym-session-run', [
             'sessao' => $sessao,
-            'itens' => $sessao->workout->workoutExercises,
+            'itens' => $itens,
+            'swapItem' => $swapItem,
+            'swapOptions' => $swapItem ? app(GymPlanService::class)->swapOptions($swapItem, $this->swapSearch, $this->swapAllGroups) : [],
             'series' => $series,
             'equipamentos' => GymEquipment::query()->orderBy('name')->get(),
             'modos' => GymLoadMode::options(),
@@ -225,7 +331,47 @@ class GymSessionRun extends Component
         return GymSession::query()->findOrFail($this->sessionId);
     }
 
+    /**
+     * Linhas do treino finalizado, uma por exercício que teve série, na ordem em que foram feitos. Usa a meta do item do plano
+     * quando o exercício ainda está nele; senão (foi trocado depois), uma linha só com o que foi feito.
+     *
+     * @param  Collection<string, Collection<int, GymSetLog>>  $series  séries por exercício
+     * @return Collection<int, GymWorkoutExercise>
+     */
+    private function historyRows(GymSession $sessao, Collection $series): Collection
+    {
+        $doPlano = $sessao->workout->workoutExercises->keyBy('exercise_id');
+        $exercicios = GymExercise::query()->whereIn('id', $series->keys())->get()->keyBy('id');
+
+        return $series->map(function (Collection $logs, string $exercicioId) use ($doPlano, $exercicios): ?GymWorkoutExercise {
+            $exercicio = $exercicios->get($exercicioId);
+
+            if ($exercicio === null) {
+                return null;
+            }
+
+            $item = $doPlano->get($exercicioId);
+
+            if ($item === null) {
+                $item = new GymWorkoutExercise(['target_sets' => $logs->count()]);
+                $item->setAttribute('id', 'feito-'.$exercicioId);
+                $item->setRelation('exercise', $exercicio);
+            }
+
+            $item->setAttribute('feito_em', $logs->min('completed_at'));
+
+            return $item;
+        })->filter()->sortBy(fn (GymWorkoutExercise $i) => $i->getAttribute('feito_em'))->values();
+    }
+
+    /** O item do treino já com a troca de hoje aplicada (só na memória): é o que a tela está mostrando. */
     private function item(string $itemId): GymWorkoutExercise
+    {
+        return app(GymSessionService::class)->applySwaps($this->session(), collect([$this->planItem($itemId)]))->first();
+    }
+
+    /** O item como está no plano, sem a troca de hoje: é o que a troca (de hoje ou definitiva) precisa receber. */
+    private function planItem(string $itemId): GymWorkoutExercise
     {
         return GymWorkoutExercise::query()
             ->with('exercise')

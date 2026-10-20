@@ -199,6 +199,25 @@ e o honorário fixo por cliente é `FeeAgreement` (mensal, trimestral, semestral
   gera previsão. Rotina `comissoes-de-consorcio` (04:11), chave `origin_key` `consortium:{consórcio}:{parcela}`. Componente `ConsortiumCommissions`.
 - **Fase seguinte (combinada)**: 5) conferência por extrato de comissão (IA com revisão), ainda não feita.
 
+### Academia: troca de exercício e treino automático
+
+Dado de saúde pessoal (só o dono vê; `IsPersonalHealthData`). Regras que não se quebram:
+
+- **Cada série guarda o exercício que foi feito** (`gym_set_logs.exercise_id`), por isso trocar o exercício de um item do treino
+  (`GymPlanService::swapExercise`) **não muda o histórico**. O detalhe de uma sessão **finalizada** é montado pelas séries gravadas
+  (`GymSessionRun::historyRows`), nunca pelo plano de hoje: se voltasse a ler o plano, a troca apagaria o que foi feito na tela.
+- **Troca definitiva** (no plano ou na sessão): muda o item, mantém séries, repetições, pausa e observação, e vale nas próximas
+  vezes. Recusa trocar exercício que já tem série numa sessão em andamento e exercício que já está no treino.
+- **Troca "só por hoje"** (`GymSessionSwap`, só na sessão): o plano não muda; `GymSessionService::applySwaps` troca o exercício do item
+  **só na memória** (a tela da sessão nunca salva o item). Só antes da primeira série do item; a troca definitiva do mesmo item
+  substitui a de hoje.
+- **Treino automático** (`GymPlanGenerator` → `GymWorkoutGenerator`, `GymExerciseClassifier`): regras fixas, sem IA e sem gravar nada
+  até a pessoa revisar e salvar (`GymPlanService::createPlanFromDraft`, tudo ou nada; encerra a fase ativa). Usa só o catálogo.
+  O catálogo não traz "composto/isolado", nível nem equipamento padronizado: o classificador infere por palavra-chave no nome e na
+  dica de equipamento (decisão: marcar o catálogo à mão fica para depois). Entradas: objetivo, nível, dias (2 a 6), tempo, onde treina
+  e regiões a proteger. É orientação geral, não prescrição: a tela avisa. Exercício de reabilitação ou muito específico nunca entra
+  sozinho (`NEVER_AUTO`), condicionamento (salto, corda, burpee) só no bloco de cardio.
+
 ### Calendário (Saúde e agenda do profissional)
 
 Um módulo só desenha o calendário: `<x-calendar>` (mês, semana e dia, no estilo de uma agenda) alimentado por `CalendarBuilder` e

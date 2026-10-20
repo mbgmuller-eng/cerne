@@ -6,11 +6,13 @@ use App\Enums\GymLoadMode;
 use App\Enums\GymMeasureType;
 use App\Models\GymExercise;
 use App\Models\GymSession;
+use App\Models\GymSessionSwap;
 use App\Models\GymSetLog;
 use App\Models\GymWorkout;
 use App\Models\GymWorkoutExercise;
 use DomainException;
 use Illuminate\Database\UniqueConstraintViolationException;
+use Illuminate\Support\Collection;
 
 /**
  * Registro de uma ida à academia: abrir/retomar a sessão, gravar uma linha
@@ -79,6 +81,70 @@ class GymSessionService
         } catch (UniqueConstraintViolationException) {
             return null;
         }
+    }
+
+    /** @return Collection<string, GymSessionSwap> as trocas "só por hoje" da sessão, pelo id do item do treino */
+    public function swapsOf(GymSession $session): Collection
+    {
+        return GymSessionSwap::query()->where('session_id', $session->id)->with('exercise')->get()->keyBy('workout_exercise_id');
+    }
+
+    /**
+     * Aplica as trocas de hoje nos itens, só na memória: o item passa a apontar para o outro exercício. Nunca se salva um
+     * item assim (a tela da sessão só lê).
+     *
+     * @param  Collection<int, GymWorkoutExercise>  $itens
+     * @return Collection<int, GymWorkoutExercise>
+     */
+    public function applySwaps(GymSession $session, Collection $itens): Collection
+    {
+        $trocas = $this->swapsOf($session);
+
+        return $itens->each(function (GymWorkoutExercise $item) use ($trocas): void {
+            $troca = $trocas->get($item->id);
+
+            if ($troca !== null) {
+                $item->exercise_id = $troca->exercise_id;
+                $item->setRelation('exercise', $troca->exercise);
+            }
+        });
+    }
+
+    /**
+     * Faz o item com outro exercício só nesta sessão; o plano não muda. Só antes de registrar série nele, e nunca com um
+     * exercício que já esteja em outro item da sessão (as séries são guardadas por exercício).
+     */
+    public function swapToday(GymSession $session, GymWorkoutExercise $item, GymExercise $novo): void
+    {
+        $this->assertEditable($session, $item);
+
+        $itens = $this->applySwaps($session, GymWorkoutExercise::query()->with('exercise')->where('workout_id', $session->workout_id)->get());
+        $atual = $itens->firstWhere('id', $item->id);
+
+        if (GymSetLog::query()->where('session_id', $session->id)->where('exercise_id', $atual->exercise_id)->exists()) {
+            throw new DomainException('Este exercício já tem séries neste treino. Desfaça as séries antes de trocar.');
+        }
+
+        if ($itens->contains(fn (GymWorkoutExercise $i) => $i->id !== $item->id && $i->exercise_id === $novo->id)) {
+            throw new DomainException('Este exercício já está neste treino.');
+        }
+
+        if ($novo->id === $item->exercise_id) {
+            GymSessionSwap::query()->where('session_id', $session->id)->where('workout_exercise_id', $item->id)->delete();
+
+            return;
+        }
+
+        GymSessionSwap::query()->updateOrCreate(
+            ['session_id' => $session->id, 'workout_exercise_id' => $item->id],
+            ['exercise_id' => $novo->id],
+        );
+    }
+
+    /** A troca definitiva substitui a de hoje daquele item. */
+    public function clearSwap(GymSession $session, GymWorkoutExercise $item): void
+    {
+        GymSessionSwap::query()->where('session_id', $session->id)->where('workout_exercise_id', $item->id)->delete();
     }
 
     public function undoLastSet(GymSession $session, GymWorkoutExercise $item): void

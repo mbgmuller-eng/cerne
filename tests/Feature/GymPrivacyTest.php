@@ -11,6 +11,7 @@ use App\Models\GymEquipment;
 use App\Models\GymExercise;
 use App\Models\GymPlan;
 use App\Models\GymSession;
+use App\Models\GymSessionSwap;
 use App\Models\GymSetLog;
 use App\Models\GymWorkout;
 use App\Models\GymWorkoutExercise;
@@ -40,6 +41,7 @@ class GymPrivacyTest extends TestCase
         GymWorkoutExercise::class,
         GymSession::class,
         GymSetLog::class,
+        GymSessionSwap::class,
     ];
 
     public function test_dono_ve_o_proprio_treino(): void
@@ -242,7 +244,7 @@ class GymPrivacyTest extends TestCase
         $equipamento = GymEquipment::create($dados + ['name' => 'Halteres '.$dono->id]);
         $plano = GymPlan::create($dados + ['name' => 'Fase 1']);
         $treino = GymWorkout::create($dados + ['plan_id' => $plano->id, 'name' => 'Treino A', 'position' => 1]);
-        GymWorkoutExercise::create($dados + [
+        $item = GymWorkoutExercise::create($dados + [
             'workout_id' => $treino->id,
             'exercise_id' => $exercicio->id,
             'position' => 1,
@@ -260,6 +262,8 @@ class GymPrivacyTest extends TestCase
             'equipment_id' => $equipamento->id,
             'completed_at' => now(),
         ]);
+
+        GymSessionSwap::create($dados + ['session_id' => $sessao->id, 'workout_exercise_id' => $item->id, 'exercise_id' => $exercicio->id]);
 
         return ['exercise' => $exercicio, 'session' => $sessao];
     }
