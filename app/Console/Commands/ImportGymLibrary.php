@@ -52,6 +52,7 @@ class ImportGymLibrary extends Command
         $this->line("  Exercícios novos cadastrados: {$r['criados']}");
         $this->line("  Exercícios que já existiam sem a biblioteca e foram adotados: {$r['adotados']}");
         $this->line("  Exercícios já importados antes (nada a fazer): {$r['ja_importados']}");
+        $this->line("  Exercícios importados antes liberados para o treino automático: {$r['liberados']}");
         $this->line("  Exercícios com as duas fotos vinculadas: {$r['fotos']}");
 
         if ($r['sem_par'] !== []) {

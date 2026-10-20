@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Enums\GymGoal;
 use App\Enums\GymLevel;
+use App\Enums\GymSeason;
 use App\Enums\PlatformModule;
 use App\Models\GymPlan;
 use App\Models\GymSession;
@@ -66,7 +67,7 @@ class GymPhaseReviewService
         $semanas = max(0, intdiv((int) $inicio->diffInDays($hoje), 7));
         $treinos = GymSession::query()->whereNotNull('finished_at')->whereIn('workout_id', $plano->workouts()->select('id'))->count();
 
-        [$suave, $firme] = $this->thresholds($plano->goal, $plano->level);
+        [$suave, $firme] = $this->thresholds($plano->goal, $plano->level, $plano->sport !== null ? $plano->season : null);
 
         $exerciciosDoPlano = $plano->workouts()->with('workoutExercises:id,workout_id,exercise_id')->get()
             ->flatMap(fn ($t) => $t->workoutExercises->pluck('exercise_id'))->unique();
@@ -90,7 +91,10 @@ class GymPhaseReviewService
             default => 'ok',
         };
 
-        $objetivo = $plano->goal ? mb_strtolower($plano->goal->label()) : null;
+        // Em fase de esporte, o prazo e o texto falam da temporada, que é o que faz a troca valer.
+        $objetivo = $plano->sport !== null
+            ? $plano->sport->shortLabel().($plano->season ? ' ('.mb_strtolower($plano->season->label()).')' : '')
+            : ($plano->goal ? mb_strtolower($plano->goal->label()) : null);
         $faixa = "{$suave} a {$firme} semanas";
         $base = "Sua fase \"{$plano->name}\" está há {$semanas} ".($semanas === 1 ? 'semana' : 'semanas')." e você fez {$treinos} ".($treinos === 1 ? 'treino' : 'treinos').'.';
 
@@ -103,7 +107,7 @@ class GymPhaseReviewService
             default => ['Fase em dia', $base],
         };
 
-        if ($plano->goal === null && in_array($status, ['soon', 'due'], true)) {
+        if ($plano->goal === null && $plano->sport === null && in_array($status, ['soon', 'due'], true)) {
             $mensagem .= ' Defina o objetivo desta fase para o aviso ficar mais preciso.';
         }
 
@@ -114,10 +118,16 @@ class GymPhaseReviewService
         ];
     }
 
-    /** @return array{0: int, 1: int} */
-    public function thresholds(?GymGoal $objetivo, ?GymLevel $nivel): array
+    /**
+     * Com esporte, a fase da temporada manda no prazo (a pré-temporada é curta); sem ele, o objetivo.
+     *
+     * @return array{0: int, 1: int}
+     */
+    public function thresholds(?GymGoal $objetivo, ?GymLevel $nivel, ?GymSeason $temporada = null): array
     {
-        [$suave, $firme] = $objetivo !== null ? (self::WEEKS[$objetivo->value] ?? self::DEFAULT_WEEKS) : self::DEFAULT_WEEKS;
+        [$suave, $firme] = $temporada !== null
+            ? $temporada->weeks()
+            : ($objetivo !== null ? (self::WEEKS[$objetivo->value] ?? self::DEFAULT_WEEKS) : self::DEFAULT_WEEKS);
         $extra = $nivel === GymLevel::Beginner ? self::BEGINNER_EXTRA_WEEKS : 0;
 
         return [$suave + $extra, $firme + $extra];

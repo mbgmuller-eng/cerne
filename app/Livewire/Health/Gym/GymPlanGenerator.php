@@ -6,6 +6,8 @@ use App\Enums\GymEquipmentAccess;
 use App\Enums\GymGoal;
 use App\Enums\GymLevel;
 use App\Enums\GymRestriction;
+use App\Enums\GymSeason;
+use App\Enums\GymSport;
 use App\Enums\PlatformModule;
 use App\Livewire\Concerns\RequiresActiveProfile;
 use App\Livewire\Concerns\RequiresModule;
@@ -36,6 +38,16 @@ class GymPlanGenerator extends Component
 
     /** 'review' (quem já tem fase), 'form' ou 'draft'. */
     public string $step = 'form';
+
+    /** 'body' (objetivo do corpo) ou 'sport' (a academia reforça um esporte). */
+    public string $focus = 'body';
+
+    public string $sport = 'running';
+
+    /** Quantas vezes por semana a pessoa pratica o esporte. */
+    public int $sportDays = 3;
+
+    public string $season = 'off_season';
 
     public string $goal = 'hypertrophy';
 
@@ -86,6 +98,19 @@ class GymPlanGenerator extends Component
         }
     }
 
+    /** Escolher o esporte sugere o objetivo de academia que costuma servir a ele; a pessoa pode trocar. */
+    public function updatedFocus(string $valor): void
+    {
+        if ($valor === 'sport') {
+            $this->goal = GymSport::tryFrom($this->sport)?->defaultGoal()->value ?? $this->goal;
+        }
+    }
+
+    public function updatedSport(string $valor): void
+    {
+        $this->goal = GymSport::tryFrom($valor)?->defaultGoal()->value ?? $this->goal;
+    }
+
     /** "Sim, os objetivos continuam": gera direto com as respostas da fase atual (e o nível novo, se ela aceitou subir). */
     public function keepGoals(GymPlanService $plans, GymPhaseReviewService $review, GymWorkoutGenerator $generator): void
     {
@@ -98,7 +123,13 @@ class GymPlanGenerator extends Component
             return;
         }
 
+        // A fase da temporada é a resposta que mais muda de uma fase para a outra: o que a pessoa marcou na pergunta vale.
+        $temporada = $this->season;
         $this->fillFrom($plano);
+
+        if ($plano->sport !== null) {
+            $this->season = $temporada;
+        }
 
         if ($this->upgradeLevel && ($proximo = $review->levelSuggestion($plano->level)) !== null) {
             $this->level = $proximo->value;
@@ -124,7 +155,11 @@ class GymPlanGenerator extends Component
             'restrictions' => ['array'],
             'restrictions.*' => [Rule::in(GymRestriction::values())],
             'variety' => ['required', Rule::in(['vary', 'keep', 'free'])],
-        ]);
+            'focus' => ['required', Rule::in(['body', 'sport'])],
+            'sport' => [$this->focus === 'sport' ? 'required' : 'nullable', Rule::in(GymSport::values())],
+            'sportDays' => [$this->focus === 'sport' ? 'required' : 'nullable', 'integer', 'min:1', 'max:7'],
+            'season' => [$this->focus === 'sport' ? 'required' : 'nullable', Rule::in(GymSeason::values())],
+        ], attributes: ['sport' => 'esporte', 'sportDays' => 'vezes por semana no esporte', 'season' => 'fase da temporada']);
 
         $this->variant = 0;
         $this->draft = $generator->generate($this->input($plans));
@@ -221,6 +256,8 @@ class GymPlanGenerator extends Component
             'acessos' => GymEquipmentAccess::options(),
             'restricoes' => GymRestriction::options(),
             'minutosOpcoes' => GymGeneratorInput::MINUTES,
+            'esportes' => GymSport::cases(),
+            'temporadas' => GymSeason::cases(),
             'plano' => $plano,
             'temPlanoAtivo' => $plano !== null,
             'revisao' => $this->step === 'review' && $plano !== null ? $this->reviewData($plano, $reviews, $reports) : null,
@@ -261,6 +298,10 @@ class GymPlanGenerator extends Component
         $this->minutes = in_array($plano->session_minutes, GymGeneratorInput::MINUTES, true) ? $plano->session_minutes : $this->minutes;
         $this->access = $plano->equipment_access?->value ?? $this->access;
         $this->restrictions = $plano->restrictions ?? [];
+        $this->focus = $plano->sport !== null ? 'sport' : 'body';
+        $this->sport = $plano->sport?->value ?? $this->sport;
+        $this->sportDays = $plano->sport_days ?? $this->sportDays;
+        $this->season = $plano->season?->value ?? $this->season;
     }
 
     private function input(GymPlanService $plans): GymGeneratorInput
@@ -277,6 +318,9 @@ class GymPlanGenerator extends Component
             $this->variant,
             $evitar,
             $manter,
+            $this->focus === 'sport' ? GymSport::tryFrom($this->sport) : null,
+            $this->focus === 'sport' ? $this->sportDays : 0,
+            $this->focus === 'sport' ? GymSeason::tryFrom($this->season) : null,
         );
     }
 

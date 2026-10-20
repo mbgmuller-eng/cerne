@@ -64,8 +64,24 @@
                     <div><dt class="text-xs text-slate-500 dark:text-slate-400">Dias por semana</dt><dd class="text-slate-800 dark:text-slate-200">{{ $plano->days_per_week ?? '—' }}</dd></div>
                     <div><dt class="text-xs text-slate-500 dark:text-slate-400">Tempo por treino</dt><dd class="text-slate-800 dark:text-slate-200">{{ $plano->session_minutes ? $plano->session_minutes.' minutos' : '—' }}</dd></div>
                     <div><dt class="text-xs text-slate-500 dark:text-slate-400">Onde treina</dt><dd class="text-slate-800 dark:text-slate-200">{{ $plano->equipment_access?->label() ?? '—' }}</dd></div>
+                    @if ($plano->sport)
+                        <div><dt class="text-xs text-slate-500 dark:text-slate-400">Esporte</dt><dd class="text-slate-800 dark:text-slate-200">{{ $plano->sport->label() }}</dd></div>
+                        <div><dt class="text-xs text-slate-500 dark:text-slate-400">Pratica por semana</dt><dd class="text-slate-800 dark:text-slate-200">{{ $plano->sport_days ?? '—' }} {{ ($plano->sport_days ?? 0) === 1 ? 'vez' : 'vezes' }}</dd></div>
+                    @endif
                     <div><dt class="text-xs text-slate-500 dark:text-slate-400">Regiões protegidas</dt><dd class="text-slate-800 dark:text-slate-200">{{ $plano->restrictions ? implode(', ', array_map(fn ($v) => $restricoes[$v] ?? $v, $plano->restrictions)) : 'nenhuma' }}</dd></div>
                 </dl>
+
+                @if ($plano->sport)
+                    <fieldset class="space-y-2">
+                        <legend class="text-sm font-medium text-slate-800 dark:text-slate-200">Em que fase da temporada você está agora?</legend>
+                        @foreach ($temporadas as $t)
+                            <label class="flex items-start gap-2 text-sm text-slate-700 dark:text-slate-300">
+                                <input type="radio" wire:model="season" value="{{ $t->value }}" class="mt-1">
+                                <span><span class="font-medium">{{ $t->label() }}</span> <span class="block text-xs text-slate-500 dark:text-slate-400">{{ $t->hint() }}</span></span>
+                            </label>
+                        @endforeach
+                    </fieldset>
+                @endif
 
                 @if ($revisao['level_suggestion'])
                     <label class="flex cursor-pointer items-start gap-3 rounded-xl border border-sky-200 bg-sky-50 p-3 text-sm dark:border-sky-500/30 dark:bg-sky-500/10">
@@ -105,7 +121,63 @@
         {{-- Passo 1: o pedido -------------------------------------------------- --}}
         <form wire:submit="generate" class="space-y-6">
             <fieldset class="card space-y-3 p-5">
-                <legend class="text-sm font-semibold text-slate-900 dark:text-white">Qual é o seu objetivo?</legend>
+                <legend class="text-sm font-semibold text-slate-900 dark:text-white">O que você quer melhorar?</legend>
+                <div class="grid gap-2 sm:grid-cols-2">
+                    <label class="{{ $card }} {{ $focus === 'body' ? 'ring-2 ring-saude-800/60' : '' }}">
+                        <input type="radio" wire:model.live="focus" value="body" class="mt-1">
+                        <span>
+                            <span class="block font-medium text-slate-800 dark:text-slate-200">Meu corpo</span>
+                            <span class="block text-xs text-slate-500 dark:text-slate-400">Ganhar massa, emagrecer, ficar mais forte ou cuidar da saúde.</span>
+                        </span>
+                    </label>
+                    <label class="{{ $card }} {{ $focus === 'sport' ? 'ring-2 ring-saude-800/60' : '' }}">
+                        <input type="radio" wire:model.live="focus" value="sport" class="mt-1">
+                        <span>
+                            <span class="block font-medium text-slate-800 dark:text-slate-200">Um esporte ou atividade</span>
+                            <span class="block text-xs text-slate-500 dark:text-slate-400">A academia reforça o que o esporte pede: corrida, tênis, natação e outros.</span>
+                        </span>
+                    </label>
+                </div>
+            </fieldset>
+
+            @if ($focus === 'sport')
+                <div class="card grid gap-5 p-5 sm:grid-cols-2">
+                    <div class="sm:col-span-2">
+                        <label class="{{ $campo }}">Qual esporte</label>
+                        <select wire:model.live="sport" class="select mt-1.5 w-full">
+                            @foreach ($esportes as $e) <option value="{{ $e->value }}">{{ $e->label() }}</option> @endforeach
+                        </select>
+                        <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">{{ \App\Enums\GymSport::tryFrom($sport)?->hint() }}</p>
+                        @error('sport') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                    </div>
+
+                    <div>
+                        <label class="{{ $campo }}">Vezes por semana no esporte</label>
+                        <select wire:model="sportDays" class="select mt-1.5 w-full">
+                            @foreach (range(1, 7) as $n) <option value="{{ $n }}">{{ $n }} {{ $n === 1 ? 'vez' : 'vezes' }}</option> @endforeach
+                        </select>
+                        <p class="mt-1 text-xs text-slate-400">Quanto mais você pratica, menos academia o treino pede.</p>
+                        @error('sportDays') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                    </div>
+
+                    <fieldset class="sm:col-span-2 space-y-2">
+                        <legend class="{{ $campo }}">Em que fase da temporada você está</legend>
+                        @foreach ($temporadas as $t)
+                            <label class="flex items-start gap-2 text-sm text-slate-700 dark:text-slate-300">
+                                <input type="radio" wire:model="season" value="{{ $t->value }}" class="mt-1">
+                                <span><span class="font-medium">{{ $t->label() }}</span> <span class="block text-xs text-slate-500 dark:text-slate-400">{{ $t->hint() }}</span></span>
+                            </label>
+                        @endforeach
+                        @error('season') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                    </fieldset>
+                </div>
+            @endif
+
+            <fieldset class="card space-y-3 p-5">
+                <legend class="text-sm font-semibold text-slate-900 dark:text-white">{{ $focus === 'sport' ? 'Como quer treinar na academia?' : 'Qual é o seu objetivo?' }}</legend>
+                @if ($focus === 'sport')
+                    <p class="text-xs text-slate-500 dark:text-slate-400">Já deixei marcado o que costuma servir ao esporte. Muda só o jeito de prescrever (séries e repetições): os exercícios vêm do esporte.</p>
+                @endif
                 <div class="grid gap-2 sm:grid-cols-2">
                     @foreach ($objetivos as $o)
                         <label class="{{ $card }} {{ $goal === $o->value ? 'ring-2 ring-saude-800/60' : '' }}">
@@ -138,7 +210,7 @@
                 </div>
 
                 <div>
-                    <label class="{{ $campo }}">Dias por semana</label>
+                    <label class="{{ $campo }}">{{ $focus === 'sport' ? 'Dias de academia por semana' : 'Dias por semana' }}</label>
                     <select wire:model="days" class="select mt-1.5 w-full">
                         @foreach (range(2, 6) as $n) <option value="{{ $n }}">{{ $n }} dias</option> @endforeach
                     </select>
@@ -194,6 +266,17 @@
                 @error('draft.name') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
             </div>
             <p class="text-sm text-slate-600 dark:text-slate-300">{{ $draft['summary'] }}</p>
+
+            @if (! empty($draft['notes']))
+                <div class="rounded-lg bg-sky-50 px-3 py-2 text-xs text-sky-900 dark:bg-sky-500/10 dark:text-sky-200">
+                    <p class="font-medium">Orientações para esta fase</p>
+                    <ul class="mt-1 list-disc space-y-0.5 pl-4">
+                        @foreach (explode("\n", $draft['notes']) as $nota)
+                            <li>{{ $nota }}</li>
+                        @endforeach
+                    </ul>
+                </div>
+            @endif
 
             @foreach ($draft['warnings'] as $aviso)
                 <p class="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:bg-amber-500/10 dark:text-amber-300">{{ $aviso }}</p>

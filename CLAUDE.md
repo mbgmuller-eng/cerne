@@ -236,8 +236,18 @@ Dado de saúde pessoal (só o dono vê; `IsPersonalHealthData`). Regras que não
   que já existiam e cadastra os que não existiam, com as duas fotos. É idempotente (`source_id`), tem `--dry-run`, **nunca troca foto que já
   está lá nem reescreve texto** (só com `--force`) e não toca `notes`. As fotos **não entram no repositório**: vão por `scp` para uma pasta
   e o comando lê `--images=`. O exercício pessoal (`GymExercise`) não guarda ligação com o catálogo, então o "Como fazer" é achado **pelo nome**
-  (`GymExerciseCatalog::instructionsFor`, componente `<x-gym.instructions>`). Exercício importado nasce com `in_auto_workout = false`: o treino
-  automático só sorteia a lista curada (a troca à mão enxerga tudo). Listas que carregam o catálogo inteiro usam `withoutInstructions()`.
+  (`GymExerciseCatalog::instructionsFor`, componente `<x-gym.instructions>`). O treino automático só sorteia o que tem `in_auto_workout`: a lista curada e,
+  dos importados, só a força comum de academia (`GymLibraryImporter::eligibleForAuto`: categoria força, nível não avançado, composto ou isolado
+  conhecido, equipamento do dia a dia, sem variação rara); a troca à mão enxerga tudo. A biblioteca guarda `source_level/mechanic/category`, que o
+  gerador usa no lugar das palavras do nome (nível e composto/isolado) nos importados; o `--force` não é preciso para completar a metadata: ela
+  só é preenchida quando falta, para nunca desfazer uma escolha do admin.
+- **Foco esportivo** (`GymSport`, `GymSeason`; colunas `gym_plans.sport/sport_days/season`): o esporte **não é um objetivo a mais**. O objetivo continua
+  dizendo como prescrever (séries, repetições, descanso); o esporte diz **quais exercícios** ganham prioridade (`emphasis`: o maior peso que bater, nunca
+  soma), quais **espaços extras** entram no lugar dos últimos do dia (`extraSlots`, revezando entre os treinos), o que sai do "nunca automático" só
+  para ele (`unlocks`: rotação externa para quem nada ou joga tênis, antebraço, trenó) e as **orientações** (`tips`, que viram "Orientações da fase").
+  Esporte de resistência (corrida, ciclismo, natação) com 2+ vezes por semana, ou qualquer esporte em competição, **não soma bloco de cardio**.
+  A temporada limita os dias (fora 6, pré 4, competição 3; esporte 5+ vezes por semana, 3) e, em competição, tira uma série dos exercícios de carga.
+  Prazo de troca da fase com esporte: pré-temporada 4 a 6 semanas, o resto 8 a 12. A revisão pergunta a temporada de novo (é o que mais muda). Listas que carregam o catálogo inteiro usam `withoutInstructions()`.
 
 ### Calendário (Saúde e agenda do profissional)
 

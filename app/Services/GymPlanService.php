@@ -7,6 +7,8 @@ use App\Enums\GymGoal;
 use App\Enums\GymLevel;
 use App\Enums\GymMeasureType;
 use App\Enums\GymMuscleGroup;
+use App\Enums\GymSeason;
+use App\Enums\GymSport;
 use App\Models\GymEquipment;
 use App\Models\GymExercise;
 use App\Models\GymExerciseCatalog;
@@ -288,7 +290,13 @@ class GymPlanService
                     'goal' => GymGoal::tryFrom((string) ($i['goal'] ?? '')), 'level' => GymLevel::tryFrom((string) ($i['level'] ?? '')),
                     'days_per_week' => $i['days'] ?? null, 'session_minutes' => $i['minutes'] ?? null,
                     'equipment_access' => GymEquipmentAccess::tryFrom((string) ($i['access'] ?? '')), 'restrictions' => $i['restrictions'] ?? [],
+                    'sport' => GymSport::tryFrom((string) ($i['sport'] ?? '')), 'sport_days' => $i['sport_days'] ?? null, 'season' => GymSeason::tryFrom((string) ($i['season'] ?? '')),
                 ]);
+            }
+
+            // As orientações do esporte (cuidados, limite de dias) viram o texto "Orientações da fase" da Academia.
+            if (! empty($rascunho['notes'])) {
+                $plano->update(['notes' => mb_substr((string) $rascunho['notes'], 0, 4000)]);
             }
 
             foreach ($rascunho['workouts'] as $w) {

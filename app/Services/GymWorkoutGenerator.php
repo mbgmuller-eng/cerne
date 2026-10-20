@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Enums\GymEquipmentAccess;
 use App\Enums\GymGoal;
 use App\Enums\GymLevel;
+use App\Enums\GymSeason;
 use App\Models\GymExerciseCatalog;
 use App\Support\GymExerciseClassifier as C;
 use App\Support\GymGeneratorInput;
@@ -67,7 +68,7 @@ class GymWorkoutGenerator
     {
         $pool = $this->pool($in, soAutomaticos: true);
         $cardio = $this->cardioPool($in);
-        $dias = max(2, min(6, $in->days));
+        [$dias, $notasDoEsporte] = $this->daysAndNotes($in);
         $estrutura = self::SPLITS[$dias];
         $quantos = $this->exerciseCount($in);
         $usadosNoPlano = [];
@@ -78,7 +79,7 @@ class GymWorkoutGenerator
             $linhas = [];
             $usadosNoTreino = [];
 
-            foreach (array_slice(self::SLOTS[$tipo], 0, $quantos) as [$grupo, $especie]) {
+            foreach ($this->slotsFor($tipo, $quantos, $in, $i) as [$grupo, $especie]) {
                 $escolhido = $this->pick($pool, $grupo, $especie, $usadosNoTreino, $usadosNoPlano, $in->variant, $in->avoid, $in->keep);
 
                 if ($escolhido === null) {
@@ -109,9 +110,12 @@ class GymWorkoutGenerator
             'input' => [
                 'goal' => $in->goal->value, 'level' => $in->level->value, 'days' => $dias, 'minutes' => $in->minutes,
                 'access' => $in->access->value, 'restrictions' => array_map(fn ($r) => $r->value, $in->restrictions),
+                'sport' => $in->sport?->value, 'sport_days' => $in->sport !== null ? $in->sportDays : null, 'season' => $in->sport !== null ? $in->season?->value : null,
             ],
-            'name' => 'Treino automático: '.mb_strtolower($in->goal->label()).' ('.$dias.' dias)',
+            'name' => 'Treino automático: '.($in->sport !== null ? $in->sport->shortLabel().', '.mb_strtolower(($in->season ?? GymSeason::OffSeason)->label()) : mb_strtolower($in->goal->label())).' ('.$dias.' dias)',
             'summary' => $this->summary($in, $dias, $quantos),
+            // As orientações viram o texto "Orientações da fase" da Academia quando a pessoa salva.
+            'notes' => $notasDoEsporte,
             'warnings' => array_values(array_map(
                 fn (string $grupo) => "Não encontrei exercício de {$grupo} que combine com o que você tem e com as restrições. O treino ficou sem esse grupo em alguns dias.",
                 array_unique($avisos),
@@ -172,18 +176,18 @@ class GymWorkoutGenerator
         return GymExerciseCatalog::query()->active()->withoutInstructions()
             // O sorteio só usa a lista curada; quem troca um exercício à mão enxerga a biblioteca inteira.
             ->when($soAutomaticos, fn ($q) => $q->where('in_auto_workout', true))->get()
-            ->filter(fn (GymExerciseCatalog $c) => ! C::isNeverAuto($c->name)
-                && C::fitsLevel($c->name, $in->level)
+            ->filter(fn (GymExerciseCatalog $c) => ! C::isNeverAuto($c->name, $in->sport?->unlocks() ?? [])
+                && $this->fitsLevel($c, $in->level)
                 && C::fitsAccess($c->name, $c->equipment_hint, $in->access)
                 && ! C::hitsRestriction($c->name, $in->restrictions)
                 && ($incluirCardio ? true : ($c->muscle_group->value !== 'cardio' && ! C::isConditioning($c->name))))
             ->map(fn (GymExerciseCatalog $c) => [
                 'id' => $c->id, 'name' => $c->name, 'norm' => C::normalize($c->name), 'group' => $c->muscle_group->value, 'label' => $c->muscle_group->label(),
                 'equipment' => $c->equipment_hint, 'measure' => $c->measure_type->value,
-                'kind' => C::kind($c->name, $c->muscle_group->value), 'arm' => C::armPart($c->name), 'calf' => C::isCalf($c->name),
+                'kind' => $this->kindOf($c), 'arm' => C::armPart($c->name), 'calf' => C::isCalf($c->name),
                 'pref' => C::preference($c->equipment_hint, $c->name, $in->level), 'family' => C::family($c->name),
                 // O básico do grupo manda; o nível puxa para o equipamento que ele prefere (iniciante, aparelho guiado).
-                'score' => C::priority($c->name) * 3 + C::preference($c->equipment_hint, $c->name, $in->level) * 4,
+                'score' => C::priority($c->name) * 3 + C::preference($c->equipment_hint, $c->name, $in->level) * 4 + $this->sportBonus($c->name, $in),
             ])
             ->values();
     }
@@ -278,6 +282,12 @@ class GymWorkoutGenerator
 
     private function wantsCardio(GymGeneratorInput $in, int $indice, int $total): bool
     {
+        // Corrida, ciclismo e natação já são o condicionamento: somar cardio na academia é cansar a mais.
+        // Em competição o esporte também já cobre o condicionamento.
+        if (($in->sport?->isEndurance() && $in->sportDays >= 2) || ($in->sport !== null && $in->season === GymSeason::InSeason)) {
+            return false;
+        }
+
         return match ($in->goal) {
             GymGoal::WeightLoss, GymGoal::Endurance => true,
             GymGoal::GeneralHealth => $indice === $total - 1,
@@ -292,12 +302,121 @@ class GymWorkoutGenerator
         return $in->level === GymLevel::Beginner ? max(3, $base - 1) : $base;
     }
 
+    // --- Esporte -----------------------------------------------------------------------------------------------------
+
+    /**
+     * Quantos dias de academia a fase tem e o que dizer sobre isso. Sem esporte, os dias pedidos; com esporte, a temporada e a
+     * frequência do esporte puxam o teto para baixo (em competição, ou com o esporte quase todo dia, a academia é pouca e boa).
+     *
+     * @return array{0: int, 1: string|null}
+     */
+    private function daysAndNotes(GymGeneratorInput $in): array
+    {
+        $dias = max(2, min(6, $in->days));
+
+        if ($in->sport === null) {
+            return [$dias, null];
+        }
+
+        $temporada = $in->season ?? GymSeason::OffSeason;
+        $teto = $temporada->maxDays();
+        $notas = [];
+
+        if ($in->sportDays >= 5) {
+            $teto = min($teto, 3);
+        }
+
+        if ($dias > $teto) {
+            $notas[] = "Limitei a {$teto} treinos de academia por semana: ".($in->sportDays >= 5 ? 'você pratica o esporte quase todo dia' : mb_strtolower($temporada->label()).' pede menos academia').'.';
+            $dias = max(2, $teto);
+        }
+
+        if ($temporada->reducesVolume()) {
+            $notas[] = 'Em competição o volume é menor (uma série a menos por exercício): o objetivo é manter a força sem chegar cansado ao esporte.';
+        }
+
+        return [$dias, implode("\n", array_merge($notas, $in->sport->tips()))];
+    }
+
+    /**
+     * Os espaços do treino. Com esporte, os últimos do dia (os de menor importância) dão lugar aos espaços extras do esporte,
+     * que se revezam entre os treinos da semana. O tamanho do treino não muda.
+     *
+     * @return list<array{0: string, 1: string}>
+     */
+    private function slotsFor(string $tipo, int $quantos, GymGeneratorInput $in, int $indice): array
+    {
+        $base = array_slice(self::SLOTS[$tipo], 0, $quantos);
+
+        if ($in->sport === null) {
+            return $base;
+        }
+
+        $extras = $in->sport->extraSlots();
+        $n = $quantos >= 7 ? 2 : 1;
+        $espacos = array_slice($base, 0, max(2, $quantos - $n));
+
+        for ($k = 0; $k < $n; $k++) {
+            $espacos[] = $extras[($indice * $n + $k) % count($extras)];
+        }
+
+        return $espacos;
+    }
+
+    /** O quanto o nome do exercício serve ao esporte: o maior dos pesos que baterem (nunca soma, para um nome não ganhar duas vezes). */
+    private function sportBonus(string $nome, GymGeneratorInput $in): int
+    {
+        if ($in->sport === null) {
+            return 0;
+        }
+
+        $n = C::normalize($nome);
+        $melhor = 0;
+
+        foreach ($in->sport->emphasis() as [$palavra, $peso]) {
+            if ($peso > $melhor && str_contains($n, $palavra)) {
+                $melhor = $peso;
+            }
+        }
+
+        return $melhor;
+    }
+
+    /** Composto ou isolado: a biblioteca de origem diz, quando o exercício veio dela; senão, o nome. */
+    private function kindOf(GymExerciseCatalog $c): string
+    {
+        return match ($c->source_mechanic) {
+            'compound' => C::COMPOUND,
+            'isolation' => C::ISOLATION,
+            default => C::kind($c->name, $c->muscle_group->value),
+        };
+    }
+
+    /** O nível da biblioteca de origem manda nos exercícios que vieram dela; nos demais, a lista do classificador. */
+    private function fitsLevel(GymExerciseCatalog $c, GymLevel $nivel): bool
+    {
+        if ($c->source_level === null) {
+            return C::fitsLevel($c->name, $nivel);
+        }
+
+        return match ($nivel) {
+            GymLevel::Beginner => $c->source_level === 'beginner',
+            GymLevel::Intermediate => in_array($c->source_level, ['beginner', 'intermediate'], true),
+            GymLevel::Advanced => true,
+        };
+    }
+
     // --- Prescrição --------------------------------------------------------------------------------------------------
 
     /** @param  array<string, mixed>  $e */
     private function row(array $e, GymGeneratorInput $in): array
     {
         $p = $this->prescribe($e, $in);
+
+        // Em competição a academia é manutenção: uma série a menos nos exercícios de carga.
+        if ($in->season?->reducesVolume() && $e['measure'] === 'load_reps') {
+            $p['sets'] = max(2, $p['sets'] - 1);
+        }
 
         return [
             'catalog_id' => $e['id'], 'name' => $e['name'], 'group' => $e['label'], 'group_value' => $e['group'], 'equipment' => $e['equipment'],
@@ -379,6 +498,7 @@ class GymWorkoutGenerator
     private function summary(GymGeneratorInput $in, int $dias, int $quantos): string
     {
         return "{$dias} treinos por semana, com cerca de {$quantos} exercícios cada. ".$in->goal->hint()
+            .($in->sport !== null ? ' Reforço para '.$in->sport->shortLabel().': '.$in->sport->hint() : '')
             .($in->level === GymLevel::Beginner ? ' Para quem está começando, o treino prefere aparelhos guiados e menos exercícios por dia.' : '')
             .($in->restrictions !== [] ? ' Ficam de fora os exercícios que mais exigem: '.implode(', ', array_map(fn ($r) => mb_strtolower($r->label()), $in->restrictions)).'.' : '');
     }

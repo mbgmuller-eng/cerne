@@ -240,13 +240,20 @@ final class GymExerciseClassifier
         return true;
     }
 
-    /** Exercício de reabilitação ou muito específico: nunca entra sozinho. */
-    public static function isNeverAuto(string $nome): bool
+    /**
+     * Exercício de reabilitação ou muito específico: nunca entra sozinho. Um esporte pode liberar alguns (rotação externa para
+     * quem nada ou joga tênis, por exemplo): $liberar traz as palavras liberadas, sem acento.
+     *
+     * @param  list<string>  $liberar
+     */
+    public static function isNeverAuto(string $nome, array $liberar = []): bool
     {
         $n = self::normalize($nome);
 
         foreach (self::NEVER_AUTO as $palavra) {
-            if (str_contains($n, self::normalize($palavra))) {
+            $p = self::normalize($palavra);
+
+            if (str_contains($n, $p) && ! in_array($p, $liberar, true)) {
                 return true;
             }
         }

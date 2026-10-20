@@ -22,7 +22,7 @@ use Illuminate\Database\Eloquent\Model;
  */
 #[Fillable([
     'profile_id', 'name', 'muscle_group', 'measure_type', 'equipment_hint',
-    'notes', 'instructions', 'source_id', 'image_path', 'image_path_2', 'is_active', 'in_auto_workout',
+    'notes', 'instructions', 'source_id', 'source_level', 'source_mechanic', 'source_category', 'image_path', 'image_path_2', 'is_active', 'in_auto_workout',
 ])]
 class GymExerciseCatalog extends Model
 {
@@ -51,7 +51,7 @@ class GymExerciseCatalog extends Model
     /** As listas e o gerador só precisam do cabeçalho do exercício: o passo a passo é texto longo e fica de fora. */
     public function scopeWithoutInstructions(Builder $query): Builder
     {
-        return $query->select(['id', 'profile_id', 'name', 'muscle_group', 'measure_type', 'equipment_hint', 'notes', 'source_id', 'image_path', 'image_path_2', 'is_active', 'in_auto_workout', 'created_at', 'updated_at']);
+        return $query->select(['id', 'profile_id', 'name', 'muscle_group', 'measure_type', 'equipment_hint', 'notes', 'source_id', 'source_level', 'source_mechanic', 'source_category', 'image_path', 'image_path_2', 'is_active', 'in_auto_workout', 'created_at', 'updated_at']);
     }
 
     /**

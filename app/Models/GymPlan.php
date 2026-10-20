@@ -5,6 +5,8 @@ namespace App\Models;
 use App\Enums\GymEquipmentAccess;
 use App\Enums\GymGoal;
 use App\Enums\GymLevel;
+use App\Enums\GymSeason;
+use App\Enums\GymSport;
 use App\Models\Concerns\BelongsToProfile;
 use App\Models\Concerns\IsPersonalHealthData;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -18,7 +20,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  */
 #[Fillable([
     'profile_id', 'member_id', 'name', 'goal', 'level', 'days_per_week', 'session_minutes', 'equipment_access', 'restrictions',
-    'is_active', 'started_on', 'ended_on', 'notes',
+    'sport', 'sport_days', 'season', 'is_active', 'started_on', 'ended_on', 'notes',
 ])]
 class GymPlan extends Model
 {
@@ -33,6 +35,9 @@ class GymPlan extends Model
             'goal' => GymGoal::class,
             'level' => GymLevel::class,
             'equipment_access' => GymEquipmentAccess::class,
+            'sport' => GymSport::class,
+            'season' => GymSeason::class,
+            'sport_days' => 'integer',
             'days_per_week' => 'integer',
             'session_minutes' => 'integer',
             'restrictions' => 'array',
