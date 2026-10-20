@@ -175,10 +175,25 @@
                     @error('formNotes') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
                 </div>
 
+                <div class="@sm:col-span-2">
+                    <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Passo a passo (opcional)</label>
+                    <textarea wire:model="formInstructions" rows="5" class="input mt-1.5"></textarea>
+                    <p class="mt-1 text-xs text-slate-400">Um passo por linha. Aparece para o usuário em "Como fazer".</p>
+                    @error('formInstructions') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                </div>
+
                 <label class="inline-flex items-center gap-2 text-sm text-slate-600 @sm:col-span-2 dark:text-slate-300">
                     <input type="checkbox" wire:model="formActive" class="rounded border-slate-300 dark:border-white/20">
                     Ativo (aparece na lista de quem monta o treino)
                 </label>
+
+                <div class="@sm:col-span-2">
+                    <label class="inline-flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+                        <input type="checkbox" wire:model="formAuto" class="rounded border-slate-300 dark:border-white/20">
+                        Pode entrar no treino automático
+                    </label>
+                    <p class="mt-1 text-xs text-slate-400">Os exercícios importados da biblioteca começam de fora: o sorteio só usa a lista escolhida à mão.</p>
+                </div>
             </div>
 
             <button type="submit" class="btn-primary w-full" wire:loading.attr="disabled">Salvar</button>

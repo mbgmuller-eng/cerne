@@ -253,4 +253,24 @@ class AdminExercisesTest extends TestCase
 
         Livewire::test(AdminExercises::class)->assertSee('Rosca Martelo Inclinada')->assertSee('pedido 2 vezes');
     }
+
+    public function test_admin_edita_o_passo_a_passo_e_se_o_exercicio_entra_no_treino_automatico(): void
+    {
+        $this->actingAs($this->admin());
+        $e = $this->exercicio();
+        $e->update(['instructions' => ['Passo antigo.'], 'in_auto_workout' => false]);
+
+        Livewire::test(AdminExercises::class)->call('editar', $e->id)
+            ->assertSet('formInstructions', 'Passo antigo.')->assertSet('formAuto', false)
+            ->set('formInstructions', "Primeiro passo.\n\n  Segundo passo.  \n")
+            ->set('formAuto', true)
+            ->call('salvar')->assertHasNoErrors();
+
+        $e->refresh();
+        self::assertSame(['Primeiro passo.', 'Segundo passo.'], $e->instructions);
+        self::assertTrue($e->in_auto_workout);
+
+        Livewire::test(AdminExercises::class)->call('editar', $e->id)->set('formInstructions', '')->call('salvar')->assertHasNoErrors();
+        self::assertNull($e->fresh()->instructions, 'texto vazio limpa o passo a passo');
+    }
 }

@@ -52,6 +52,12 @@ class AdminExercises extends Component
 
     public bool $formActive = true;
 
+    /** Passo a passo, uma frase por linha. */
+    public string $formInstructions = '';
+
+    /** O treino automático pode sortear este exercício. */
+    public bool $formAuto = true;
+
     public $foto1 = null;
 
     public $foto2 = null;
@@ -83,6 +89,9 @@ class AdminExercises extends Component
         $this->formEquipment = (string) $exercicio->equipment_hint;
         $this->formNotes = (string) $exercicio->notes;
         $this->formActive = $exercicio->is_active;
+        $this->formInstructions = implode("
+", $exercicio->instructions ?? []);
+        $this->formAuto = $exercicio->in_auto_workout;
         $this->showForm = true;
     }
 
@@ -124,11 +133,13 @@ class AdminExercises extends Component
             'formEquipment' => ['nullable', 'string', 'max:120'],
             'formNotes' => ['nullable', 'string', 'max:2000'],
             'formActive' => ['boolean'],
+            'formAuto' => ['boolean'],
+            'formInstructions' => ['nullable', 'string', 'max:8000'],
             'foto1' => ['nullable', 'image', "max:{$limite}"],
             'foto2' => ['nullable', 'image', "max:{$limite}"],
         ], attributes: [
             'formName' => 'nome', 'formGroup' => 'grupo muscular', 'formType' => 'tipo de medida',
-            'formEquipment' => 'equipamento', 'formNotes' => 'observações', 'foto1' => 'quadro 1', 'foto2' => 'quadro 2',
+            'formEquipment' => 'equipamento', 'formNotes' => 'observações', 'formInstructions' => 'passo a passo', 'foto1' => 'quadro 1', 'foto2' => 'quadro 2',
         ]);
 
         if ($this->nomeEmUso($dados['formName'], $this->editandoId)) {
@@ -144,6 +155,8 @@ class AdminExercises extends Component
             'equipment_hint' => $this->vazioParaNulo($dados['formEquipment']),
             'notes' => $this->vazioParaNulo($dados['formNotes']),
             'is_active' => $dados['formActive'],
+            'in_auto_workout' => $dados['formAuto'],
+            'instructions' => $this->passos($dados['formInstructions'] ?? ''),
         ];
 
         if ($this->editandoId !== null) {
@@ -202,7 +215,8 @@ class AdminExercises extends Component
 
     public function render()
     {
-        $todos = $this->catalogo()->orderBy('name')->get();
+        // O passo a passo é texto longo e a lista não o mostra: fica de fora do carregamento das ~900 linhas.
+        $todos = $this->catalogo()->withoutInstructions()->orderBy('name')->get();
         $procurado = GymExerciseCatalog::normalizeName($this->busca);
 
         $filtrados = $todos
@@ -241,6 +255,14 @@ class AdminExercises extends Component
             ->contains(fn (string $existente): bool => GymExerciseCatalog::normalizeName($existente) === $procurado);
     }
 
+    /** @return list<string>|null */
+    private function passos(string $texto): ?array
+    {
+        $linhas = array_values(array_filter(array_map('trim', preg_split('/\R/', $texto) ?: []), fn (string $l) => $l !== ''));
+
+        return $linhas === [] ? null : $linhas;
+    }
+
     private function vazioParaNulo(?string $valor): ?string
     {
         $valor = trim((string) $valor);
@@ -250,10 +272,11 @@ class AdminExercises extends Component
 
     private function resetForm(): void
     {
-        $this->reset('editandoId', 'sugestaoId', 'formName', 'formEquipment', 'formNotes', 'foto1', 'foto2', 'removerFoto1', 'removerFoto2');
+        $this->reset('editandoId', 'sugestaoId', 'formName', 'formEquipment', 'formNotes', 'formInstructions', 'foto1', 'foto2', 'removerFoto1', 'removerFoto2');
         $this->formGroup = 'chest';
         $this->formType = 'load_reps';
         $this->formActive = true;
+        $this->formAuto = true;
         $this->resetErrorBag();
     }
 }

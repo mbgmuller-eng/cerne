@@ -361,7 +361,7 @@ class GymPlanService
 
         $nomesProprios = $proprios->map(fn (array $o) => GymExerciseCatalog::normalizeName($o['name']))->all();
 
-        $catalogo = GymExerciseCatalog::query()->active()
+        $catalogo = GymExerciseCatalog::query()->active()->withoutInstructions()
             ->when(! $todos, fn ($q) => $q->where('muscle_group', $atual->muscle_group->value))
             ->get()
             ->reject(fn (GymExerciseCatalog $c) => in_array(GymExerciseCatalog::normalizeName($c->name), $nomesProprios, true))

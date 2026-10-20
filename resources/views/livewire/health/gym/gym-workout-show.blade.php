@@ -51,6 +51,7 @@
                         @if ($item->notes)
                             <p class="mt-1 text-xs text-slate-400">{{ $item->notes }}</p>
                         @endif
+                        <x-gym.instructions :exercise="$exercicio" />
                     </div>
                 </li>
             @endforeach

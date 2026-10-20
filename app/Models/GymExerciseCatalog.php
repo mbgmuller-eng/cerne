@@ -22,7 +22,7 @@ use Illuminate\Database\Eloquent\Model;
  */
 #[Fillable([
     'profile_id', 'name', 'muscle_group', 'measure_type', 'equipment_hint',
-    'notes', 'image_path', 'image_path_2', 'is_active',
+    'notes', 'instructions', 'source_id', 'image_path', 'image_path_2', 'is_active', 'in_auto_workout',
 ])]
 class GymExerciseCatalog extends Model
 {
@@ -37,13 +37,35 @@ class GymExerciseCatalog extends Model
         return [
             'muscle_group' => GymMuscleGroup::class,
             'measure_type' => GymMeasureType::class,
+            'instructions' => 'array',
             'is_active' => 'boolean',
+            'in_auto_workout' => 'boolean',
         ];
     }
 
     public function scopeActive(Builder $query): Builder
     {
         return $query->where('is_active', true);
+    }
+
+    /** As listas e o gerador só precisam do cabeçalho do exercício: o passo a passo é texto longo e fica de fora. */
+    public function scopeWithoutInstructions(Builder $query): Builder
+    {
+        return $query->select(['id', 'profile_id', 'name', 'muscle_group', 'measure_type', 'equipment_hint', 'notes', 'source_id', 'image_path', 'image_path_2', 'is_active', 'in_auto_workout', 'created_at', 'updated_at']);
+    }
+
+    /**
+     * O passo a passo do exercício de uma pessoa. O exercício pessoal (`GymExercise`) nasce do catálogo mas não guarda ligação com
+     * ele, só o nome; então a orientação é achada pelo nome (a collation do banco já ignora caixa e acento) e fica de fora o que o
+     * catálogo desativou.
+     *
+     * @return list<string>|null
+     */
+    public static function instructionsFor(string $nome): ?array
+    {
+        $passos = self::query()->active()->whereNotNull('instructions')->where('name', $nome)->value('instructions');
+
+        return is_array($passos) && $passos !== [] ? array_values($passos) : null;
     }
 
     /** Mesma regra de GymExercise::imageUrl() — ver lá o porquê de cada detalhe. */

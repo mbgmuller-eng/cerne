@@ -88,6 +88,7 @@
                     @isset($hint[$item->id])
                         <p class="mt-1 text-xs {{ $hint[$item->id]['type'] === 'raise' ? 'text-emerald-700 dark:text-emerald-400' : 'text-amber-700 dark:text-amber-400' }}">{{ $hint[$item->id]['message'] }}</p>
                     @endisset
+                    <x-gym.instructions :exercise="$exercicio" />
                     </div>
                 </div>
                 <div class="flex shrink-0 flex-col items-end gap-1">

@@ -231,6 +231,14 @@ Dado de saúde pessoal (só o dono vê; `IsPersonalHealthData`). Regras que não
   exercício dentro do seu treino com recorde, variação e gráfico (SVG por `GymReportCharts`). Lê o histórico inteiro até o fim do período
   para comparar com o que veio antes.
 
+- **Biblioteca de exercícios** (`database/data/gym-exercise-library.json`, tradução em português do free-exercise-db, domínio público; criada
+  por `GymLibraryImporter` / `cerne:gym-library-import`): dá o **passo a passo** (`gym_exercise_catalog.instructions`, lista de frases) aos exercícios
+  que já existiam e cadastra os que não existiam, com as duas fotos. É idempotente (`source_id`), tem `--dry-run`, **nunca troca foto que já
+  está lá nem reescreve texto** (só com `--force`) e não toca `notes`. As fotos **não entram no repositório**: vão por `scp` para uma pasta
+  e o comando lê `--images=`. O exercício pessoal (`GymExercise`) não guarda ligação com o catálogo, então o "Como fazer" é achado **pelo nome**
+  (`GymExerciseCatalog::instructionsFor`, componente `<x-gym.instructions>`). Exercício importado nasce com `in_auto_workout = false`: o treino
+  automático só sorteia a lista curada (a troca à mão enxerga tudo). Listas que carregam o catálogo inteiro usam `withoutInstructions()`.
+
 ### Calendário (Saúde e agenda do profissional)
 
 Um módulo só desenha o calendário: `<x-calendar>` (mês, semana e dia, no estilo de uma agenda) alimentado por `CalendarBuilder` e

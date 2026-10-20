@@ -211,7 +211,7 @@ class GymPlanEditor extends Component
         $procurado = GymExerciseCatalog::normalizeName($nome);
         $catalogo = $nome === ''
             ? null
-            : GymExerciseCatalog::query()->active()->get()->first(fn (GymExerciseCatalog $c): bool => GymExerciseCatalog::normalizeName($c->name) === $procurado);
+            : GymExerciseCatalog::query()->active()->withoutInstructions()->get()->first(fn (GymExerciseCatalog $c): bool => GymExerciseCatalog::normalizeName($c->name) === $procurado);
 
         if ($catalogo === null) {
             $this->catalogMatchId = null;

@@ -65,7 +65,7 @@ class GymWorkoutGenerator
      */
     public function generate(GymGeneratorInput $in): array
     {
-        $pool = $this->pool($in);
+        $pool = $this->pool($in, soAutomaticos: true);
         $cardio = $this->cardioPool($in);
         $dias = max(2, min(6, $in->days));
         $estrutura = self::SPLITS[$dias];
@@ -167,9 +167,11 @@ class GymWorkoutGenerator
      *
      * @return Collection<int, array<string, mixed>>
      */
-    private function pool(GymGeneratorInput $in, bool $incluirCardio = false): Collection
+    private function pool(GymGeneratorInput $in, bool $incluirCardio = false, bool $soAutomaticos = false): Collection
     {
-        return GymExerciseCatalog::query()->active()->get()
+        return GymExerciseCatalog::query()->active()->withoutInstructions()
+            // O sorteio só usa a lista curada; quem troca um exercício à mão enxerga a biblioteca inteira.
+            ->when($soAutomaticos, fn ($q) => $q->where('in_auto_workout', true))->get()
             ->filter(fn (GymExerciseCatalog $c) => ! C::isNeverAuto($c->name)
                 && C::fitsLevel($c->name, $in->level)
                 && C::fitsAccess($c->name, $c->equipment_hint, $in->access)
@@ -189,7 +191,7 @@ class GymWorkoutGenerator
     /** O condicionamento: o grupo de cardio do catálogo mais burpee e salto lateral, já filtrados. */
     private function cardioPool(GymGeneratorInput $in): Collection
     {
-        return GymExerciseCatalog::query()->active()->get()
+        return GymExerciseCatalog::query()->active()->withoutInstructions()->where('in_auto_workout', true)->get()
             ->filter(fn (GymExerciseCatalog $c) => ($c->muscle_group->value === 'cardio' || C::isConditioning($c->name))
                 && ! str_contains(C::normalize($c->name), 'salto vertical') && ! str_contains(C::normalize($c->name), 'jump rope')
                 && C::fitsLevel($c->name, $in->level)
