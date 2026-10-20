@@ -144,6 +144,36 @@ class InsuranceCommissionTest extends TestCase
         self::assertSame('2026-12-05', $itens[0]['due_on']);
     }
 
+    public function test_parcela_do_mes_anterior_cuja_comissao_cai_neste_mes_entra_neste_mes(): void
+    {
+        // Hoje é 10/11/2026. A parcela de 28/10 com prazo de 20 dias paga em 17/11: é renda de novembro, mesmo a parcela
+        // tendo vencido em outubro. A de 28/09 pagou em 18/10 e já ficou para trás.
+        $regra = $this->regra(['payout_delay_days' => 20, 'first_year_percent' => '30.000', 'renewal_percent' => '30.000']);
+        $apolice = $this->apolice(['start_date' => '2025-10-28']);
+
+        $itens = collect(app(InsuranceCommissionCalculator::class)->entries($apolice, $regra))->keyBy('due_on');
+
+        self::assertArrayHasKey('2026-11-17', $itens->all());
+        self::assertSame("policy:{$apolice->id}:commission:2026-10-28", $itens['2026-11-17']['key']);
+        self::assertArrayNotHasKey('2026-10-18', $itens->all());
+        self::assertSame('2026-11-17', $itens->keys()->sort()->first());
+    }
+
+    public function test_cada_apolice_aparece_no_mes_atual_mesmo_com_prazos_diferentes(): void
+    {
+        $this->regra(['payout_delay_days' => 7]);
+        $dia28 = $this->apolice(['start_date' => '2024-05-28', 'policy_number' => 'D-28']);
+        $dia15 = $this->apolice(['start_date' => '2024-05-15', 'policy_number' => 'D-15']);
+        foreach ([$dia28, $dia15] as $a) {
+            PolicyCommission::factory()->create(['professional_id' => $this->corretor->id, 'insurance_policy_id' => $a->id]);
+        }
+
+        $this->service()->reconcile($this->corretor);
+
+        $noMes = IncomeEntry::query()->where('professional_id', $this->corretor->id)->forPeriod(2026, 11)->pluck('origin_key')->all();
+        self::assertCount(2, $noMes, 'as duas apólices têm comissão em novembro');
+        self::assertCount(2, array_unique(array_map(fn ($k) => explode(':', $k)[1], $noMes)));
+    }
     public function test_apolice_sem_renovacao_automatica_nao_gera_depois_do_vencimento(): void
     {
         $regra = $this->regra();

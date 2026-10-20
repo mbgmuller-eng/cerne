@@ -48,12 +48,15 @@ class InsuranceCommissionCalculator
 
         for ($k = 0; ; $k++) {
             $vencimento = $inicio->addMonthsNoOverflow($k * $ciclo);
+            $pagamento = $vencimento->addDays($atraso);
 
-            if ($vencimento->gt($limite) || ($fimDaApolice !== null && $vencimento->gt($fimDaApolice))) {
+            if ($pagamento->gt($limite) || ($fimDaApolice !== null && $vencimento->gt($fimDaApolice))) {
                 break;
             }
 
-            if ($vencimento->lt($primeiroMes)) {
+            // O mês em que o dinheiro cai é o do pagamento, não o do vencimento da parcela: a parcela de 28/09 com prazo de 7 dias
+            // cai em 05/10 e é renda de outubro.
+            if ($pagamento->lt($primeiroMes)) {
                 continue;
             }
 
@@ -73,7 +76,7 @@ class InsuranceCommissionCalculator
             $itens[] = [
                 'key' => "policy:{$policy->id}:commission:{$vencimento->toDateString()}",
                 'source' => IncomeSource::InsuranceCommission,
-                'due_on' => $vencimento->addDays($atraso)->toDateString(),
+                'due_on' => $pagamento->toDateString(),
                 'amount' => $valor,
                 'description' => "Comissão {$nome} ({$ano}º ano)",
             ];
@@ -81,7 +84,7 @@ class InsuranceCommissionCalculator
 
         // Agenciamento: só de apólice que começa de agora em diante; a antiga não gera fechamento retroativo. O percentual incide
         // sobre o prêmio do 1º mês, ou seja, a primeira parcela (nunca o prêmio do ano todo).
-        if ($rule->hasAgency() && $inicio->gte($primeiroMes) && $inicio->lte($limite)) {
+        if ($rule->hasAgency() && $inicio->addDays($atraso)->gte($primeiroMes) && $inicio->addDays($atraso)->lte($limite)) {
             $valor = $rule->agency_type === CommissionType::Amount
                 ? number_format((float) $rule->agency_amount, 2, '.', '')
                 : $this->percentOf($parcela, (string) $rule->agency_percent);
