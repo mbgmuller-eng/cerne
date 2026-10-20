@@ -11,6 +11,8 @@
             <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Cada exercício, treino a treino. Só treinos finalizados entram.</p>
         </div>
 
+        <a href="{{ route('health.gym.report') }}" wire:navigate class="btn-primary self-end">Ver relatório completo</a>
+
         <form wire:submit="baixarRelatorio" class="card flex flex-wrap items-end gap-2 p-3">
             <div>
                 <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">De</label>

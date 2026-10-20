@@ -5,6 +5,7 @@ namespace App\Livewire\Health\Gym;
 use App\Livewire\Concerns\RequiresActiveProfile;
 use App\Livewire\Concerns\RequiresPersonalHealth;
 use App\Services\GymProgressService;
+use App\Services\GymReportService;
 use App\Support\ProfileContext;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Carbon;
@@ -43,18 +44,16 @@ class GymProgress extends Component
         ];
     }
 
-    public function baixarRelatorio(GymProgressService $progress)
+    public function baixarRelatorio(GymProgressService $progress, GymReportService $reports)
     {
         $this->validate();
 
         $inicio = Carbon::parse($this->inicioRelatorio)->startOfDay();
         $fim = Carbon::parse($this->fimRelatorio)->endOfDay();
 
-        $pdf = Pdf::loadView('pdf.gym-evolution-report', [
-            'linhas' => $progress->periodReport($inicio, $fim),
+        $pdf = Pdf::loadView('pdf.gym-report', [
+            'relatorio' => $reports->report($inicio, $fim),
             'progress' => $progress,
-            'inicio' => $inicio,
-            'fim' => $fim,
             'membro' => app(ProfileContext::class)->member(),
             'geradoEm' => now(),
         ])->setPaper('a4');

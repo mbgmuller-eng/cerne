@@ -127,6 +127,7 @@ Todas idempotentes (regra 4). O cron da Hostinger chama `schedule:run` a cada mi
 | `comissoes-de-seguros` | 04:07 | vincula as apólices que cada profissional vendeu e refaz a previsão de comissão e agenciamento (chave `origin_key` única por profissional) |
 | `percentual-patrimonio` | 04:09 | refaz a previsão do percentual sobre patrimônio de cada consultor (estimativa com o patrimônio de hoje) |
 | `comissoes-de-consorcio` | 04:11 | refaz a previsão da comissão de consórcio dos consultores (percentual da carta nas parcelas combinadas) |
+| `academia-revisao-de-treino` | 09:00 | avisa (uma vez por fase, só o dono) que a fase de treino passou do ponto de troca (`GymPhaseReviewService::notifyDue`, livro `engagement_reminders` tipo `review_due`; monta e solta o `ProfileContext` de cada pessoa) |
 | `anexos-de-leads` | 04:10 | apaga arquivos de leads perdidos há mais de 12 meses |
 | `leads-de-renovacao` | 07:30 | cria lead para apólice que vence (preferências em `users.renewal_lead_*`) |
 | `resumo-de-leads` | 08:00 | uma notificação por profissional com o que pede atenção nos leads |
@@ -217,6 +218,18 @@ Dado de saúde pessoal (só o dono vê; `IsPersonalHealthData`). Regras que não
   dica de equipamento (decisão: marcar o catálogo à mão fica para depois). Entradas: objetivo, nível, dias (2 a 6), tempo, onde treina
   e regiões a proteger. É orientação geral, não prescrição: a tela avisa. Exercício de reabilitação ou muito específico nunca entra
   sozinho (`NEVER_AUTO`), condicionamento (salto, corda, burpee) só no bloco de cardio.
+- **A fase guarda as respostas do gerador** (`gym_plans.goal/level/days_per_week/session_minutes/equipment_access/restrictions`, preenchidas
+  por `createPlanFromDraft`; fase montada à mão fica sem objetivo até a pessoa defini-lo na tela da Academia, `setPlanGoal`).
+- **Hora de trocar a fase** (`GymPhaseReviewService::review`, status ok/soon/due/slow): prazo por objetivo (hipertrofia e saúde geral 8 a 12
+  semanas, força, emagrecimento e resistência 6 a 8, iniciante +2; sem objetivo, 8 a 12), **ou** metade dos exercícios acompanhados parados
+  (platô), **mas** com menos da metade dos treinos previstos o aviso vira "retome a rotina" (`slow`), não "troque". O aviso aparece na
+  Academia e vira notificação **uma vez por fase**. Sugerir subir de nível exige tempo e volume (`levelSuggestion`) e nunca troca sozinho.
+- **Treino novo pergunta "seus objetivos continuam os mesmos?"** (passo `review` do `GymPlanGenerator`): mostra a fase (tempo, treinos,
+  o que evoluiu), as respostas anteriores e a variedade (variar, manter os que evoluíram, tanto faz; vira `avoid`/`keep` no
+  `GymGeneratorInput`). "Sim" gera direto; "Mudou" abre o pedido preenchido.
+- **Relatório** (`/saude/academia/relatorio`, `GymReport`, `GymReportService`, PDF `pdf/gym-report`): resumo, frequência, destaques e cada
+  exercício dentro do seu treino com recorde, variação e gráfico (SVG por `GymReportCharts`). Lê o histórico inteiro até o fim do período
+  para comparar com o que veio antes.
 
 ### Calendário (Saúde e agenda do profissional)
 

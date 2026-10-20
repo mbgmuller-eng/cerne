@@ -2,6 +2,9 @@
 
 namespace App\Services;
 
+use App\Enums\GymEquipmentAccess;
+use App\Enums\GymGoal;
+use App\Enums\GymLevel;
 use App\Enums\GymMeasureType;
 use App\Enums\GymMuscleGroup;
 use App\Models\GymEquipment;
@@ -278,6 +281,16 @@ class GymPlanService
         return DB::transaction(function () use ($rascunho): GymPlan {
             $plano = $this->createPlan(mb_substr($rascunho['name'], 0, 80));
 
+            // As respostas ficam na fase: é com elas que o Cerne sabe quando avisar que é hora de trocar e o que perguntar na próxima.
+            if (isset($rascunho['input'])) {
+                $i = $rascunho['input'];
+                $plano->update([
+                    'goal' => GymGoal::tryFrom((string) ($i['goal'] ?? '')), 'level' => GymLevel::tryFrom((string) ($i['level'] ?? '')),
+                    'days_per_week' => $i['days'] ?? null, 'session_minutes' => $i['minutes'] ?? null,
+                    'equipment_access' => GymEquipmentAccess::tryFrom((string) ($i['access'] ?? '')), 'restrictions' => $i['restrictions'] ?? [],
+                ]);
+            }
+
             foreach ($rascunho['workouts'] as $w) {
                 if ($w['exercises'] === []) {
                     continue;
@@ -299,6 +312,25 @@ class GymPlanService
 
             return $plano;
         });
+    }
+
+    /** Define (ou corrige) o objetivo e o nível de uma fase montada à mão, para o aviso de troca saber de que prazo falar. */
+    public function setPlanGoal(GymPlan $plano, ?GymGoal $objetivo, ?GymLevel $nivel): GymPlan
+    {
+        $plano->update(['goal' => $objetivo, 'level' => $nivel]);
+
+        return $plano;
+    }
+
+    /**
+     * Nomes (normalizados) dos exercícios de uma fase, para o treino novo poder evitar repeti-los.
+     *
+     * @return list<string>
+     */
+    public function exerciseNamesOf(GymPlan $plano): array
+    {
+        return GymWorkoutExercise::query()->whereIn('workout_id', $plano->workouts()->select('id'))->with('exercise:id,name')->get()
+            ->map(fn (GymWorkoutExercise $i) => \App\Support\GymExerciseClassifier::normalize($i->exercise->name))->unique()->values()->all();
     }
 
     // --- Troca de exercício ------------------------------------------------------------------------------------------

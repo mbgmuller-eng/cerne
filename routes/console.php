@@ -202,6 +202,14 @@ Schedule::call(function (): void {
     logger()->info('Comissões de consórcio', $resultado);
 })->dailyAt('04:11')->name('comissoes-de-consorcio')->withoutOverlapping();
 
+// Academia: avisa, uma vez por fase, quem já passou do ponto de trocar o treino (tempo para o objetivo ou exercícios parados).
+// Idempotente pelo livro de lembretes (índice único usuário + fase + tipo).
+Schedule::call(function (): void {
+    $enviados = app(\App\Services\GymPhaseReviewService::class)->notifyDue();
+
+    logger()->info('Revisão de treino', ['avisados' => $enviados]);
+})->dailyAt('09:00')->name('academia-revisao-de-treino')->withoutOverlapping();
+
 // Leads: anexos de contatos perdidos há mais do prazo de retenção saem do servidor.
 // Idempotente: o que já foi apagado não aparece de novo.
 Schedule::command('cerne:purge-lead-files')->dailyAt('04:10')->name('anexos-de-leads')->withoutOverlapping();

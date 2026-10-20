@@ -79,7 +79,7 @@ class GymWorkoutGenerator
             $usadosNoTreino = [];
 
             foreach (array_slice(self::SLOTS[$tipo], 0, $quantos) as [$grupo, $especie]) {
-                $escolhido = $this->pick($pool, $grupo, $especie, $usadosNoTreino, $usadosNoPlano, $in->variant);
+                $escolhido = $this->pick($pool, $grupo, $especie, $usadosNoTreino, $usadosNoPlano, $in->variant, $in->avoid, $in->keep);
 
                 if ($escolhido === null) {
                     $avisos[$grupo] = $this->label($grupo);
@@ -105,6 +105,11 @@ class GymWorkoutGenerator
         }
 
         return [
+            // As respostas seguem no rascunho para serem gravadas na fase: é com elas que o Cerne avisa quando trocar.
+            'input' => [
+                'goal' => $in->goal->value, 'level' => $in->level->value, 'days' => $dias, 'minutes' => $in->minutes,
+                'access' => $in->access->value, 'restrictions' => array_map(fn ($r) => $r->value, $in->restrictions),
+            ],
             'name' => 'Treino automático: '.mb_strtolower($in->goal->label()).' ('.$dias.' dias)',
             'summary' => $this->summary($in, $dias, $quantos),
             'warnings' => array_values(array_map(
@@ -171,7 +176,7 @@ class GymWorkoutGenerator
                 && ! C::hitsRestriction($c->name, $in->restrictions)
                 && ($incluirCardio ? true : ($c->muscle_group->value !== 'cardio' && ! C::isConditioning($c->name))))
             ->map(fn (GymExerciseCatalog $c) => [
-                'id' => $c->id, 'name' => $c->name, 'group' => $c->muscle_group->value, 'label' => $c->muscle_group->label(),
+                'id' => $c->id, 'name' => $c->name, 'norm' => C::normalize($c->name), 'group' => $c->muscle_group->value, 'label' => $c->muscle_group->label(),
                 'equipment' => $c->equipment_hint, 'measure' => $c->measure_type->value,
                 'kind' => C::kind($c->name, $c->muscle_group->value), 'arm' => C::armPart($c->name), 'calf' => C::isCalf($c->name),
                 'pref' => C::preference($c->equipment_hint, $c->name, $in->level), 'family' => C::family($c->name),
@@ -207,7 +212,7 @@ class GymWorkoutGenerator
      * @param  array<string, bool>  $noPlano
      * @return array<string, mixed>|null
      */
-    private function pick(Collection $pool, string $grupo, string $especie, array $noTreino, array $noPlano, int $variant): ?array
+    private function pick(Collection $pool, string $grupo, string $especie, array $noTreino, array $noPlano, int $variant, array $evitar = [], array $manter = []): ?array
     {
         foreach ([$especie, 'any'] as $tentativa) {
             $candidatos = $pool->filter(fn (array $e) => $e['group'] === $grupo && ! isset($noTreino[$e['id']]) && $this->matches($e, $tentativa))
@@ -219,9 +224,24 @@ class GymWorkoutGenerator
 
             // Dá preferência ao que ainda não apareceu na fase e a uma família de movimento diferente das já usadas no treino.
             $familias = collect($noTreino)->keys()->map(fn (string $id) => $pool->firstWhere('id', $id)['family'] ?? null)->filter()->all();
-            $ideais = $candidatos->reject(fn (array $e) => isset($noPlano[$e['id']]) || in_array($e['family'], $familias, true))->values();
-            $novos = $candidatos->reject(fn (array $e) => isset($noPlano[$e['id']]))->values();
-            $lista = $ideais->isNotEmpty() ? $ideais : ($novos->isNotEmpty() ? $novos : $candidatos);
+            // O que evoluiu bem na fase anterior fica, se ainda não entrou na fase nova.
+            $mantidos = $candidatos->filter(fn (array $e) => in_array($e['norm'], $manter, true) && ! isset($noPlano[$e['id']]))->values();
+
+            if ($mantidos->isNotEmpty()) {
+                return $mantidos[0];
+            }
+
+            // Sem alternativa, repetir o exercício da fase anterior é melhor que ficar sem o grupo.
+            $semRepetir = $candidatos->reject(fn (array $e) => in_array($e['norm'], $evitar, true));
+            $ideais = $semRepetir->reject(fn (array $e) => isset($noPlano[$e['id']]) || in_array($e['family'], $familias, true))->values();
+            $novos = $semRepetir->reject(fn (array $e) => isset($noPlano[$e['id']]))->values();
+            $qualquerNovo = $candidatos->reject(fn (array $e) => isset($noPlano[$e['id']]))->values();
+            $lista = match (true) {
+                $ideais->isNotEmpty() => $ideais,
+                $novos->isNotEmpty() => $novos,
+                $qualquerNovo->isNotEmpty() => $qualquerNovo,
+                default => $candidatos,
+            };
 
             return $lista[$variant % $lista->count()];
         }

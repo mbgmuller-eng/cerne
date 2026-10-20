@@ -12,7 +12,96 @@
         </p>
     </div>
 
-    @if ($draft === null)
+    @if ($step === 'review' && $revisao)
+        {{-- Passo 0: como foi a fase e se os objetivos continuam ------------------ --}}
+        @php
+            $r = $revisao['review'];
+            $tom = match ($r['status']) {
+                'due' => 'border-l-amber-500',
+                'soon' => 'border-l-sky-500',
+                'slow' => 'border-l-slate-400',
+                default => 'border-l-emerald-500',
+            };
+        @endphp
+
+        <div class="card border-l-4 {{ $tom }} space-y-3 p-5">
+            <p class="eyebrow">Sua fase atual</p>
+            <h2 class="text-lg font-medium text-slate-900 dark:text-white">{{ $plano->name }}</h2>
+            <p class="text-sm font-medium text-slate-800 dark:text-slate-200">{{ $r['headline'] }}</p>
+            <p class="text-sm text-slate-600 dark:text-slate-300">{{ $r['message'] }}</p>
+
+            <dl class="grid grid-cols-3 gap-3 pt-1 text-center">
+                <div class="rounded-xl bg-slate-50 p-3 dark:bg-white/5">
+                    <dt class="text-xs text-slate-500 dark:text-slate-400">Semanas na fase</dt>
+                    <dd class="figure mt-1 text-xl text-slate-900 dark:text-white">{{ $r['weeks'] }}</dd>
+                </div>
+                <div class="rounded-xl bg-slate-50 p-3 dark:bg-white/5">
+                    <dt class="text-xs text-slate-500 dark:text-slate-400">Treinos feitos</dt>
+                    <dd class="figure mt-1 text-xl text-slate-900 dark:text-white">{{ $r['sessions'] }}</dd>
+                </div>
+                <div class="rounded-xl bg-slate-50 p-3 dark:bg-white/5">
+                    <dt class="text-xs text-slate-500 dark:text-slate-400">Exercícios que melhoraram</dt>
+                    <dd class="figure mt-1 text-xl text-slate-900 dark:text-white">{{ $revisao['improved'] }}@if ($revisao['measured'] > 0)<span class="text-sm text-slate-400"> de {{ $revisao['measured'] }}</span>@endif</dd>
+                </div>
+            </dl>
+
+            @if ($revisao['top'])
+                <p class="text-xs text-slate-500 dark:text-slate-400">
+                    Maiores evoluções:
+                    @foreach ($revisao['top'] as $t) {{ $t['exercise']->name }} ({{ str_replace('.', ',', $t['change_pct']) }}%){{ $loop->last ? '' : ', ' }}@endforeach.
+                </p>
+            @endif
+
+            <a href="{{ route('health.gym.report', ['periodo' => 'fase']) }}" wire:navigate class="inline-block text-xs underline text-slate-500 hover:text-slate-700 dark:text-slate-400">Ver o relatório desta fase</a>
+        </div>
+
+        @if ($plano->goal)
+            <div class="card space-y-4 p-5">
+                <h2 class="text-sm font-semibold text-slate-900 dark:text-white">Seus objetivos continuam os mesmos?</h2>
+                <dl class="grid gap-x-6 gap-y-2 text-sm sm:grid-cols-2">
+                    <div><dt class="text-xs text-slate-500 dark:text-slate-400">Objetivo</dt><dd class="text-slate-800 dark:text-slate-200">{{ $plano->goal->label() }}</dd></div>
+                    <div><dt class="text-xs text-slate-500 dark:text-slate-400">Nível</dt><dd class="text-slate-800 dark:text-slate-200">{{ $plano->level?->label() ?? '—' }}</dd></div>
+                    <div><dt class="text-xs text-slate-500 dark:text-slate-400">Dias por semana</dt><dd class="text-slate-800 dark:text-slate-200">{{ $plano->days_per_week ?? '—' }}</dd></div>
+                    <div><dt class="text-xs text-slate-500 dark:text-slate-400">Tempo por treino</dt><dd class="text-slate-800 dark:text-slate-200">{{ $plano->session_minutes ? $plano->session_minutes.' minutos' : '—' }}</dd></div>
+                    <div><dt class="text-xs text-slate-500 dark:text-slate-400">Onde treina</dt><dd class="text-slate-800 dark:text-slate-200">{{ $plano->equipment_access?->label() ?? '—' }}</dd></div>
+                    <div><dt class="text-xs text-slate-500 dark:text-slate-400">Regiões protegidas</dt><dd class="text-slate-800 dark:text-slate-200">{{ $plano->restrictions ? implode(', ', array_map(fn ($v) => $restricoes[$v] ?? $v, $plano->restrictions)) : 'nenhuma' }}</dd></div>
+                </dl>
+
+                @if ($revisao['level_suggestion'])
+                    <label class="flex cursor-pointer items-start gap-3 rounded-xl border border-sky-200 bg-sky-50 p-3 text-sm dark:border-sky-500/30 dark:bg-sky-500/10">
+                        <input type="checkbox" wire:model="upgradeLevel" class="mt-1 h-4 w-4 rounded border-slate-300">
+                        <span class="text-slate-700 dark:text-slate-200">
+                            Você treina há bastante tempo. Quer passar para <strong>{{ $revisao['level_suggestion']->label() }}</strong> neste treino novo?
+                        </span>
+                    </label>
+                @endif
+            </div>
+        @else
+            <div class="card space-y-2 p-5">
+                <h2 class="text-sm font-semibold text-slate-900 dark:text-white">Qual é o seu objetivo agora?</h2>
+                <p class="text-sm text-slate-600 dark:text-slate-300">Esta fase foi montada à mão, então o Cerne não guardou o objetivo dela. Responda as perguntas a seguir para montar o treino novo.</p>
+            </div>
+        @endif
+
+        <fieldset class="card space-y-3 p-5">
+            <legend class="text-sm font-semibold text-slate-900 dark:text-white">E os exercícios do treino novo?</legend>
+            @foreach (['vary' => ['Variar', 'Evita repetir os exercícios desta fase quando há alternativa. Mudar o estímulo é parte do motivo de trocar.'], 'keep' => ['Manter os que evoluíram', 'Fica com os exercícios que melhoraram nesta fase e troca os demais.'], 'free' => ['Tanto faz', 'Escolhe só pelo seu pedido, sem olhar a fase anterior.']] as $valor => [$titulo, $ajuda])
+                <label class="{{ $card }} {{ $variety === $valor ? 'ring-2 ring-saude-800/60' : '' }}">
+                    <input type="radio" wire:model.live="variety" value="{{ $valor }}" class="mt-1">
+                    <span><span class="block font-medium text-slate-800 dark:text-slate-200">{{ $titulo }}</span><span class="block text-xs text-slate-500 dark:text-slate-400">{{ $ajuda }}</span></span>
+                </label>
+            @endforeach
+        </fieldset>
+
+        <div class="flex flex-wrap gap-2">
+            @if ($plano->goal)
+                <button type="button" wire:click="keepGoals" wire:loading.attr="disabled" class="btn-primary">Sim, manter e montar o treino novo</button>
+                <button type="button" wire:click="changeGoals" class="btn-secondary">Mudou, quero ajustar</button>
+            @else
+                <button type="button" wire:click="changeGoals" class="btn-primary">Responder e montar o treino novo</button>
+            @endif
+        </div>
+    @elseif ($draft === null)
         {{-- Passo 1: o pedido -------------------------------------------------- --}}
         <form wire:submit="generate" class="space-y-6">
             <fieldset class="card space-y-3 p-5">
@@ -77,6 +166,17 @@
                     @endforeach
                 </div>
             </fieldset>
+
+            @if ($temPlanoAtivo)
+                <fieldset class="card space-y-3 p-5">
+                    <legend class="text-sm font-semibold text-slate-900 dark:text-white">E os exercícios, em relação à fase atual?</legend>
+                    @foreach (['vary' => 'Variar: evitar repetir os da fase atual', 'keep' => 'Manter os que evoluíram e variar o resto', 'free' => 'Tanto faz'] as $valor => $rotulo)
+                        <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
+                            <input type="radio" wire:model="variety" value="{{ $valor }}"> {{ $rotulo }}
+                        </label>
+                    @endforeach
+                </fieldset>
+            @endif
 
             <p class="rounded-xl bg-slate-50 px-4 py-3 text-xs text-slate-500 dark:bg-white/5 dark:text-slate-400">
                 É uma orientação geral, não a prescrição de um profissional. Com dor, lesão ou condição de saúde, converse com um médico ou

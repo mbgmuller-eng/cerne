@@ -17,6 +17,67 @@
         </div>
     </div>
 
+    {{-- Há quanto tempo está na fase e se já é hora de trocar (prazo por objetivo, estagnação e adesão). --}}
+    @if ($phase && $phase['status'] !== 'ok')
+        @php
+            $borda = match ($phase['status']) {
+                'due' => 'border-l-amber-500',
+                'soon' => 'border-l-sky-500',
+                default => 'border-l-slate-400',
+            };
+        @endphp
+        <div class="card flex flex-wrap items-center justify-between gap-3 border-l-4 {{ $borda }} p-5">
+            <div class="min-w-0 max-w-2xl">
+                <p class="text-sm font-semibold text-slate-900 dark:text-white">{{ $phase['headline'] }}</p>
+                <p class="mt-1 text-sm text-slate-600 dark:text-slate-300">{{ $phase['message'] }}</p>
+            </div>
+            <div class="flex flex-wrap gap-2">
+                @if ($phase['status'] !== 'slow')
+                    <a href="{{ route('health.gym.generate') }}" wire:navigate class="btn-primary">Criar o treino novo</a>
+                @endif
+                <a href="{{ route('health.gym.report', ['periodo' => 'fase']) }}" wire:navigate class="btn-secondary">Ver o relatório da fase</a>
+                @if (! $plan->goal)
+                    <button type="button" wire:click="openGoal" class="btn-ghost">Definir objetivo</button>
+                @endif
+            </div>
+        </div>
+    @elseif ($plan && ! $plan->goal)
+        <div class="flex justify-end">
+            <button type="button" wire:click="openGoal" class="btn-ghost px-2 py-1 text-xs">Definir o objetivo desta fase</button>
+        </div>
+    @endif
+
+    <x-modal wire-model="showGoal" max-width="sm">
+        <form wire:submit="saveGoal" class="space-y-4">
+            <div class="flex items-baseline justify-between">
+                <h2 class="text-sm font-semibold text-slate-900 dark:text-white">Objetivo desta fase</h2>
+                <button type="button" wire:click="$set('showGoal', false)" class="btn-ghost px-2 py-1 text-xs">Cancelar</button>
+            </div>
+            <p class="text-xs text-slate-500 dark:text-slate-400">Serve para o Cerne avisar na hora certa de trocar o treino: o prazo muda conforme o objetivo.</p>
+            <div>
+                <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Objetivo</label>
+                <select wire:model="goal" class="input mt-1.5">
+                    <option value="">Escolha</option>
+                    @foreach ($objetivos as $o)
+                        <option value="{{ $o->value }}">{{ $o->label() }}</option>
+                    @endforeach
+                </select>
+                @error('goal') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+            </div>
+            <div>
+                <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Nível</label>
+                <select wire:model="level" class="input mt-1.5">
+                    <option value="">Escolha</option>
+                    @foreach ($niveis as $valor => $rotulo)
+                        <option value="{{ $valor }}">{{ $rotulo }}</option>
+                    @endforeach
+                </select>
+                @error('level') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+            </div>
+            <button type="submit" class="btn-primary w-full">Salvar</button>
+        </form>
+    </x-modal>
+
     @if ($plan?->notes)
         <details class="card px-5 py-3">
             <summary class="cursor-pointer text-sm font-medium text-slate-700 dark:text-slate-300">Orientações da fase</summary>

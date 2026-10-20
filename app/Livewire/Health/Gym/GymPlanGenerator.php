@@ -10,16 +10,22 @@ use App\Enums\PlatformModule;
 use App\Livewire\Concerns\RequiresActiveProfile;
 use App\Livewire\Concerns\RequiresModule;
 use App\Livewire\Concerns\RequiresPersonalHealth;
+use App\Models\GymPlan;
+use App\Services\GymPhaseReviewService;
 use App\Services\GymPlanService;
+use App\Services\GymReportService;
 use App\Services\GymWorkoutGenerator;
+use App\Support\GymExerciseClassifier;
 use App\Support\GymGeneratorInput;
+use Carbon\CarbonImmutable;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 
 /**
- * Treino automático: a pessoa responde objetivo, nível, dias, tempo, equipamento e restrições, o gerador monta um rascunho com
- * os exercícios do catálogo e ela revisa (troca, remove) antes de salvar como uma fase nova. Nada é gravado até o "Salvar".
+ * Treino automático em três passos: (1) quem já tem uma fase vê como ela foi e responde "seus objetivos continuam os mesmos?";
+ * (2) o pedido (objetivo, nível, dias, tempo, equipamento, restrições); (3) o rascunho, que a pessoa revisa (troca, remove)
+ * antes de salvar como fase nova. Nada é gravado até o "Salvar".
  *
  * Orientação geral, não prescrição de profissional. O rascunho mora na própria tela (sem banco): fechar a página o descarta.
  */
@@ -27,6 +33,9 @@ use Livewire\Component;
 class GymPlanGenerator extends Component
 {
     use RequiresActiveProfile, RequiresModule, RequiresPersonalHealth;
+
+    /** 'review' (quem já tem fase), 'form' ou 'draft'. */
+    public string $step = 'form';
 
     public string $goal = 'hypertrophy';
 
@@ -41,9 +50,15 @@ class GymPlanGenerator extends Component
     /** @var list<string> */
     public array $restrictions = [];
 
+    /** Em relação à fase anterior: variar os exercícios, manter os que evoluíram ou não se importar. */
+    public string $variety = 'vary';
+
+    /** Aceitou a sugestão de subir de nível (só aparece quando há tempo e treinos que sustentem). */
+    public bool $upgradeLevel = false;
+
     public int $variant = 0;
 
-    /** @var array<string, mixed>|null o rascunho; nulo = ainda no formulário */
+    /** @var array<string, mixed>|null o rascunho; nulo = ainda não gerado */
     public ?array $draft = null;
 
     public bool $showSwap = false;
@@ -56,15 +71,49 @@ class GymPlanGenerator extends Component
 
     public bool $swapAllGroups = false;
 
-    public function mount(): void
+    public function mount(GymPlanService $plans): void
     {
         $this->redirectOrAbortWithoutProfile();
         $this->abortUnlessPersonalHealthOwner();
         // O treino automático termina na Academia, que é do módulo Saúde: sem a assinatura, nem monta.
         $this->abortUnlessModuleEntitled(PlatformModule::Saude);
+
+        $plano = $plans->activePlan();
+
+        if ($plano !== null) {
+            $this->step = 'review';
+            $this->fillFrom($plano);
+        }
     }
 
-    public function generate(GymWorkoutGenerator $generator): void
+    /** "Sim, os objetivos continuam": gera direto com as respostas da fase atual (e o nível novo, se ela aceitou subir). */
+    public function keepGoals(GymPlanService $plans, GymPhaseReviewService $review, GymWorkoutGenerator $generator): void
+    {
+        $plano = $plans->activePlan();
+
+        // Fase montada à mão não guarda as respostas: não há o que "manter", a pessoa responde agora.
+        if ($plano === null || $plano->goal === null) {
+            $this->step = 'form';
+
+            return;
+        }
+
+        $this->fillFrom($plano);
+
+        if ($this->upgradeLevel && ($proximo = $review->levelSuggestion($plano->level)) !== null) {
+            $this->level = $proximo->value;
+        }
+
+        $this->generate($generator, $plans);
+    }
+
+    /** "Mudou": abre o pedido já preenchido com as respostas anteriores, para ajustar só o que mudou. */
+    public function changeGoals(): void
+    {
+        $this->step = 'form';
+    }
+
+    public function generate(GymWorkoutGenerator $generator, GymPlanService $plans): void
     {
         $this->validate([
             'goal' => ['required', Rule::in(GymGoal::values())],
@@ -74,23 +123,26 @@ class GymPlanGenerator extends Component
             'access' => ['required', Rule::in(GymEquipmentAccess::values())],
             'restrictions' => ['array'],
             'restrictions.*' => [Rule::in(GymRestriction::values())],
+            'variety' => ['required', Rule::in(['vary', 'keep', 'free'])],
         ]);
 
         $this->variant = 0;
-        $this->draft = $generator->generate($this->input());
+        $this->draft = $generator->generate($this->input($plans));
+        $this->step = 'draft';
     }
 
     /** "Sortear outras opções": mesmo pedido, próximos exercícios da fila de cada espaço. */
-    public function regenerate(GymWorkoutGenerator $generator): void
+    public function regenerate(GymWorkoutGenerator $generator, GymPlanService $plans): void
     {
         $this->variant++;
-        $this->draft = $generator->generate($this->input());
+        $this->draft = $generator->generate($this->input($plans));
     }
 
     public function backToForm(): void
     {
         $this->draft = null;
         $this->showSwap = false;
+        $this->step = 'form';
     }
 
     public function removeExercise(int $w, int $i): void
@@ -117,11 +169,11 @@ class GymPlanGenerator extends Component
         $this->showSwap = false;
     }
 
-    public function swapTo(string $catalogId, GymWorkoutGenerator $generator): void
+    public function swapTo(string $catalogId, GymWorkoutGenerator $generator, GymPlanService $plans): void
     {
         abort_unless($this->swapWorkout !== null && isset($this->draft['workouts'][$this->swapWorkout]['exercises'][$this->swapIndex]), 404);
 
-        $nova = $generator->rowFor($catalogId, $this->input());
+        $nova = $generator->rowFor($catalogId, $this->input($plans));
 
         if ($nova === null) {
             $this->addError('swap', 'Esse exercício não está disponível para o seu pedido.');
@@ -157,8 +209,9 @@ class GymPlanGenerator extends Component
         $this->redirect(route('health.gym.index'), navigate: true);
     }
 
-    public function render(GymPlanService $plano, GymWorkoutGenerator $generator)
+    public function render(GymPlanService $plans, GymWorkoutGenerator $generator, GymPhaseReviewService $reviews, GymReportService $reports)
     {
+        $plano = $plans->activePlan();
         $linha = $this->showSwap && $this->swapWorkout !== null ? ($this->draft['workouts'][$this->swapWorkout]['exercises'][$this->swapIndex] ?? null) : null;
         $jaNoTreino = $linha !== null ? array_column($this->draft['workouts'][$this->swapWorkout]['exercises'], 'catalog_id') : [];
 
@@ -168,14 +221,52 @@ class GymPlanGenerator extends Component
             'acessos' => GymEquipmentAccess::options(),
             'restricoes' => GymRestriction::options(),
             'minutosOpcoes' => GymGeneratorInput::MINUTES,
-            'temPlanoAtivo' => $plano->activePlan() !== null,
+            'plano' => $plano,
+            'temPlanoAtivo' => $plano !== null,
+            'revisao' => $this->step === 'review' && $plano !== null ? $this->reviewData($plano, $reviews, $reports) : null,
             'swapLinha' => $linha,
-            'swapOptions' => $linha !== null ? $generator->alternatives($linha, $this->input(), $jaNoTreino, $this->swapSearch, $this->swapAllGroups) : [],
+            'swapOptions' => $linha !== null ? $generator->alternatives($linha, $this->input($plans), $jaNoTreino, $this->swapSearch, $this->swapAllGroups) : [],
         ]);
     }
 
-    private function input(): GymGeneratorInput
+    /**
+     * O que a pessoa precisa ver antes de decidir se mantém os objetivos: como foi a fase, o que evoluiu e o que parou.
+     *
+     * @return array<string, mixed>
+     */
+    private function reviewData(GymPlan $plano, GymPhaseReviewService $reviews, GymReportService $reports): array
     {
+        $revisao = $reviews->review($plano);
+        $inicio = CarbonImmutable::parse($plano->started_on ?? $plano->created_at)->startOfDay();
+        $relatorio = $reports->report($inicio, CarbonImmutable::today());
+
+        $linhas = collect($relatorio['workouts'])->flatMap(fn (array $t) => $t['exercises'])->unique(fn (array $l) => $l['exercise']->id)
+            ->filter(fn (array $l) => $l['sessions_count'] >= 2);
+
+        return [
+            'review' => $revisao,
+            'improved' => $linhas->filter(fn (array $l) => $l['change_pct'] !== null && bccomp($l['change_pct'], '0', 1) > 0)->count(),
+            'measured' => $linhas->count(),
+            'top' => $relatorio['highlights']['evolution'],
+            'level_suggestion' => $plano->level !== null ? $reviews->levelSuggestion($plano->level) : null,
+        ];
+    }
+
+    /** Preenche o pedido com as respostas guardadas na fase (o que não está guardado fica como estava). */
+    private function fillFrom(GymPlan $plano): void
+    {
+        $this->goal = $plano->goal?->value ?? $this->goal;
+        $this->level = $plano->level?->value ?? $this->level;
+        $this->days = $plano->days_per_week ?? $this->days;
+        $this->minutes = in_array($plano->session_minutes, GymGeneratorInput::MINUTES, true) ? $plano->session_minutes : $this->minutes;
+        $this->access = $plano->equipment_access?->value ?? $this->access;
+        $this->restrictions = $plano->restrictions ?? [];
+    }
+
+    private function input(GymPlanService $plans): GymGeneratorInput
+    {
+        [$evitar, $manter] = $this->previousPhaseNames($plans);
+
         return new GymGeneratorInput(
             GymGoal::from($this->goal),
             GymLevel::from($this->level),
@@ -184,6 +275,38 @@ class GymPlanGenerator extends Component
             GymEquipmentAccess::from($this->access),
             array_map(fn (string $r) => GymRestriction::from($r), array_values(array_intersect($this->restrictions, GymRestriction::values()))),
             $this->variant,
+            $evitar,
+            $manter,
         );
+    }
+
+    /**
+     * Os exercícios da fase anterior que o treino novo evita repetir e os que ele prefere manter (os que evoluíram), conforme
+     * a escolha da pessoa. Sem fase anterior, ou com "tanto faz", não há nada a evitar nem a manter.
+     *
+     * @return array{0: list<string>, 1: list<string>}
+     */
+    private function previousPhaseNames(GymPlanService $plans): array
+    {
+        $plano = $plans->activePlan();
+
+        if ($plano === null || $this->variety === 'free') {
+            return [[], []];
+        }
+
+        $nomes = $plans->exerciseNamesOf($plano);
+
+        if ($this->variety === 'vary') {
+            return [$nomes, []];
+        }
+
+        // Manter: os que melhoraram na fase ficam; os demais variam.
+        $inicio = CarbonImmutable::parse($plano->started_on ?? $plano->created_at)->startOfDay();
+        $relatorio = app(GymReportService::class)->report($inicio, CarbonImmutable::today());
+        $evoluiram = collect($relatorio['workouts'])->flatMap(fn (array $t) => $t['exercises'])
+            ->filter(fn (array $l) => $l['sessions_count'] >= 2 && $l['change_pct'] !== null && bccomp($l['change_pct'], '0', 1) > 0)
+            ->map(fn (array $l) => GymExerciseClassifier::normalize($l['exercise']->name))->unique()->values()->all();
+
+        return [array_values(array_diff($nomes, $evoluiram)), $evoluiram];
     }
 }
