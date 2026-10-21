@@ -29,6 +29,11 @@ enum AssetClass: string
     case AcaoExterior = 'acao_exterior';
     case Poupanca = 'poupanca';
     case Consorcio = 'consorcio';
+    // Saldo em corretora de cripto/câmbio, por moeda (ex.: Onil). Valor na moeda de origem em native_amount.
+    case Usdt = 'usdt';
+    case Btc = 'btc';
+    case Eth = 'eth';
+    case Brl = 'brl';
     case Outro = 'outro';
 
     public function label(): string
@@ -49,8 +54,29 @@ enum AssetClass: string
             self::AcaoExterior => 'Ação no exterior',
             self::Poupanca => 'Poupança',
             self::Consorcio => 'Consórcio',
+            self::Usdt => 'USDT',
+            self::Btc => 'BTC',
+            self::Eth => 'ETH',
+            self::Brl => 'BRL',
             self::Outro => 'Outro',
         };
+    }
+
+    /** A moeda em que o valor deste ativo é guardado (BRL para tudo que não é USDT, BTC ou ETH). */
+    public function currency(): string
+    {
+        return match ($this) {
+            self::Usdt => 'USDT',
+            self::Btc => 'BTC',
+            self::Eth => 'ETH',
+            default => 'BRL',
+        };
+    }
+
+    /** Guardado em USDT, BTC ou ETH: o valor em reais vem da quantidade vezes a cotação do dia. */
+    public function isForeignCurrency(): bool
+    {
+        return $this->currency() !== 'BRL';
     }
 
     /**
@@ -77,7 +103,7 @@ enum AssetClass: string
             self::Poupanca => InvestmentSector::Reserve,
             self::Previdencia => InvestmentSector::Retirement,
             self::Cdb, self::Tesouro, self::Lca, self::Lci, self::Consorcio => InvestmentSector::FixedIncome,
-            self::Acao, self::Fii, self::Etf, self::FundoInfra, self::Cripto, self::Fundo, self::Outro => InvestmentSector::VariableIncome,
+            self::Acao, self::Fii, self::Etf, self::FundoInfra, self::Cripto, self::Fundo, self::Outro, self::Usdt, self::Btc, self::Eth, self::Brl => InvestmentSector::VariableIncome,
             self::EtfInternacional, self::AcaoExterior => InvestmentSector::International,
         };
     }
@@ -98,10 +124,10 @@ enum AssetClass: string
             self::Cdb, self::Tesouro, self::Lca, self::Lci, self::Consorcio => AllocationAssetClass::FixedIncome,
             self::Fundo, self::FundoInfra => AllocationAssetClass::Funds,
             self::Acao, self::Fii => AllocationAssetClass::EquitiesFiis,
-            self::Cripto => AllocationAssetClass::DigitalAssets,
+            self::Cripto, self::Usdt, self::Btc, self::Eth => AllocationAssetClass::DigitalAssets,
             self::Etf => AllocationAssetClass::Etfs,
             self::EtfInternacional, self::AcaoExterior => AllocationAssetClass::International,
-            self::Previdencia, self::Poupanca, self::Outro => null,
+            self::Previdencia, self::Poupanca, self::Outro, self::Brl => null,
         };
     }
 }

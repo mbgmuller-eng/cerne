@@ -14,6 +14,7 @@ use App\Models\PartnerInvite;
 use App\Models\ProfileMember;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -109,6 +110,53 @@ class ClientOnboardingService
 
             $invite->update([
                 'status' => InviteStatus::Accepted,
+                'accepted_at' => now(),
+            ]);
+
+            return $user;
+        });
+    }
+
+    /**
+     * Cadastra um cliente DIRETO, a pedido do consultor, sem convite: conta com senha aleatória que ninguém conhece, perfil, titular
+     * e vínculo ativo com o consultor. Não manda e-mail nenhum e NÃO marca o e-mail como verificado (ninguém o confirmou): a pessoa
+     * entra depois pelo "esqueci a senha", e a verificação do e-mail acontece nessa hora. Serve às cargas em lote (planilha da
+     * corretora, apólices), em que o dado precisa existir antes de o cliente ganhar acesso.
+     *
+     * Quem chama confere antes que o e-mail não tem conta (aqui ele já existiria = erro de e-mail único) e que o consultor tem vaga.
+     */
+    public function createManagedClient(User $consultor, string $name, string $email): User
+    {
+        return DB::transaction(function () use ($consultor, $name, $email): User {
+            $user = User::create([
+                'name' => $name,
+                'email' => $email,
+                'password' => Str::random(40),
+                'role' => UserRole::Client,
+                'is_active' => true,
+            ]);
+
+            $perfil = FinancialProfile::create([
+                'owner_user_id' => $user->id,
+                'profile_name' => $name,
+                'profile_type' => ProfileType::Single,
+                'base_currency' => 'BRL',
+                'reference_month' => 1,
+            ]);
+
+            ProfileMember::create([
+                'profile_id' => $perfil->id,
+                'user_id' => $user->id,
+                'name' => $name,
+                'role' => MemberRole::Primary,
+                'is_active' => true,
+            ]);
+
+            ConsultantClient::create([
+                'consultant_id' => $consultor->id,
+                'client_id' => $user->id,
+                'status' => ConsultantClientStatus::Active,
+                'invited_at' => now(),
                 'accepted_at' => now(),
             ]);
 

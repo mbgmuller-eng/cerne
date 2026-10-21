@@ -11,6 +11,7 @@ use App\Models\Goal;
 use App\Models\IncomeRecord;
 use App\Models\InsurancePolicy;
 use App\Models\InvestmentRecord;
+use App\Support\CurrencyBreakdown;
 use App\Support\Money;
 use App\Support\ProfileContext;
 use Carbon\CarbonImmutable;
@@ -92,8 +93,16 @@ class DashboardService
             CreditCardInvoice::query()->outstanding()->sum('total_amount')
         );
 
+        // Quanto há em cada moeda (reais, USDT, BTC, ETH): só texto e arrays, que o cache guarda sem problema.
+        $porMoeda = CurrencyBreakdown::rows(
+            InvestmentRecord::query()->active()->selectRaw('currency, SUM(current_amount) as brl, SUM(native_amount) as native')->groupBy('currency')->get()
+                ->map(fn (InvestmentRecord $r) => ['currency' => (string) $r->currency, 'brl' => (string) $r->brl, 'native' => $r->native === null ? null : (string) $r->native])
+                ->all(),
+        );
+
         return [
             'investimentos' => $investimentos,
+            'por_moeda' => $porMoeda,
             'contas' => $contas,
             'faturas' => $faturas,
             'liquido' => bcsub($investimentos, $faturas, 2),

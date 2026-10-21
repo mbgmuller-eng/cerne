@@ -1,8 +1,13 @@
 @use('App\Support\Money')
 @use('App\Enums\Necessity')
+@use('App\Support\CurrencyBreakdown')
 
 @php
     $p = $dados['patrimonio'];
+    // Só há o que filtrar quando existe investimento em USDT, BTC ou ETH.
+    $linhasMoeda = $p['por_moeda'] ?? [];
+    $temMoeda = CurrencyBreakdown::hasForeign($linhasMoeda);
+    $porMoeda = $temMoeda && $exibicao === 'moedas';
     $m = $dados['mes'];
     // O cache guarda array puro (ver DashboardService::overview); a
     // Collection é reconstituída aqui, fora do (un)serialize do cache.
@@ -33,10 +38,25 @@
         <div class="pointer-events-none absolute -bottom-32 -left-16 h-64 w-64 rounded-full bg-brand-950/70 blur-3xl"></div>
 
         <div class="relative">
-            <p class="eyebrow text-brand-200">Patrimônio investido</p>
-            <p class="figure mt-2 text-4xl font-medium sm:text-5xl {{ (float) $p['liquido'] < 0 ? 'text-red-200' : '' }}">
-                {{ Money::format($p['liquido']) }}
-            </p>
+            <div class="flex flex-wrap items-center justify-between gap-2">
+                <p class="eyebrow text-brand-200">Patrimônio investido</p>
+
+                @if ($temMoeda)
+                    <div class="inline-flex rounded-lg bg-white/10 p-0.5 text-xs" role="group" aria-label="Mostrar patrimônio">
+                        <button type="button" wire:click="exibir('reais')" class="rounded-md px-3 py-1 {{ ! $porMoeda ? 'bg-white text-brand-800' : 'text-brand-100' }}">Em reais</button>
+                        <button type="button" wire:click="exibir('moedas')" class="rounded-md px-3 py-1 {{ $porMoeda ? 'bg-white text-brand-800' : 'text-brand-100' }}">Por moeda</button>
+                    </div>
+                @endif
+            </div>
+
+            @if ($porMoeda)
+                <x-currency-breakdown :rows="$linhasMoeda" class="mt-4" />
+                <p class="mt-3 text-xs text-brand-200">Tudo em reais, líquido das faturas em aberto: {{ Money::format($p['liquido']) }}</p>
+            @else
+                <p class="figure mt-2 text-4xl font-medium sm:text-5xl {{ (float) $p['liquido'] < 0 ? 'text-red-200' : '' }}">
+                    {{ Money::format($p['liquido']) }}
+                </p>
+            @endif
 
             <div class="mt-6 grid gap-x-8 gap-y-3 text-sm sm:grid-cols-3">
                 <div>

@@ -7,6 +7,7 @@ use App\Models\Concerns\BelongsToProfileOrShared;
 use App\Models\BillingDetail;
 use App\Models\AssetFeeAgreement;
 use App\Models\CommissionRule;
+use App\Models\CurrencyRate;
 use App\Models\ConsultantClient;
 use App\Models\ConsultantInvite;
 use App\Models\DebtCommission;
@@ -76,6 +77,9 @@ class TenancyCoverageTest extends TestCase
         AssetFeeAgreement::class => 'percentual sobre patrimônio que o consultor cobra de um cliente (professional_id) — mesmo sigilo de IncomeEntry; o profile_id aponta o cliente, não isola o dado',
         DebtCommission::class => 'liga o consultor a um consórcio de cliente em que ele tem comissão (professional_id) — sigiloso; o consórcio em si segue isolado por perfil',
         FeeAgreement::class => 'honorário que o profissional combinou com um cliente (professional_id) — mesmo sigilo de IncomeEntry; o profile_id aponta o cliente, não isola o dado',
+
+        // Dado público de mercado, igual para todo mundo.
+        CurrencyRate::class => 'cotação diária de USDT, BTC e ETH em reais — dado público de mercado, sem dono; a rotina escreve e o preço dos investimentos lê',
 
         // Vínculos consultor-cliente: ligam dois usuários, sem profile_id.
         ConsultantClient::class => 'liga consultor e cliente por user_id — não tem profile_id',

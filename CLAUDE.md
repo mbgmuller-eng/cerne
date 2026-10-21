@@ -118,6 +118,7 @@ Todas idempotentes (regra 4). O cron da Hostinger chama `schedule:run` a cada mi
 | `contas-fixas`, `receitas-recorrentes`, `faturas` | 03:10 a 03:20 | gera vencimentos e avisos |
 | `datas-importantes` | 03:25 | avisos de aniversário e de vencimento de apólice (não avisa apólice que renova sozinha) |
 | `parcelas-de-dividas` | 03:45 | avisa parcela de financiamento, empréstimo ou consórcio a vencer, a em atraso (a quem deve no 1º dia e uma semana depois; ao consultor do cliente uma vez, com uma semana; até 45 dias de atraso) e a data de reajuste da carta do consórcio (índice único por usuário e parcela em `engagement_reminders`, via `ReminderLedger`) |
+| `cotacoes-moedas` | 03:00 | cotação de USDT, BTC e ETH em reais (CoinGecko, depois Binance, depois AwesomeAPI) e novo valor em reais dos investimentos nessas moedas (`CurrencyRateService`; índice único `currency_rates(currency, rate_date)`) |
 | `snapshots` | dia 1, 03:30 | foto mensal dos investimentos |
 | `agenda-saude`, `cuidados-saude` | 03:35 | avisos de saúde |
 | cobrança (`lembrete-pix`, `pix-automatico-*`, `nota-fiscal-pendentes`, `lembrete-fim-do-teste`, `aviso-acesso-encerrando`) | 03:35 a 04:00 | assinatura e Asaas |
@@ -158,6 +159,16 @@ Módulo `Debt` + `DebtInstallment` + `DebtAdjustment` (reajustes do consórcio).
 - **Consórcio assistido**: a prévia do reajuste (`DebtService::previewAdjustment`) usa a mesma conta do registro; a sugestão de percentual vem do último reajuste registrado ou, sem histórico, do salto visto nas parcelas pagas (`Debt::observedAdjustment`). O lance na contemplação (`DebtSimulator::bid`, base em `Debt::contemplationBase`: extrato ou parcelas em aberto) mostra "baixar a parcela" x "encurtar o prazo" e só preenche o formulário; lance embutido sai da carta.
 - **Objetivos** têm cadastro próprio (`GoalsIndex`): avançam pelo dinheiro informado, pelo saldo de um investimento ou pelas parcelas pagas de um consórcio (um consórcio, um objetivo).
 - Fora de produção o projeto **proíbe lazy loading** (`Model::shouldBeStrict` em ambiente local): carregue as relações que a view usa (`with`/`loadMissing`).
+
+### Investimento em outra moeda (USDT, BTC, ETH)
+
+Tipos de ativo `usdt`, `btc`, `eth` e `brl` (`AssetClass`; `brl` é saldo em reais numa corretora). Regras que não se quebram:
+
+- **`current_amount` é SEMPRE em reais**: toda soma, o painel, a carteira do consultor e o cálculo de honorários leem ele, e somar 0,05 BTC com R$ 1.000 em uma `SUM()` daria um número errado sem aviso. A quantidade na moeda de origem fica em `native_amount` (`DECIMAL(24,10)`, BTC e ETH vêm com 8 casas) e `current_amount` = quantidade × cotação do dia.
+- A moeda (`currency`) é consequência da classe e o model a grava no `saving`: nunca se informa à parte.
+- **Cotação diária** (`CurrencyRateService`, rotina `cotacoes-moedas` 03:00, antes da foto mensal das 03:30): grava `currency_rates` (uma por moeda por dia, `upsert`) e refaz o valor em reais com **uma `UPDATE` por moeda** (nada de carregar os ativos; derruba o cache do painel de cada perfil afetado). O arredondamento é o mesmo do cadastro (`toBrl` soma meio centavo antes de cortar), para o valor não mudar um centavo só por ser recalculado. Se todas as fontes falharem, ficam as cotações de ontem e o `cerne:check` avisa depois de 3 dias.
+- **Filtro "Em reais / Por moeda"** no painel (`Dashboard::exibir`, lembrado na sessão) e no resumo de Investimentos (`currencyView`): `CurrencyBreakdown` e `<x-currency-breakdown>`. Só aparece para quem tem algo em USDT, BTC ou ETH. USDT mostra 2 casas (como dólar), BTC e ETH 8 (`Money::native`).
+- **Carga da Onil** (`OnilPositionsImporter`, `cerne:import-onil`, simulação antes de `--apply`): um investimento por moeda com saldo + saque em processamento, instituição "Onil", chave `external_asset_id = onil:{id}:{moeda}` (rodar de novo atualiza e desativa quem zerou). Cliente sem conta é cadastrado por `ClientOnboardingService::createManagedClient` (senha aleatória, **sem e-mail e sem marcar o e-mail como verificado**; a pessoa entra pelo "esqueci a senha"). Conta existente **sem vínculo ativo não é vinculada**: o vínculo depende da autorização dela. Nunca toca no que foi cadastrado à mão. `--merge=origem:destino` soma uma conta em outra (ex.: a empresa na conta do sócio).
 
 ### Recebimentos do profissional (consultor e corretor)
 

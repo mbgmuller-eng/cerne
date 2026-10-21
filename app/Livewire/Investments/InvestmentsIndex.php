@@ -21,6 +21,7 @@ use App\Models\InvestmentTransaction;
 use App\Models\InvestorProfile;
 use App\Models\ProfileMember;
 use App\Models\RecommendedAllocation;
+use App\Services\CurrencyRateService;
 use App\Services\InvestmentPerformanceService;
 use App\Services\InvestmentTransactionService;
 use App\Support\Money;
@@ -53,6 +54,9 @@ class InvestmentsIndex extends Component
 
     #[Url]
     public string $tab = 'portfolio';
+
+    /** 'reais' (tudo convertido) ou 'moedas' (dividido em reais, USDT, BTC e ETH): o filtro do resumo do topo. */
+    public string $currencyView = 'reais';
 
     // -----------------------------------------------------------------
     // Evolução do patrimônio (aba Performance) — lente do gráfico
@@ -117,6 +121,9 @@ class InvestmentsIndex extends Component
     public bool $investmentIsPrivate = false;
 
     public string $investmentCurrentAmount = '';
+
+    /** Quantidade na moeda de origem (USDT, BTC ou ETH): o valor em reais é essa quantidade vezes a cotação do dia. */
+    public string $investmentNativeAmount = '';
 
     /** Só usado ao editar — o dia em que o valor atual informado foi conferido (atualiza a foto do mês). */
     public string $investmentValueDate = '';
@@ -515,6 +522,7 @@ class InvestmentsIndex extends Component
         $this->investmentIsPrivate = $investimento->is_private;
         $this->investmentHasPosition = $investimento->hasPosition();
         $this->investmentCurrentAmount = $investimento->current_amount;
+        $this->investmentNativeAmount = (string) $investimento->native_amount;
         $this->investmentValueDate = CarbonImmutable::now()->toDateString();
         $this->investmentInvestedAmount = (string) $investimento->invested_amount;
         $this->investmentPurchaseDate = $investimento->purchase_date?->toDateString() ?? '';
@@ -541,6 +549,7 @@ class InvestmentsIndex extends Component
     {
         $editando = $this->editingInvestmentId !== null;
         $comCotas = ! $editando && $this->investmentAssetClass !== '' && (AssetClass::tryFrom($this->investmentAssetClass)?->hasQuantity() ?? false);
+        $estrangeira = AssetClass::tryFrom($this->investmentAssetClass)?->isForeignCurrency() ?? false;
 
         $data = $this->validate([
             'investmentName' => ['required', 'string', 'max:255'],
@@ -555,7 +564,8 @@ class InvestmentsIndex extends Component
             'investmentInstitution' => ['nullable', 'string', 'max:255'],
             'investmentQuantity' => [$comCotas ? 'required' : 'nullable', 'numeric', 'gt:0'],
             'investmentUnitPrice' => [$comCotas ? 'required' : 'nullable', 'numeric', 'gt:0'],
-            'investmentCurrentAmount' => [$comCotas ? 'nullable' : 'required', 'numeric', 'gte:0'],
+            'investmentCurrentAmount' => [$comCotas || $estrangeira ? 'nullable' : 'required', 'numeric', 'gte:0'],
+            'investmentNativeAmount' => [$estrangeira ? 'required' : 'nullable', 'numeric', 'gte:0'],
             'investmentValueDate' => [$editando ? 'required' : 'nullable', 'date', 'before_or_equal:today'],
             'investmentInvestedAmount' => ['nullable', 'numeric', 'gte:0'],
             'investmentPurchaseDate' => ['nullable', 'date'],
@@ -567,6 +577,7 @@ class InvestmentsIndex extends Component
             'investmentQuantity' => 'quantidade',
             'investmentUnitPrice' => 'preço unitário',
             'investmentCurrentAmount' => 'valor atual',
+            'investmentNativeAmount' => 'quantidade',
             'investmentValueDate' => 'data deste valor',
         ]);
 
@@ -589,20 +600,26 @@ class InvestmentsIndex extends Component
             'is_private' => $this->investmentIsPrivate,
         ];
 
+        // USDT, BTC e ETH: o que se digita é a quantidade; o valor em reais sai da cotação do dia.
+        $nativo = $estrangeira ? bcadd((string) $data['investmentNativeAmount'], '0', 10) : null;
+        $valorEmReais = $estrangeira ? $this->valorEmReais($nativo, $classe) : null;
+
         if ($editando) {
-            $valorAtual = Money::parse($data['investmentCurrentAmount']);
+            $valorAtual = $valorEmReais ?? Money::parse($data['investmentCurrentAmount']);
             $registro = InvestmentRecord::findOrFail($this->editingInvestmentId);
             $dataValor = CarbonImmutable::parse($data['investmentValueDate']);
             $temPosicao = $registro->hasPosition();
 
             $registro->update($base + ['current_amount' => $valorAtual] + (
-                $temPosicao
+                $estrangeira
+                    ? ['native_amount' => $nativo]
+                    : ($temPosicao
                     // Ativo com cotas: o custo vem das compras (não se digita) e a cotação passa a ser o valor
                     // digitado dividido pelas cotas, para o valor e a cotação nunca discordarem.
                     ? ['current_price' => bcdiv($valorAtual, (string) $registro->quantity, 6), 'price_date' => $dataValor->toDateString()]
                     : ['invested_amount' => $data['investmentInvestedAmount'] !== null && $data['investmentInvestedAmount'] !== ''
                         ? Money::parse($data['investmentInvestedAmount'])
-                        : $valorAtual]
+                        : $valorAtual])
             ));
 
             // Mesma "foto mensal" que InvestmentSnapshotService::captureMonth()
@@ -638,6 +655,12 @@ class InvestmentsIndex extends Component
                 $informouValor ? bcdiv($valorAtual, (string) $data['investmentQuantity'], 6) : (string) $data['investmentUnitPrice'],
                 $informouValor ? CarbonImmutable::today() : ($dataCompra ?? CarbonImmutable::today()),
             );
+        } elseif ($estrangeira) {
+            InvestmentRecord::create($base + [
+                'native_amount' => $nativo,
+                'current_amount' => $valorEmReais,
+                'created_by_user_id' => auth()->id(),
+            ]);
         } else {
             InvestmentRecord::create($base + [
                 'current_amount' => Money::parse($data['investmentCurrentAmount']),
@@ -653,11 +676,23 @@ class InvestmentsIndex extends Component
         $this->resetInvestmentForm();
     }
 
+    /** O valor em reais de uma quantidade em USDT, BTC ou ETH, pela cotação mais recente. */
+    private function valorEmReais(string $quantidade, AssetClass $classe): string
+    {
+        $valor = app(CurrencyRateService::class)->toBrl($quantidade, $classe->currency());
+
+        if ($valor === null) {
+            throw ValidationException::withMessages(['investmentNativeAmount' => 'Ainda não há cotação de '.$classe->currency().'. Tente de novo em alguns instantes.']);
+        }
+
+        return $valor;
+    }
+
     private function resetInvestmentForm(): void
     {
         $this->reset(
             'editingInvestmentId', 'investmentName', 'investmentTicker', 'investmentAssetClass', 'investmentReserveType', 'investmentInstitution',
-            'investmentMemberId', 'investmentIsPrivate', 'investmentCurrentAmount', 'investmentValueDate', 'investmentInvestedAmount',
+            'investmentMemberId', 'investmentIsPrivate', 'investmentCurrentAmount', 'investmentNativeAmount', 'investmentValueDate', 'investmentInvestedAmount',
             'investmentQuantity', 'investmentUnitPrice', 'investmentPurchaseDate', 'investmentReturnRate', 'investmentHasPosition',
         );
         $this->resetErrorBag();

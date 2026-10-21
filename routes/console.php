@@ -64,6 +64,13 @@ Schedule::call(function (): void {
     logger()->info('Faturas', $resultado);
 })->dailyAt('03:20')->name('faturas')->withoutOverlapping();
 
+// Cotação de USDT, BTC e ETH em reais e novo valor dos investimentos nessas moedas. Roda antes da foto mensal (03:30), que lê esse valor.
+Schedule::call(function (): void {
+    $r = app(\App\Services\CurrencyRateService::class)->update();
+
+    logger()->info('Cotações de moedas', $r ?? ['falhou' => true]);
+})->dailyAt('03:00')->name('cotacoes-moedas')->withoutOverlapping();
+
 // Investimentos: foto mensal da carteira, no dia 1.
 Schedule::call(function (): void {
     $criadas = app(InvestmentSnapshotService::class)->captureMonth();

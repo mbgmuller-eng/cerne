@@ -16,11 +16,33 @@
     </div>
 
     {{-- Totais -------------------------------------------------------- --}}
+    @php
+        $linhasMoeda = \App\Support\CurrencyBreakdown::rows($this->investments->groupBy('currency')->map(fn ($g, $moeda) => [
+            'currency' => (string) $moeda, 'brl' => Money::sum($g->pluck('current_amount')), 'native' => $moeda === 'BRL' ? null : $g->reduce(fn ($c, $i) => bcadd($c, (string) $i->native_amount, 10), '0'),
+        ])->values());
+        $temMoeda = \App\Support\CurrencyBreakdown::hasForeign($linhasMoeda);
+        $porMoeda = $temMoeda && $currencyView === 'moedas';
+    @endphp
     <div class="grid gap-4 sm:grid-cols-3">
-        <div class="card p-5">
-            <p class="eyebrow">Patrimônio investido</p>
-            <p class="figure mt-2 text-2xl font-medium text-brand-800 dark:text-brand-300">{{ Money::format($total) }}</p>
+        <div class="card p-5 {{ $porMoeda ? 'sm:col-span-3' : '' }}">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+                <p class="eyebrow">Patrimônio investido</p>
+
+                @if ($temMoeda)
+                    <div class="inline-flex rounded-lg bg-slate-100 p-0.5 text-xs dark:bg-white/10" role="group" aria-label="Mostrar patrimônio">
+                        <button type="button" wire:click="$set('currencyView', 'reais')" class="rounded-md px-3 py-1 {{ ! $porMoeda ? 'bg-white text-slate-900 shadow-sm dark:bg-slate-700 dark:text-white' : 'text-slate-500 dark:text-slate-400' }}">Em reais</button>
+                        <button type="button" wire:click="$set('currencyView', 'moedas')" class="rounded-md px-3 py-1 {{ $porMoeda ? 'bg-white text-slate-900 shadow-sm dark:bg-slate-700 dark:text-white' : 'text-slate-500 dark:text-slate-400' }}">Por moeda</button>
+                    </div>
+                @endif
+            </div>
+            @if ($porMoeda)
+                <x-currency-breakdown :rows="$linhasMoeda" tone="light" class="mt-3" />
+                <p class="mt-3 text-xs text-slate-400">Tudo em reais: {{ Money::format($total) }}</p>
+            @else
+                <p class="figure mt-2 text-2xl font-medium text-brand-800 dark:text-brand-300">{{ Money::format($total) }}</p>
+            @endif
         </div>
+        @if (! $porMoeda)
         <div class="card p-5">
             <p class="eyebrow">Custo de aquisição</p>
             <p class="figure mt-2 text-2xl font-medium text-slate-700 dark:text-slate-300">{{ Money::format($totalInvested) }}</p>
@@ -45,6 +67,7 @@
                 </p>
             @endif
         </div>
+        @endif
     </div>
 
     {{-- Abas ---------------------------------------------------------- --}}
@@ -80,6 +103,10 @@
             // Editar nunca mostra os campos de cota, mesmo pra um ativo
             // que nasceu com elas — ver InvestmentsIndex::saveInvestment().
             $comCotas = ! $editingInvestmentId && $investmentAssetClass !== '' && AssetClass::tryFrom($investmentAssetClass)?->hasQuantity();
+            // USDT, BTC e ETH: digita-se a quantidade na moeda; o valor em reais vem da cotação do dia.
+            $moedaDoForm = $investmentAssetClass !== '' ? AssetClass::tryFrom($investmentAssetClass) : null;
+            $estrangeira = $moedaDoForm?->isForeignCurrency() ?? false;
+            $cotacaoDoForm = $estrangeira ? app(\App\Services\CurrencyRateService::class)->latest($moedaDoForm->currency()) : null;
         @endphp
         <x-modal wire-model="showInvestmentForm">
             <form wire:submit="saveInvestment" class="space-y-4">
@@ -168,6 +195,19 @@
                         <div wire:key="investment-field-current-amount-cotas">
                             <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Valor atual de mercado</label>
                             <input type="number" step="0.01" min="0" wire:model="investmentCurrentAmount" class="input mt-1.5" placeholder="Se vazio, usa qtd. x preço">
+                        </div>
+                    @elseif ($estrangeira)
+                        <div wire:key="investment-field-native-amount" class="@sm:col-span-2">
+                            <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Quantidade em {{ $moedaDoForm->currency() }}</label>
+                            <input type="number" step="0.0000000001" min="0" wire:model="investmentNativeAmount" class="input mt-1.5" placeholder="{{ $moedaDoForm->currency() === 'USDT' ? '0,00' : '0,00000000' }}">
+                            <p class="mt-1 text-xs text-slate-400">
+                                @if ($cotacaoDoForm)
+                                    O valor em reais é calculado pela cotação do dia (1 {{ $moedaDoForm->currency() }} = {{ Money::format($cotacaoDoForm) }}) e se atualiza todo dia.
+                                @else
+                                    Ainda não há cotação de {{ $moedaDoForm->currency() }}; ela é buscada todo dia às 03:00.
+                                @endif
+                            </p>
+                            @error('investmentNativeAmount') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
                         </div>
                     @else
                         <div wire:key="investment-field-current-amount-plain">
@@ -474,7 +514,12 @@
                                 </div>
 
                                 <div class="shrink-0 text-right">
-                                    <p class="text-sm tabular-nums text-slate-800 dark:text-slate-200">{{ Money::format($ativo->current_amount) }}</p>
+                                    @if ($ativo->native_amount !== null && $ativo->currency !== 'BRL')
+                                        <p class="text-sm tabular-nums text-slate-800 dark:text-slate-200">{{ Money::native($ativo->native_amount, $ativo->currency) }}</p>
+                                        <p class="text-xs tabular-nums text-slate-400">≈ {{ Money::format($ativo->current_amount) }}</p>
+                                    @else
+                                        <p class="text-sm tabular-nums text-slate-800 dark:text-slate-200">{{ Money::format($ativo->current_amount) }}</p>
+                                    @endif
                                     @php $crescimento = $growthPercentages[$ativo->id] ?? ['pct' => null, 'ganho' => null]; @endphp
                                     @if ($crescimento['ganho'] !== null)
                                         <p class="text-xs tabular-nums {{ (float) $crescimento['ganho'] < 0 ? 'text-slate-500 dark:text-slate-400' : 'text-accent-700 dark:text-accent-400' }}">

@@ -16,6 +16,15 @@ use Livewire\Component;
 #[Layout('components.layouts.app')]
 class Dashboard extends Component
 {
+    /** 'reais' (tudo convertido) ou 'moedas' (dividido em reais, USDT, BTC e ETH). Lembrado na sessão. */
+    public string $exibicao = 'reais';
+
+    public function exibir(string $modo): void
+    {
+        $this->exibicao = $modo === 'moedas' ? 'moedas' : 'reais';
+        session(['dashboard_exibicao' => $this->exibicao]);
+    }
+
     /**
      * Consultor sem cliente aberto cai na Carteira, não numa tela vazia —
      * "escolher um cliente" agora só acontece pela aba Clientes. Um cliente
@@ -24,6 +33,8 @@ class Dashboard extends Component
      */
     public function mount(): void
     {
+        $this->exibicao = session('dashboard_exibicao') === 'moedas' ? 'moedas' : 'reais';
+
         if (app(ProfileContext::class)->profile() === null) {
             if (auth()->user()?->isConsultant()) {
                 $this->redirect(route('consultant.portfolio'));

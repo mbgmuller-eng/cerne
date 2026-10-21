@@ -25,7 +25,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 #[Fillable([
     'profile_id', 'member_id', 'sector', 'asset_class', 'reserve_type', 'ticker', 'name', 'institution',
-    'current_amount', 'invested_amount', 'average_price', 'quantity', 'current_price', 'price_date', 'purchase_date',
+    'currency', 'native_amount', 'current_amount', 'invested_amount', 'average_price', 'quantity', 'current_price', 'price_date', 'purchase_date',
     'maturity_date', 'return_rate', 'return_rate_type', 'broker_account_id', 'source',
     'external_asset_id', 'is_locked_by_sync', 'is_active', 'notes', 'source_document_id',
     'created_by_user_id', 'is_private',
@@ -43,6 +43,7 @@ class InvestmentRecord extends Model
             'return_rate_type' => ReturnRateType::class,
             'source' => RecordSource::class,
             'current_amount' => 'decimal:2',
+            'native_amount' => 'decimal:10',
             'invested_amount' => 'decimal:2',
             'average_price' => 'decimal:6',
             'quantity' => 'decimal:6',
@@ -54,6 +55,20 @@ class InvestmentRecord extends Model
             'is_active' => 'boolean',
             'is_private' => 'boolean',
         ];
+    }
+
+    protected static function booted(): void
+    {
+        // A moeda é consequência da classe do ativo (USDT, BTC, ETH ou real): nunca se informa à parte, para os dois não divergirem.
+        static::saving(function (self $registro): void {
+            $registro->currency = $registro->asset_class?->currency() ?? 'BRL';
+        });
+    }
+
+    /** Guardado em USDT, BTC ou ETH: `native_amount` é a quantidade e `current_amount` o valor do dia em reais. */
+    public function isForeignCurrency(): bool
+    {
+        return $this->asset_class?->isForeignCurrency() ?? false;
     }
 
     public function member(): BelongsTo

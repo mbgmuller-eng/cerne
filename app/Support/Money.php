@@ -23,6 +23,21 @@ final class Money
     }
 
     /**
+     * Quantidade em uma moeda que não é o real: USDT com 2 casas (como dólar), BTC e ETH com 8 (a precisão da corretora).
+     * "1039.2" USDT => "USDT 1.039,20"; "0.05216887" BTC => "BTC 0,05216887".
+     */
+    public static function native(string|int|float|null $value, string $currency): string
+    {
+        $casas = in_array($currency, ['BTC', 'ETH'], true) ? 8 : 2;
+
+        if ($currency === 'BRL') {
+            return self::format($value);
+        }
+
+        return $currency.' '.number_format((float) ($value ?? 0), $casas, ',', '.');
+    }
+
+    /**
      * Versão curta para gráficos e cards, onde o valor cheio não cabe.
      * "1234567.89" => "R$ 1,2 mi"
      */
