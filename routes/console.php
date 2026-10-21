@@ -220,6 +220,21 @@ Schedule::call(function (): void {
     logger()->info('Revisão de treino', ['avisados' => $enviados]);
 })->dailyAt('09:00')->name('academia-revisao-de-treino')->withoutOverlapping();
 
+// Privacidade: exclui as contas cuja carência de 7 dias (pedida em Minha conta) acabou. Idempotente: a conta apagada some da consulta; uma que falhe
+// (ex.: a Asaas não cancelou a cobrança) fica para a próxima rodada e vai para o acompanhamento de erros.
+Schedule::call(function (): void {
+    $apagadas = app(\App\Services\Privacy\DataRetentionService::class)->deleteDueAccounts();
+
+    logger()->info('Exclusão de contas', ['apagadas' => $apagadas]);
+})->dailyAt('04:20')->name('exclusao-de-contas')->withoutOverlapping();
+
+// Privacidade: política de retenção (cópias de dados vencidas, registros antigos, arquivos órfãos). Idempotente: só apaga o que já passou do prazo.
+Schedule::call(function (): void {
+    $resultado = app(\App\Services\Privacy\DataRetentionService::class)->purge();
+
+    logger()->info('Retenção de dados', $resultado);
+})->dailyAt('04:30')->name('retencao-de-dados')->withoutOverlapping();
+
 // Leads: anexos de contatos perdidos há mais do prazo de retenção saem do servidor.
 // Idempotente: o que já foi apagado não aparece de novo.
 Schedule::command('cerne:purge-lead-files')->dailyAt('04:10')->name('anexos-de-leads')->withoutOverlapping();

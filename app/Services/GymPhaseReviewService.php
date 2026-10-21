@@ -176,7 +176,7 @@ class GymPhaseReviewService
                 $usuario = $membro?->user;
                 $perfil = $membro?->profile;
 
-                if ($usuario === null || $perfil === null || ! $direitos->profileHasModule($perfil, PlatformModule::Saude)) {
+                if ($usuario === null || $perfil === null || ! $usuario->hasCurrentHealthConsent() || ! $direitos->profileHasModule($perfil, PlatformModule::Saude)) {
                     continue;
                 }
 

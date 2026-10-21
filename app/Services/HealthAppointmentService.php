@@ -112,7 +112,8 @@ class HealthAppointmentService
             ->chunkById(200, function (Collection $consultas) use (&$notificados): void {
                 foreach ($consultas as $consulta) {
                     foreach ($this->recipientsFor($consulta) as $user) {
-                        if ($this->alreadyNotifiedToday($user, $consulta->id)) {
+                        // Sem o consentimento de saúde (ou depois de revogá-lo) não se trata dado de saúde, nem para avisar.
+                        if (! $user->hasCurrentHealthConsent() || $this->alreadyNotifiedToday($user, $consulta->id)) {
                             continue;
                         }
 

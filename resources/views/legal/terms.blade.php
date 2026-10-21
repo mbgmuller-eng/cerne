@@ -4,8 +4,8 @@
             Rascunho: este texto ainda não passou por revisão jurídica. Não é a versão final.
         </div>
 
-        <h1 class="font-display text-3xl font-semibold tracking-tight text-slate-900 dark:text-white">Termos de Uso e Privacidade</h1>
-        <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">Última atualização: {{ now()->translatedFormat('d \d\e F \d\e Y') }}</p>
+        <h1 class="font-display text-3xl font-semibold tracking-tight text-slate-900 dark:text-white">Termos de Uso</h1>
+        <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">Versão de {{ \Carbon\CarbonImmutable::parse(config('cerne.legal.terms_version'))->translatedFormat('d \d\e F \d\e Y') }}. O tratamento dos seus dados está na <a href="{{ route('legal.privacy') }}" class="underline">Política de Privacidade</a>.</p>
 
         <div class="mt-8 space-y-6 text-sm leading-relaxed text-slate-700 dark:text-slate-300">
             <section>
@@ -47,16 +47,16 @@
                     Coletamos os dados necessários para prestar o serviço (identificação, dados financeiros e de saúde
                     que você cadastra, e, para quem assina, nome completo, CPF/CNPJ, data de nascimento e endereço, usados
                     para emitir a cobrança e a nota fiscal, como exige a lei). Esses dados não são compartilhados com
-                    terceiros além dos processadores necessários à operação (ex.: Asaas, para cobrança e emissão de nota fiscal). Dados de saúde
-                    nunca são visíveis a consultores ou corretores vinculados.
+                    terceiros além dos processadores necessários à operação, descritos na Política de Privacidade. Dados de saúde
+                    só são tratados com o seu consentimento específico e nunca são visíveis a consultores ou corretores vinculados.
                 </p>
             </section>
 
             <section>
                 <h2 class="font-display text-lg font-semibold text-slate-900 dark:text-white">5. Cancelamento e exclusão de conta</h2>
                 <p class="mt-2">
-                    Você pode solicitar a exclusão da sua conta e dos seus dados a qualquer momento, pelos canais de
-                    contato abaixo.
+                    Você pode baixar uma cópia dos seus dados e excluir a sua conta a qualquer momento em Minha conta. A exclusão
+                    apaga os dados e os arquivos ligados a ela e cancela a assinatura, com 7 dias de carência para desistir.
                 </p>
             </section>
 

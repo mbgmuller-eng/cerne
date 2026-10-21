@@ -11,7 +11,10 @@ use App\Models\CurrencyRate;
 use App\Models\ConsultantClient;
 use App\Models\ConsultantInvite;
 use App\Models\DebtCommission;
+use App\Models\DataExport;
 use App\Models\ErrorLog;
+use App\Models\ImpersonationLog;
+use App\Models\SecurityIncident;
 use App\Models\EngagementPlanTemplate;
 use App\Models\EngagementReminder;
 use App\Models\FeeAgreement;
@@ -78,6 +81,11 @@ class TenancyCoverageTest extends TestCase
         AssetFeeAgreement::class => 'percentual sobre patrimônio que o consultor cobra de um cliente (professional_id) — mesmo sigilo de IncomeEntry; o profile_id aponta o cliente, não isola o dado',
         DebtCommission::class => 'liga o consultor a um consórcio de cliente em que ele tem comissão (professional_id) — sigiloso; o consórcio em si segue isolado por perfil',
         FeeAgreement::class => 'honorário que o profissional combinou com um cliente (professional_id) — mesmo sigilo de IncomeEntry; o profile_id aponta o cliente, não isola o dado',
+
+        // Privacidade (LGPD): registros da plataforma sobre a conta do usuário, sem perfil.
+        DataExport::class => 'cópia dos dados pedida pelo próprio usuário (user_id) — pertence à conta, não a um perfil; o download confere o dono',
+        ImpersonationLog::class => 'registro de quando um administrador entrou em uma conta (admin_id, target_user_id) — só o administrador lê e sobrevive à conta, por isso não tem perfil',
+        SecurityIncident::class => 'registro de incidente de segurança da plataforma — só o administrador lê; não pertence a um perfil',
 
         // Operação da plataforma, só do administrador.
         ErrorLog::class => 'erro da plataforma agrupado por classe, arquivo e linha — acompanhamento técnico que só o administrador lê; de propósito não guarda dado de cliente nem perfil (mensagem limpa, rota em padrão, usuário só por id)',

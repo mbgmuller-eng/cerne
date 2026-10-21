@@ -66,6 +66,7 @@ Route::get('/manifest.webmanifest', [PwaController::class, 'manifest'])->name('p
 Route::get('/', fn () => Auth::check() ? redirect()->route('dashboard') : view('landing'))->name('home');
 
 Route::view('/termos', 'legal.terms')->name('legal.terms');
+Route::view('/privacidade', 'legal.privacy')->name('legal.privacy');
 
 // Página pública pra consultor, corretor e (em breve) profissional de saúde.
 // A landing em / é só pro usuário final.
@@ -134,6 +135,13 @@ Route::middleware('auth')->group(function (): void {
     // quem se cadastrou e ainda não confirmou fica preso sem conseguir
     // nem deslogar (o "verified" do grupo abaixo bloquearia isto também).
     Route::post('/sair', [LoginController::class, 'destroy'])->name('logout');
+
+    // Aceite da versão atual dos Termos e da Política (ver RequiresCurrentTerms) e consentimento específico de saúde (RequiresHealthConsent).
+    Route::get('/aceite-dos-termos', [\App\Http\Controllers\LegalAcceptanceController::class, 'showTerms'])->name('legal.accept');
+    Route::post('/aceite-dos-termos', [\App\Http\Controllers\LegalAcceptanceController::class, 'storeTerms'])->name('legal.accept.store');
+    Route::get('/saude/consentimento', [\App\Http\Controllers\LegalAcceptanceController::class, 'showHealth'])->name('health.consent');
+    Route::post('/saude/consentimento', [\App\Http\Controllers\LegalAcceptanceController::class, 'storeHealth'])->name('health.consent.store');
+    Route::post('/saude/consentimento/revogar', [\App\Http\Controllers\LegalAcceptanceController::class, 'revokeHealth'])->name('health.consent.revoke');
 });
 
 /*
@@ -144,10 +152,11 @@ Route::middleware('auth')->group(function (): void {
 | carimbado (ClientOnboardingService/ProfessionalOnboardingService), não
 | muda de comportamento pra ela.
 */
-Route::middleware(['auth', 'verified'])->group(function (): void {
+Route::middleware(['auth', 'verified', 'termos'])->group(function (): void {
     // Fora do bloqueio por assinatura: o necessário para pagar e para sair
     // (ver RequiresActiveSubscription).
     Route::get('/minha-conta', MyAccount::class)->name('my-account');
+    Route::get('/minha-conta/dados/{export}', [\App\Http\Controllers\PrivacyExportController::class, 'download'])->middleware('signed')->name('privacy.export.download');
     Route::get('/assinatura', SubscriptionIndex::class)->name('subscription.index');
     Route::post('/preferencias/tema', [ThemePreferenceController::class, 'store'])->name('theme.update');
     Route::post('/preferencias/push', [PushSubscriptionController::class, 'store'])->name('push.subscribe');
@@ -188,8 +197,12 @@ Route::middleware(['auth', 'verified'])->group(function (): void {
         Route::get('/documentos', DocumentVaultIndex::class)->name('documents.vault.index');
         Route::get('/documentos/{document}/arquivo', [DocumentFileController::class, 'show'])->name('documents.vault.file');
 
+        // Catálogo compartilhado: não é dado pessoal, não passa por RequiresPersonalHealth nem pede consentimento — qualquer autenticado pode ver.
+        Route::get('/saude/academia/catalogo/{exercise}/imagem', [GymExerciseCatalogImageController::class, 'show'])->name('health.gym.catalog-image');
+
         // Saúde pessoal: só o dono abre (RequiresPersonalHealth) — consultor
-        // e corretor levam 403 mesmo com o cliente aberto.
+        // e corretor levam 403 mesmo com o cliente aberto — e só depois do consentimento específico (RequiresHealthConsent).
+        Route::middleware('consentimento-saude')->group(function (): void {
         Route::get('/saude/academia', GymHome::class)->name('health.gym.index');
         Route::get('/saude/academia/plano', GymPlanEditor::class)->name('health.gym.plan');
         Route::get('/saude/academia/treino-automatico', GymPlanGenerator::class)->name('health.gym.generate');
@@ -202,9 +215,6 @@ Route::middleware(['auth', 'verified'])->group(function (): void {
         Route::get('/saude/academia/relatorio', GymReport::class)->name('health.gym.report');
         Route::get('/saude/academia/exercicio/{exercise}', GymExerciseHistory::class)->name('health.gym.exercise');
         Route::get('/saude/academia/exercicios/{exercise}/imagem', [GymExerciseImageController::class, 'show'])->name('health.gym.exercise-image');
-        // Catálogo compartilhado: não é dado pessoal, não passa por RequiresPersonalHealth — qualquer autenticado pode ver.
-        Route::get('/saude/academia/catalogo/{exercise}/imagem', [GymExerciseCatalogImageController::class, 'show'])->name('health.gym.catalog-image');
-
         // Ficha de saúde: visível aos DOIS do casal (CoupleHealthScope) —
         // diferente da Academia, mas com o mesmo bloqueio a consultor/corretor.
         Route::get('/saude/ficha', HealthCardIndex::class)->name('health.card.index');
@@ -214,6 +224,7 @@ Route::middleware(['auth', 'verified'])->group(function (): void {
         // Evento para a agenda da pessoa (.ics); mesma restrição das telas de onde sai.
         Route::get('/saude/agenda/{appointment}/evento.ics', [HealthCalendarController::class, 'appointment'])->name('health.appointments.ics');
         Route::get('/saude/cuidados/{item}/evento.ics', [HealthCalendarController::class, 'careItem'])->name('health.care.ics');
+        });
         Route::get('/importar', DocumentsIndex::class)->name('documents.index');
         Route::get('/regras-de-categorizacao', CategorizationRulesIndex::class)->name('categorization-rules.index');
         Route::get('/contas', AccountsIndex::class)->name('accounts.index');
@@ -241,5 +252,7 @@ Route::middleware(['auth', 'verified'])->group(function (): void {
         Route::get('/admin/seguradoras', AdminInsurers::class)->name('admin.insurers');
         Route::get('/admin/exercicios', AdminExercises::class)->name('admin.exercises');
         Route::get('/admin/erros', \App\Livewire\Admin\AdminErrors::class)->name('admin.errors');
+        Route::get('/admin/acessos', \App\Livewire\Admin\AdminAccessLog::class)->name('admin.access-log');
+        Route::get('/admin/incidentes', \App\Livewire\Admin\AdminIncidents::class)->name('admin.incidents');
     });
 });

@@ -192,7 +192,7 @@ class HealthCardIndex extends Component
                 'conditions' => HealthCondition::query()->where('member_id', $membro->id)->orderBy('created_at')->get(),
                 'medications' => HealthMedication::query()->where('member_id', $membro->id)
                     ->with('changes.changedBy')
-                    ->orderByDesc('is_active')->orderBy('name')->get(),
+                    ->orderByDesc('is_active')->get()->sortBy(fn (HealthMedication $m) => mb_strtolower((string) $m->name))->sortByDesc('is_active')->values(),
             ]];
         });
 

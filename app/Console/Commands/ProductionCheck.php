@@ -103,6 +103,14 @@ class ProductionCheck extends Command
         $this->item('Relatório diário de erros tem destinatário', app(\App\Services\ErrorTracking\ErrorDigest::class)->recipients() !== [],
             'Defina ERROR_REPORT_EMAILS ou cadastre um administrador da plataforma: sem destinatário o relatório das 08:10 não sai.', aviso: true);
 
+        $this->secao('Privacidade (LGPD)');
+        $this->item('Encarregado (DPO) com e-mail definido', filled(config('cerne.legal.dpo_email')),
+            'Defina CERNE_DPO_EMAIL (e CERNE_DPO_NAME): a Política de Privacidade precisa dizer a quem o titular recorre.', aviso: true);
+        $this->item('Controlador identificado', filled(config('cerne.legal.controller_name')),
+            'Defina CERNE_CONTROLLER_NAME (e CERNE_CONTROLLER_CNPJ): a Política de Privacidade precisa dizer quem é o responsável pelos dados.', aviso: true);
+        $this->item('Campos sensíveis cifrados no banco', \App\Console\Commands\EncryptSensitiveData::plaintextRows() === 0,
+            'Há linhas com CPF/CNPJ ou dado de saúde em texto puro. Rode php artisan cerne:encrypt-sensitive (antes com --dry-run).', aviso: true);
+
         $this->secao('Cache');
         $this->item('Configuração em cache', file_exists(base_path('bootstrap/cache/config.php')),
             'Sem cache o Laravel lê e analisa todos os arquivos de config a cada requisição.');

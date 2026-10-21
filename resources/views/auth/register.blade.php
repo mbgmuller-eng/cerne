@@ -79,7 +79,7 @@
 
             <label class="flex items-start gap-2.5 text-sm text-slate-600 dark:text-slate-400">
                 <input name="termos" type="checkbox" value="1" class="mt-0.5 h-4 w-4 rounded border-slate-300 text-brand-700 focus:ring-brand-500 dark:border-slate-600 dark:bg-slate-800">
-                <span>Li e aceito os <a href="{{ route('legal.terms') }}" target="_blank" class="text-brand-800 underline dark:text-brand-300">Termos de Uso</a>.</span>
+                <span>Li e aceito os <a href="{{ route('legal.terms') }}" target="_blank" class="text-brand-800 underline dark:text-brand-300">Termos de Uso</a> e a <a href="{{ route('legal.privacy') }}" target="_blank" class="text-brand-800 underline dark:text-brand-300">Política de Privacidade</a>.</span>
             </label>
             @error('termos')
                 <p class="text-sm text-red-700 dark:text-red-400">{{ $message }}</p>

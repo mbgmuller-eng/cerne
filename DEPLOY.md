@@ -305,6 +305,15 @@ ssh -p 65002 -i ~/.ssh/cerne_hostinger u165451165@89.117.7.59 "cd ~/cerne && php
 ssh -p 65002 -i ~/.ssh/cerne_hostinger u165451165@89.117.7.59 "cd ~/cerne && php artisan cerne:gym-catalog-link-images ~/mapping.json && rm -rf ~/gym-catalog-images ~/mapping.json"
 ```
 
+## Privacidade e LGPD (primeira publicação)
+
+1. No `.env` da produção, defina `CERNE_CONTROLLER_NAME`, `CERNE_CONTROLLER_CNPJ`, `CERNE_DPO_NAME` e `CERNE_DPO_EMAIL` (a Política de Privacidade mostra estes dados; o `cerne:check` avisa enquanto faltarem).
+2. Depois do `migrate`, cifre o que já estava gravado em texto puro: `php artisan cerne:encrypt-sensitive --dry-run` (conta) e em seguida `php artisan cerne:encrypt-sensitive`. É idempotente.
+3. **Guarde a `APP_KEY` no cofre de senhas, junto com o backup do banco.** Sem ela os campos cifrados não abrem.
+4. Todos os usuários vão ver a tela de aceite dos Termos e, ao abrir Saúde, a do consentimento. É esperado.
+5. O texto de `/privacidade` e `/termos` ainda é rascunho: leve a um advogado antes de divulgar.
+6. Plano de incidente: `INCIDENTES.md`. Registro em `/admin/incidentes`; acessos da equipe em `/admin/acessos`.
+
 ## Leads de seguros (rotinas e ajustes)
 
 - **Anexos:** ficam no disco privado (`cerne.lead_files`). `cerne:purge-lead-files` (diário, 04:10) apaga os de leads perdidos há mais de 12 meses.

@@ -498,6 +498,14 @@
                             <span class="badge ml-auto bg-red-50 text-red-800 ring-1 ring-red-200 dark:bg-red-500/10 dark:text-red-300 dark:ring-red-500/20">{{ $errosAbertos }}</span>
                         @endif
                     </a>
+                    <a href="{{ route('admin.access-log') }}" @class(['nav-item', 'nav-item-active' => request()->routeIs('admin.access-log')])>
+                        <x-nav-icon name="lock" />
+                        <span>Acessos</span>
+                    </a>
+                    <a href="{{ route('admin.incidents') }}" @class(['nav-item', 'nav-item-active' => request()->routeIs('admin.incidents')])>
+                        <x-nav-icon name="shield" />
+                        <span>Incidentes</span>
+                    </a>
                 </div>
 
                 <p class="mt-5 px-3 pb-1 text-[10px] font-semibold tracking-wide text-slate-400 uppercase dark:text-slate-500">Cadastros</p>

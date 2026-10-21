@@ -38,6 +38,12 @@ class UserFactory extends Factory
             // simplesmente ausente (null), mesmo a linha no banco estando 1/0.
             'notify_email_enabled' => true,
             'notify_push_enabled' => false,
+            // Conta de teste já aceitou a versão atual dos Termos e deu o consentimento de saúde: sem isso toda tela redirecionaria para a
+            // tela de aceite. Os testes do aceite usam withoutLegalConsent().
+            'terms_accepted_at' => now(),
+            'terms_version' => config('cerne.legal.terms_version'),
+            'health_consent_at' => now(),
+            'health_consent_version' => config('cerne.legal.health_consent_version'),
             'password' => static::$password ??= Hash::make('password'),
             'remember_token' => Str::random(10),
         ];
@@ -51,6 +57,12 @@ class UserFactory extends Factory
         return $this->state(fn (array $attributes) => [
             'email_verified_at' => null,
         ]);
+    }
+
+    /** Conta que ainda não aceitou os Termos nem deu o consentimento de saúde (a de antes da LGPD, ou a criada por carga). */
+    public function withoutLegalConsent(): static
+    {
+        return $this->state(fn () => ['terms_accepted_at' => null, 'terms_version' => null, 'health_consent_at' => null, 'health_consent_version' => null]);
     }
 
     public function consultant(): static

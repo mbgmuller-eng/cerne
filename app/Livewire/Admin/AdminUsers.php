@@ -6,6 +6,7 @@ use App\Enums\InviteStatus;
 use App\Enums\UserRole;
 use App\Models\ConsultantClient;
 use App\Models\ConsultantInvite;
+use App\Models\ImpersonationLog;
 use App\Models\FinancialProfile;
 use App\Models\ProfessionalInvite;
 use App\Models\User;
@@ -51,6 +52,11 @@ class AdminUsers extends Component
     public ?string $excluindoUserId = null;
 
     public string $confirmacaoExclusao = '';
+
+    /** Conta que o administrador quer acessar, enquanto ele escreve o motivo. */
+    public ?string $entrandoUserId = null;
+
+    public string $motivoAcesso = '';
 
     public function mount(): void
     {
@@ -205,7 +211,16 @@ class AdminUsers extends Component
         }
 
         $nome = $alvo->name;
-        $alvo->delete();
+
+        // Pelo serviço: cancela a cobrança e apaga também os arquivos do disco, que a cascata do banco não alcança.
+        try {
+            app(\App\Services\Privacy\AccountDeletionService::class)->delete($alvo, 'admin');
+        } catch (\Throwable $e) {
+            report($e);
+            $this->addError('confirmacaoExclusao', 'Não foi possível excluir agora (a cobrança não pôde ser cancelada ou houve um erro). Nada foi apagado; tente de novo.');
+
+            return;
+        }
 
         $this->excluindoUserId = null;
         $this->confirmacaoExclusao = '';
@@ -271,6 +286,25 @@ class AdminUsers extends Component
      * (personificar durante uma personificação continua guardando o
      * MESMO admin original).
      */
+    public function pedirEntrada(string $userId): void
+    {
+        $this->entrandoUserId = User::findOrFail($userId)->id;
+        $this->motivoAcesso = '';
+        $this->resetErrorBag();
+    }
+
+    public function cancelarEntrada(): void
+    {
+        $this->entrandoUserId = null;
+        $this->motivoAcesso = '';
+        $this->resetErrorBag();
+    }
+
+    /**
+     * Entra na sessão como outra conta, ou seja, vê tudo que a pessoa vê (inclusive dado de saúde): por isso o motivo é obrigatório e o acesso
+     * fica registrado (quem, em qual conta, quando e por quê, ver ImpersonationLog). Guarda quem começou, pra sempre voltar pra ele (ver
+     * ImpersonationController::stop()); nunca encadeia (personificar durante uma personificação continua guardando o MESMO admin original).
+     */
     public function entrarComo(string $userId): void
     {
         $alvo = User::findOrFail($userId);
@@ -281,9 +315,23 @@ class AdminUsers extends Component
             return;
         }
 
-        if (! session()->has('impersonator_id')) {
-            session(['impersonator_id' => auth()->id()]);
-        }
+        $this->validate(
+            ['motivoAcesso' => ['required', 'string', 'min:10', 'max:500']],
+            ['motivoAcesso.required' => 'Conte o motivo do acesso.', 'motivoAcesso.min' => 'Descreva o motivo com pelo menos 10 caracteres.'],
+            ['motivoAcesso' => 'motivo'],
+        );
+
+        $adminId = session('impersonator_id') ?? auth()->id();
+        $admin = User::findOrFail($adminId);
+
+        $registro = ImpersonationLog::create([
+            'admin_id' => $admin->id, 'admin_email' => $admin->email,
+            'target_user_id' => $alvo->id, 'target_name' => $alvo->name, 'target_email' => $alvo->email, 'target_role' => $alvo->role->value,
+            'reason' => trim($this->motivoAcesso), 'started_at' => now(),
+            'ip_address' => request()->ip(), 'user_agent' => mb_substr((string) request()->userAgent(), 0, 255),
+        ]);
+
+        session(['impersonator_id' => $adminId, 'impersonation_log_id' => $registro->id]);
 
         Auth::login($alvo);
 

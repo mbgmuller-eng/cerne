@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Casts\Sensitive;
 use App\Models\Concerns\BelongsToProfile;
 use App\Models\Concerns\IsCoupleHealthData;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -24,6 +25,11 @@ class HealthMedication extends Model
             'started_on' => 'date',
             'ended_on' => 'date',
             'is_active' => 'boolean',
+            'name' => Sensitive::class,
+            'dose' => Sensitive::class,
+            'schedule' => Sensitive::class,
+            'reason' => Sensitive::class,
+            'prescriber' => Sensitive::class,
         ];
     }
 

@@ -293,7 +293,7 @@ class AdminUsersTest extends TestCase
 
         $this->actingAs($admin);
 
-        Livewire::test(AdminUsers::class)->call('entrarComo', $cliente->id);
+        Livewire::test(AdminUsers::class)->set('motivoAcesso', 'Cliente pediu ajuda com a importação')->call('entrarComo', $cliente->id);
 
         $this->assertAuthenticatedAs($cliente);
         self::assertSame($admin->id, session('impersonator_id'));

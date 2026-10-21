@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Casts\Sensitive;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
@@ -28,6 +29,7 @@ class BillingDetail extends Model
     {
         return [
             'birth_date' => 'date',
+            'document' => Sensitive::class,
         ];
     }
 

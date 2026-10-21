@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Casts\Sensitive;
 use App\Enums\HealthAppointmentKind;
 use App\Models\Concerns\BelongsToProfile;
 use App\Models\Concerns\IsCoupleHealthData;
@@ -25,6 +26,10 @@ class HealthAppointment extends Model
         return [
             'kind' => HealthAppointmentKind::class,
             'scheduled_at' => 'datetime',
+            'title' => Sensitive::class,
+            'professional_name' => Sensitive::class,
+            'specialty' => Sensitive::class,
+            'notes' => Sensitive::class,
         ];
     }
 

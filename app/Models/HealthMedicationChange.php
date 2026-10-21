@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Casts\Sensitive;
 use App\Enums\HealthMedicationChangeType;
 use App\Models\Concerns\BelongsToProfile;
 use App\Models\Concerns\IsCoupleHealthData;
@@ -28,6 +29,9 @@ class HealthMedicationChange extends Model
     {
         return [
             'change_type' => HealthMedicationChangeType::class,
+            'old_value' => Sensitive::class,
+            'new_value' => Sensitive::class,
+            'note' => Sensitive::class,
         ];
     }
 

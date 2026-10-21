@@ -35,7 +35,11 @@ return Application::configure(basePath: dirname(__DIR__))
             ],
         );
 
-        $middleware->alias(['assinatura' => RequiresActiveSubscription::class]);
+        $middleware->alias([
+            'assinatura' => RequiresActiveSubscription::class,
+            'termos' => \App\Http\Middleware\RequiresCurrentTerms::class,
+            'consentimento-saude' => \App\Http\Middleware\RequiresHealthConsent::class,
+        ]);
 
         // Em toda resposta, inclusive as de erro. A hospedagem compartilhada
         // não dá acesso à configuração do Nginx, então os cabeçalhos saem

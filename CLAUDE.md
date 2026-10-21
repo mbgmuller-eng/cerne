@@ -130,6 +130,8 @@ Todas idempotentes (regra 4). O cron da Hostinger chama `schedule:run` a cada mi
 | `comissoes-de-consorcio` | 04:11 | refaz a previsão da comissão de consórcio dos consultores (percentual da carta nas parcelas combinadas) |
 | `academia-revisao-de-treino` | 09:00 | avisa (uma vez por fase, só o dono) que a fase de treino passou do ponto de troca (`GymPhaseReviewService::notifyDue`, livro `engagement_reminders` tipo `review_due`; monta e solta o `ProfileContext` de cada pessoa) |
 | `relatorio-de-erros` | 08:10 | e-mail com os erros do dia anterior (`cerne:error-report`, `ErrorDigest`; índice único `error_report_digests(sent_on)`), importa o arquivo de reserva e limpa o antigo |
+| `exclusao-de-contas` | 04:20 | apaga as contas cuja carência de 7 dias (pedida em Minha conta) venceu: `DataRetentionService::deleteDueAccounts` → `AccountDeletionService` (conta que falha, ex.: cobrança não cancelada, fica para a rodada seguinte) |
+| `retencao-de-dados` | 04:30 | apaga cópia de dados vencida (7 dias) e o PDF original de importação 90 dias depois de confirmado, descartado ou falho (`DataRetentionService::purge`) |
 | `anexos-de-leads` | 04:10 | apaga arquivos de leads perdidos há mais de 12 meses |
 | `leads-de-renovacao` | 07:30 | cria lead para apólice que vence (preferências em `users.renewal_lead_*`) |
 | `resumo-de-leads` | 08:00 | uma notificação por profissional com o que pede atenção nos leads |
@@ -175,6 +177,28 @@ continua). Regras que não se quebram:
 - **Relatório diário** (`cerne:error-report`, 08:10): cobre ontem, do mais frequente para o menos, com novos e reabertos em destaque; vai para `ERROR_REPORT_EMAILS` (vírgula) ou, sem isso, para os administradores da plataforma.
   Sai uma vez por dia (índice único); se o e-mail falha a reserva do dia é solta para a próxima rodada tentar de novo. Erro resolvido/ignorado some depois de 90 dias parado, aberto depois de 180.
 - **Tela** `/admin/erros` (`AdminErrors`, só administrador, `wire:poll.30s`): abertos, resolvidos, ignorados, busca, passo a passo e ações; o menu do administrador mostra quantos estão abertos.
+
+### Privacidade e LGPD
+
+Texto da política em `/privacidade` (rascunho, **sem revisão jurídica**), plano de incidente em `INCIDENTES.md`. Regras que não se quebram:
+
+- **Aceite versionado** (`config cerne.legal.terms_version`, `RequiresCurrentTerms`, grupo `termos` de toda rota autenticada): mudar o texto dos Termos ou da
+  Política exige subir a versão, e todo mundo aceita de novo no próximo acesso. Todo caminho que cria conta grava `terms_accepted_at` **e** `terms_version`.
+  A `UserFactory` já nasce aceitando; `->withoutLegalConsent()` simula a conta de antes.
+- **Saúde exige consentimento específico** (LGPD art. 11; `RequiresHealthConsent`, `users.health_consent_at/version`). Sem ele a área fecha e as rotinas de
+  aviso de saúde pulam a pessoa (`hasCurrentHealthConsent()`). Rota nova de Saúde entra no grupo `consentimento-saude`. Quem se passa por outro ("Entrar como") não é barrado.
+- **"Entrar como" tem motivo obrigatório e deixa registro** (`ImpersonationLog`, /admin/acessos): quem, quando, por quê, IP. O registro sobrevive à conta e
+  perde nome e e-mail dela na exclusão.
+- **Campo sensível é cifrado** (`App\Casts\Sensitive`, `APP_KEY`): CPF/CNPJ e o texto da ficha e da agenda de saúde. Lê cifrado ou texto puro (a troca não derruba tela),
+  grava sempre cifrado; `cerne:encrypt-sensitive [--dry-run]` cifra o que sobrou (lista em `EncryptSensitiveData::COLUMNS`). **Não dá para filtrar nem ordenar
+  por esses campos em SQL**: ordene em PHP. Campo sensível novo: cast + coluna `TEXT` + entrada em `COLUMNS`. Perder a `APP_KEY` é perder esses dados.
+- **Cópia dos dados** (`UserDataExporter`, `ExportUserDataJob`, `DataExport`): roda SOB o `ProfileContext` da pessoa, perfil a perfil, com todos os escopos ligados,
+  então o privado do cônjuge e a saúde alheia não saem. Zip em disco privado por 7 dias, link assinado **e** dono logado. Um pedido por dia.
+- **Exclusão da conta** (`AccountDeletionService`, nunca `$user->delete()` direto): cancela assinatura e débito na Asaas **antes** (se falhar, não apaga), apaga em
+  cascata, apaga o que não tem chave estrangeira (notificações, sessões, convites pelo e-mail...), apaga **os arquivos do disco** (que a cascata do banco não alcança)
+  só depois de o banco confirmar, e grava em `account_deletions` um registro sem dado pessoal. Em Minha conta tem carência de 7 dias, senha e e-mail digitado; titular
+  de perfil compartilhado confirma que o cônjuge perde o perfil. Cônjuge que não é titular só perde o login. Administrador da plataforma não se exclui por aqui.
+  **Tabela nova com dado do usuário sem chave estrangeira, ou disco novo com arquivo da pessoa: acrescente em `AccountDeletionService` e em `UserDataExporter`.**
 
 ### Investimento em outra moeda (USDT, BTC, ETH)
 

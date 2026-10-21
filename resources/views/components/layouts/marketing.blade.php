@@ -93,6 +93,8 @@
                 ·
                 <a href="{{ route('legal.terms') }}" class="underline hover:text-slate-700 dark:hover:text-slate-200">Termos de Uso</a>
                 ·
+                <a href="{{ route('legal.privacy') }}" class="underline hover:text-slate-700 dark:hover:text-slate-200">Política de Privacidade</a>
+                ·
                 <a href="{{ route('login') }}" class="underline hover:text-slate-700 dark:hover:text-slate-200">Minha conta</a>
             </p>
         </div>

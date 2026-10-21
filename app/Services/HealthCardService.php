@@ -119,7 +119,7 @@ class HealthCardService
             'card' => $card,
             'allergies' => HealthAllergy::query()->withoutGlobalScopes()->where('member_id', $membro->id)->orderBy('created_at')->get(),
             'conditions' => HealthCondition::query()->withoutGlobalScopes()->where('member_id', $membro->id)->orderBy('created_at')->get(),
-            'medications' => HealthMedication::query()->withoutGlobalScopes()->where('member_id', $membro->id)->where('is_active', true)->orderBy('name')->get(),
+            'medications' => HealthMedication::query()->withoutGlobalScopes()->where('member_id', $membro->id)->where('is_active', true)->get()->sortBy(fn (HealthMedication $m) => mb_strtolower((string) $m->name))->values(),
             'contacts' => ProfileMember::withoutGlobalScopes()
                 ->where('profile_id', $membro->profile_id)
                 ->where('is_active', true)

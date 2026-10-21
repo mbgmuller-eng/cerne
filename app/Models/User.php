@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Casts\Sensitive;
 use App\Enums\ThemePreference;
 use App\Enums\UserRole;
 use App\Notifications\VerifyEmailAddress;
@@ -20,7 +21,7 @@ use NotificationChannels\WebPush\HasPushSubscriptions;
 
 #[Fillable([
     'name', 'email', 'password', 'role', 'phone', 'birthdate', 'cpf_cnpj', 'asaas_customer_id', 'avatar_url', 'is_active', 'is_platform_admin', 'theme',
-    'agenda_layout', 'calendar_view', 'portfolio_prefs', 'notify_email_enabled', 'notify_push_enabled', 'gym_keep_awake', 'gym_vibrate', 'gym_sound', 'terms_accepted_at', 'renewal_lead_types', 'renewal_lead_days',
+    'agenda_layout', 'calendar_view', 'portfolio_prefs', 'notify_email_enabled', 'notify_push_enabled', 'gym_keep_awake', 'gym_vibrate', 'gym_sound', 'terms_accepted_at', 'terms_version', 'health_consent_at', 'health_consent_version', 'deletion_requested_at', 'deletion_due_at', 'renewal_lead_types', 'renewal_lead_days',
 ])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable implements MustVerifyEmail
@@ -36,6 +37,10 @@ class User extends Authenticatable implements MustVerifyEmail
         return [
             'email_verified_at' => 'datetime',
             'terms_accepted_at' => 'datetime',
+            'health_consent_at' => 'datetime',
+            'deletion_requested_at' => 'datetime',
+            'deletion_due_at' => 'datetime',
+            'cpf_cnpj' => Sensitive::class,
             'birthdate' => 'date',
             'last_login_at' => 'datetime',
             'password' => 'hashed',
@@ -108,6 +113,33 @@ class User extends Authenticatable implements MustVerifyEmail
      * tela de gestão de toda a plataforma por cima. Nasce sempre false;
      * vira true só via `php artisan cerne:tornar-admin`.
      */
+    /** Aceitou a versão atual dos Termos e da Política (ver config cerne.legal)? */
+    public function hasAcceptedCurrentTerms(): bool
+    {
+        return $this->terms_version === config('cerne.legal.terms_version') && $this->terms_accepted_at !== null;
+    }
+
+    public function acceptTerms(): void
+    {
+        $this->forceFill(['terms_accepted_at' => now(), 'terms_version' => config('cerne.legal.terms_version')])->save();
+    }
+
+    /** Deu o consentimento específico para dado de saúde (versão atual) e não o revogou? */
+    public function hasCurrentHealthConsent(): bool
+    {
+        return $this->health_consent_at !== null && $this->health_consent_version === config('cerne.legal.health_consent_version');
+    }
+
+    public function grantHealthConsent(): void
+    {
+        $this->forceFill(['health_consent_at' => now(), 'health_consent_version' => config('cerne.legal.health_consent_version')])->save();
+    }
+
+    public function revokeHealthConsent(): void
+    {
+        $this->forceFill(['health_consent_at' => null, 'health_consent_version' => null])->save();
+    }
+
     public function isPlatformAdmin(): bool
     {
         return (bool) $this->is_platform_admin;

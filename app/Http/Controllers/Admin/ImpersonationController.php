@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\ImpersonationLog;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Auth;
@@ -20,7 +21,13 @@ class ImpersonationController extends Controller
     public function stop(): RedirectResponse
     {
         $adminId = session('impersonator_id');
-        session()->forget('impersonator_id');
+        $registroId = session('impersonation_log_id');
+        session()->forget(['impersonator_id', 'impersonation_log_id']);
+
+        // Fecha o registro do acesso (se a sessão acabar sem passar por aqui, ele fica aberto e a tela de acessos mostra "em andamento").
+        if ($registroId !== null) {
+            ImpersonationLog::query()->whereKey($registroId)->whereNull('ended_at')->update(['ended_at' => now()]);
+        }
 
         if ($adminId !== null && ($admin = User::find($adminId)) !== null) {
             Auth::login($admin);

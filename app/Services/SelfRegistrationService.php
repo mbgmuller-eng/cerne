@@ -36,6 +36,7 @@ class SelfRegistrationService
                 'role' => UserRole::Client,
                 'is_active' => true,
                 'terms_accepted_at' => now(),
+                'terms_version' => config('cerne.legal.terms_version'),
             ]);
 
             $profile = FinancialProfile::create([
@@ -74,6 +75,7 @@ class SelfRegistrationService
             'birthdate' => $birthdate,
             'is_active' => true,
             'terms_accepted_at' => now(),
+                'terms_version' => config('cerne.legal.terms_version'),
         ]);
     }
 }

@@ -222,6 +222,27 @@ return [
 
     /*
     |---------------------------------------------------------------------------
+    | Privacidade e LGPD
+    |---------------------------------------------------------------------------
+    | As versões mudam quando o TEXTO dos Termos, da Política ou do consentimento de
+    | saúde muda de forma que exija novo aceite: todo mundo aceita de novo no
+    | próximo acesso. O controlador e o encarregado (DPO) aparecem na Política; o
+    | cerne:check avisa enquanto o e-mail do encarregado não estiver definido.
+    */
+
+    'legal' => [
+        'terms_version' => '2026-10-22',
+        'health_consent_version' => '2026-10-22',
+        'controller_name' => env('CERNE_CONTROLLER_NAME'),
+        'controller_cnpj' => env('CERNE_CONTROLLER_CNPJ'),
+        'dpo_name' => env('CERNE_DPO_NAME'),
+        'dpo_email' => env('CERNE_DPO_EMAIL'),
+        // O PDF original de extrato/fatura/apólice sai do servidor depois de lido e confirmado (ou descartado) e deste prazo (ver DataRetentionService).
+        'source_pdf_days' => 90,
+    ],
+
+    /*
+    |---------------------------------------------------------------------------
     | Acompanhamento de erros
     |---------------------------------------------------------------------------
     | Todo erro da plataforma é anotado (ErrorRecorder) e o relatório do dia

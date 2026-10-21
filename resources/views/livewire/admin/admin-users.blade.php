@@ -138,6 +138,30 @@
         </div>
     @endif
 
+    @if ($entrandoUserId)
+        @php $alvoEntrada = \App\Models\User::find($entrandoUserId); @endphp
+        <div x-data x-init="$nextTick(() => $el.scrollIntoView({ behavior: 'smooth', block: 'start' }))" class="card space-y-3 border border-amber-200 p-5 dark:border-amber-500/30">
+            <div>
+                <p class="text-sm font-semibold text-amber-800 dark:text-amber-300">Entrar como {{ $alvoEntrada?->name }}</p>
+                <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                    Você vai ver tudo que esta pessoa vê, inclusive dado financeiro e de saúde. O acesso fica registrado (quem, em qual conta, quando e por quê) e
+                    aparece em Acessos. Entre só para atender a um pedido ou investigar um problema.
+                </p>
+            </div>
+            <form wire:submit="entrarComo('{{ $entrandoUserId }}')" class="space-y-3">
+                <div>
+                    <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Motivo do acesso</label>
+                    <textarea wire:model="motivoAcesso" rows="2" maxlength="500" class="input mt-1.5" placeholder="Ex.: cliente pediu ajuda com a importação do extrato"></textarea>
+                    @error('motivoAcesso') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                </div>
+                <div class="flex gap-3">
+                    <button type="submit" class="btn-primary px-3 py-1.5 text-sm">Entrar</button>
+                    <button type="button" wire:click="cancelarEntrada" class="btn-ghost px-3 py-1.5 text-sm">Cancelar</button>
+                </div>
+            </form>
+        </div>
+    @endif
+
     @if ($this->exclusaoInfo)
         {{-- O clique em "Excluir" pode vir de uma linha lá embaixo na
              lista — sem isto, o painel muda lá em cima e ninguém percebe
@@ -276,7 +300,7 @@
                                 <td class="px-5 py-2.5 text-slate-500 dark:text-slate-400">{{ $u->created_at->format('d/m/Y') }}</td>
                                 <td class="px-5 py-2.5 text-right whitespace-nowrap">
                                     @unless ($u->id === auth()->id())
-                                        <button type="button" wire:click="entrarComo('{{ $u->id }}')" class="text-sm text-accent-700 hover:underline dark:text-accent-400">Entrar como</button>
+                                        <button type="button" wire:click="pedirEntrada('{{ $u->id }}')" class="text-sm text-accent-700 hover:underline dark:text-accent-400">Entrar como</button>
                                         <button type="button" wire:click="pedirExclusao('{{ $u->id }}')" class="ml-3 text-sm text-red-700 hover:underline dark:text-red-400">Excluir</button>
                                     @endunless
                                 </td>

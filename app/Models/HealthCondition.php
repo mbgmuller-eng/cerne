@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Casts\Sensitive;
 use App\Models\Concerns\BelongsToProfile;
 use App\Models\Concerns\IsCoupleHealthData;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -13,6 +14,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 #[Fillable(['profile_id', 'member_id', 'description', 'created_by_member_id'])]
 class HealthCondition extends Model
 {
+    protected function casts(): array
+    {
+        return ['description' => Sensitive::class];
+    }
+
     use BelongsToProfile, HasUuids, IsCoupleHealthData;
 
     public function createdBy(): BelongsTo
