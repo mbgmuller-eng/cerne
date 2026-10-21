@@ -11,6 +11,7 @@ use App\Models\CurrencyRate;
 use App\Models\ConsultantClient;
 use App\Models\ConsultantInvite;
 use App\Models\DebtCommission;
+use App\Models\ErrorLog;
 use App\Models\EngagementPlanTemplate;
 use App\Models\EngagementReminder;
 use App\Models\FeeAgreement;
@@ -77,6 +78,9 @@ class TenancyCoverageTest extends TestCase
         AssetFeeAgreement::class => 'percentual sobre patrimônio que o consultor cobra de um cliente (professional_id) — mesmo sigilo de IncomeEntry; o profile_id aponta o cliente, não isola o dado',
         DebtCommission::class => 'liga o consultor a um consórcio de cliente em que ele tem comissão (professional_id) — sigiloso; o consórcio em si segue isolado por perfil',
         FeeAgreement::class => 'honorário que o profissional combinou com um cliente (professional_id) — mesmo sigilo de IncomeEntry; o profile_id aponta o cliente, não isola o dado',
+
+        // Operação da plataforma, só do administrador.
+        ErrorLog::class => 'erro da plataforma agrupado por classe, arquivo e linha — acompanhamento técnico que só o administrador lê; de propósito não guarda dado de cliente nem perfil (mensagem limpa, rota em padrão, usuário só por id)',
 
         // Dado público de mercado, igual para todo mundo.
         CurrencyRate::class => 'cotação diária de USDT, BTC e ETH em reais — dado público de mercado, sem dono; a rotina escreve e o preço dos investimentos lê',

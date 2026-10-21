@@ -97,6 +97,12 @@ class ProductionCheck extends Command
         $this->item('Cotações de USDT, BTC e ETH em dia', app(\App\Services\CurrencyRateService::class)->isFresh(),
             'Sem cotação dos últimos 3 dias, o valor em reais dos investimentos nessas moedas fica parado. Rode php artisan cerne:update-currency-rates e confira o agendador.', aviso: true);
 
+        $this->secao('Erros');
+        $this->item('Acompanhamento de erros ligado', (bool) config('cerne.error_tracking.enabled'),
+            'Com ERROR_TRACKING desligado nenhum erro é anotado e o relatório diário sai vazio.');
+        $this->item('Relatório diário de erros tem destinatário', app(\App\Services\ErrorTracking\ErrorDigest::class)->recipients() !== [],
+            'Defina ERROR_REPORT_EMAILS ou cadastre um administrador da plataforma: sem destinatário o relatório das 08:10 não sai.', aviso: true);
+
         $this->secao('Cache');
         $this->item('Configuração em cache', file_exists(base_path('bootstrap/cache/config.php')),
             'Sem cache o Laravel lê e analisa todos os arquivos de config a cada requisição.');

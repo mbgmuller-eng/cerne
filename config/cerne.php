@@ -220,4 +220,18 @@ return [
         'quantity' => 6,
     ],
 
+    /*
+    |---------------------------------------------------------------------------
+    | Acompanhamento de erros
+    |---------------------------------------------------------------------------
+    | Todo erro da plataforma é anotado (ErrorRecorder) e o relatório do dia
+    | anterior sai por e-mail às 08:10. Sem ERROR_REPORT_EMAILS (separados por
+    | vírgula), vai para as contas de administrador da plataforma.
+    */
+
+    'error_tracking' => [
+        'enabled' => (bool) env('ERROR_TRACKING', true),
+        'report_to' => array_filter(array_map('trim', explode(',', (string) env('ERROR_REPORT_EMAILS', '')))),
+    ],
+
 ];

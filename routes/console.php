@@ -64,6 +64,9 @@ Schedule::call(function (): void {
     logger()->info('Faturas', $resultado);
 })->dailyAt('03:20')->name('faturas')->withoutOverlapping();
 
+// Relatório de erros da plataforma do dia anterior, por e-mail. Também importa o que ficou no arquivo de reserva e limpa o antigo.
+Schedule::command('cerne:error-report')->dailyAt('08:10')->name('relatorio-de-erros')->withoutOverlapping();
+
 // Cotação de USDT, BTC e ETH em reais e novo valor dos investimentos nessas moedas. Roda antes da foto mensal (03:30), que lê esse valor.
 Schedule::call(function (): void {
     $r = app(\App\Services\CurrencyRateService::class)->update();

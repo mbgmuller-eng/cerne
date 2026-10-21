@@ -3,6 +3,7 @@
 use App\Http\Middleware\RequiresActiveSubscription;
 use App\Http\Middleware\SecurityHeaders;
 use App\Http\Middleware\SetProfileContext;
+use App\Services\ErrorTracking\ErrorRecorder;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -47,6 +48,12 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->validateCsrfTokens(except: ['webhooks/asaas']);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
+        // Todo erro que o Laravel reporta (tela, ação do Livewire, fila, rotina agendada) é anotado e entra no relatório diário. Sem
+        // `stop()`: o log em arquivo continua como sempre. O registro nunca lança (ver ErrorRecorder).
+        $exceptions->reportable(function (Throwable $e): void {
+            app(ErrorRecorder::class)->record($e);
+        });
+
         $exceptions->shouldRenderJsonWhen(
             fn (Request $request) => $request->is('api/*'),
         );

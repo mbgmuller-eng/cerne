@@ -129,6 +129,7 @@ Todas idempotentes (regra 4). O cron da Hostinger chama `schedule:run` a cada mi
 | `percentual-patrimonio` | 04:09 | refaz a previsão do percentual sobre patrimônio de cada consultor (estimativa com o patrimônio de hoje) |
 | `comissoes-de-consorcio` | 04:11 | refaz a previsão da comissão de consórcio dos consultores (percentual da carta nas parcelas combinadas) |
 | `academia-revisao-de-treino` | 09:00 | avisa (uma vez por fase, só o dono) que a fase de treino passou do ponto de troca (`GymPhaseReviewService::notifyDue`, livro `engagement_reminders` tipo `review_due`; monta e solta o `ProfileContext` de cada pessoa) |
+| `relatorio-de-erros` | 08:10 | e-mail com os erros do dia anterior (`cerne:error-report`, `ErrorDigest`; índice único `error_report_digests(sent_on)`), importa o arquivo de reserva e limpa o antigo |
 | `anexos-de-leads` | 04:10 | apaga arquivos de leads perdidos há mais de 12 meses |
 | `leads-de-renovacao` | 07:30 | cria lead para apólice que vence (preferências em `users.renewal_lead_*`) |
 | `resumo-de-leads` | 08:00 | uma notificação por profissional com o que pede atenção nos leads |
@@ -159,6 +160,21 @@ Módulo `Debt` + `DebtInstallment` + `DebtAdjustment` (reajustes do consórcio).
 - **Consórcio assistido**: a prévia do reajuste (`DebtService::previewAdjustment`) usa a mesma conta do registro; a sugestão de percentual vem do último reajuste registrado ou, sem histórico, do salto visto nas parcelas pagas (`Debt::observedAdjustment`). O lance na contemplação (`DebtSimulator::bid`, base em `Debt::contemplationBase`: extrato ou parcelas em aberto) mostra "baixar a parcela" x "encurtar o prazo" e só preenche o formulário; lance embutido sai da carta.
 - **Objetivos** têm cadastro próprio (`GoalsIndex`): avançam pelo dinheiro informado, pelo saldo de um investimento ou pelas parcelas pagas de um consórcio (um consórcio, um objetivo).
 - Fora de produção o projeto **proíbe lazy loading** (`Model::shouldBeStrict` em ambiente local): carregue as relações que a view usa (`with`/`loadMissing`).
+
+### Acompanhamento de erros da plataforma
+
+Todo erro que o Laravel reporta (tela, ação do Livewire, fila, rotina agendada) é anotado na hora por `ErrorRecorder`, ligado em `bootstrap/app.php` (`reportable`, sem `stop()`: o log em arquivo
+continua). Regras que não se quebram:
+
+- **Agrupado, não empilhado**: o mesmo erro (classe + arquivo + linha = `fingerprint`, índice único) é UMA linha em `error_logs` com contador, mais `error_log_days` (por dia) e
+  `error_log_users` (quem bateu). A gravação é uma instrução atômica (`ON DUPLICATE KEY UPDATE`). Erro **resolvido que volta reabre sozinho** (`regressions`, `reopened_at`); ignorado segue ignorado.
+- **Nunca dado de cliente**: a mensagem perde e-mail, CPF, número longo e token (`scrub`); consulta SQL entra com `?` e nunca com os valores; a origem é o nome da rota ou o padrão do endereço
+  (`/convite/{token}`), nunca o endereço; o usuário é só o id; o corpo da requisição nem é lido; o passo a passo traz só código do Cerne, sem argumentos. `ErrorLog` está em `EXEMPT` do `TenancyCoverageTest`.
+- **Nunca derruba quem estava fazendo outra coisa**: qualquer falha ao gravar (inclusive banco fora do ar) vira uma linha em `storage/logs/erros-pendentes.jsonl`, importada na próxima rodada do relatório.
+- Não são anotados: validação, login, permissão, 4xx. `ERROR_TRACKING=false` desliga (os testes rodam assim; quem testa o acompanhamento liga em `setUp`).
+- **Relatório diário** (`cerne:error-report`, 08:10): cobre ontem, do mais frequente para o menos, com novos e reabertos em destaque; vai para `ERROR_REPORT_EMAILS` (vírgula) ou, sem isso, para os administradores da plataforma.
+  Sai uma vez por dia (índice único); se o e-mail falha a reserva do dia é solta para a próxima rodada tentar de novo. Erro resolvido/ignorado some depois de 90 dias parado, aberto depois de 180.
+- **Tela** `/admin/erros` (`AdminErrors`, só administrador, `wire:poll.30s`): abertos, resolvidos, ignorados, busca, passo a passo e ações; o menu do administrador mostra quantos estão abertos.
 
 ### Investimento em outra moeda (USDT, BTC, ETH)
 

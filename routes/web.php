@@ -240,5 +240,6 @@ Route::middleware(['auth', 'verified'])->group(function (): void {
         Route::get('/admin/bancos', AdminBanks::class)->name('admin.banks');
         Route::get('/admin/seguradoras', AdminInsurers::class)->name('admin.insurers');
         Route::get('/admin/exercicios', AdminExercises::class)->name('admin.exercises');
+        Route::get('/admin/erros', \App\Livewire\Admin\AdminErrors::class)->name('admin.errors');
     });
 });

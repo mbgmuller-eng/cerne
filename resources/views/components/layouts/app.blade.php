@@ -218,6 +218,8 @@
     $bancosPendentes = $user?->isPlatformAdmin() ? \App\Models\Bank::withoutTaxonomyScope()->pending()->count() : 0;
     $seguradorasPendentes = $user?->isPlatformAdmin() ? \App\Models\Insurer::withoutTaxonomyScope()->pending()->count() : 0;
     $exerciciosPendentes = $user?->isPlatformAdmin() ? \App\Models\GymExerciseSuggestion::query()->pending()->count() : 0;
+    // Erros da plataforma ainda sem resolver: o número que aparece em "Erros" no menu do administrador.
+    $errosAbertos = $user?->isPlatformAdmin() ? \App\Models\ErrorLog::query()->open()->count() : 0;
     // Cadastros da plataforma (admin): catálogos compartilhados, cada um com a
     // fila de sugestões dos usuários. Última posição = pendências.
     $cadastrosAdmin = [
@@ -488,6 +490,13 @@
                     <a href="{{ route('admin.users') }}" @class(['nav-item', 'nav-item-active' => request()->routeIs('admin.users')])>
                         <x-nav-icon name="admin" />
                         <span>Contas e perfis</span>
+                    </a>
+                    <a href="{{ route('admin.errors') }}" @class(['nav-item', 'nav-item-active' => request()->routeIs('admin.errors')])>
+                        <x-nav-icon name="alert" />
+                        <span>Erros</span>
+                        @if ($errosAbertos > 0)
+                            <span class="badge ml-auto bg-red-50 text-red-800 ring-1 ring-red-200 dark:bg-red-500/10 dark:text-red-300 dark:ring-red-500/20">{{ $errosAbertos }}</span>
+                        @endif
                     </a>
                 </div>
 
@@ -849,6 +858,13 @@
             <a href="{{ route('admin.users') }}" @class(['tab-item', 'tab-item-active' => request()->routeIs('admin.users')])>
                 <x-nav-icon name="admin" class="h-6 w-6" />
                 <span>Contas</span>
+            </a>
+            <a href="{{ route('admin.errors') }}" @class(['tab-item relative', 'tab-item-active' => request()->routeIs('admin.errors')])>
+                <x-nav-icon name="alert" class="h-6 w-6" />
+                <span>Erros</span>
+                @if ($errosAbertos > 0)
+                    <span class="absolute top-1.5 right-1/4 h-2 w-2 rounded-full bg-red-500" aria-label="Há erros abertos"></span>
+                @endif
             </a>
             <button
                 type="button"
