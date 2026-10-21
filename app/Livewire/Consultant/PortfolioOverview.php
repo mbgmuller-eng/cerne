@@ -31,6 +31,15 @@ use Livewire\Component;
 #[Layout('components.layouts.app')]
 class PortfolioOverview extends Component
 {
+    /** 'reais' (tudo convertido) ou 'moedas' (dividido em reais, USDT, BTC e ETH). Lembrado na sessão e valendo também em Investimentos da carteira. */
+    public string $exibicao = 'reais';
+
+    public function exibir(string $modo): void
+    {
+        $this->exibicao = $modo === 'moedas' ? 'moedas' : 'reais';
+        session(['carteira_exibicao' => $this->exibicao]);
+    }
+
     public string $inviteName = '';
 
     public string $inviteEmail = '';
@@ -119,6 +128,8 @@ class PortfolioOverview extends Component
     public function mount(): void
     {
         abort_unless(auth()->user()?->isConsultant(), 403);
+
+        $this->exibicao = session('carteira_exibicao') === 'moedas' ? 'moedas' : 'reais';
 
         [$this->ordenarClientes, $this->sentidoClientes] = $this->ordemInicial(
             'clients', $this->ordenarClientes, $this->sentidoClientes, self::ORDENS_CLIENTES, self::PADRAO_CLIENTES,

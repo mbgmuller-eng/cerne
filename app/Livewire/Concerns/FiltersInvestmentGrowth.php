@@ -131,7 +131,8 @@ trait FiltersInvestmentGrowth
             return $investimentos->mapWithKeys(fn (InvestmentRecord $i) => [
                 $i->id => [
                     'de' => $i->invested_amount !== null && bccomp($i->invested_amount, '0', 2) > 0 ? $i->invested_amount : null,
-                    'para' => $i->current_amount,
+                    // O que já foi resgatado também é resultado: sem ele, quem tirou dinheiro pareceria ter perdido.
+                    'para' => $i->totalReturnAmount(),
                 ],
             ])->all();
         }

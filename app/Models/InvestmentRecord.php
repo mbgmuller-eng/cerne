@@ -25,7 +25,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 #[Fillable([
     'profile_id', 'member_id', 'sector', 'asset_class', 'reserve_type', 'ticker', 'name', 'institution',
-    'currency', 'native_amount', 'current_amount', 'invested_amount', 'average_price', 'quantity', 'current_price', 'price_date', 'purchase_date',
+    'currency', 'native_amount', 'invested_native', 'realized_native', 'current_amount', 'invested_amount', 'realized_amount', 'average_price', 'quantity', 'current_price', 'price_date', 'purchase_date',
     'maturity_date', 'return_rate', 'return_rate_type', 'broker_account_id', 'source',
     'external_asset_id', 'is_locked_by_sync', 'is_active', 'notes', 'source_document_id',
     'created_by_user_id', 'is_private',
@@ -44,6 +44,9 @@ class InvestmentRecord extends Model
             'source' => RecordSource::class,
             'current_amount' => 'decimal:2',
             'native_amount' => 'decimal:10',
+            'invested_native' => 'decimal:10',
+            'realized_native' => 'decimal:10',
+            'realized_amount' => 'decimal:2',
             'invested_amount' => 'decimal:2',
             'average_price' => 'decimal:6',
             'quantity' => 'decimal:6',
@@ -167,14 +170,40 @@ class InvestmentRecord extends Model
         return $negociacoes === 0;
     }
 
-    /** Ganho ou perda não realizada: valor atual menos o investido. */
+    /**
+     * Ganho ou perda: valor atual, mais o que já foi resgatado, menos o investido. Sem resgates é o ganho não realizado de sempre.
+     * (O nome ficou por causa dos usos antigos; quem tem resgate registrado, como a carteira da Onil, passa a contá-lo.)
+     */
     public function unrealizedGain(): string
     {
         if ($this->invested_amount === null) {
             return '0.00';
         }
 
-        return bcsub($this->current_amount, $this->invested_amount, 2);
+        return bcsub(bcadd($this->current_amount, $this->realized_amount ?? '0', 2), $this->invested_amount, 2);
+    }
+
+    /** Valor atual mais o que já foi resgatado: o ponto de chegada do desempenho desde o início. */
+    public function totalReturnAmount(): string
+    {
+        return bcadd($this->current_amount, $this->realized_amount ?? '0', 2);
+    }
+
+    /**
+     * Desempenho na moeda de origem (USDT, BTC, ETH): quantidade atual mais resgatada menos a base, em quantidade e em %. Sem a cotação
+     * no meio. Nulo quando não há base na moeda.
+     *
+     * @return array{base: string, gain: string, pct: float}|null
+     */
+    public function nativePerformance(): ?array
+    {
+        if ($this->invested_native === null || bccomp($this->invested_native, '0', 10) <= 0 || $this->native_amount === null) {
+            return null;
+        }
+
+        $ganho = bcsub(bcadd($this->native_amount, $this->realized_native ?? '0', 10), $this->invested_native, 10);
+
+        return ['base' => $this->invested_native, 'gain' => $ganho, 'pct' => round((float) bcmul(bcdiv($ganho, $this->invested_native, 10), '100', 6), 2)];
     }
 
     public function displayName(): string
@@ -196,7 +225,7 @@ class InvestmentRecord extends Model
     /** Percentual de ganho sobre o investido — não confundir com return_rate (a taxa contratada). */
     public function gainPercentage(): ?float
     {
-        return self::percentageChange($this->invested_amount, $this->current_amount);
+        return self::percentageChange($this->invested_amount, $this->totalReturnAmount());
     }
 
     /**
@@ -243,7 +272,7 @@ class InvestmentRecord extends Model
             return null;
         }
 
-        $razao = (float) $this->current_amount / (float) $this->invested_amount;
+        $razao = (float) $this->totalReturnAmount() / (float) $this->invested_amount;
 
         if ($razao <= 0) {
             return null;

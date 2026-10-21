@@ -98,8 +98,12 @@ class CurrencyRateService
             $perfis = DB::table('investment_records')->where('currency', $moeda)->whereNotNull('native_amount')->distinct()->pluck('profile_id');
 
             $total += DB::update(
-                'UPDATE investment_records SET current_amount = ROUND(native_amount * ?, 2), updated_at = ? WHERE currency = ? AND native_amount IS NOT NULL',
-                [$cotacao, now(), $moeda],
+                // A base e o já resgatado também andam com a cotação: o desempenho em reais é o da quantidade, sem o sobe e desce do preço.
+                'UPDATE investment_records SET current_amount = ROUND(native_amount * ?, 2),
+                    invested_amount = CASE WHEN invested_native IS NULL THEN invested_amount ELSE ROUND(invested_native * ?, 2) END,
+                    realized_amount = CASE WHEN realized_native IS NULL THEN realized_amount ELSE ROUND(realized_native * ?, 2) END,
+                    updated_at = ? WHERE currency = ? AND native_amount IS NOT NULL',
+                [$cotacao, $cotacao, $cotacao, now(), $moeda],
             );
 
             foreach ($perfis as $perfil) {

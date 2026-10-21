@@ -5,6 +5,7 @@ namespace App\Livewire\Consultant;
 use App\Livewire\Concerns\FiltersInvestmentGrowth;
 use App\Models\InvestmentRecord;
 use App\Services\ConsultantPortfolioService;
+use App\Support\CurrencyBreakdown;
 use App\Support\Money;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Layout;
@@ -26,9 +27,20 @@ class PortfolioInvestments extends Component
     #[Url]
     public string $instituicao = '';
 
+    /** 'reais' ou 'moedas': a mesma escolha do painel da carteira (fica na sessão). */
+    public string $exibicao = 'reais';
+
     public function mount(): void
     {
         abort_unless(auth()->user()?->isConsultant(), 403);
+
+        $this->exibicao = session('carteira_exibicao') === 'moedas' ? 'moedas' : 'reais';
+    }
+
+    public function exibir(string $modo): void
+    {
+        $this->exibicao = $modo === 'moedas' ? 'moedas' : 'reais';
+        session(['carteira_exibicao' => $this->exibicao]);
     }
 
     public function render(ConsultantPortfolioService $portfolio)
@@ -51,11 +63,29 @@ class PortfolioInvestments extends Component
 
         return view('livewire.consultant.portfolio-investments', [
             'grouped' => $this->group($linhas),
+            // O total de todos os clientes mostrados, por moeda — o resumo do topo no modo "Por moeda".
+            'porMoeda' => self::currencies($linhas->pluck('investment')),
+            'temMoeda' => CurrencyBreakdown::hasForeign(self::currencies($todos->pluck('investment'))),
             'instituicoes' => $instituicoes,
             'totalGeral' => $todos->count(),
             'growthPeriod' => $this->growthPeriod,
             'growthPeriodOptions' => $this->growthPeriodOptions(),
         ]);
+    }
+
+    /**
+     * Soma por moeda (reais, USDT, BTC, ETH) de uma lista de investimentos já carregada nesta tela.
+     *
+     * @param  Collection<int, InvestmentRecord>  $investimentos
+     * @return list<array{currency: string, native: string, brl: string}>
+     */
+    public static function currencies(Collection $investimentos): array
+    {
+        return CurrencyBreakdown::rows($investimentos->groupBy('currency')->map(fn (Collection $g, $moeda) => [
+            'currency' => (string) $moeda,
+            'brl' => Money::sum($g->pluck('current_amount')),
+            'native' => $moeda === 'BRL' ? null : $g->reduce(fn (string $c, InvestmentRecord $i) => bcadd($c, (string) $i->native_amount, 10), '0'),
+        ])->values()->all());
     }
 
     /**
@@ -82,6 +112,7 @@ class PortfolioInvestments extends Component
                     'separarPorMembro' => $separarPorMembro,
                     'quantidade' => $doCliente->count(),
                     'total' => Money::sum($doCliente->map(fn (array $l) => $l['investment']->current_amount)),
+                    'moedas' => self::currencies($doCliente->pluck('investment')),
                     // Crescimento da carteira DESTE cliente no período
                     // escolhido — soma dos ativos dele, não média das
                     // percentuais individuais (ver computeGrowthTotal()).

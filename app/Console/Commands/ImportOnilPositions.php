@@ -8,7 +8,8 @@ use Illuminate\Console\Command;
 
 /**
  * Posição dos clientes da Onil (saldo + saque em processamento, em reais, USDT, BTC e ETH) como investimentos na carteira do consultor.
- * O JSON traz um item por cliente: onil_id, nome, email, saldo{BRL,USDT,BTC,ETH} e saque{...}. Sem --apply nada é gravado.
+ * O JSON traz um item por cliente: onil_id, nome, email, saldo{BRL,USDT,BTC,ETH}, saque{...} e, opcionalmente, base{moeda: depositos,
+ * valor_inicial_contratos, performance_contratos, saques_aprovados} (aba "Base e performance"). Sem --apply nada é gravado.
  */
 class ImportOnilPositions extends Command
 {
@@ -77,9 +78,13 @@ class ImportOnilPositions extends Command
         return self::SUCCESS;
     }
 
-    /** @param  array{total: string, acao: string}  $p */
+    /** @param  array{total: string, acao: string, base?: ?string}  $p */
     private function celula(array $p): string
     {
-        return bccomp($p['total'], '0', 10) === 0 && $p['acao'] === 'sem saldo' ? '-' : rtrim(rtrim($p['total'], '0'), '.').' ('.$p['acao'].')';
+        if (bccomp($p['total'], '0', 10) === 0 && $p['acao'] === 'sem saldo') {
+            return '-';
+        }
+
+        return rtrim(rtrim($p['total'], '0'), '.').' ('.$p['acao'].(isset($p['base']) ? ' · base: '.$p['base'] : '').')';
     }
 }

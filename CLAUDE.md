@@ -170,6 +170,16 @@ Tipos de ativo `usdt`, `btc`, `eth` e `brl` (`AssetClass`; `brl` é saldo em rea
 - **Filtro "Em reais / Por moeda"** no painel (`Dashboard::exibir`, lembrado na sessão) e no resumo de Investimentos (`currencyView`): `CurrencyBreakdown` e `<x-currency-breakdown>`. Só aparece para quem tem algo em USDT, BTC ou ETH. USDT mostra 2 casas (como dólar), BTC e ETH 8 (`Money::native`).
 - **Carga da Onil** (`OnilPositionsImporter`, `cerne:import-onil`, simulação antes de `--apply`): um investimento por moeda com saldo + saque em processamento, instituição "Onil", chave `external_asset_id = onil:{id}:{moeda}` (rodar de novo atualiza e desativa quem zerou). Cliente sem conta é cadastrado por `ClientOnboardingService::createManagedClient` (senha aleatória, **sem e-mail e sem marcar o e-mail como verificado**; a pessoa entra pelo "esqueci a senha"). Conta existente **sem vínculo ativo não é vinculada**: o vínculo depende da autorização dela. Nunca toca no que foi cadastrado à mão. `--merge=origem:destino` soma uma conta em outra (ex.: a empresa na conta do sócio).
 
+- **Base e performance** (`invested_native`, `realized_native`, `realized_amount`; `OnilBasePerformance`): em USDT, BTC e ETH a base e o resgate ficam na moeda e o
+  desempenho é medido em **quantidade**, sem o sobe e desce da cotação; `invested_amount` e `realized_amount` (reais) são essas quantidades vezes a cotação do dia,
+  refeitas na mesma `UPDATE` diária. **Ganho = valor atual + já resgatado − base** (`unrealizedGain`, `gainPercentage`, `nativePerformance`); quem não tem resgate
+  fica como sempre foi. Regra da carga: base = depósitos da moeda (sem depósito, o valor inicial dos contratos); o resultado por fluxo vale quando concorda com a
+  performance dos contratos (até 5% da base). Quando não concorda houve **conversão entre moedas**: vale a performance dos contratos e a base é o que fecha a conta; sem
+  nenhum dos dois, `sem base` (resultado zero). A linha da carga diz qual regra saiu em cada moeda.
+- **Painel da carteira do consultor**: o filtro "Em reais / Por moeda" (`PortfolioOverview::exibir`, sessão `carteira_exibicao`, vale também em Investimentos da carteira) só
+  aparece quando algum cliente tem USDT, BTC ou ETH. Patrimônio de cliente e da carteira aparece **inteiro** (`Money::format`), nunca em `Money::compact`. O último mês do
+  gráfico é o valor de hoje (o mesmo do cartão, antes das faturas); mês sem foto segue com o último valor conhecido do ativo até a última foto dele (e até hoje, se ainda ativo).
+
 ### Recebimentos do profissional (consultor e corretor)
 
 Tela `/recebimentos` (`ProfessionalIncome`, serviço `ProfessionalIncomeService`): quanto o profissional recebe por mês.

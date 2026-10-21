@@ -23,6 +23,7 @@ use App\Models\InvestmentSnapshot;
 use App\Models\Scopes\MemberPrivacyScope;
 use App\Models\User;
 use App\Support\ClientDisplayName;
+use App\Support\CurrencyBreakdown;
 use App\Support\Money;
 use App\Support\PrivacyGovernedModels;
 use Carbon\CarbonImmutable;
@@ -310,7 +311,7 @@ class ConsultantPortfolioService
     private function netWorth(Collection $profileIds): array
     {
         if ($profileIds->isEmpty()) {
-            return ['liquido' => '0.00', 'investimentos' => '0.00', 'contas' => '0.00', 'faturas' => '0.00'];
+            return ['liquido' => '0.00', 'investimentos' => '0.00', 'contas' => '0.00', 'faturas' => '0.00', 'por_moeda' => []];
         }
 
         $investimentos = Money::parse(
@@ -327,6 +328,12 @@ class ConsultantPortfolioService
 
         return [
             'investimentos' => $investimentos,
+            // O mesmo patrimônio dividido em reais, USDT, BTC e ETH (para o filtro "Por moeda"): somas em SQL.
+            'por_moeda' => CurrencyBreakdown::rows(
+                InvestmentRecord::withoutProfileScope()->whereIn('profile_id', $profileIds)->active()
+                    ->selectRaw('currency, SUM(current_amount) as brl, SUM(native_amount) as native')->groupBy('currency')->get()
+                    ->map(fn (InvestmentRecord $r) => ['currency' => (string) $r->currency, 'brl' => (string) $r->brl, 'native' => $r->native === null ? null : (string) $r->native])->all(),
+            ),
             'contas' => $contas,
             'faturas' => $faturas,
             'liquido' => bcsub($investimentos, $faturas, 2),
@@ -368,6 +375,7 @@ class ConsultantPortfolioService
             ->get();
 
         $patrimonioPorPerfil = $this->netWorthByProfile($profileIds);
+        $moedasPorPerfil = $this->currenciesByProfile($profileIds);
 
         // Cliente importado em lote (ex.: planilha de seguros) nasce com
         // usuário, perfil e vínculo já prontos, mas sem NENHUM
@@ -381,7 +389,7 @@ class ConsultantPortfolioService
             ->map(fn (string $email) => mb_strtolower($email))
             ->flip();
 
-        return $links->map(function (ConsultantClient $link) use ($patrimonioPorPerfil, $apolicesPorPerfil, $emailsComConvite): array {
+        return $links->map(function (ConsultantClient $link) use ($patrimonioPorPerfil, $moedasPorPerfil, $apolicesPorPerfil, $emailsComConvite): array {
             $profile = $link->client->ownedProfiles->first();
             $ativo = $link->status === ConsultantClientStatus::Active;
             $profileId = $ativo ? $profile?->id : null;
@@ -398,6 +406,7 @@ class ConsultantPortfolioService
                 'since' => $this->clientSince($link, $apolicesDoCliente),
                 'profile_id' => $profileId,
                 'patrimonio' => $profileId ? ($patrimonioPorPerfil[$profileId] ?? '0.00') : null,
+                'moedas' => $profileId ? ($moedasPorPerfil[$profileId] ?? []) : [],
                 'seguro_vida' => $apolicesDoCliente->contains(fn (InsurancePolicy $p) => $p->insurance_type === InsuranceType::Vida),
                 'insurers' => $apolicesDoCliente->pluck('insurer_name')->unique()->values()->all(),
                 'insurance_types' => $apolicesDoCliente
@@ -510,6 +519,30 @@ class ConsultantPortfolioService
     }
 
     /**
+     * O patrimônio investido de cada cliente dividido por moeda (reais, USDT, BTC, ETH): uma consulta agrupada por perfil e moeda.
+     *
+     * @param  Collection<int, string>  $profileIds
+     * @return array<string, list<array{currency: string, native: string, brl: string}>> profile_id => linhas
+     */
+    private function currenciesByProfile(Collection $profileIds): array
+    {
+        if ($profileIds->isEmpty()) {
+            return [];
+        }
+
+        return InvestmentRecord::withoutProfileScope()
+            ->whereIn('profile_id', $profileIds)->active()
+            ->selectRaw('profile_id, currency, SUM(current_amount) as brl, SUM(native_amount) as native')
+            ->groupBy('profile_id', 'currency')
+            ->get()
+            ->groupBy('profile_id')
+            ->map(fn (Collection $linhas) => CurrencyBreakdown::rows(
+                $linhas->map(fn (InvestmentRecord $r) => ['currency' => (string) $r->currency, 'brl' => (string) $r->brl, 'native' => $r->native === null ? null : (string) $r->native])->all(),
+            ))
+            ->all();
+    }
+
+    /**
      * Clientes ativos sem nenhuma apólice de vida vigente — lista acionável
      * (quem contatar), não só a contagem que já vai em seguro_vida.sem.
      * Deriva de $porCliente (já calculado) em vez de reconsultar: é o
@@ -528,6 +561,7 @@ class ConsultantPortfolioService
                 'name' => $l['name'],
                 'email' => $l['email'],
                 'patrimonio' => $l['patrimonio'],
+                'moedas' => $l['moedas'] ?? [],
                 'since' => $l['since'],
             ])
             ->values()
@@ -548,8 +582,14 @@ class ConsultantPortfolioService
     {
         $meses = config('cerne.dashboard.evolution_months');
         $inicio = CarbonImmutable::now()->startOfMonth()->subMonths($meses - 1);
+        $hoje = CarbonImmutable::now();
 
-        $totais = $profileIds->isEmpty() ? collect() : InvestmentSnapshot::withoutProfileScope()
+        if ($profileIds->isEmpty()) {
+            return collect(range(0, $meses - 1))->map(fn (int $i) => ['rotulo' => $inicio->addMonths($i)->translatedFormat('M/y'), 'valor' => '0.00'])->all();
+        }
+
+        // Foto de cada ativo por mês, dentro da janela.
+        $fotos = InvestmentSnapshot::withoutProfileScope()
             ->whereIn('profile_id', $profileIds)
             ->where(function ($q) use ($inicio): void {
                 $q->where('year', '>', $inicio->year)
@@ -557,19 +597,46 @@ class ConsultantPortfolioService
                         $q2->where('year', $inicio->year)->where('month', '>=', $inicio->month);
                     });
             })
-            ->selectRaw('year, month, SUM(amount) as total')
-            ->groupBy('year', 'month')
-            ->get()
-            ->mapWithKeys(fn ($linha) => [$linha->year.'-'.$linha->month => $linha->total]);
+            ->get(['investment_id', 'year', 'month', 'amount'])
+            ->groupBy('investment_id');
 
-        return collect(range(0, $meses - 1))->map(function (int $i) use ($inicio, $totais): array {
-            $mes = $inicio->addMonths($i);
+        $ativos = InvestmentRecord::withoutProfileScope()->whereIn('profile_id', $profileIds)->pluck('is_active', 'id');
+        $totais = array_fill(0, $meses, '0.00');
 
-            return [
-                'rotulo' => $mes->translatedFormat('M/y'),
-                'valor' => Money::parse($totais[$mes->year.'-'.$mes->month] ?? 0),
-            ];
-        })->all();
+        // Um mês sem foto (a rotina falhou, ou o ativo é novo) não pode virar buraco no gráfico: o ativo segue com o último valor
+        // conhecido até a última foto dele e, se ainda está ativo, até hoje. Ativo encerrado não continua contando.
+        foreach ($fotos as $id => $linhas) {
+            $porMes = $linhas->mapWithKeys(fn ($l) => [$l->year.'-'.$l->month => (string) $l->amount]);
+            $ultimaFoto = $linhas->map(fn ($l) => $l->year * 12 + $l->month)->max();
+            $ultimo = null;
+
+            for ($i = 0; $i < $meses; $i++) {
+                $mes = $inicio->addMonths($i);
+                $indice = $mes->year * 12 + $mes->month;
+                $chave = $mes->year.'-'.$mes->month;
+
+                if (isset($porMes[$chave])) {
+                    $ultimo = $porMes[$chave];
+                } elseif ($ultimo !== null && ($indice <= $ultimaFoto || ($ativos[$id] ?? false))) {
+                    // segue com o último valor conhecido
+                } else {
+                    continue;
+                }
+
+                $totais[$i] = bcadd($totais[$i], Money::parse($ultimo), 2);
+            }
+        }
+
+        $serie = collect(range(0, $meses - 1))->map(fn (int $i) => [
+            'rotulo' => $inicio->addMonths($i)->translatedFormat('M/y'),
+            'valor' => $totais[$i],
+        ])->all();
+
+        // O mês corrente é o valor de hoje, o mesmo do cartão "Patrimônio investido": a foto mensal é do dia 1 e deixaria de fora tudo
+        // que entrou depois dela.
+        $serie[$meses - 1]['valor'] = Money::parse(InvestmentRecord::withoutProfileScope()->whereIn('profile_id', $profileIds)->active()->sum('current_amount'));
+
+        return $serie;
     }
 
     /**

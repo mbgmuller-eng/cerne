@@ -70,12 +70,37 @@
     @endif
 
     {{-- KPIs ---------------------------------------------------------- --}}
+    @php
+        // Só há o que filtrar quando algum cliente tem USDT, BTC ou ETH.
+        $linhasMoeda = $dados['patrimonio']['por_moeda'] ?? [];
+        $temMoeda = \App\Support\CurrencyBreakdown::hasForeign($linhasMoeda);
+        $porMoeda = $temMoeda && $exibicao === 'moedas';
+        $temFaturas = bccomp($dados['patrimonio']['faturas'], '0', 2) > 0;
+    @endphp
     <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <div class="card relative overflow-hidden bg-brand-800 p-6 text-white">
             <div class="pointer-events-none absolute -top-16 -right-16 h-40 w-40 rounded-full bg-brand-600/50 dark:bg-brand-400/20 blur-3xl"></div>
-            <p class="relative eyebrow text-brand-200">Patrimônio investido</p>
-            <p class="relative figure mt-2 text-3xl font-medium">{{ Money::compact($dados['patrimonio']['liquido']) }}</p>
-            <p class="relative mt-1 text-xs text-brand-200">{{ Money::format($dados['patrimonio']['liquido']) }}</p>
+            <div class="relative flex flex-wrap items-center justify-between gap-2">
+                <p class="eyebrow text-brand-200">Patrimônio investido</p>
+
+                @if ($temMoeda)
+                    <div class="inline-flex rounded-lg bg-white/10 p-0.5 text-xs" role="group" aria-label="Mostrar patrimônio">
+                        <button type="button" wire:click="exibir('reais')" class="rounded-md px-2.5 py-1 {{ ! $porMoeda ? 'bg-white text-brand-800' : 'text-brand-100' }}">Em reais</button>
+                        <button type="button" wire:click="exibir('moedas')" class="rounded-md px-2.5 py-1 {{ $porMoeda ? 'bg-white text-brand-800' : 'text-brand-100' }}">Por moeda</button>
+                    </div>
+                @endif
+            </div>
+
+            @if ($porMoeda)
+                <x-currency-breakdown :rows="$linhasMoeda" :compact="true" size="text-base" class="relative mt-3" />
+                <p class="relative mt-3 text-xs text-brand-200">Tudo em reais: {{ Money::format($dados['patrimonio']['liquido']) }}</p>
+            @else
+                {{-- O valor inteiro, sem arredondar: é o que o consultor confere contra a corretora. --}}
+                <p class="relative figure mt-2 text-3xl font-medium">{{ Money::format($dados['patrimonio']['liquido']) }}</p>
+                @if ($temFaturas)
+                    <p class="relative mt-1 text-xs text-brand-200">Investimentos {{ Money::format($dados['patrimonio']['investimentos']) }} − faturas em aberto {{ Money::format($dados['patrimonio']['faturas']) }}</p>
+                @endif
+            @endif
         </div>
 
         <div class="card p-6">
@@ -157,7 +182,7 @@
     @endphp
     <div class="card p-6">
         <p class="eyebrow">Patrimônio investido · últimos {{ $evolucao->count() }} meses</p>
-        <p class="mt-0.5 text-xs text-slate-400">soma dos investimentos ativos da carteira — contas e faturas não têm histórico mensal</p>
+        <p class="mt-0.5 text-xs text-slate-400">soma dos investimentos ativos da carteira (antes das faturas); o último mês é o valor de hoje — contas e faturas não têm histórico mensal</p>
 
         <div class="mt-6">
             <x-bar-chart
@@ -251,7 +276,7 @@
                             </div>
                             <div class="flex items-center gap-4">
                                 <div class="text-right">
-                                    <p class="figure text-sm text-slate-700 dark:text-slate-300">{{ Money::compact($cliente['patrimonio']) }}</p>
+                                    <p class="figure text-sm text-slate-700 dark:text-slate-300">{{ Money::format($cliente['patrimonio']) }}</p>
                                     <p class="text-xs text-slate-400">cliente desde {{ $cliente['since']?->translatedFormat('m/Y') ?? '—' }}</p>
                                 </div>
                                 <div class="flex items-center gap-2">
@@ -383,7 +408,21 @@
                                     @endif
                                 </td>
                                 <td class="px-3 py-3 text-right tabular-nums text-slate-800 dark:text-slate-200">
-                                    {{ $linha['patrimonio'] !== null ? Money::compact($linha['patrimonio']) : '—' }}
+                                    @if ($linha['patrimonio'] === null)
+                                        —
+                                    @elseif ($porMoeda && \App\Support\CurrencyBreakdown::hasForeign($linha['moedas']))
+                                        {{-- Cliente com carteira em outra moeda: cada moeda na sua quantidade, com o equivalente em reais do lado. --}}
+                                        <div class="space-y-0.5">
+                                            @foreach ($linha['moedas'] as $m)
+                                                <p>
+                                                    {{ $m['currency'] === 'BRL' ? Money::format($m['brl']) : \App\Support\Money::native($m['native'], $m['currency']) }}
+                                                    @if ($m['currency'] !== 'BRL') <span class="block text-xs text-slate-400">≈ {{ Money::format($m['brl']) }}</span> @endif
+                                                </p>
+                                            @endforeach
+                                        </div>
+                                    @else
+                                        {{ Money::format($linha['patrimonio']) }}
+                                    @endif
                                 </td>
                                 <td class="px-3 py-3 text-right tabular-nums text-slate-500 dark:text-slate-400">
                                     {{ $linha['premio_mensal'] !== null ? Money::format($linha['premio_mensal']) : '—' }}

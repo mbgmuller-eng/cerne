@@ -295,7 +295,8 @@ class ConsultantPortfolioServiceTest extends TestCase
         $consultor = User::factory()->consultant()->create();
 
         [$perfilA] = $this->criarClienteVinculado($consultor);
-        $investimentoA = InvestmentRecord::factory()->create(['profile_id' => $perfilA->id]);
+        // O mês corrente do gráfico é o valor de hoje: o investimento vale o mesmo que a foto, para a soma continuar sendo a das fotos.
+        $investimentoA = InvestmentRecord::factory()->create(['profile_id' => $perfilA->id, 'current_amount' => '10000.00']);
         InvestmentSnapshot::create([
             'profile_id' => $perfilA->id,
             'investment_id' => $investimentoA->id,
@@ -305,7 +306,7 @@ class ConsultantPortfolioServiceTest extends TestCase
         ]);
 
         [$perfilB] = $this->criarClienteVinculado($consultor);
-        $investimentoB = InvestmentRecord::factory()->create(['profile_id' => $perfilB->id]);
+        $investimentoB = InvestmentRecord::factory()->create(['profile_id' => $perfilB->id, 'current_amount' => '5000.00']);
         InvestmentSnapshot::create([
             'profile_id' => $perfilB->id,
             'investment_id' => $investimentoB->id,
@@ -344,7 +345,7 @@ class ConsultantPortfolioServiceTest extends TestCase
         $consultor = User::factory()->consultant()->create();
 
         [$perfil] = $this->criarClienteVinculado($consultor, saldoConta: '500000.00');
-        $investimento = InvestmentRecord::factory()->create(['profile_id' => $perfil->id]);
+        $investimento = InvestmentRecord::factory()->create(['profile_id' => $perfil->id, 'current_amount' => '10000.00']);
         InvestmentSnapshot::create([
             'profile_id' => $perfil->id,
             'investment_id' => $investimento->id,

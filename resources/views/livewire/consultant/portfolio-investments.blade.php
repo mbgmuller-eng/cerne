@@ -28,8 +28,23 @@
             </div>
 
             <x-investment-growth-filter :period="$growthPeriod" :options="$growthPeriodOptions" />
+
+            @if ($temMoeda)
+                <div class="inline-flex rounded-lg bg-slate-100 p-0.5 text-sm dark:bg-white/10" role="group" aria-label="Mostrar valores">
+                    <button type="button" wire:click="exibir('reais')" class="rounded-md px-3 py-1.5 {{ $exibicao !== 'moedas' ? 'bg-white text-slate-900 shadow-sm dark:bg-slate-700 dark:text-white' : 'text-slate-500 dark:text-slate-400' }}">Em reais</button>
+                    <button type="button" wire:click="exibir('moedas')" class="rounded-md px-3 py-1.5 {{ $exibicao === 'moedas' ? 'bg-white text-slate-900 shadow-sm dark:bg-slate-700 dark:text-white' : 'text-slate-500 dark:text-slate-400' }}">Por moeda</button>
+                </div>
+            @endif
         </div>
     </div>
+
+    @php $porMoedaAtivo = $temMoeda && $exibicao === 'moedas'; @endphp
+    @if ($porMoedaAtivo && $porMoeda !== [])
+        <div class="card p-5">
+            <p class="eyebrow">Total da carteira{{ $instituicao !== '' ? ' em '.$instituicao : '' }}, por moeda</p>
+            <x-currency-breakdown :rows="$porMoeda" tone="light" class="mt-3" />
+        </div>
+    @endif
 
     @if ($grouped->isEmpty())
         <div class="rounded-2xl border border-dashed border-slate-300 bg-white/60 px-5 py-12 text-center dark:border-slate-600 dark:bg-slate-800/40">
@@ -54,7 +69,16 @@
 
                         <div class="flex items-center gap-4">
                             <div class="text-right">
-                                <p class="figure text-sm font-semibold text-slate-800 dark:text-slate-200">{{ Money::compact($porCliente['total']) }}</p>
+                                @if ($porMoedaAtivo && \App\Support\CurrencyBreakdown::hasForeign($porCliente['moedas']))
+                                    @foreach ($porCliente['moedas'] as $m)
+                                        <p class="figure text-sm font-semibold text-slate-800 dark:text-slate-200">
+                                            {{ $m['currency'] === 'BRL' ? Money::format($m['brl']) : Money::native($m['native'], $m['currency']) }}
+                                        </p>
+                                    @endforeach
+                                @else
+                                    {{-- O valor inteiro, sem arredondar. --}}
+                                    <p class="figure text-sm font-semibold text-slate-800 dark:text-slate-200">{{ Money::format($porCliente['total']) }}</p>
+                                @endif
                                 <p class="text-xs text-slate-400">
                                     {{ $porCliente['quantidade'] }} {{ $porCliente['quantidade'] === 1 ? 'ativo' : 'ativos' }}
                                     @if ($porCliente['crescimento']['pct'] !== null)
@@ -134,7 +158,12 @@
                                                                 </td>
                                                                 <td class="truncate py-2 pr-3 text-slate-600 dark:text-slate-400">{{ $ativo->asset_class->label() }}</td>
                                                                 <td class="py-2 pr-3 text-right tabular-nums text-slate-800 dark:text-slate-200">
-                                                                    {{ Money::compact($ativo->current_amount) }}
+                                                                    @if ($porMoedaAtivo && $ativo->native_amount !== null && $ativo->currency !== 'BRL')
+                                                                        {{ Money::native($ativo->native_amount, $ativo->currency) }}
+                                                                        <span class="block text-xs text-slate-400">≈ {{ Money::format($ativo->current_amount) }}</span>
+                                                                    @else
+                                                                        {{ Money::format($ativo->current_amount) }}
+                                                                    @endif
                                                                 </td>
                                                                 <td class="py-2 text-right tabular-nums">
                                                                     @if ($pct !== null)

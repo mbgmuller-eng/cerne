@@ -48,7 +48,7 @@
             <p class="figure mt-2 text-2xl font-medium text-slate-700 dark:text-slate-300">{{ Money::format($totalInvested) }}</p>
         </div>
         <div class="card p-5">
-            <p class="eyebrow">Ganho não realizado</p>
+            <p class="eyebrow">{{ bccomp($this->totalRealized, '0', 2) > 0 ? 'Ganho (inclui o que já foi resgatado)' : 'Ganho não realizado' }}</p>
             <p class="figure mt-2 text-2xl font-medium {{ (float) $totalGain < 0 ? 'text-slate-500 dark:text-slate-400' : 'text-accent-700 dark:text-accent-400' }}">
                 {{ Money::format($totalGain) }}
             </p>
@@ -208,6 +208,13 @@
                                 @endif
                             </p>
                             @error('investmentNativeAmount') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                        </div>
+
+                        <div wire:key="investment-field-invested-native" class="@sm:col-span-2">
+                            <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Base em {{ $moedaDoForm->currency() }} (quanto foi colocado)</label>
+                            <input type="number" step="0.0000000001" min="0" wire:model="investmentInvestedNative" class="input mt-1.5" placeholder="Se vazio, usa a quantidade">
+                            <p class="mt-1 text-xs text-slate-400">O resultado é a quantidade de hoje menos esta base, em {{ $moedaDoForm->currency() }}, sem o sobe e desce da cotação.</p>
+                            @error('investmentInvestedNative') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
                         </div>
                     @else
                         <div wire:key="investment-field-current-amount-plain">
@@ -495,6 +502,20 @@
                                         @endif
                                         @if ($ativo->return_rate) · {{ $ativo->return_rate }} @endif
                                     </p>
+                                    {{-- Base e desempenho de quem rende na própria moeda (carteira da Onil): em quantidade, sem o sobe e desce da cotação. --}}
+                                    @php $desempenho = $ativo->nativePerformance(); $resgatado = $ativo->realized_amount !== null && bccomp($ativo->realized_amount, '0', 2) > 0; @endphp
+                                    @if ($desempenho)
+                                        <p class="truncate text-xs text-slate-400">
+                                            Base {{ Money::native($desempenho['base'], $ativo->currency) }}
+                                            · resultado <span class="{{ $desempenho['pct'] < 0 ? '' : 'font-medium text-accent-700 dark:text-accent-400' }}">{{ $desempenho['pct'] >= 0 ? '+' : '' }}{{ number_format($desempenho['pct'], 2, ',', '.') }}%</span>
+                                            ({{ bccomp($desempenho['gain'], '0', 10) >= 0 ? '+' : '' }}{{ Money::native($desempenho['gain'], $ativo->currency) }})
+                                            @if ($ativo->realized_native !== null && bccomp($ativo->realized_native, '0', 10) > 0)
+                                                · já resgatado {{ Money::native($ativo->realized_native, $ativo->currency) }}
+                                            @endif
+                                        </p>
+                                    @elseif ($resgatado && $ativo->invested_amount !== null)
+                                        <p class="truncate text-xs text-slate-400">Base {{ Money::format($ativo->invested_amount) }} · já resgatado {{ Money::format($ativo->realized_amount) }}</p>
+                                    @endif
                                     {{-- Posição em cotas: comprar mais, vender e atualizar a cotação (PositionActions). --}}
                                     @if ($ativo->asset_class->hasQuantity())
                                         <p class="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs font-medium">

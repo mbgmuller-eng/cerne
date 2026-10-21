@@ -1,4 +1,4 @@
-@props(['rows', 'tone' => 'dark'])
+@props(['rows', 'tone' => 'dark', 'compact' => false, 'size' => 'text-xl'])
 
 {{--
     O patrimônio investido dividido por moeda: cada moeda com a sua quantidade (BTC e ETH com 8 casas, USDT com 2, como dólar) e o
@@ -11,11 +11,11 @@
     $claro = $tone === 'light';
 @endphp
 
-<div {{ $attributes->merge(['class' => 'grid gap-4 sm:grid-cols-2 lg:grid-cols-4']) }}>
+<div {{ $attributes->merge(['class' => $compact ? 'grid grid-cols-2 gap-3' : 'grid gap-4 sm:grid-cols-2 lg:grid-cols-4']) }}>
     @foreach ($rows as $linha)
         <div>
             <p class="{{ $claro ? 'text-slate-500 dark:text-slate-400' : 'text-brand-200' }} text-xs">{{ $rotulo[$linha['currency']] ?? $linha['currency'] }}</p>
-            <p class="figure mt-0.5 {{ $claro ? 'text-slate-900 dark:text-white' : '' }} text-xl font-medium">
+            <p class="figure mt-0.5 {{ $claro ? 'text-slate-900 dark:text-white' : '' }} {{ $size }} font-medium">
                 {{ $linha['currency'] === 'BRL' ? Money::format($linha['brl']) : Money::native($linha['native'], $linha['currency']) }}
             </p>
             @if ($linha['currency'] !== 'BRL')

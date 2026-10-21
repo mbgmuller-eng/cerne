@@ -125,6 +125,9 @@ class InvestmentsIndex extends Component
     /** Quantidade na moeda de origem (USDT, BTC ou ETH): o valor em reais é essa quantidade vezes a cotação do dia. */
     public string $investmentNativeAmount = '';
 
+    /** A base (quanto foi colocado) na moeda de origem; vazio mantém a que já existe. */
+    public string $investmentInvestedNative = '';
+
     /** Só usado ao editar — o dia em que o valor atual informado foi conferido (atualiza a foto do mês). */
     public string $investmentValueDate = '';
 
@@ -233,9 +236,15 @@ class InvestmentsIndex extends Component
         return Money::sum($this->investments->pluck('invested_amount'));
     }
 
+    /** O que já foi resgatado de investimentos que registram isso (a carteira da Onil): conta no ganho, não no patrimônio. */
+    public function getTotalRealizedProperty(): string
+    {
+        return Money::sum($this->investments->pluck('realized_amount'));
+    }
+
     public function getTotalGainProperty(): string
     {
-        return bcsub($this->total, $this->totalInvested, 2);
+        return bcsub(bcadd($this->total, $this->totalRealized, 2), $this->totalInvested, 2);
     }
 
     /**
@@ -523,6 +532,7 @@ class InvestmentsIndex extends Component
         $this->investmentHasPosition = $investimento->hasPosition();
         $this->investmentCurrentAmount = $investimento->current_amount;
         $this->investmentNativeAmount = (string) $investimento->native_amount;
+        $this->investmentInvestedNative = (string) $investimento->invested_native;
         $this->investmentValueDate = CarbonImmutable::now()->toDateString();
         $this->investmentInvestedAmount = (string) $investimento->invested_amount;
         $this->investmentPurchaseDate = $investimento->purchase_date?->toDateString() ?? '';
@@ -566,6 +576,7 @@ class InvestmentsIndex extends Component
             'investmentUnitPrice' => [$comCotas ? 'required' : 'nullable', 'numeric', 'gt:0'],
             'investmentCurrentAmount' => [$comCotas || $estrangeira ? 'nullable' : 'required', 'numeric', 'gte:0'],
             'investmentNativeAmount' => [$estrangeira ? 'required' : 'nullable', 'numeric', 'gte:0'],
+            'investmentInvestedNative' => ['nullable', 'numeric', 'gte:0'],
             'investmentValueDate' => [$editando ? 'required' : 'nullable', 'date', 'before_or_equal:today'],
             'investmentInvestedAmount' => ['nullable', 'numeric', 'gte:0'],
             'investmentPurchaseDate' => ['nullable', 'date'],
@@ -578,6 +589,7 @@ class InvestmentsIndex extends Component
             'investmentUnitPrice' => 'preço unitário',
             'investmentCurrentAmount' => 'valor atual',
             'investmentNativeAmount' => 'quantidade',
+            'investmentInvestedNative' => 'base',
             'investmentValueDate' => 'data deste valor',
         ]);
 
@@ -603,6 +615,8 @@ class InvestmentsIndex extends Component
         // USDT, BTC e ETH: o que se digita é a quantidade; o valor em reais sai da cotação do dia.
         $nativo = $estrangeira ? bcadd((string) $data['investmentNativeAmount'], '0', 10) : null;
         $valorEmReais = $estrangeira ? $this->valorEmReais($nativo, $classe) : null;
+        // A base na moeda: o que a pessoa informou; sem informar, ao criar vale a própria quantidade (sem ganho) e ao editar fica a que já existe.
+        $baseNativa = $estrangeira && ($data['investmentInvestedNative'] ?? '') !== '' ? bcadd((string) $data['investmentInvestedNative'], '0', 10) : null;
 
         if ($editando) {
             $valorAtual = $valorEmReais ?? Money::parse($data['investmentCurrentAmount']);
@@ -612,7 +626,7 @@ class InvestmentsIndex extends Component
 
             $registro->update($base + ['current_amount' => $valorAtual] + (
                 $estrangeira
-                    ? ['native_amount' => $nativo]
+                    ? ['native_amount' => $nativo] + ($baseNativa !== null ? ['invested_native' => $baseNativa, 'invested_amount' => $this->valorEmReais($baseNativa, $classe)] : [])
                     : ($temPosicao
                     // Ativo com cotas: o custo vem das compras (não se digita) e a cotação passa a ser o valor
                     // digitado dividido pelas cotas, para o valor e a cotação nunca discordarem.
@@ -658,6 +672,8 @@ class InvestmentsIndex extends Component
         } elseif ($estrangeira) {
             InvestmentRecord::create($base + [
                 'native_amount' => $nativo,
+                'invested_native' => $baseNativa ?? $nativo,
+                'invested_amount' => $baseNativa !== null ? $this->valorEmReais($baseNativa, $classe) : $valorEmReais,
                 'current_amount' => $valorEmReais,
                 'created_by_user_id' => auth()->id(),
             ]);
@@ -692,7 +708,7 @@ class InvestmentsIndex extends Component
     {
         $this->reset(
             'editingInvestmentId', 'investmentName', 'investmentTicker', 'investmentAssetClass', 'investmentReserveType', 'investmentInstitution',
-            'investmentMemberId', 'investmentIsPrivate', 'investmentCurrentAmount', 'investmentNativeAmount', 'investmentValueDate', 'investmentInvestedAmount',
+            'investmentMemberId', 'investmentIsPrivate', 'investmentCurrentAmount', 'investmentNativeAmount', 'investmentInvestedNative', 'investmentValueDate', 'investmentInvestedAmount',
             'investmentQuantity', 'investmentUnitPrice', 'investmentPurchaseDate', 'investmentReturnRate', 'investmentHasPosition',
         );
         $this->resetErrorBag();
