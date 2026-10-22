@@ -90,6 +90,25 @@ class HealthAppointmentService
 
         return $saida;
     }
+    /**
+     * Confirma o que aconteceu com a consulta. "Realizada" e "não realizada" só depois da data (antes, ninguém sabe); "cancelada" a qualquer momento;
+     * voltar para "agendada" corrige um engano. Guarda quem marcou e quando, para quem acompanha saber.
+     */
+    public function setStatus(HealthAppointment $consulta, \App\Enums\HealthAppointmentStatus $status, User $por): HealthAppointment
+    {
+        if (in_array($status, [\App\Enums\HealthAppointmentStatus::Done, \App\Enums\HealthAppointmentStatus::NotDone], true) && ! $consulta->isPast()) {
+            throw new \DomainException('Só dá para confirmar se foi realizada depois da data da consulta. Antes disso, você pode cancelá-la.');
+        }
+
+        $consulta->update([
+            'status' => $status,
+            'status_at' => $status === \App\Enums\HealthAppointmentStatus::Scheduled ? null : now(),
+            'status_by_user_id' => $status === \App\Enums\HealthAppointmentStatus::Scheduled ? null : $por->id,
+        ]);
+
+        return $consulta;
+    }
+
     public function delete(HealthAppointment $consulta): void
     {
         $consulta->delete();
@@ -166,6 +185,8 @@ class HealthAppointmentService
         HealthAppointment::query()
             ->withoutGlobalScopes()
             ->whereDate('scheduled_at', $alvo)
+            // Cancelada ou não realizada não gera lembrete.
+            ->where('status', \App\Enums\HealthAppointmentStatus::Scheduled->value)
             ->with(['member', 'escort'])
             ->chunkById(200, function (Collection $consultas) use (&$notificados): void {
                 foreach ($consultas as $consulta) {

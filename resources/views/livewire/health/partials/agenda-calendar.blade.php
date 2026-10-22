@@ -19,8 +19,13 @@
     <x-slot:detail>
         @if ($consultaAberta)
             <div wire:key="detalhe-consulta-{{ $consultaAberta->id }}">
+                @if ($consultaAberta->status !== \App\Enums\HealthAppointmentStatus::Scheduled || $consultaAberta->awaitsConfirmation())
+                    <p class="mb-1 text-xs font-semibold uppercase tracking-wide {{ $consultaAberta->status->didNotHappen() ? 'text-rose-700 dark:text-rose-400' : ($consultaAberta->awaitsConfirmation() ? 'text-amber-700 dark:text-amber-400' : 'text-emerald-700 dark:text-emerald-400') }}">
+                        {{ $consultaAberta->awaitsConfirmation() ? 'Aguardando confirmação (veja no histórico)' : $consultaAberta->status->label() }}
+                    </p>
+                @endif
                 <x-appointment-details :consulta="$consultaAberta" />
-                @if (! $consultaAberta->isPast())
+                @if (! $consultaAberta->isPast() && $consultaAberta->status === \App\Enums\HealthAppointmentStatus::Scheduled)
                     <x-calendar-actions :consulta="$consultaAberta" :show-person="$ehCasal" />
                 @endif
                 <div class="mt-4 flex items-center justify-end gap-2">

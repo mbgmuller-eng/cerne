@@ -132,16 +132,16 @@ class HealthAppointmentIndex extends Component
 
                 return new CalendarEvent(
                     key: 'consulta:'.$c->id,
-                    title: $c->title,
+                    title: ($c->status->didNotHappen() ? '('.mb_strtolower($c->status->label()).') ' : '').$c->title,
                     start: CarbonImmutable::instance($c->scheduled_at),
                     color: $cores[$c->member_id] ?? $padrao,
-                    tag: $c->kind->label(),
+                    tag: $c->kind->label().($c->status !== \App\Enums\HealthAppointmentStatus::Scheduled ? ' · '.$c->status->label() : ($c->awaitsConfirmation() ? ' · confirmar' : '')),
                     lines: array_values(array_filter([
                         $ehCasal ? $c->member->name : null,
                         $quemAtende !== '' && $quemAtende !== $c->title ? $quemAtende : null,
                         $c->location,
                     ])),
-                    muted: $c->isPast(),
+                    muted: $c->isPast() || $c->status !== \App\Enums\HealthAppointmentStatus::Scheduled,
                     // O detalhe já mostra quem atende, onde e como falar (x-appointment-details): aqui só entra de quem é.
                     detailLines: $ehCasal ? [$c->member->name] : [],
                 );
@@ -267,6 +267,16 @@ class HealthAppointmentIndex extends Component
         $this->showForm = false;
     }
 
+    /** Confirma o que aconteceu: realizada, não realizada, cancelada, ou volta para agendada (corrige um engano). */
+    public function markStatus(string $appointmentId, string $status, HealthAppointmentService $service): void
+    {
+        try {
+            $service->setStatus(HealthAppointment::query()->findOrFail($appointmentId), \App\Enums\HealthAppointmentStatus::from($status), auth()->user());
+        } catch (\DomainException $e) {
+            $this->addError('status', $e->getMessage());
+        }
+    }
+
     /** "Eu levo": qualquer participante, inclusive o de leitura (ver HealthAppointmentService::volunteerEscort). */
     public function takeEscort(string $appointmentId, HealthAppointmentService $service): void
     {
@@ -315,7 +325,7 @@ class HealthAppointmentIndex extends Component
             'paleta' => MemberPalette::COLORS,
             'calendario' => $this->calendarData(),
             'upcoming' => HealthAppointment::query()->where('profile_id', $profileId)->upcoming()->with(['member', 'createdByUser', 'escort'])->get(),
-            'past' => HealthAppointment::query()->where('profile_id', $profileId)->past()->with(['member', 'createdByUser'])->get(),
+            'past' => HealthAppointment::query()->where('profile_id', $profileId)->past()->with(['member', 'createdByUser', 'statusBy'])->get(),
             'editingExisting' => $this->editingId !== null,
             'emPessoaAcompanhada' => app(ProfileContext::class)->isCaregiver() || app(ProfileContext::class)->profile()?->isCare(),
             // Quem pode ser escolhido para levar: dono, cuidadores ativos e a própria pessoa (só dentro de uma pessoa acompanhada).
