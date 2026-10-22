@@ -45,7 +45,7 @@ class HealthCalendarController extends Controller
     {
         $context = app(ProfileContext::class);
 
-        abort_if($context->isConsultant() || $context->memberId() === null, 403);
+        abort_unless($context->isHealthParticipant(), 403);
     }
 
     /** O nome da pessoa só entra na descrição quando o perfil tem mais de uma (casal). */

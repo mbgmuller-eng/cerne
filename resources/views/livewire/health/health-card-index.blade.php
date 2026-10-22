@@ -5,7 +5,7 @@
     <div>
         <h1 class="font-display text-3xl font-semibold tracking-tight text-slate-900 dark:text-white">Ficha de Saúde</h1>
         <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
-            Tipo sanguíneo, alergias, doenças e remédios — visível para você e seu cônjuge. Consultor e corretor não têm acesso.
+            Tipo sanguíneo, alergias, doenças e remédios — @if ($emPessoaAcompanhada) visível para quem cuida desta pessoa. @else visível para você e seu cônjuge. @endif Consultor e corretor não têm acesso.
         </p>
     </div>
 
@@ -17,7 +17,7 @@
                 <h2 class="font-display text-xl font-semibold text-slate-900 dark:text-white">{{ $membro->name }}</h2>
                 <div class="flex items-center gap-2">
                     <label class="text-xs text-slate-500 dark:text-slate-400">Tipo sanguíneo</label>
-                    <select wire:model.live="bloodTypeDrafts.{{ $membro->id }}" class="select w-24">
+                    <select wire:model.live="bloodTypeDrafts.{{ $membro->id }}" class="select w-24" @disabled(! app(\App\Support\ProfileContext::class)->canWriteAsCaregiver())>
                         <option value=""></option>
                         @foreach (['A+','A-','B+','B-','AB+','AB-','O+','O-'] as $tipo)
                             <option value="{{ $tipo }}">{{ $tipo }}</option>
@@ -37,12 +37,12 @@
                             @foreach ($allergies as $alergia)
                                 <li class="flex items-center justify-between gap-2 text-sm" wire:key="al-{{ $alergia->id }}">
                                     <span class="text-slate-700 dark:text-slate-300">{{ $alergia->description }}</span>
-                                    <button type="button" wire:click="removeAllergy('{{ $alergia->id }}')" class="text-xs text-slate-400 hover:text-red-700 dark:hover:text-red-400">remover</button>
+                                    <button type="button" data-write wire:click="removeAllergy('{{ $alergia->id }}')" class="text-xs text-slate-400 hover:text-red-700 dark:hover:text-red-400">remover</button>
                                 </li>
                             @endforeach
                         </ul>
                     @endif
-                    <form wire:submit="addAllergy('{{ $membro->id }}')" class="mt-2 flex gap-2">
+                    <form data-write wire:submit="addAllergy('{{ $membro->id }}')" class="mt-2 flex gap-2">
                         <input type="text" wire:model="newAllergyText.{{ $membro->id }}" class="input" placeholder="Ex.: Dipirona" maxlength="160">
                         <button type="submit" class="btn-secondary shrink-0 px-3 text-xs">Adicionar</button>
                     </form>
@@ -58,12 +58,12 @@
                             @foreach ($conditions as $condicao)
                                 <li class="flex items-center justify-between gap-2 text-sm" wire:key="co-{{ $condicao->id }}">
                                     <span class="text-slate-700 dark:text-slate-300">{{ $condicao->description }}</span>
-                                    <button type="button" wire:click="removeCondition('{{ $condicao->id }}')" class="text-xs text-slate-400 hover:text-red-700 dark:hover:text-red-400">remover</button>
+                                    <button type="button" data-write wire:click="removeCondition('{{ $condicao->id }}')" class="text-xs text-slate-400 hover:text-red-700 dark:hover:text-red-400">remover</button>
                                 </li>
                             @endforeach
                         </ul>
                     @endif
-                    <form wire:submit="addCondition('{{ $membro->id }}')" class="mt-2 flex gap-2">
+                    <form data-write wire:submit="addCondition('{{ $membro->id }}')" class="mt-2 flex gap-2">
                         <input type="text" wire:model="newConditionText.{{ $membro->id }}" class="input" placeholder="Ex.: Hipertensão" maxlength="160">
                         <button type="submit" class="btn-secondary shrink-0 px-3 text-xs">Adicionar</button>
                     </form>
@@ -74,7 +74,7 @@
             <div>
                 <div class="flex items-center justify-between">
                     <p class="eyebrow">Remédios</p>
-                    <button type="button" wire:click="newMedication('{{ $membro->id }}')" class="btn-ghost px-2 py-1 text-xs">+ Remédio</button>
+                    <button type="button" data-write wire:click="newMedication('{{ $membro->id }}')" class="btn-ghost px-2 py-1 text-xs">+ Remédio</button>
                 </div>
 
                 @if ($medications->isEmpty())
@@ -98,7 +98,7 @@
                                             <p class="text-xs text-slate-400">Prescrito por {{ $remedio->prescriber }}</p>
                                         @endif
                                     </div>
-                                    <button type="button" wire:click="editMedication('{{ $remedio->id }}')" class="btn-ghost shrink-0 px-2 py-1 text-xs">Editar</button>
+                                    <button type="button" data-write wire:click="editMedication('{{ $remedio->id }}')" class="btn-ghost shrink-0 px-2 py-1 text-xs">Editar</button>
                                 </div>
 
                                 @if ($remedio->changes->isNotEmpty())
@@ -123,7 +123,7 @@
                                     </details>
                                 @endif
 
-                                <form wire:submit="addMedicationNote('{{ $remedio->id }}')" class="mt-2 flex gap-2">
+                                <form data-write wire:submit="addMedicationNote('{{ $remedio->id }}')" class="mt-2 flex gap-2">
                                     <input type="text" wire:model="medNoteText.{{ $remedio->id }}" class="input text-xs" placeholder="Adicionar observação ao histórico..." maxlength="500">
                                     <button type="submit" class="btn-ghost shrink-0 px-2 text-xs">Salvar</button>
                                 </form>
@@ -132,7 +132,8 @@
                     </ul>
                 @endif
             </div>
-            {{-- QR Code de emergência --}}
+            {{-- QR Code de emergência (o cuidador de leitura só vê se o dono já gerou) --}}
+            @if ($card->emergency_token)
             @php
                 $qrCodeUrl = route('health.qrcode.show', $membro->id) . '?v=' . $card->updated_at?->timestamp;
                 $emergencyUrl = route('health.emergency.show', $card->emergency_token);
@@ -174,17 +175,18 @@
                             <span x-show="!baixando">Baixar imagem</span>
                             <span x-show="baixando" x-cloak>Baixando...</span>
                         </button>
-                        <button type="button" wire:click="regenerateEmergencyToken('{{ $membro->id }}')" wire:confirm="Gerar um novo código? O QR Code impresso atual para de funcionar." class="text-xs text-slate-400 hover:text-red-700 dark:hover:text-red-400">
+                        <button type="button" data-owner-only wire:click="regenerateEmergencyToken('{{ $membro->id }}')" wire:confirm="Gerar um novo código? O QR Code impresso atual para de funcionar." class="text-xs text-slate-400 hover:text-red-700 dark:hover:text-red-400">
                             Gerar novo código
                         </button>
                     </div>
                 </div>
             </div>
+            @endif
         </section>
     @endforeach
 
     <x-modal wire-model="showMedicationForm">
-        <form wire:submit="saveMedication" class="space-y-4">
+        <form data-write wire:submit="saveMedication" class="space-y-4">
             <div class="flex items-baseline justify-between">
                 <h2 class="text-sm font-semibold text-slate-900 dark:text-white">{{ $editingExisting ? 'Editar remédio' : 'Novo remédio' }}</h2>
                 <button type="button" wire:click="closeMedicationForm" class="btn-ghost px-2 py-1 text-xs">Cancelar</button>

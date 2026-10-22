@@ -81,7 +81,7 @@ class PrivacyCenter extends Component
             return;
         }
 
-        if ($this->sharedWith() !== [] && ! $this->understandsShared) {
+        if (($this->sharedWith() !== [] || $this->carePeople() !== []) && ! $this->understandsShared) {
             $this->addError('understandsShared', 'Confirme que entende que o perfil compartilhado também será apagado.');
 
             return;
@@ -116,6 +116,16 @@ class PrivacyCenter extends Component
         return ProfileMember::query()->whereIn('profile_id', $perfis)->whereNotNull('user_id')->where('user_id', '!=', $usuario->id)->pluck('name')->all();
     }
 
+    /**
+     * Nomes das pessoas acompanhadas que este usuário cadastrou: apagar a conta apaga o espaço delas, com os dados, os documentos e o acesso de quem cuida.
+     *
+     * @return list<string>
+     */
+    public function carePeople(): array
+    {
+        return auth()->user()->careProfiles()->pluck('profile_name')->all();
+    }
+
     public function render()
     {
         $usuario = auth()->user();
@@ -124,6 +134,7 @@ class PrivacyCenter extends Component
             'user' => $usuario,
             'latestExport' => DataExport::query()->where('user_id', $usuario->id)->latest()->first(),
             'sharedWith' => $this->sharedWith(),
+            'carePeople' => $this->carePeople(),
             'isHealthUser' => $usuario->isClient() || $usuario->health_consent_at !== null,
         ]);
     }

@@ -15,6 +15,21 @@ use App\Support\ProfileContext;
  */
 trait RequiresPersonalHealth
 {
+    /**
+     * Ficha, agenda e cuidados: além dos membros do perfil, entram o cuidador e o dono do perfil de uma pessoa acompanhada (que não tem
+     * cadeira nele). Consultor e corretor continuam barrados.
+     */
+    protected function abortUnlessHealthParticipant(): void
+    {
+        $context = app(ProfileContext::class);
+
+        if ($context->profile() === null) {
+            return;
+        }
+
+        abort_unless($context->isHealthParticipant(), 403);
+    }
+
     protected function abortUnlessPersonalHealthOwner(): void
     {
         $context = app(ProfileContext::class);

@@ -18,10 +18,11 @@ use Illuminate\Support\Str;
 class DocumentService
 {
     /** @param  array<string, mixed>  $dados  category, title, member_id, insurance_policy_id, expires_on, visible_to_professional */
-    public function upload(UploadedFile $arquivo, array $dados, ProfileMember $autor): Document
+    public function upload(UploadedFile $arquivo, array $dados, ?ProfileMember $autor): Document
     {
+        // O perfil vem do contexto, não do autor: cuidador e dono de uma pessoa acompanhada não têm cadeira no perfil.
         $caminho = $arquivo->store(
-            config('cerne.document_vault.path').'/'.$autor->profile_id,
+            config('cerne.document_vault.path').'/'.app(ProfileContext::class)->profileId(),
             config('cerne.document_vault.disk'),
         );
 
@@ -75,6 +76,7 @@ class DocumentService
             // gravar mesmo assim não abre brecha nenhuma nas outras categorias.
             'visible_to_professional' => $categoria === DocumentCategory::Other && (bool) ($dados['visible_to_professional'] ?? false),
             'created_by_member_id' => $autor?->id,
+            'shared_with_caregivers' => (bool) ($dados['shared_with_caregivers'] ?? false),
         ]);
     }
 
@@ -97,6 +99,7 @@ class DocumentService
             'title' => trim($dados['title']),
             'expires_on' => $dados['expires_on'] ?? null,
             'visible_to_professional' => $categoria === DocumentCategory::Other && (bool) ($dados['visible_to_professional'] ?? false),
+            'shared_with_caregivers' => array_key_exists('shared_with_caregivers', $dados) ? (bool) $dados['shared_with_caregivers'] : $documento->shared_with_caregivers,
         ]);
 
         return $documento;

@@ -8,7 +8,7 @@
                 Avisamos um dia antes e no dia. Remédios de uso contínuo ficam na Ficha de Saúde.
             </p>
         </div>
-        <button type="button" wire:click="newItem" class="btn-primary shrink-0 px-3 py-2 text-sm">+ Novo item</button>
+        <button type="button" data-write wire:click="newItem" class="btn-primary shrink-0 px-3 py-2 text-sm">+ Novo item</button>
     </div>
 
     <section class="card space-y-3 p-5">
@@ -61,10 +61,10 @@
                                 <x-calendar-actions :item="$item" :show-person="$membros->count() > 1" />
                             </div>
                             <div class="flex shrink-0 flex-col items-end gap-1">
-                                <button type="button" wire:click="markDone('{{ $item->id }}')" wire:loading.attr="disabled" class="btn-secondary px-3 py-1 text-xs">Feito hoje</button>
+                                <button type="button" data-write wire:click="markDone('{{ $item->id }}')" wire:loading.attr="disabled" class="btn-secondary px-3 py-1 text-xs">Feito hoje</button>
                                 <div class="flex items-center gap-2">
-                                    <button type="button" wire:click="editItem('{{ $item->id }}')" class="btn-ghost px-2 py-1 text-xs">Editar</button>
-                                    <button type="button" wire:click="toggleActive('{{ $item->id }}')" class="text-xs text-slate-400 hover:text-slate-700 dark:hover:text-slate-200">pausar</button>
+                                    <button type="button" data-write wire:click="editItem('{{ $item->id }}')" class="btn-ghost px-2 py-1 text-xs">Editar</button>
+                                    <button type="button" data-write wire:click="toggleActive('{{ $item->id }}')" class="text-xs text-slate-400 hover:text-slate-700 dark:hover:text-slate-200">pausar</button>
                                 </div>
                             </div>
                         </div>
@@ -86,8 +86,8 @@
                             <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{{ $item->member->name }} · {{ $item->frequencyLabel() }}</p>
                         </div>
                         <div class="flex shrink-0 items-center gap-2">
-                            <button type="button" wire:click="toggleActive('{{ $item->id }}')" class="btn-secondary px-3 py-1 text-xs">Retomar</button>
-                            <button type="button" wire:click="delete('{{ $item->id }}')" wire:confirm="Remover este item de vez?" class="text-xs text-slate-400 hover:text-red-700 dark:hover:text-red-400">remover</button>
+                            <button type="button" data-write wire:click="toggleActive('{{ $item->id }}')" class="btn-secondary px-3 py-1 text-xs">Retomar</button>
+                            <button type="button" data-write wire:click="delete('{{ $item->id }}')" wire:confirm="Remover este item de vez?" class="text-xs text-slate-400 hover:text-red-700 dark:hover:text-red-400">remover</button>
                         </div>
                     </li>
                 @endforeach
@@ -163,7 +163,7 @@
             <div class="flex items-center gap-3">
                 <button type="submit" class="btn-primary flex-1">Salvar</button>
                 @if ($editingExisting)
-                    <button type="button" wire:click="delete('{{ $editingId }}')" wire:confirm="Remover este item de vez?" class="text-xs text-slate-400 hover:text-red-700 dark:hover:text-red-400">remover</button>
+                    <button type="button" data-write wire:click="delete('{{ $editingId }}')" wire:confirm="Remover este item de vez?" class="text-xs text-slate-400 hover:text-red-700 dark:hover:text-red-400">remover</button>
                 @endif
             </div>
         </form>

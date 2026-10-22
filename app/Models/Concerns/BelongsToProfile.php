@@ -41,7 +41,8 @@ trait BelongsToProfile
 
     public function profile(): BelongsTo
     {
-        return $this->belongsTo(FinancialProfile::class, 'profile_id');
+        // O perfil de cuidado fica escondido por padrão (CareProfileScope), mas o dado de saúde dele pertence a ele: a relação tem que achá-lo.
+        return $this->belongsTo(FinancialProfile::class, 'profile_id')->withoutGlobalScope(\App\Models\Scopes\CareProfileScope::class);
     }
 
     /**

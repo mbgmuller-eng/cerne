@@ -65,6 +65,17 @@
                     <button type="button" wire:click="$set('confirmingDeletion', true)" class="mt-2 rounded-lg border border-red-300 px-3 py-1.5 text-sm text-red-800 hover:bg-red-50 dark:border-red-800 dark:text-red-300 dark:hover:bg-red-950/30">Quero excluir minha conta</button>
                 @else
                     <div class="mt-3 space-y-3 rounded-lg border border-red-200 p-3 dark:border-red-900">
+                        @if ($carePeople !== [])
+                            <div class="rounded-md bg-amber-50 p-2 text-xs text-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
+                                Você cadastrou {{ implode(', ', $carePeople) }}. Apagar a sua conta apaga também esse espaço, com os dados de saúde, os documentos e o acesso de quem cuida junto com você.
+                                <label class="mt-2 flex items-start gap-2">
+                                    <input type="checkbox" wire:model="understandsShared" class="mt-0.5 rounded border-slate-300 text-brand-700 focus:ring-brand-500">
+                                    <span>Entendo e quero apagar também essas pessoas acompanhadas.</span>
+                                </label>
+                                @error('understandsShared') <p class="mt-1 text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                            </div>
+                        @endif
+
                         @if ($sharedWith !== [])
                             <div class="rounded-md bg-amber-50 p-2 text-xs text-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
                                 Você é o titular de um perfil que {{ implode(', ', $sharedWith) }} também usa. Apagar a sua conta apaga esse perfil inteiro, inclusive o que essa pessoa lançou.

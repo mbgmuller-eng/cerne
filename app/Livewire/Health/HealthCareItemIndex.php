@@ -41,7 +41,7 @@ class HealthCareItemIndex extends Component
     public function mount(): void
     {
         $this->redirectOrAbortWithoutProfile();
-        $this->abortUnlessPersonalHealthOwner();
+        $this->abortUnlessHealthParticipant();
     }
 
     public function newItem(): void
@@ -184,7 +184,7 @@ class HealthCareItemIndex extends Component
             ->findOrFail($memberId);
     }
 
-    private function autor(): ProfileMember
+    private function autor(): ?ProfileMember
     {
         return app(ProfileContext::class)->member();
     }

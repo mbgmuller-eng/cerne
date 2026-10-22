@@ -54,7 +54,7 @@ class HealthAppointmentIndex extends Component
     public function mount(): void
     {
         $this->redirectOrAbortWithoutProfile();
-        $this->abortUnlessPersonalHealthOwner();
+        $this->abortUnlessHealthParticipant();
     }
 
     // -----------------------------------------------------------------
@@ -287,6 +287,7 @@ class HealthAppointmentIndex extends Component
             'upcoming' => HealthAppointment::query()->where('profile_id', $profileId)->upcoming()->with('member')->get(),
             'past' => HealthAppointment::query()->where('profile_id', $profileId)->past()->with('member')->get(),
             'editingExisting' => $this->editingId !== null,
+            'emPessoaAcompanhada' => app(ProfileContext::class)->isCaregiver() || app(ProfileContext::class)->profile()?->isCare(),
         ] + $this->compromissoAberto());
     }
 
@@ -307,7 +308,7 @@ class HealthAppointmentIndex extends Component
             ->findOrFail($memberId);
     }
 
-    private function autor(): ProfileMember
+    private function autor(): ?ProfileMember
     {
         return app(ProfileContext::class)->member();
     }

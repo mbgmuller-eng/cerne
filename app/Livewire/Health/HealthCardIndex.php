@@ -54,7 +54,7 @@ class HealthCardIndex extends Component
     public function mount(): void
     {
         $this->redirectOrAbortWithoutProfile();
-        $this->abortUnlessPersonalHealthOwner();
+        $this->abortUnlessHealthParticipant();
 
         foreach ($this->membros() as $membro) {
             $this->bloodTypeDrafts[$membro->id] = app(HealthCardService::class)->cardFor($membro)->blood_type ?? '';
@@ -101,6 +101,9 @@ class HealthCardIndex extends Component
 
     public function regenerateEmergencyToken(string $memberId, HealthCardService $service): void
     {
+        // Trocar o QR invalida o que está impresso: é decisão do dono, não de quem cuida.
+        abort_if(app(ProfileContext::class)->isCaregiver(), 403);
+
         $service->regenerateEmergencyToken($this->membroOuFalha($memberId), $this->autor());
     }
 
@@ -199,6 +202,7 @@ class HealthCardIndex extends Component
         return view('livewire.health.health-card-index', [
             'fichas' => $fichas,
             'editingExisting' => $this->editingMedicationId !== null,
+            'emPessoaAcompanhada' => app(ProfileContext::class)->isCaregiver() || app(ProfileContext::class)->profile()?->isCare(),
         ]);
     }
 
@@ -222,7 +226,7 @@ class HealthCardIndex extends Component
             ->findOrFail($memberId);
     }
 
-    private function autor(): ProfileMember
+    private function autor(): ?ProfileMember
     {
         return app(ProfileContext::class)->member();
     }

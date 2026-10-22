@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Support\ProfileContext;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -16,6 +17,17 @@ class RequiresHealthConsent
     public function handle(Request $request, Closure $next): Response
     {
         $user = $request->user();
+
+        // Na pessoa acompanhada o consentimento que vale é o DELA (declarado por quem a cadastrou), não o de quem está olhando.
+        $perfil = app(ProfileContext::class)->profile();
+
+        if ($perfil !== null && $perfil->isCare()) {
+            if ($perfil->care_consent_at !== null) {
+                return $next($request);
+            }
+
+            return redirect()->route('care.index')->with('status', 'Esta pessoa ainda não tem a declaração de consentimento. Quem a cadastrou precisa confirmá-la.');
+        }
 
         if ($user === null || $request->session()->has('impersonator_id') || $user->hasCurrentHealthConsent()) {
             return $next($request);

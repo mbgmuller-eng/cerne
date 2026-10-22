@@ -17,7 +17,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  */
 #[Fillable([
     'profile_id', 'member_id', 'category', 'name', 'device_name', 'interval_value', 'interval_unit',
-    'last_done_on', 'next_due_on', 'notes', 'is_active', 'created_by_member_id',
+    'last_done_on', 'next_due_on', 'notes', 'is_active', 'created_by_member_id', 'created_by_user_id',
 ])]
 class HealthCareItem extends Model
 {

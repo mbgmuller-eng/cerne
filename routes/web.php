@@ -103,6 +103,11 @@ Route::middleware('guest')->group(function (): void {
     Route::post('/convite-profissional/{token}', [AcceptProfessionalInviteController::class, 'store'])->name('professional-invite.store');
 });
 
+// Convite para acompanhar uma pessoa: fora do grupo de visitantes de propósito. Quem já tem conta pode estar logado ao abrir o link, e o
+// controlador decide o que mostrar conforme o e-mail convidado.
+Route::get('/convite-cuidador/{token}', [\App\Http\Controllers\Auth\AcceptCaregiverInviteController::class, 'show'])->name('caregiver-invite.accept');
+Route::post('/convite-cuidador/{token}', [\App\Http\Controllers\Auth\AcceptCaregiverInviteController::class, 'store'])->name('caregiver-invite.store');
+
 // QR Code de emergência: pública de propósito (quem escaneia é um
 // socorrista ou familiar sem conta) — token opaco no lugar de login, ver
 // HealthCardService::emergencyPayload().
@@ -152,7 +157,7 @@ Route::middleware('auth')->group(function (): void {
 | carimbado (ClientOnboardingService/ProfessionalOnboardingService), não
 | muda de comportamento pra ela.
 */
-Route::middleware(['auth', 'verified', 'termos'])->group(function (): void {
+Route::middleware(['auth', 'verified', 'termos', 'cuidado'])->group(function (): void {
     // Fora do bloqueio por assinatura: o necessário para pagar e para sair
     // (ver RequiresActiveSubscription).
     Route::get('/minha-conta', MyAccount::class)->name('my-account');
@@ -173,6 +178,11 @@ Route::middleware(['auth', 'verified', 'termos'])->group(function (): void {
     Route::get('/vinculo/{consultantClient}', [ConsultantLinkController::class, 'show'])->name('link.show')->middleware('signed');
     Route::post('/vinculo/{consultantClient}/autorizar', [ConsultantLinkController::class, 'accept'])->name('link.accept');
     Route::post('/vinculo/{consultantClient}/recusar', [ConsultantLinkController::class, 'decline'])->name('link.decline');
+
+    // Pessoas que acompanho: fora do bloqueio por assinatura (quem só cuida, como o irmão, pode não ter plano) e sem perfil ativo.
+    Route::get('/pessoas', \App\Livewire\Care\CareIndex::class)->name('care.index');
+    Route::post('/pessoas/sair', [\App\Http\Controllers\CareSwitchController::class, 'leave'])->name('care.exit');
+    Route::post('/pessoas/{profile}/abrir', [\App\Http\Controllers\CareSwitchController::class, 'open'])->name('care.open');
 
     Route::middleware('assinatura')->group(function (): void {
         Route::get('/painel', Dashboard::class)->name('dashboard');

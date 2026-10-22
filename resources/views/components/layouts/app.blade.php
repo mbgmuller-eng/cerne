@@ -63,6 +63,30 @@
             $context->isConsultant() ? null : ['label' => 'Saúde', 'items' => $navSaude],
         ]));
 
+    // Dentro do perfil de uma pessoa acompanhada (cuidador, ou o dono dela) só existem saúde e documentos: o resto é finança, que ali não há.
+    $emPerfilDeCuidado = $profile && ($context->isCaregiver() || $profile->isCare());
+    if ($emPerfilDeCuidado) {
+        $navSections = [
+            ['label' => 'Saúde', 'items' => [
+                ['health.card.index', 'Ficha de Saúde', 'Ficha', 'heart'],
+                ['health.appointments.index', 'Agenda de Saúde', 'Agenda', 'calendar'],
+                ['health.care.index', 'Cuidados e itens', 'Cuidados', 'tag'],
+                ['care.index', 'Pessoas que acompanho', 'Pessoas', 'contact'],
+            ]],
+            ['label' => 'Documentos', 'items' => $navDocumentos],
+        ];
+    } elseif ($user && \App\Services\CareProfileService::enabled()) {
+        // "Pessoas que acompanho" entra na seção de Saúde de quem pode cadastrar alguém (recurso ligado). Quem só cuida, sem plano próprio,
+        // chega pela lista (care.index) e pelo banner.
+        $navSections = array_map(function (array $secao) {
+            if ($secao['label'] === 'Saúde') {
+                $secao['items'][] = ['care.index', 'Pessoas que acompanho', 'Pessoas', 'contact'];
+            }
+
+            return $secao;
+        }, $navSections);
+    }
+
     // Cor da barra de dentro do perfil: a do SETOR que a pessoa está
     // vendo, não o tema claro/escuro (esse continua só no conteúdo — ver
     // memory: project_multi_product_branding). Corretor só tem Seguros,
@@ -556,6 +580,21 @@
          ============================================================ --}}
     <div class="flex min-w-0 flex-1 flex-col">
 
+        @if ($emPerfilDeCuidado)
+            <div class="flex flex-wrap items-center justify-between gap-3 bg-saude-800 px-4 py-2 text-sm text-white">
+                <span>
+                    Você está acompanhando <strong>{{ $profile->profile_name }}</strong>@if ($context->isCaregiver()) · {{ mb_strtolower($context->caregiver()->access_level->label()) }}@endif.
+                </span>
+                <span class="flex items-center gap-4">
+                    <a href="{{ route('care.index') }}" class="font-medium underline">Pessoas</a>
+                    <form method="POST" action="{{ route('care.exit') }}">
+                        @csrf
+                        <button type="submit" class="font-medium underline">Voltar para minha conta</button>
+                    </form>
+                </span>
+            </div>
+        @endif
+
         @if (session('impersonator_id'))
             <div class="flex items-center justify-between gap-3 bg-amber-500 px-4 py-2 text-sm text-amber-950">
                 <span>Você está vendo como <strong>{{ $user->name }}</strong>.</span>
@@ -661,6 +700,10 @@
             'mx-auto w-full flex-1 px-4 py-6 sm:px-6 sm:py-8 lg:px-10 lg:py-10',
             'max-w-6xl 2xl:max-w-[96rem]' => ! $wide,
             'pb-24 lg:pb-10' => $mostraAsideDesktop,  // espaço para a barra inferior no celular
+            // Cuidador de leitura não vê os botões de escrita (a trava de verdade é no servidor, ver CaregiverWriteGuard); o de edição também não
+            // vê o que é só do dono (ex.: trocar o QR de emergência).
+            '[&_[data-write]]:hidden' => $context->isCaregiver() && ! $context->canWriteAsCaregiver(),
+            '[&_[data-owner-only]]:hidden' => $context->isCaregiver(),
         ])>
             @if (session('status'))
                 <div class="mb-6 rounded-xl bg-brand-50 px-4 py-3 text-sm text-brand-900 ring-1 ring-brand-200 dark:bg-brand-500/10 dark:text-brand-200 dark:ring-brand-500/20">
@@ -905,7 +948,7 @@
 {{-- Atalho de lançamento: quem tem Finanças e está dentro de um perfil. Fora:
      corretor (só Seguros), áreas do consultor e do admin, e as telas que
      funcionam com o acesso travado (assinatura, Minha conta). --}}
-@if ($dentroDoPerfil && ! $user?->isBroker() && ! request()->routeIs(['subscription.*', 'my-account']))
+@if ($dentroDoPerfil && ! $emPerfilDeCuidado && ! $user?->isBroker() && ! request()->routeIs(['subscription.*', 'my-account', 'care.*']))
     <x-quick-add :na-tela="request()->routeIs('cashflow.index')" />
 @endif
 

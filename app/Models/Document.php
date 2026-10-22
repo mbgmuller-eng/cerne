@@ -17,7 +17,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  */
 #[Fillable([
     'profile_id', 'member_id', 'folder_id', 'category', 'insurance_policy_id', 'title', 'original_filename',
-    'storage_path', 'mime_type', 'size_bytes', 'expires_on', 'visible_to_professional', 'created_by_member_id',
+    'storage_path', 'mime_type', 'size_bytes', 'expires_on', 'visible_to_professional', 'shared_with_caregivers', 'created_by_member_id', 'created_by_user_id',
 ])]
 class Document extends Model
 {
@@ -30,6 +30,7 @@ class Document extends Model
             'expires_on' => 'date',
             'size_bytes' => 'integer',
             'visible_to_professional' => 'boolean',
+            'shared_with_caregivers' => 'boolean',
         ];
     }
 

@@ -200,6 +200,28 @@ Texto da política em `/privacidade` (rascunho, **sem revisão jurídica**), pla
   de perfil compartilhado confirma que o cônjuge perde o perfil. Cônjuge que não é titular só perde o login. Administrador da plataforma não se exclui por aqui.
   **Tabela nova com dado do usuário sem chave estrangeira, ou disco novo com arquivo da pessoa: acrescente em `AccountDeletionService` e em `UserDataExporter`.**
 
+### Pessoa acompanhada e cuidadores (saúde e documentos de quem não usa o app)
+
+Mãe, pai ou quem mais o usuário ajuda a cuidar: um perfil de cuidado (`ProfileType::Care`, `FinancialProfile`) com UM membro sem login. Quem cadastra é o **dono** e paga
+(R$ 4,90 por pessoa: a cobrança é a fase 2, ainda não feita; o recurso fica atrás de `CERNE_CARE_ENABLED`, desligado em produção até lá). Quem cuida junto entra como
+**cuidador** (`ProfileCaregiver`, leitura ou edição) e não precisa de assinatura nem de perfil próprio. Regras que não se quebram:
+
+- **Perfil de cuidado é invisível a todo código antigo**: `CareProfileScope` (global em `FinancialProfile`) o esconde de toda consulta por dono (carteira do consultor, agenda,
+  perfil padrão ao entrar, datas importantes...). Só aparece por `FinancialProfile::withCareProfiles()`. Consulta nova que precise dele diz isso de propósito.
+  Consultor e corretor **nunca** abrem esse perfil (a policy nega), mesmo vinculados ao dono.
+- **Cuidador = lista de permitidos, fail-closed**: `ProfileScope` só devolve linhas ao cuidador dos models que declaram `visibleToCaregiver()` (as 7 tabelas de saúde por
+  `IsCoupleHealthData` e `Document` por `HasDocumentVisibility`); todo o resto (finanças, seguros, academia, taxonomias) devolve zero. `CaregiverTest` varre `app/Models` e trava a
+  lista: mudá-la é decisão de privacidade. Segunda trava por rota: `RestrictCareContext` (alias `cuidado`) só deixa abertas as rotas permitidas dentro do perfil de cuidado.
+- **Escrita travada no model** (`CaregiverWriteGuard`): leitor não grava nem apaga; editor cria e altera, mas só apaga o que ele mesmo registrou. Todo registro novo guarda
+  `created_by_user_id`/`changed_by_user_id` (o cuidador não tem membro no perfil). Quem não pode gravar não pode nem criar linha ao abrir a tela (`HealthCardService::cardFor`).
+- **Documentos**: o cuidador vê só o `shared_with_caregivers` (o dono libera); o que ele mesmo cadastra já nasce liberado para todos. Sem pastas (estrutura do dono).
+- **Consentimento é o da pessoa acompanhada**, declarado por quem cadastra (`care_consent_*`: ela autorizou, ou ele é o representante legal). Sem a declaração a Saúde dessa pessoa
+  fecha e ninguém é avisado (`RequiresHealthConsent`, `HealthReminderRecipients`). O texto da declaração precisa de advogado.
+- **Avisos** de consulta e de troca de item vão ao dono e aos cuidadores com `notify_reminders` (a pessoa não lê o app): `HealthReminderRecipients`.
+- **Só o dono** convida, muda o nível, revoga e exclui a pessoa (`FinancialProfilePolicy::manageCaregivers`). Revogar corta na hora (o `SetProfileContext` reautoriza a cada requisição).
+  Excluir a pessoa ou a conta do dono apaga dados **e arquivos** (`AccountDeletionService::deleteProfile`).
+- Tela `/pessoas` (`CareIndex`) é a porta de entrada, sem perfil ativo (quem só cuida pode não ter perfil próprio). Convite: `/convite-cuidador/{token}`, POST puro.
+
 ### Investimento em outra moeda (USDT, BTC, ETH)
 
 Tipos de ativo `usdt`, `btc`, `eth` e `brl` (`AssetClass`; `brl` é saldo em reais numa corretora). Regras que não se quebram:

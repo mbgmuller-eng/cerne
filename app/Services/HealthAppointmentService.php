@@ -24,7 +24,7 @@ class HealthAppointmentService
      * @param  array<string, mixed>  $dados  kind, title, scheduled_at e os campos opcionais (profissional, especialidade,
      *                                       local, endereço, telefone, quem agendou e com quem, anotações)
      */
-    public function create(ProfileMember $membro, array $dados, ProfileMember $autor): HealthAppointment
+    public function create(ProfileMember $membro, array $dados, ?ProfileMember $autor): HealthAppointment
     {
         $opcionais = $this->opcionais($dados);
 
@@ -33,7 +33,7 @@ class HealthAppointmentService
             'kind' => $dados['kind'],
             'title' => $this->titulo($dados['title'] ?? '', $opcionais),
             'scheduled_at' => $dados['scheduled_at'],
-            'created_by_member_id' => $autor->id,
+            'created_by_member_id' => $autor?->id,
         ]);
     }
 
@@ -112,8 +112,8 @@ class HealthAppointmentService
             ->chunkById(200, function (Collection $consultas) use (&$notificados): void {
                 foreach ($consultas as $consulta) {
                     foreach ($this->recipientsFor($consulta) as $user) {
-                        // Sem o consentimento de saúde (ou depois de revogá-lo) não se trata dado de saúde, nem para avisar.
-                        if (! $user->hasCurrentHealthConsent() || $this->alreadyNotifiedToday($user, $consulta->id)) {
+                        // O consentimento de saúde já foi conferido em HealthReminderRecipients (o do membro, ou o declarado da pessoa acompanhada).
+                        if ($this->alreadyNotifiedToday($user, $consulta->id)) {
                             continue;
                         }
 
@@ -129,9 +129,7 @@ class HealthAppointmentService
     /** @return Collection<int, User> */
     private function recipientsFor(HealthAppointment $consulta): Collection
     {
-        return FinancialProfile::find($consulta->profile_id)
-            ?->activeMembers()->whereNotNull('user_id')->with('user')->get()
-            ->pluck('user')->filter()->values() ?? collect();
+        return app(HealthReminderRecipients::class)->forProfile($consulta->profile_id);
     }
 
     private function alreadyNotifiedToday(User $user, string $appointmentId): bool

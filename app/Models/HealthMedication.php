@@ -13,7 +13,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 #[Fillable([
     'profile_id', 'member_id', 'name', 'dose', 'schedule', 'reason', 'prescriber',
-    'started_on', 'ended_on', 'is_active', 'created_by_member_id',
+    'started_on', 'ended_on', 'is_active', 'created_by_member_id', 'created_by_user_id',
 ])]
 class HealthMedication extends Model
 {

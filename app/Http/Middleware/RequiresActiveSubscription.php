@@ -3,6 +3,7 @@
 namespace App\Http\Middleware;
 
 use App\Services\AccessService;
+use App\Support\ProfileContext;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -30,8 +31,15 @@ class RequiresActiveSubscription
 
         $usuario = $request->user();
 
-        if ($usuario === null || $this->acesso->hasAccess($usuario)) {
+        // Cuidador sem plano próprio entra na pessoa que o liberou (quem paga é o dono dela). O que é dele continua travado: o contexto de
+        // cuidador só abre saúde e documentos (RestrictCareContext), e o módulo é conferido na assinatura do dono.
+        if ($usuario === null || app(ProfileContext::class)->isCaregiver() || $this->acesso->hasAccess($usuario)) {
             return $next($request);
+        }
+
+        // Quem não tem plano mas acompanha alguém (o irmão que só cuida) não tem o que pagar para fazer isso: vai para a lista de pessoas.
+        if ($usuario->followedProfiles()->exists()) {
+            return redirect()->route('care.index');
         }
 
         return redirect()

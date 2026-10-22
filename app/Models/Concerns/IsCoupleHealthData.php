@@ -31,6 +31,7 @@ trait IsCoupleHealthData
     public static function bootIsCoupleHealthData(): void
     {
         static::addGlobalScope(new CoupleHealthScope);
+        \App\Support\CaregiverWriteGuard::register(static::class);
 
         static::creating(function (Model $model): void {
             if ($model->getAttribute('member_id') === null) {
@@ -49,6 +50,12 @@ trait IsCoupleHealthData
                 $model->setAttribute('profile_id', $profileId);
             }
         });
+    }
+
+    /** Ficha e agenda de saúde são do que o cuidador enxerga (lista de permitidos em ProfileScope). */
+    public static function visibleToCaregiver(): bool
+    {
+        return true;
     }
 
     public function member(): BelongsTo

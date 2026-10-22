@@ -36,6 +36,15 @@ class Dashboard extends Component
         $this->exibicao = session('dashboard_exibicao') === 'moedas' ? 'moedas' : 'reais';
 
         if (app(ProfileContext::class)->profile() === null) {
+            // Quem só cuida de alguém (sem perfil próprio) começa na lista de pessoas.
+            $usuario = auth()->user();
+
+            if ($usuario !== null && ($usuario->careProfiles()->exists() || $usuario->followedProfiles()->exists())) {
+                $this->redirect(route('care.index'));
+
+                return;
+            }
+
             if (auth()->user()?->isConsultant()) {
                 $this->redirect(route('consultant.portfolio'));
 

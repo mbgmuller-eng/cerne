@@ -1,0 +1,41 @@
+<?php
+
+namespace App\Services;
+
+use App\Models\FinancialProfile;
+use App\Models\ProfileCaregiver;
+use App\Models\User;
+use Illuminate\Support\Collection;
+
+/**
+ * Quem recebe o lembrete de saúde de um perfil (consulta amanhã, troca de item).
+ *
+ * Perfil comum (individual ou casal): os usuários dos membros que deram o consentimento de saúde; sem consentimento, nem avisar.
+ * Pessoa acompanhada: a pessoa normalmente não tem login, então o aviso vai para o dono e para os cuidadores com avisos ligados. O
+ * consentimento que vale ali é o dela (declaração de quem cadastrou), não o de cada destinatário; sem a declaração, ninguém é avisado.
+ */
+class HealthReminderRecipients
+{
+    /** @return Collection<int, User> */
+    public function forProfile(string $profileId): Collection
+    {
+        $perfil = FinancialProfile::withCareProfiles()->find($profileId);
+
+        if ($perfil === null) {
+            return collect();
+        }
+
+        if ($perfil->isCare()) {
+            if ($perfil->care_consent_at === null) {
+                return collect();
+            }
+
+            $cuidadores = ProfileCaregiver::query()->active()->where('profile_id', $perfil->id)->where('notify_reminders', true)->with('user')->get()->pluck('user');
+
+            return collect([$perfil->owner])->merge($cuidadores)->filter()->unique('id')->values();
+        }
+
+        return $perfil->activeMembers()->whereNotNull('user_id')->with('user')->get()
+            ->pluck('user')->filter(fn (?User $user) => $user !== null && $user->hasCurrentHealthConsent())->values();
+    }
+}

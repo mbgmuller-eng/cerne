@@ -44,7 +44,7 @@ class AccountDeletionService
 
         $arquivos = $this->collectFiles($user);
         $papel = $user->role->value;
-        $tinhaPerfil = FinancialProfile::query()->where('owner_user_id', $user->id)->exists();
+        $tinhaPerfil = FinancialProfile::withCareProfiles()->where('owner_user_id', $user->id)->exists();
         $pedidoEm = $user->deletion_requested_at;
 
         DB::transaction(function () use ($user, $papel, $tinhaPerfil, $pedidoEm, $requestedBy, $arquivos): void {
@@ -96,8 +96,57 @@ class AccountDeletionService
      */
     public function collectFiles(User $user): array
     {
+        $perfis = FinancialProfile::withCareProfiles()->where('owner_user_id', $user->id)->pluck('id');
+        $arquivos = $this->filesForProfiles($perfis);
+
+        // Profissional: os anexos dos leads dele (simulações em PDF de gente que nunca foi cliente).
+        $leads = DB::table('leads')->where('consultant_id', $user->id)->pluck('id');
+        if ($leads->isNotEmpty()) {
+            foreach (LeadAttachment::query()->whereIn('lead_id', $leads)->pluck('storage_path') as $p) {
+                $arquivos[] = [(string) config('cerne.lead_files.disk'), (string) $p];
+            }
+        }
+
+        foreach (DataExport::query()->where('user_id', $user->id)->whereNotNull('path')->pluck('path') as $p) {
+            $arquivos[] = ['local', (string) $p];
+        }
+
+        return $arquivos;
+    }
+
+    /**
+     * Apaga uma pessoa acompanhada: dados em cascata e, depois de o banco confirmar, os arquivos do disco.
+     *
+     * @return int quantos arquivos foram apagados
+     */
+    public function deleteProfile(FinancialProfile $perfil): int
+    {
+        $arquivos = $this->filesForProfiles(collect([$perfil->id]));
+
+        DB::transaction(function () use ($perfil): void {
+            $perfil->delete();
+        });
+
+        foreach ($arquivos as [$disco, $caminho]) {
+            try {
+                Storage::disk($disco)->delete($caminho);
+            } catch (Throwable) {
+                // arquivo já ausente ou disco indisponível: a rotina de retenção varre o que sobrar
+            }
+        }
+
+        return count($arquivos);
+    }
+
+    /**
+     * Arquivos no disco dos perfis dados: [disco, caminho].
+     *
+     * @param  \Illuminate\Support\Collection<int, string>  $perfis
+     * @return list<array{0: string, 1: string}>
+     */
+    private function filesForProfiles(\Illuminate\Support\Collection $perfis): array
+    {
         $arquivos = [];
-        $perfis = FinancialProfile::query()->where('owner_user_id', $user->id)->pluck('id');
 
         if ($perfis->isNotEmpty()) {
             $cofre = (string) config('cerne.document_vault.disk');
@@ -121,18 +170,6 @@ class AccountDeletionService
                     }
                 }
             }
-        }
-
-        // Profissional: os anexos dos leads dele (simulações em PDF de gente que nunca foi cliente).
-        $leads = DB::table('leads')->where('consultant_id', $user->id)->pluck('id');
-        if ($leads->isNotEmpty()) {
-            foreach (LeadAttachment::query()->whereIn('lead_id', $leads)->pluck('storage_path') as $p) {
-                $arquivos[] = [(string) config('cerne.lead_files.disk'), (string) $p];
-            }
-        }
-
-        foreach (DataExport::query()->where('user_id', $user->id)->whereNotNull('path')->pluck('path') as $p) {
-            $arquivos[] = ['local', (string) $p];
         }
 
         return $arquivos;

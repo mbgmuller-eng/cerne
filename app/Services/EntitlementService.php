@@ -44,6 +44,12 @@ class EntitlementService
             ->contains(fn (Subscription $assinatura) => $assinatura->isCurrent() && $assinatura->bundle->includes($modulo));
     }
 
+    /** Assinatura DIRETA própria em vigor que inclui o módulo (não vale a do profissional vinculado). */
+    public function userHasDirectModule(\App\Models\User $usuario, PlatformModule $modulo): bool
+    {
+        return $this->hasDirectAccess($usuario->id, $modulo);
+    }
+
     private function hasDirectAccess(string $userId, PlatformModule $modulo): bool
     {
         return Subscription::query()

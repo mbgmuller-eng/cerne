@@ -10,12 +10,12 @@
             </p>
         </div>
         @if ($podeGerenciar)
-            <button type="button" wire:click="newDocument" class="btn-primary shrink-0 px-3 py-2 text-sm">+ Novo documento</button>
+            <button type="button" data-write wire:click="newDocument" class="btn-primary shrink-0 px-3 py-2 text-sm">+ Novo documento</button>
         @endif
     </div>
 
     {{-- Caminho até a pasta aberta, subpastas e atalho para listar tudo. --}}
-    @if ($temPastas || $podeGerenciar)
+    @if ($temPastas || $podeGerenciarPastas)
         <section class="space-y-3">
             <div class="flex flex-wrap items-center justify-between gap-2">
                 <nav aria-label="Caminho das pastas" class="flex min-w-0 flex-wrap items-center gap-1 text-sm">
@@ -44,11 +44,11 @@
                             {{ $verTodos ? 'Voltar às pastas' : 'Ver todos os documentos' }}
                         </button>
                     @endif
-                    @if ($podeGerenciar && ! $verTodos)
+                    @if ($podeGerenciarPastas && ! $verTodos)
                         @if ($pastaAtual)
-                            <button type="button" wire:click="editFolder('{{ $pastaAtual->id }}')" class="text-slate-500 hover:underline dark:text-slate-400">Editar pasta</button>
+                            <button type="button" data-write wire:click="editFolder('{{ $pastaAtual->id }}')" class="text-slate-500 hover:underline dark:text-slate-400">Editar pasta</button>
                         @endif
-                        <button type="button" wire:click="newFolder" class="font-medium text-documentos-800 hover:underline dark:text-documentos-200">+ Nova pasta</button>
+                        <button type="button" data-write wire:click="newFolder" class="font-medium text-documentos-800 hover:underline dark:text-documentos-200">+ Nova pasta</button>
                     @endif
                 </div>
             </div>
@@ -73,11 +73,11 @@
                         </li>
                     @endforeach
                 </ul>
-            @elseif (! $verTodos && ! $temPastas && $podeGerenciar)
+            @elseif (! $verTodos && ! $temPastas && $podeGerenciarPastas)
                 <div class="card space-y-2 p-4">
                     <p class="text-sm text-slate-700 dark:text-slate-300">Organize seus documentos em pastas e subpastas, do seu jeito.</p>
                     <p class="text-xs text-slate-500 dark:text-slate-400">Exemplo: Propriedades › Fazenda Santa Maria › Escritura. Quem ainda não tem pasta pode começar pelas sugestões.</p>
-                    <button type="button" wire:click="criarPastasSugeridas" class="btn-secondary px-3 py-1.5 text-xs">Criar pastas sugeridas (Propriedades, Veículos, Família, Outros)</button>
+                    <button type="button" data-write wire:click="criarPastasSugeridas" class="btn-secondary px-3 py-1.5 text-xs">Criar pastas sugeridas (Propriedades, Veículos, Família, Outros)</button>
                 </div>
             @endif
         </section>
@@ -143,8 +143,8 @@
                                 <span x-show="baixando" x-cloak>Baixando...</span>
                             </button>
                             @if ($podeGerenciar)
-                                <button type="button" wire:click="editDocument('{{ $documento->id }}')" class="btn-ghost px-2 py-1 text-xs">Editar</button>
-                                <button type="button" wire:click="delete('{{ $documento->id }}')" wire:confirm="Remover este documento?" class="text-xs text-slate-400 hover:text-red-700 dark:hover:text-red-400">
+                                <button type="button" data-write wire:click="editDocument('{{ $documento->id }}')" class="btn-ghost px-2 py-1 text-xs">Editar</button>
+                                <button type="button" data-write wire:click="delete('{{ $documento->id }}')" wire:confirm="Remover este documento?" class="text-xs text-slate-400 hover:text-red-700 dark:hover:text-red-400">
                                     remover
                                 </button>
                             @endif
@@ -229,6 +229,13 @@
                         </label>
                     @endif
 
+                    @if (app(\App\Support\ProfileContext::class)->profile()?->isCare() && ! app(\App\Support\ProfileContext::class)->isCaregiver())
+                        <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
+                            <input type="checkbox" wire:model="sharedWithCaregivers" class="h-4 w-4 rounded accent-documentos-800">
+                            Liberar este documento para os cuidadores
+                        </label>
+                    @endif
+
                     @if (! $editingExisting)
                         <div>
                             <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Arquivo (PDF, JPG ou PNG)</label>
@@ -272,7 +279,7 @@
                 <div class="flex items-center gap-3">
                     <button type="submit" class="btn-primary flex-1">Salvar</button>
                     @if ($editingFolder)
-                        <button type="button" wire:click="deleteFolder('{{ $editingFolderId }}')"
+                        <button type="button" data-write wire:click="deleteFolder('{{ $editingFolderId }}')"
                             wire:confirm="Remover esta pasta? Os documentos e as subpastas dela não são apagados: sobem para a pasta de cima."
                             class="text-xs text-slate-400 hover:text-red-700 dark:hover:text-red-400">remover pasta</button>
                     @endif

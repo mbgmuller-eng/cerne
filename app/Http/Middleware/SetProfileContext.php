@@ -3,6 +3,7 @@
 namespace App\Http\Middleware;
 
 use App\Models\FinancialProfile;
+use App\Models\ProfileCaregiver;
 use App\Support\ProfileContext;
 use Closure;
 use Illuminate\Http\Request;
@@ -49,15 +50,25 @@ class SetProfileContext
             return $next($request);
         }
 
+        $member = $profile->memberFor($user);
+
+        // Cuidador: nem dono nem membro, mas com acesso ativo a esta pessoa. Resolvido ANTES do papel profissional: um consultor que cuida da
+        // própria mãe entra como cuidador (só saúde), nunca como consultor.
+        $cuidador = null;
+        if ($profile->owner_user_id !== $user->id && $member === null) {
+            $cuidador = ProfileCaregiver::query()->active()->where('profile_id', $profile->id)->where('user_id', $user->id)->first();
+        }
+
         $context->set(
             profile: $profile,
-            member: $profile->memberFor($user),
+            member: $member,
+            caregiver: $cuidador,
             // isLinkedProfessional() (consultor OU corretor) — não só
             // isConsultant(): sem isso, um corretor vendo o perfil de um
             // cliente seria tratado como se fosse o cônjuge dele pela
             // privacidade do casal (MemberPrivacyScope), em vez de alguém
             // de fora com acesso restrito por tipo de seguro.
-            asConsultant: $user->isLinkedProfessional() && $profile->owner_user_id !== $user->id,
+            asConsultant: $cuidador === null && $user->isLinkedProfessional() && $profile->owner_user_id !== $user->id,
         );
 
         $request->session()->put(self::SESSION_KEY, $profile->id);
@@ -70,7 +81,7 @@ class SetProfileContext
         $sessionId = $request->session()->get(self::SESSION_KEY);
 
         if ($sessionId !== null) {
-            $profile = FinancialProfile::find($sessionId);
+            $profile = FinancialProfile::withCareProfiles()->find($sessionId);
 
             if ($profile !== null) {
                 return $profile;

@@ -51,6 +51,8 @@ class DocumentVaultIndex extends Component
     public string $insurancePolicyId = '';
     public string $expiresOn = '';
     public bool $visibleToProfessional = false;
+    /** Só o dono de uma pessoa acompanhada libera um documento aos cuidadores; o que o cuidador cadastra já nasce liberado. */
+    public bool $sharedWithCaregivers = false;
     public $arquivo = null;
 
     public function mount(): void
@@ -81,6 +83,7 @@ class DocumentVaultIndex extends Component
         $this->insurancePolicyId = (string) $documento->insurance_policy_id;
         $this->expiresOn = $documento->expires_on?->toDateString() ?? '';
         $this->visibleToProfessional = $documento->visible_to_professional;
+        $this->sharedWithCaregivers = $documento->shared_with_caregivers;
         $this->showForm = true;
     }
 
@@ -127,6 +130,12 @@ class DocumentVaultIndex extends Component
             'visible_to_professional' => $this->visibleToProfessional,
         ];
 
+        // Quem pode liberar: o dono da pessoa acompanhada. Cuidador não mexe nisso (o documento dele já nasce liberado).
+        $contexto = app(ProfileContext::class);
+        if ($contexto->profile()?->isCare() && ! $contexto->isCaregiver()) {
+            $dados['shared_with_caregivers'] = $this->sharedWithCaregivers;
+        }
+
         if ($this->editingId !== null) {
             $service->update(Document::query()->findOrFail($this->editingId), $dados);
         } else {
@@ -155,7 +164,7 @@ class DocumentVaultIndex extends Component
 
     public function newFolder(): void
     {
-        $this->abortUnlessCanManage();
+        $this->abortUnlessCanManageFolders();
         $this->resetFolderForm();
         $this->folderParentId = $this->pasta;
         $this->showFolderForm = true;
@@ -163,7 +172,7 @@ class DocumentVaultIndex extends Component
 
     public function editFolder(string $folderId): void
     {
-        $this->abortUnlessCanManage();
+        $this->abortUnlessCanManageFolders();
         $pasta = DocumentFolder::query()->findOrFail($folderId);
 
         $this->resetFolderForm();
@@ -180,7 +189,7 @@ class DocumentVaultIndex extends Component
 
     public function saveFolder(DocumentFolderService $service): void
     {
-        $this->abortUnlessCanManage();
+        $this->abortUnlessCanManageFolders();
 
         $this->validate([
             'folderName' => ['required', 'string', 'max:80'],
@@ -213,7 +222,7 @@ class DocumentVaultIndex extends Component
     /** O conteúdo da pasta (documentos e subpastas) sobe para a pasta de cima: nada é apagado junto. */
     public function deleteFolder(string $folderId, DocumentFolderService $service): void
     {
-        $this->abortUnlessCanManage();
+        $this->abortUnlessCanManageFolders();
         $pasta = DocumentFolder::query()->findOrFail($folderId);
 
         // Se a pasta aberta está dentro da que sai, volta para o nível de cima dela.
@@ -227,7 +236,7 @@ class DocumentVaultIndex extends Component
 
     public function criarPastasSugeridas(DocumentFolderService $service): void
     {
-        $this->abortUnlessCanManage();
+        $this->abortUnlessCanManageFolders();
         $service->createSuggested();
     }
 
@@ -265,6 +274,8 @@ class DocumentVaultIndex extends Component
             'membros' => $this->membros(),
             'policies' => InsurancePolicy::query()->active()->orderBy('insurer_name')->get(),
             'podeGerenciar' => ! $profissional,
+            // Pastas são estrutura do dono: quem cuida só vê a lista de documentos liberados.
+            'podeGerenciarPastas' => ! $profissional && ! app(ProfileContext::class)->isCaregiver(),
             'editingExisting' => $this->editingId !== null,
             'pastaAtual' => $atual,
             'caminho' => $caminho,
@@ -308,7 +319,7 @@ class DocumentVaultIndex extends Component
             ->get();
     }
 
-    private function autor(): ProfileMember
+    private function autor(): ?ProfileMember
     {
         return app(ProfileContext::class)->member();
     }
@@ -317,6 +328,14 @@ class DocumentVaultIndex extends Component
     private function abortUnlessCanManage(): void
     {
         abort_if(app(ProfileContext::class)->isConsultant(), 403);
+        abort_unless(app(ProfileContext::class)->canWriteAsCaregiver(), 403);
+    }
+
+    /** Pastas são estrutura do dono: cuidador não cria nem mexe nelas (só vê a lista de documentos liberados). */
+    private function abortUnlessCanManageFolders(): void
+    {
+        $this->abortUnlessCanManage();
+        abort_if(app(ProfileContext::class)->isCaregiver(), 403);
     }
 
     private function resetFolderForm(): void
@@ -327,7 +346,7 @@ class DocumentVaultIndex extends Component
 
     private function resetForm(): void
     {
-        $this->reset('editingId', 'category', 'title', 'memberId', 'folderId', 'insurancePolicyId', 'expiresOn', 'visibleToProfessional', 'arquivo');
+        $this->reset('editingId', 'category', 'title', 'memberId', 'folderId', 'insurancePolicyId', 'expiresOn', 'visibleToProfessional', 'sharedWithCaregivers', 'arquivo');
         $this->resetErrorBag();
     }
 }

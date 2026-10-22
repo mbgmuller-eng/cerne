@@ -4,6 +4,7 @@ namespace App\Policies;
 
 use App\Models\ConsultantClient;
 use App\Models\FinancialProfile;
+use App\Models\ProfileCaregiver;
 use App\Models\ProfileMember;
 use App\Models\User;
 
@@ -50,6 +51,12 @@ class FinancialProfilePolicy
         return $this->isOwner($user, $profile) || $this->isLinkedConsultant($user, $profile);
     }
 
+    /** Convidar, mudar o nível e revogar cuidadores: só o dono da pessoa acompanhada. */
+    public function manageCaregivers(User $user, FinancialProfile $profile): bool
+    {
+        return $profile->isCare() && $this->isOwner($user, $profile);
+    }
+
     // ---------------------------------------------------------------------
 
     /**
@@ -63,8 +70,15 @@ class FinancialProfilePolicy
     {
         return $this->isOwner($user, $profile)
             || $this->isMember($user, $profile)
+            || $this->isActiveCaregiver($user, $profile)
             || $this->isLinkedConsultant($user, $profile)
             || $this->isLinkedBroker($user, $profile);
+    }
+
+    /** Cuidador com acesso ativo a uma pessoa acompanhada. Abre o perfil, mas não administra nada nele (update/delete/manageMembers seguem do dono). */
+    private function isActiveCaregiver(User $user, FinancialProfile $profile): bool
+    {
+        return $profile->isCare() && ProfileCaregiver::query()->active()->where('profile_id', $profile->id)->where('user_id', $user->id)->exists();
     }
 
     private function isOwner(User $user, FinancialProfile $profile): bool
@@ -87,7 +101,7 @@ class FinancialProfilePolicy
      */
     private function isLinkedConsultant(User $user, FinancialProfile $profile): bool
     {
-        if (! $user->isConsultant()) {
+        if (! $user->isConsultant() || $profile->isCare()) {
             return false;
         }
 
@@ -108,7 +122,7 @@ class FinancialProfilePolicy
      */
     private function isLinkedBroker(User $user, FinancialProfile $profile): bool
     {
-        if (! $user->isBroker()) {
+        if (! $user->isBroker() || $profile->isCare()) {
             return false;
         }
 

@@ -155,6 +155,24 @@ class User extends Authenticatable implements MustVerifyEmail
         return $this->hasMany(FinancialProfile::class, 'owner_user_id');
     }
 
+    /** Pessoas acompanhadas de que este usuário é o DONO (e paga). */
+    public function careProfiles(): \Illuminate\Database\Eloquent\Builder
+    {
+        return FinancialProfile::withCareProfiles()->where('owner_user_id', $this->id)->where('profile_type', \App\Enums\ProfileType::Care->value);
+    }
+
+    /** Acessos de cuidador deste usuário (convites aceitos e ainda ativos). */
+    public function caregiverLinks(): HasMany
+    {
+        return $this->hasMany(ProfileCaregiver::class)->where('status', \App\Enums\CaregiverStatus::Active->value);
+    }
+
+    /** Pessoas que este usuário acompanha como cuidador (não as que ele possui). */
+    public function followedProfiles(): \Illuminate\Database\Eloquent\Builder
+    {
+        return FinancialProfile::withCareProfiles()->whereIn('id', ProfileCaregiver::query()->active()->where('user_id', $this->id)->select('profile_id'));
+    }
+
     /** Cadeiras que este usuário ocupa em perfis (inclusive de terceiros). */
     public function memberships(): HasMany
     {

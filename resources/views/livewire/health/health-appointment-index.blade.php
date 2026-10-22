@@ -4,10 +4,10 @@
         <div>
             <h1 class="font-display text-3xl font-semibold tracking-tight text-slate-900 dark:text-white">Agenda de Saúde</h1>
             <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                Consultas e exames, com quem atende, onde fica e como falar com o local. Visível para você e seu cônjuge. Avisamos um dia antes.
+                Consultas e exames, com quem atende, onde fica e como falar com o local. @if ($emPessoaAcompanhada) Visível para quem cuida desta pessoa. @else Visível para você e seu cônjuge. @endif Avisamos um dia antes.
             </p>
         </div>
-        <button type="button" wire:click="newAppointment" class="btn-primary shrink-0 px-3 py-2 text-sm">+ Agendar</button>
+        <button type="button" data-write wire:click="newAppointment" class="btn-primary shrink-0 px-3 py-2 text-sm">+ Agendar</button>
     </div>
 
     {{-- O que vem primeiro na tela: a preferência fica na conta, a tela mostra sempre os dois. --}}
@@ -97,8 +97,8 @@
                             <x-calendar-actions :consulta="$consulta" :show-person="$membros->count() > 1" />
                         </div>
                         <div class="flex shrink-0 items-center gap-2">
-                            <button type="button" wire:click="editAppointment('{{ $consulta->id }}')" class="btn-ghost px-2 py-1 text-xs">Editar</button>
-                            <button type="button" wire:click="delete('{{ $consulta->id }}')" wire:confirm="Remover este agendamento?" class="text-xs text-slate-400 hover:text-red-700 dark:hover:text-red-400">remover</button>
+                            <button type="button" data-write wire:click="editAppointment('{{ $consulta->id }}')" class="btn-ghost px-2 py-1 text-xs">Editar</button>
+                            <button type="button" data-write wire:click="delete('{{ $consulta->id }}')" wire:confirm="Remover este agendamento?" class="text-xs text-slate-400 hover:text-red-700 dark:hover:text-red-400">remover</button>
                         </div>
                     </li>
                 @endforeach
@@ -126,7 +126,7 @@
                                 </p>
                                 <x-appointment-details :consulta="$consulta" />
                             </div>
-                            <button type="button" wire:click="editAppointment('{{ $consulta->id }}')" class="btn-ghost shrink-0 px-2 py-1 text-xs">Editar</button>
+                            <button type="button" data-write wire:click="editAppointment('{{ $consulta->id }}')" class="btn-ghost shrink-0 px-2 py-1 text-xs">Editar</button>
                         </div>
                     </li>
                 @endforeach

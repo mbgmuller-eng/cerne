@@ -24,26 +24,31 @@ class HealthCardService
 {
     public function cardFor(ProfileMember $member): HealthCard
     {
+        // Quem não pode gravar (cuidador de leitura) só olha: abrir a ficha não pode criar a linha dela.
+        if (! app(\App\Support\ProfileContext::class)->canWriteAsCaregiver()) {
+            return HealthCard::query()->where('member_id', $member->id)->first() ?? new HealthCard(['member_id' => $member->id]);
+        }
+
         return HealthCard::query()->firstOrCreate(['member_id' => $member->id]);
     }
 
-    public function setBloodType(ProfileMember $member, ?string $bloodType, ProfileMember $autor): HealthCard
+    public function setBloodType(ProfileMember $member, ?string $bloodType, ?ProfileMember $autor): HealthCard
     {
         $card = $this->cardFor($member);
         $card->update([
             'blood_type' => $bloodType !== null && trim($bloodType) !== '' ? trim($bloodType) : null,
-            'updated_by_member_id' => $autor->id,
+            'updated_by_member_id' => $autor?->id,
         ]);
 
         return $card;
     }
 
-    public function addAllergy(ProfileMember $member, string $description, ProfileMember $autor): HealthAllergy
+    public function addAllergy(ProfileMember $member, string $description, ?ProfileMember $autor): HealthAllergy
     {
         return HealthAllergy::create([
             'member_id' => $member->id,
             'description' => trim($description),
-            'created_by_member_id' => $autor->id,
+            'created_by_member_id' => $autor?->id,
         ]);
     }
 
@@ -52,12 +57,12 @@ class HealthCardService
         $allergy->delete();
     }
 
-    public function addCondition(ProfileMember $member, string $description, ProfileMember $autor): HealthCondition
+    public function addCondition(ProfileMember $member, string $description, ?ProfileMember $autor): HealthCondition
     {
         return HealthCondition::create([
             'member_id' => $member->id,
             'description' => trim($description),
-            'created_by_member_id' => $autor->id,
+            'created_by_member_id' => $autor?->id,
         ]);
     }
 
@@ -75,7 +80,7 @@ class HealthCardService
     {
         $card = $this->cardFor($member);
 
-        if ($card->emergency_token === null) {
+        if ($card->emergency_token === null && app(\App\Support\ProfileContext::class)->canWriteAsCaregiver()) {
             $card->update(['emergency_token' => $this->novoToken()]);
         }
 
@@ -83,10 +88,10 @@ class HealthCardService
     }
 
     /** Troca o código — o QR Code (impresso, adesivo) com o antigo para de funcionar. É a forma simples de revogar. */
-    public function regenerateEmergencyToken(ProfileMember $member, ProfileMember $autor): HealthCard
+    public function regenerateEmergencyToken(ProfileMember $member, ?ProfileMember $autor): HealthCard
     {
         $card = $this->cardFor($member);
-        $card->update(['emergency_token' => $this->novoToken(), 'updated_by_member_id' => $autor->id]);
+        $card->update(['emergency_token' => $this->novoToken(), 'updated_by_member_id' => $autor?->id]);
 
         return $card;
     }
@@ -139,7 +144,7 @@ class HealthCardService
     }
 
     /** @param  array<string, mixed>  $dados  name, dose, schedule, reason, prescriber, started_on */
-    public function addMedication(ProfileMember $member, array $dados, ProfileMember $autor): HealthMedication
+    public function addMedication(ProfileMember $member, array $dados, ?ProfileMember $autor): HealthMedication
     {
         $medicamento = HealthMedication::create([
             'member_id' => $member->id,
@@ -150,7 +155,7 @@ class HealthCardService
             'prescriber' => $this->blankToNull($dados['prescriber'] ?? null),
             'started_on' => $dados['started_on'] ?? null,
             'is_active' => true,
-            'created_by_member_id' => $autor->id,
+            'created_by_member_id' => $autor?->id,
         ]);
 
         $this->logChange($medicamento, HealthMedicationChangeType::Started, null, $medicamento->dose, $autor);
@@ -166,7 +171,7 @@ class HealthCardService
      *
      * @param  array<string, mixed>  $dados
      */
-    public function updateMedication(HealthMedication $medicamento, array $dados, ProfileMember $autor): HealthMedication
+    public function updateMedication(HealthMedication $medicamento, array $dados, ?ProfileMember $autor): HealthMedication
     {
         $doseAntiga = $medicamento->dose;
         $ativoAntes = $medicamento->is_active;
@@ -195,7 +200,7 @@ class HealthCardService
         return $medicamento;
     }
 
-    public function addMedicationNote(HealthMedication $medicamento, string $nota, ProfileMember $autor): HealthMedicationChange
+    public function addMedicationNote(HealthMedication $medicamento, string $nota, ?ProfileMember $autor): HealthMedicationChange
     {
         return $this->logChange($medicamento, HealthMedicationChangeType::Note, null, null, $autor, $nota);
     }
@@ -205,7 +210,7 @@ class HealthCardService
         HealthMedicationChangeType $tipo,
         ?string $antigo,
         ?string $novo,
-        ProfileMember $autor,
+        ?ProfileMember $autor,
         ?string $nota = null,
     ): HealthMedicationChange {
         return HealthMedicationChange::create([
@@ -215,7 +220,7 @@ class HealthCardService
             'old_value' => $antigo,
             'new_value' => $novo,
             'note' => $nota,
-            'changed_by_member_id' => $autor->id,
+            'changed_by_member_id' => $autor?->id,
         ]);
     }
 

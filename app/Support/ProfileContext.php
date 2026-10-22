@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use App\Models\FinancialProfile;
+use App\Models\ProfileCaregiver;
 use App\Models\ProfileMember;
 
 /**
@@ -21,8 +22,12 @@ class ProfileContext
     /** Consultor operando sobre o perfil de um cliente. */
     private bool $asConsultant = false;
 
-    public function set(FinancialProfile $profile, ?ProfileMember $member = null, bool $asConsultant = false): void
+    /** Cuidador de uma pessoa acompanhada: vê só saúde e documentos liberados, com leitura ou edição. */
+    private ?ProfileCaregiver $caregiver = null;
+
+    public function set(FinancialProfile $profile, ?ProfileMember $member = null, bool $asConsultant = false, ?ProfileCaregiver $caregiver = null): void
     {
+        $this->caregiver = $caregiver;
         $this->profile = $profile;
         $this->member = $member;
         $this->asConsultant = $asConsultant;
@@ -33,6 +38,34 @@ class ProfileContext
         $this->profile = null;
         $this->member = null;
         $this->asConsultant = false;
+        $this->caregiver = null;
+    }
+
+    /**
+     * Pode abrir ficha, agenda e cuidados do perfil ativo: membro com cadeira, cuidador, ou o dono do perfil de uma pessoa acompanhada (que não
+     * tem cadeira nele). Consultor e corretor nunca.
+     */
+    public function isHealthParticipant(): bool
+    {
+        return $this->profile !== null
+            && ! $this->asConsultant
+            && ($this->member !== null || $this->caregiver !== null || $this->profile->isCare());
+    }
+
+    public function isCaregiver(): bool
+    {
+        return $this->caregiver !== null;
+    }
+
+    public function caregiver(): ?ProfileCaregiver
+    {
+        return $this->caregiver;
+    }
+
+    /** Quem não é cuidador sempre pode (as outras regras de escrita são as de sempre); cuidador só com acesso de edição. */
+    public function canWriteAsCaregiver(): bool
+    {
+        return $this->caregiver === null || $this->caregiver->access_level->canWrite();
     }
 
     public function profile(): ?FinancialProfile

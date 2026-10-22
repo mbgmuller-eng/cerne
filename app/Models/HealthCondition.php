@@ -11,7 +11,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /** Doença ou comorbidade — "diabetes tipo 2", "hipertensão". */
-#[Fillable(['profile_id', 'member_id', 'description', 'created_by_member_id'])]
+#[Fillable(['profile_id', 'member_id', 'description', 'created_by_member_id', 'created_by_user_id'])]
 class HealthCondition extends Model
 {
     protected function casts(): array

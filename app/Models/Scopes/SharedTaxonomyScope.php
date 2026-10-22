@@ -26,8 +26,16 @@ class SharedTaxonomyScope implements Scope
 {
     public function apply(Builder $builder, Model $model): void
     {
-        $profileId = app(ProfileContext::class)->profileId();
+        $context = app(ProfileContext::class);
+        $profileId = $context->profileId();
         $coluna = $model->qualifyColumn('profile_id');
+
+        // Categorias são finanças: o cuidador (lista de permitidos, ver ProfileScope) não vê nenhuma.
+        if ($context->isCaregiver()) {
+            $builder->whereRaw('1 = 0');
+
+            return;
+        }
 
         $builder->where(function (Builder $query) use ($coluna, $profileId): void {
             $query->whereNull($coluna);

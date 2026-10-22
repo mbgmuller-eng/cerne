@@ -39,6 +39,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'assinatura' => RequiresActiveSubscription::class,
             'termos' => \App\Http\Middleware\RequiresCurrentTerms::class,
             'consentimento-saude' => \App\Http\Middleware\RequiresHealthConsent::class,
+            'cuidado' => \App\Http\Middleware\RestrictCareContext::class,
         ]);
 
         // Em toda resposta, inclusive as de erro. A hospedagem compartilhada

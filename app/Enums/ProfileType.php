@@ -11,6 +11,8 @@ enum ProfileType: string
     case Single = 'single';
     case Couple = 'couple';
     case Family = 'family';
+    /** Pessoa acompanhada (mãe, pai...): só saúde e documentos, sem finanças, normalmente sem login. */
+    case Care = 'care';
 
     public function label(): string
     {
@@ -18,6 +20,7 @@ enum ProfileType: string
             self::Single => 'Individual',
             self::Couple => 'Casal',
             self::Family => 'Família',
+            self::Care => 'Pessoa acompanhada',
         };
     }
 

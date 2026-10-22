@@ -230,7 +230,14 @@ return [
     | cerne:check avisa enquanto o e-mail do encarregado não estiver definido.
     */
 
+    // Pessoa acompanhada (mãe, pai...) e cuidadores. Desligado em produção até a cobrança por pessoa (R$ 4,90) estar pronta.
+    'care' => [
+        'enabled' => (bool) env('CERNE_CARE_ENABLED', false),
+    ],
+
     'legal' => [
+        // Declaração de quem cadastra uma pessoa acompanhada (ela autorizou, ou ele é o representante legal). Subir quando o texto mudar.
+        'care_consent_version' => '2026-10-22',
         'terms_version' => '2026-10-22',
         'health_consent_version' => '2026-10-22',
         'controller_name' => env('CERNE_CONTROLLER_NAME'),

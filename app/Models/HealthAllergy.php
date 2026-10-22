@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['profile_id', 'member_id', 'description', 'created_by_member_id'])]
+#[Fillable(['profile_id', 'member_id', 'description', 'created_by_member_id', 'created_by_user_id'])]
 class HealthAllergy extends Model
 {
     protected function casts(): array

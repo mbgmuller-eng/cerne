@@ -19,7 +19,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  */
 #[Fillable([
     'profile_id', 'member_id', 'medication_id', 'change_type',
-    'old_value', 'new_value', 'note', 'changed_by_member_id',
+    'old_value', 'new_value', 'note', 'changed_by_member_id', 'changed_by_user_id',
 ])]
 class HealthMedicationChange extends Model
 {

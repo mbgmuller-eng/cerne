@@ -22,7 +22,7 @@ use Illuminate\Support\Collection;
 class HealthCareItemService
 {
     /** @param  array<string, mixed>  $dados  category, name, device_name, interval_value, interval_unit, last_done_on, notes */
-    public function create(ProfileMember $membro, array $dados, ProfileMember $autor): HealthCareItem
+    public function create(ProfileMember $membro, array $dados, ?ProfileMember $autor): HealthCareItem
     {
         $ultima = isset($dados['last_done_on']) && $dados['last_done_on'] !== ''
             ? CarbonImmutable::parse($dados['last_done_on'])
@@ -38,7 +38,7 @@ class HealthCareItemService
             'last_done_on' => $ultima,
             'notes' => $this->blankToNull($dados['notes'] ?? null),
             'is_active' => true,
-            'created_by_member_id' => $autor->id,
+            'created_by_member_id' => $autor?->id,
         ]);
         $item->next_due_on = $item->dueAfter($ultima);
         $item->save();
@@ -117,8 +117,8 @@ class HealthCareItemService
             ->chunkById(200, function (Collection $itens) use (&$notificados, $hoje): void {
                 foreach ($itens as $item) {
                     foreach ($this->recipientsFor($item) as $user) {
-                        // Sem o consentimento de saúde (ou depois de revogá-lo) não se trata dado de saúde, nem para avisar.
-                        if (! $user->hasCurrentHealthConsent() || $this->alreadyNotifiedToday($user, $item->id)) {
+                        // O consentimento de saúde já foi conferido em HealthReminderRecipients (o do membro, ou o declarado da pessoa acompanhada).
+                        if ($this->alreadyNotifiedToday($user, $item->id)) {
                             continue;
                         }
 
@@ -134,9 +134,7 @@ class HealthCareItemService
     /** @return Collection<int, User> */
     private function recipientsFor(HealthCareItem $item): Collection
     {
-        return FinancialProfile::find($item->profile_id)
-            ?->activeMembers()->whereNotNull('user_id')->with('user')->get()
-            ->pluck('user')->filter()->values() ?? collect();
+        return app(HealthReminderRecipients::class)->forProfile($item->profile_id);
     }
 
     private function alreadyNotifiedToday(User $user, string $itemId): bool

@@ -15,6 +15,20 @@ trait HasDocumentVisibility
     public static function bootHasDocumentVisibility(): void
     {
         static::addGlobalScope(new DocumentVisibilityScope);
+        \App\Support\CaregiverWriteGuard::register(static::class);
+
+        // O que o cuidador cadastra é de todos que cuidam daquela pessoa: já nasce liberado.
+        static::creating(function ($documento): void {
+            if (app(\App\Support\ProfileContext::class)->isCaregiver()) {
+                $documento->setAttribute('shared_with_caregivers', true);
+            }
+        });
+    }
+
+    /** Documento liberado aparece ao cuidador (ver DocumentVisibilityScope); o resto da área segue fechado. */
+    public static function visibleToCaregiver(): bool
+    {
+        return true;
     }
 
     /**
