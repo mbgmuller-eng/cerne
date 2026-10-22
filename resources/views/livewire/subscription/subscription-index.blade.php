@@ -122,6 +122,9 @@
                     </div>
                     <p class="shrink-0 text-right text-lg font-semibold text-slate-900 dark:text-white">
                         {{ \App\Support\Money::format($assinaturaAtual->monthlyPrice()) }}<span class="text-xs font-normal text-slate-400">/mês</span>
+                        @if ($assinaturaAtual->careSeats() > 0)
+                            <span class="mt-0.5 block text-xs font-normal text-slate-400">inclui {{ $assinaturaAtual->careSeats() }} {{ $assinaturaAtual->careSeats() === 1 ? 'pessoa acompanhada' : 'pessoas acompanhadas' }} ({{ \App\Support\Money::format(\App\Services\CareBillingService::seatPrice()) }} cada)</span>
+                        @endif
                     </p>
                 </div>
 

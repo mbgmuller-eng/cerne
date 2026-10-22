@@ -228,6 +228,14 @@ Schedule::call(function (): void {
     logger()->info('Exclusão de contas', ['apagadas' => $apagadas]);
 })->dailyAt('04:20')->name('exclusao-de-contas')->withoutOverlapping();
 
+// Pessoa acompanhada: alinha o valor que a Asaas cobra ao número de pessoas de cada assinatura direta (R$ 4,90 por pessoa). Idempotente: só age
+// quando a contagem mudou desde o último aviso à Asaas (subscriptions.care_seats_billed); falha de um dia é corrigida no seguinte.
+Schedule::call(function (): void {
+    $corrigidas = app(\App\Services\CareBillingService::class)->reconcile();
+
+    logger()->info('Assentos de pessoas acompanhadas', ['corrigidas' => $corrigidas]);
+})->dailyAt('04:15')->name('assentos-de-cuidado')->withoutOverlapping();
+
 // Privacidade: política de retenção (cópias de dados vencidas, registros antigos, arquivos órfãos). Idempotente: só apaga o que já passou do prazo.
 Schedule::call(function (): void {
     $resultado = app(\App\Services\Privacy\DataRetentionService::class)->purge();

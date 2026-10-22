@@ -26,7 +26,8 @@ class HealthReminderRecipients
         }
 
         if ($perfil->isCare()) {
-            if ($perfil->care_consent_at === null) {
+            // Sem a declaração de consentimento, ou com a assinatura de quem paga fora de vigor, ninguém é avisado.
+            if ($perfil->care_consent_at === null || ! app(EntitlementService::class)->careProfileEntitled($perfil)) {
                 return collect();
             }
 

@@ -31,6 +31,7 @@ class HealthAppointmentUpcoming extends Notification implements ShouldQueue
         public ?string $address = null,
         public ?string $phone = null,
         public ?string $bookedWith = null,
+        public ?string $careProfileId = null,
     ) {}
 
     public static function forAppointment(HealthAppointment $appointment): self
@@ -45,7 +46,14 @@ class HealthAppointmentUpcoming extends Notification implements ShouldQueue
             $appointment->address,
             $appointment->phone,
             $appointment->booked_with_name,
+            \App\Support\CareLinks::careProfileId($appointment->profile_id),
         );
+    }
+
+    /** Aviso de pessoa acompanhada leva a ela; o de perfil comum, à agenda de sempre. */
+    private function link(): string
+    {
+        return \App\Support\CareLinks::to($this->careProfileId, 'agenda', 'health.appointments.index');
     }
 
     /** @return array<int, string> */
@@ -84,7 +92,7 @@ class HealthAppointmentUpcoming extends Notification implements ShouldQueue
                 'wazeUrl' => $destino ? MapLinks::waze($destino) : null,
                 'dateFormatted' => $quando->format('d/m'),
                 'timeFormatted' => $quando->format('H:i'),
-                'url' => route('health.appointments.index'),
+                'url' => $this->link(),
             ]);
     }
 
@@ -107,6 +115,6 @@ class HealthAppointmentUpcoming extends Notification implements ShouldQueue
         return (new WebPushMessage)
             ->title("{$this->kindLabel} em breve — {$this->memberName}")
             ->body("{$this->title} em {$quando->format('d/m')} às {$quando->format('H:i')}")
-            ->data(['url' => route('health.appointments.index')]);
+            ->data(['url' => $this->link()]);
     }
 }

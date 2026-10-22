@@ -18,7 +18,7 @@ use Carbon\CarbonInterface;
 
 /** Carência de PastDue antes de travar o acesso — ver isCurrent(). */
 #[Fillable([
-    'user_id', 'kind', 'bundle', 'client_cap', 'status', 'billing_type', 'current_period_ends_at',
+    'user_id', 'kind', 'bundle', 'client_cap', 'care_seats_billed', 'status', 'billing_type', 'current_period_ends_at',
     'asaas_subscription_id', 'asaas_pix_authorization_id', 'pix_authorization_status', 'invoice_settings_at', 'started_at', 'cancelled_at',
 ])]
 class Subscription extends Model
@@ -79,12 +79,29 @@ class Subscription extends Model
         return $this->pix_authorization_status === 'ACTIVE';
     }
 
-    /** Valor mensal desta assinatura ("29.90"), do teto de clientes (profissional) ou do pacote. */
+    /**
+     * Valor mensal desta assinatura ("29.90"): do teto de clientes (profissional) ou do pacote, mais, na assinatura direta, cada pessoa
+     * acompanhada de quem paga (ver CareBillingService). É o valor que o Pix Automático cobra em cada ciclo e o que a Asaas recebe.
+     */
     public function monthlyPrice(): string
     {
-        return $this->client_cap !== null
-            ? ProfessionalPricing::priceFor($this->client_cap)
-            : number_format((float) config("billing.prices.{$this->bundle->value}"), 2, '.', '');
+        if ($this->client_cap !== null) {
+            return ProfessionalPricing::priceFor($this->client_cap);
+        }
+
+        $pacote = number_format((float) config("billing.prices.{$this->bundle->value}"), 2, '.', '');
+
+        return bcadd($pacote, bcmul((string) $this->careSeats(), \App\Services\CareBillingService::seatPrice(), 2), 2);
+    }
+
+    /** Pessoas acompanhadas que somam ao valor desta assinatura (só a direta tem). */
+    public function careSeats(): int
+    {
+        if ($this->kind !== SubscriptionKind::Direct || $this->client_cap !== null) {
+            return 0;
+        }
+
+        return \App\Services\CareBillingService::seatsOf($this->user ?? \App\Models\User::findOrFail($this->user_id));
     }
 
     /**

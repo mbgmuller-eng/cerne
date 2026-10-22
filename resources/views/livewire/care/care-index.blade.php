@@ -59,7 +59,7 @@
                     </label>
                     @error('declared') <p class="text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
 
-                    <p class="text-xs text-slate-400">Cada pessoa acompanhada soma R$ 4,90 por mês à sua assinatura.</p>
+                    <p class="text-xs text-slate-400">Cada pessoa acompanhada soma {{ \App\Support\Money::format(\App\Services\CareBillingService::seatPrice()) }} por mês à sua assinatura, a partir da próxima cobrança. Quem cuida junto não paga nada.</p>
 
                     <div class="flex gap-2">
                         <button type="button" wire:click="addPerson" class="btn-primary px-3 py-1.5 text-sm">Cadastrar</button>
@@ -78,7 +78,7 @@
                         <div class="flex flex-wrap items-center justify-between gap-3">
                             <div class="min-w-0">
                                 <p class="text-base font-medium text-slate-900 dark:text-white">{{ $pessoa->profile_name }}</p>
-                                <p class="text-xs text-slate-500 dark:text-slate-400">{{ $pessoa->caregivers->where('status', \App\Enums\CaregiverStatus::Active)->count() }} cuidador(es) ativo(s)</p>
+                                <p class="text-xs text-slate-500 dark:text-slate-400">{{ $pessoa->caregivers->where('status', \App\Enums\CaregiverStatus::Active)->count() }} cuidador(es) ativo(s) · {{ \App\Support\Money::format(\App\Services\CareBillingService::seatPrice()) }}/mês</p>
                             </div>
                             <div class="flex flex-wrap gap-2">
                                 <form method="POST" action="{{ route('care.open', $pessoa->id) }}">
@@ -139,7 +139,7 @@
                                 </div>
 
                                 <button type="button" wire:click="deletePerson('{{ $pessoa->id }}')"
-                                    wire:confirm="Apagar {{ $pessoa->profile_name }} e todos os dados e documentos dela? Isso não pode ser desfeito e os cuidadores perdem o acesso."
+                                    wire:confirm="Apagar {{ $pessoa->profile_name }} e todos os dados e documentos dela? Isso não pode ser desfeito, os cuidadores perdem o acesso e a cobrança dela sai a partir da próxima cobrança."
                                     class="text-xs text-red-700 underline dark:text-red-400">Excluir esta pessoa e todos os dados dela</button>
                             </div>
                         @endif

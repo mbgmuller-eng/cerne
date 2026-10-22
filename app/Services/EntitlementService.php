@@ -44,6 +44,17 @@ class EntitlementService
             ->contains(fn (Subscription $assinatura) => $assinatura->isCurrent() && $assinatura->bundle->includes($modulo));
     }
 
+    /**
+     * A pessoa acompanhada só abre (e só gera aviso) enquanto a assinatura DIRETA de quem a cadastrou estiver em vigor e incluir Saúde. Não vale a
+     * assinatura de um profissional vinculado ao dono: o assento é cobrado do dono.
+     */
+    public function careProfileEntitled(FinancialProfile $perfil): bool
+    {
+        $dono = $perfil->owner;
+
+        return $dono !== null && $this->hasDirectAccess($dono->id, PlatformModule::Saude);
+    }
+
     /** Assinatura DIRETA própria em vigor que inclui o módulo (não vale a do profissional vinculado). */
     public function userHasDirectModule(\App\Models\User $usuario, PlatformModule $modulo): bool
     {

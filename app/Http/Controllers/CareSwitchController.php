@@ -26,6 +26,19 @@ class CareSwitchController extends Controller
         return redirect()->route('health.card.index');
     }
 
+    /** Entra na pessoa e segue para a agenda ou os cuidados dela (o link dos avisos). */
+    public function goto(Request $request, string $profile, string $destino): RedirectResponse
+    {
+        $perfil = FinancialProfile::withCareProfiles()->whereKey($profile)->firstOrFail();
+
+        abort_unless($perfil->isCare(), 404);
+        $this->authorize('view', $perfil);
+
+        $request->session()->put(SetProfileContext::SESSION_KEY, $perfil->id);
+
+        return redirect()->route($destino === 'cuidados' ? 'health.care.index' : 'health.appointments.index');
+    }
+
     /** Volta para o perfil próprio (ou para a lista de pessoas, se quem cuida não tem perfil próprio). */
     public function leave(Request $request): RedirectResponse
     {

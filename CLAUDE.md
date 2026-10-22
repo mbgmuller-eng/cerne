@@ -130,6 +130,7 @@ Todas idempotentes (regra 4). O cron da Hostinger chama `schedule:run` a cada mi
 | `comissoes-de-consorcio` | 04:11 | refaz a previsão da comissão de consórcio dos consultores (percentual da carta nas parcelas combinadas) |
 | `academia-revisao-de-treino` | 09:00 | avisa (uma vez por fase, só o dono) que a fase de treino passou do ponto de troca (`GymPhaseReviewService::notifyDue`, livro `engagement_reminders` tipo `review_due`; monta e solta o `ProfileContext` de cada pessoa) |
 | `relatorio-de-erros` | 08:10 | e-mail com os erros do dia anterior (`cerne:error-report`, `ErrorDigest`; índice único `error_report_digests(sent_on)`), importa o arquivo de reserva e limpa o antigo |
+| `assentos-de-cuidado` | 04:15 | alinha o valor que a Asaas cobra ao número de pessoas acompanhadas de cada assinatura direta (`CareBillingService::reconcile`; só age quando `subscriptions.care_seats_billed` difere da contagem de hoje) |
 | `exclusao-de-contas` | 04:20 | apaga as contas cuja carência de 7 dias (pedida em Minha conta) venceu: `DataRetentionService::deleteDueAccounts` → `AccountDeletionService` (conta que falha, ex.: cobrança não cancelada, fica para a rodada seguinte) |
 | `retencao-de-dados` | 04:30 | apaga cópia de dados vencida (7 dias) e o PDF original de importação 90 dias depois de confirmado, descartado ou falho (`DataRetentionService::purge`) |
 | `anexos-de-leads` | 04:10 | apaga arquivos de leads perdidos há mais de 12 meses |
@@ -203,7 +204,7 @@ Texto da política em `/privacidade` (rascunho, **sem revisão jurídica**), pla
 ### Pessoa acompanhada e cuidadores (saúde e documentos de quem não usa o app)
 
 Mãe, pai ou quem mais o usuário ajuda a cuidar: um perfil de cuidado (`ProfileType::Care`, `FinancialProfile`) com UM membro sem login. Quem cadastra é o **dono** e paga
-(R$ 4,90 por pessoa: a cobrança é a fase 2, ainda não feita; o recurso fica atrás de `CERNE_CARE_ENABLED`, desligado em produção até lá). Quem cuida junto entra como
+(R$ 4,90 por pessoa, `billing.care_seat_price`; o recurso fica atrás de `CERNE_CARE_ENABLED`). Quem cuida junto entra como
 **cuidador** (`ProfileCaregiver`, leitura ou edição) e não precisa de assinatura nem de perfil próprio. Regras que não se quebram:
 
 - **Perfil de cuidado é invisível a todo código antigo**: `CareProfileScope` (global em `FinancialProfile`) o esconde de toda consulta por dono (carteira do consultor, agenda,
@@ -220,6 +221,11 @@ Mãe, pai ou quem mais o usuário ajuda a cuidar: um perfil de cuidado (`Profile
 - **Avisos** de consulta e de troca de item vão ao dono e aos cuidadores com `notify_reminders` (a pessoa não lê o app): `HealthReminderRecipients`.
 - **Só o dono** convida, muda o nível, revoga e exclui a pessoa (`FinancialProfilePolicy::manageCaregivers`). Revogar corta na hora (o `SetProfileContext` reautoriza a cada requisição).
   Excluir a pessoa ou a conta do dono apaga dados **e arquivos** (`AccountDeletionService::deleteProfile`).
+- **Cobrança por pessoa** (`CareBillingService`, `Subscription::monthlyPrice()`): cada pessoa soma o preço ao valor da assinatura DIRETA do dono (profissional e cuidador não pagam). `monthlyPrice()` é a fonte
+  única: o Pix Automático cobra esse valor a cada ciclo (modo MANUAL, sem nova autorização) e a Asaas recebe o mesmo valor ao criar a assinatura. Em cartão e boleto, cadastrar ou apagar uma pessoa troca o valor da
+  assinatura na Asaas (a partir da PRÓXIMA cobrança, sem proporcional). Falha da Asaas **não** trava o cuidado: fica em `care_seats_billed` e a rotina `assentos-de-cuidado` corrige. Sem a assinatura direta do dono
+  em vigor (`EntitlementService::careProfileEntitled`), a pessoa fica suspensa para todos e ninguém é avisado; os dados continuam guardados. Não vale a assinatura de um profissional vinculado.
+- Os avisos de pessoa acompanhada levam a `care.goto` (escolhe a pessoa depois de autorizar e segue para a agenda ou os cuidados): o link comum abriria o perfil de quem lê.
 - Tela `/pessoas` (`CareIndex`) é a porta de entrada, sem perfil ativo (quem só cuida pode não ter perfil próprio). Convite: `/convite-cuidador/{token}`, POST puro.
 
 ### Investimento em outra moeda (USDT, BTC, ETH)

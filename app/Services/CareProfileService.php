@@ -25,7 +25,11 @@ class CareProfileService
 
     public const BASIS_LEGAL_REPRESENTATIVE = 'legal_representative';
 
-    public function __construct(private readonly EntitlementService $entitlements, private readonly AccountDeletionService $deletion) {}
+    public function __construct(
+        private readonly EntitlementService $entitlements,
+        private readonly AccountDeletionService $deletion,
+        private readonly CareBillingService $billing,
+    ) {}
 
     public static function enabled(): bool
     {
@@ -48,7 +52,7 @@ class CareProfileService
             throw new RuntimeException('Informe se a pessoa autorizou ou se você é o representante legal.');
         }
 
-        return DB::transaction(function () use ($owner, $name, $birthdate, $basis): FinancialProfile {
+        $perfil = DB::transaction(function () use ($owner, $name, $birthdate, $basis): FinancialProfile {
             $perfil = FinancialProfile::withCareProfiles()->create([
                 'owner_user_id' => $owner->id,
                 'profile_name' => $name,
@@ -72,6 +76,11 @@ class CareProfileService
 
             return $perfil;
         });
+
+        // O valor novo vale a partir da próxima cobrança. Falha ao avisar a Asaas não desfaz o cadastro: a rotina diária corrige.
+        $this->billing->syncQuietly($owner);
+
+        return $perfil;
     }
 
     /** Apaga a pessoa acompanhada com todos os dados e arquivos dela (a cascata do banco sozinha deixaria os arquivos no disco). */
@@ -81,6 +90,14 @@ class CareProfileService
             throw new RuntimeException('Só perfil de pessoa acompanhada pode ser excluído por aqui.');
         }
 
-        return $this->deletion->deleteProfile($perfil);
+        $dono = $perfil->owner;
+        $arquivos = $this->deletion->deleteProfile($perfil);
+
+        // A pessoa deixa de ser cobrada a partir da próxima cobrança.
+        if ($dono !== null) {
+            $this->billing->syncQuietly($dono);
+        }
+
+        return $arquivos;
     }
 }

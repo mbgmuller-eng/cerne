@@ -314,6 +314,15 @@ ssh -p 65002 -i ~/.ssh/cerne_hostinger u165451165@89.117.7.59 "cd ~/cerne && php
 5. O texto de `/privacidade` e `/termos` ainda é rascunho: leve a um advogado antes de divulgar.
 6. Plano de incidente: `INCIDENTES.md`. Registro em `/admin/incidentes`; acessos da equipe em `/admin/acessos`.
 
+## Pessoa acompanhada e cuidadores (ligar o recurso)
+
+O recurso fica atrás de `CERNE_CARE_ENABLED` (padrão desligado). Antes de ligar em produção:
+
+1. Confira `BILLING_CARE_SEAT_PRICE` (padrão `4.90`) e que o agendador roda (`assentos-de-cuidado`, 04:15).
+2. Ligue com `CERNE_CARE_ENABLED=true` no `.env` e rode `php artisan config:cache`.
+3. Cada pessoa cadastrada soma o preço à assinatura direta do dono, a partir da próxima cobrança. Cartão e boleto: o valor muda na Asaas na hora; Pix Automático: o Cerne calcula o valor de cada ciclo.
+4. O texto da declaração de consentimento (`cerne.legal.care_consent_version`) precisa de revisão jurídica antes de divulgar.
+
 ## Leads de seguros (rotinas e ajustes)
 
 - **Anexos:** ficam no disco privado (`cerne.lead_files`). `cerne:purge-lead-files` (diário, 04:10) apaga os de leads perdidos há mais de 12 meses.

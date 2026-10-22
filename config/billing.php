@@ -24,6 +24,16 @@ return [
 
     /*
     |---------------------------------------------------------------------------
+    | Pessoa acompanhada (mãe, pai...)
+    |---------------------------------------------------------------------------
+    | Valor mensal de CADA pessoa acompanhada, somado à assinatura direta de quem a cadastrou (ver CareBillingService). String, porque a conta é
+    | em bcmath. Quem cuida junto não paga nada.
+    */
+
+    'care_seat_price' => env('BILLING_CARE_SEAT_PRICE', '4.90'),
+
+    /*
+    |---------------------------------------------------------------------------
     | Preço do profissional (consultor/corretor), por quantidade de clientes
     |---------------------------------------------------------------------------
     | Sem diferença entre pacotes: o que o profissional enxerga já é limitado

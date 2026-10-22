@@ -558,7 +558,8 @@ class SubscriptionIndex extends Component
             )['id'];
         }
 
-        $assinatura->update(['billing_type' => $metodo, 'asaas_subscription_id' => $id]);
+        // A Asaas nasce com o valor de hoje, que já inclui as pessoas acompanhadas: o aviso diário não precisa corrigir nada.
+        $assinatura->update(['billing_type' => $metodo, 'asaas_subscription_id' => $id, 'care_seats_billed' => $assinatura->careSeats()]);
 
         // Nota fiscal automática na confirmação de cada pagamento (se ligada). Falhar aqui nunca
         // trava o pagamento: a tarefa diária tenta de novo.

@@ -418,6 +418,26 @@ class CaregiverTest extends TestCase
         $this->assertNotNull($pessoa);
     }
 
+    public function test_link_do_aviso_de_pessoa_acompanhada_abre_a_pessoa_do_cuidador(): void
+    {
+        [$dono, $pessoa, $contexto, $cuidador] = $this->comCuidador(CaregiverAccess::Read);
+        $outro = User::factory()->create();
+        $membro = ProfileMember::query()->where('profile_id', $pessoa->id)->sole();
+
+        $contexto->set($pessoa, null);
+        $this->actingAs($dono);
+        $consulta = app(HealthAppointmentService::class)->create($membro, ['kind' => HealthAppointmentKind::Consultation, 'title' => 'Cardio', 'scheduled_at' => CarbonImmutable::now()->addDay()], null);
+        $contexto->clear();
+
+        $aviso = HealthAppointmentUpcoming::forAppointment(HealthAppointment::withoutGlobalScopes()->with('member')->findOrFail($consulta->id));
+        $this->assertSame($pessoa->id, $aviso->careProfileId);
+
+        // O link escolhe a pessoa e segue para a agenda dela; quem não tem acesso leva 403.
+        $this->actingAs($cuidador)->get(route('care.goto', ['profile' => $pessoa->id, 'destino' => 'agenda']))->assertRedirect(route('health.appointments.index'));
+        $this->get(route('health.appointments.index'))->assertOk();
+        $this->actingAs($outro)->get(route('care.goto', ['profile' => $pessoa->id, 'destino' => 'cuidados']))->assertForbidden();
+    }
+
     // --- Avisos -------------------------------------------------------------------------------
 
     public function test_lembrete_de_consulta_vai_ao_dono_e_aos_cuidadores_com_avisos_ligados(): void

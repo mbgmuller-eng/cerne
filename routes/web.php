@@ -183,6 +183,8 @@ Route::middleware(['auth', 'verified', 'termos', 'cuidado'])->group(function ():
     Route::get('/pessoas', \App\Livewire\Care\CareIndex::class)->name('care.index');
     Route::post('/pessoas/sair', [\App\Http\Controllers\CareSwitchController::class, 'leave'])->name('care.exit');
     Route::post('/pessoas/{profile}/abrir', [\App\Http\Controllers\CareSwitchController::class, 'open'])->name('care.open');
+    // Link dos avisos (e-mail e push): escolhe a pessoa e vai direto à agenda ou aos cuidados dela. Só escolhe o contexto, depois de autorizar.
+    Route::get('/pessoas/{profile}/ir/{destino}', [\App\Http\Controllers\CareSwitchController::class, 'goto'])->whereIn('destino', ['agenda', 'cuidados'])->name('care.goto');
 
     Route::middleware('assinatura')->group(function (): void {
         Route::get('/painel', Dashboard::class)->name('dashboard');

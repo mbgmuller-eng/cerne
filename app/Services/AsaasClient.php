@@ -130,9 +130,15 @@ class AsaasClient
         string $primeiroVencimento,
         ?string $externalReference = null,
     ): array {
-        $valor = $clientCap !== null
-            ? (float) ProfessionalPricing::priceFor($clientCap)
-            : config("billing.prices.{$bundle->value}");
+        // A referência é o id da assinatura do Cerne: o valor dela já inclui as pessoas acompanhadas (Subscription::monthlyPrice()). Sem assinatura
+        // conhecida, vale o do pacote ou da faixa.
+        $assinatura = $externalReference !== null ? \App\Models\Subscription::query()->find($externalReference) : null;
+
+        $valor = $assinatura !== null
+            ? (float) $assinatura->monthlyPrice()
+            : ($clientCap !== null
+                ? (float) ProfessionalPricing::priceFor($clientCap)
+                : config("billing.prices.{$bundle->value}"));
 
         $resposta = $this->request()->post('/subscriptions', [
             'customer' => $customerId,

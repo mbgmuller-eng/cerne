@@ -27,6 +27,7 @@ class HealthCareItemDue extends Notification implements ShouldQueue
         public string $memberName,
         public string $dueOn,
         public int $daysLeft,
+        public ?string $careProfileId = null,
     ) {}
 
     public static function forItem(HealthCareItem $item, CarbonImmutable $hoje): self
@@ -38,7 +39,14 @@ class HealthCareItemDue extends Notification implements ShouldQueue
             $item->member->name,
             $item->next_due_on->toDateString(),
             (int) $hoje->startOfDay()->diffInDays($item->next_due_on->startOfDay(), false),
+            \App\Support\CareLinks::careProfileId($item->profile_id),
         );
+    }
+
+    /** Aviso de pessoa acompanhada leva a ela; o de perfil comum, à tela de sempre. */
+    private function link(): string
+    {
+        return \App\Support\CareLinks::to($this->careProfileId, 'cuidados', 'health.care.index');
     }
 
     /** "é hoje" ou "é amanhã". */
@@ -78,7 +86,7 @@ class HealthCareItemDue extends Notification implements ShouldQueue
                 'deviceName' => $this->deviceName,
                 'whenLabel' => $this->whenLabel(),
                 'dueFormatted' => CarbonImmutable::parse($this->dueOn)->format('d/m/Y'),
-                'url' => route('health.care.index'),
+                'url' => $this->link(),
             ]);
     }
 
@@ -101,6 +109,6 @@ class HealthCareItemDue extends Notification implements ShouldQueue
         return (new WebPushMessage)
             ->title("Cuidado de saúde — {$this->memberName}")
             ->body("{$this->itemName} {$this->whenLabel()}")
-            ->data(['url' => route('health.care.index')]);
+            ->data(['url' => $this->link()]);
     }
 }

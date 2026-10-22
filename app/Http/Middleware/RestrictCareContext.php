@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Services\EntitlementService;
 use App\Support\ProfileContext;
 use Closure;
 use Illuminate\Http\Request;
@@ -16,6 +17,9 @@ use Symfony\Component\HttpFoundation\Response;
  */
 class RestrictCareContext
 {
+    /** Abertas mesmo com a assinatura do dono fora de vigor. */
+    private const ALLOWED_ALWAYS = ['care.*', 'legal.*', 'logout', 'theme.update', 'push.subscribe', 'privacy.export.download'];
+
     /** Nomes de rota (ou prefixo com *) que continuam abertos dentro do perfil de uma pessoa acompanhada. */
     private const ALLOWED = [
         'care.*',
@@ -32,6 +36,16 @@ class RestrictCareContext
 
         if ($profile === null || ! ($context->isCaregiver() || $profile->isCare())) {
             return $next($request);
+        }
+
+        if ($request->routeIs(...self::ALLOWED_ALWAYS)) {
+            return $next($request);
+        }
+
+        // Quem paga é o dono: sem a assinatura dele em vigor, a saúde e os documentos desta pessoa ficam suspensos (os dados continuam guardados).
+        // Só a lista de pessoas segue aberta, para ele regularizar ou apagar.
+        if (! app(EntitlementService::class)->careProfileEntitled($profile)) {
+            return redirect()->route('care.index')->with('status', 'O acesso a esta pessoa está suspenso: a assinatura de quem a cadastrou não está em vigor.');
         }
 
         if ($request->routeIs(...self::ALLOWED)) {
