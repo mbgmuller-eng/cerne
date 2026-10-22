@@ -19,7 +19,7 @@ class HealthCondition extends Model
         return ['description' => Sensitive::class];
     }
 
-    use BelongsToProfile, HasUuids, IsCoupleHealthData;
+    use BelongsToProfile, HasUuids, IsCoupleHealthData, \App\Models\Concerns\HasActorUser;
 
     public function createdBy(): BelongsTo
     {

@@ -6,7 +6,9 @@ use App\Enums\CaregiverAccess;
 use App\Enums\CaregiverStatus;
 use App\Models\FinancialProfile;
 use App\Models\ProfileCaregiver;
+use App\Models\ProfileMember;
 use App\Services\CaregiverService;
+use App\Services\CarePersonService;
 use App\Services\CareProfileService;
 use Illuminate\Support\Facades\Gate;
 use Livewire\Attributes\Layout;
@@ -40,6 +42,11 @@ class CareIndex extends Component
     public string $inviteAccess = 'read';
 
     public ?string $lastInviteLink = null;
+
+    /** Convite para a própria pessoa usar o app (e-mail dela e o link de reserva). */
+    public string $selfEmail = '';
+
+    public ?string $lastSelfLink = null;
 
     public function startAdding(): void
     {
@@ -80,7 +87,7 @@ class CareIndex extends Component
         $this->ownedOrFail($profileId);
 
         $this->managingId = $this->managingId === $profileId ? null : $profileId;
-        $this->reset('inviteName', 'inviteEmail', 'lastInviteLink');
+        $this->reset('inviteName', 'inviteEmail', 'lastInviteLink', 'selfEmail', 'lastSelfLink');
         $this->inviteAccess = 'read';
         $this->resetErrorBag();
     }
@@ -106,6 +113,25 @@ class CareIndex extends Component
         $this->reset('inviteName', 'inviteEmail');
         $this->inviteAccess = 'read';
         session()->flash('care_status', 'Convite enviado por e-mail.');
+    }
+
+    /** O dono convida a própria pessoa para ver e controlar o espaço dela. */
+    public function inviteSelf(CarePersonService $service): void
+    {
+        $perfil = $this->ownedOrFail((string) $this->managingId);
+
+        $dados = $this->validate(['selfEmail' => ['required', 'email', 'max:190']], [], ['selfEmail' => 'e-mail']);
+
+        try {
+            $this->lastSelfLink = $service->invite($perfil, auth()->user(), $dados['selfEmail']);
+        } catch (RuntimeException $e) {
+            $this->addError('selfEmail', $e->getMessage());
+
+            return;
+        }
+
+        $this->selfEmail = '';
+        session()->flash('care_status', 'Convite enviado para a própria pessoa por e-mail.');
     }
 
     public function changeAccess(string $caregiverId, string $access, CaregiverService $service): void
@@ -136,6 +162,42 @@ class CareIndex extends Component
         session()->flash('care_status', 'Você deixou de acompanhar esta pessoa.');
     }
 
+    // --- A própria pessoa acompanhada (com login) manda no acesso ao espaço dela ---
+
+    /** Ela encerra o acesso de um cuidador. */
+    public function revokeAsPerson(string $caregiverId, CaregiverService $service): void
+    {
+        $vinculo = ProfileCaregiver::query()->findOrFail($caregiverId);
+        $this->myOwnSpaceOrFail($vinculo->profile_id);
+
+        $service->revoke($vinculo);
+
+        session()->flash('care_status', 'Acesso encerrado.');
+    }
+
+    public function revokeMyConsent(string $profileId, CarePersonService $service): void
+    {
+        $service->revokeConsent($this->myOwnSpaceOrFail($profileId));
+
+        session()->flash('care_status', 'Consentimento revogado. A saúde deste espaço foi fechada e os avisos pararam. Os dados continuam guardados até você apagar o espaço.');
+    }
+
+    public function grantMyConsent(string $profileId, CarePersonService $service): void
+    {
+        $service->grantConsent($this->myOwnSpaceOrFail($profileId), auth()->user());
+
+        session()->flash('care_status', 'Consentimento dado de novo.');
+    }
+
+    /** Direito de eliminação: apaga o espaço inteiro, com dados e documentos, e avisa o dono. */
+    public function endMySpace(string $profileId, CarePersonService $service): void
+    {
+        $service->endSpace($this->myOwnSpaceOrFail($profileId), auth()->user());
+
+        session()->forget(\App\Http\Middleware\SetProfileContext::SESSION_KEY);
+        session()->flash('care_status', 'Seu espaço foi apagado.');
+    }
+
     public function toggleNotify(string $caregiverId): void
     {
         $vinculo = $this->myLinkOrFail($caregiverId);
@@ -147,12 +209,14 @@ class CareIndex extends Component
         $usuario = auth()->user();
         $servico = app(CareProfileService::class);
 
-        $minhas = $usuario->careProfiles()->with(['caregivers' => fn ($q) => $q->where('status', '!=', CaregiverStatus::Revoked->value)->orderBy('invited_name')])->orderBy('profile_name')->get();
+        $meusEspacos = $usuario->selfCareProfiles()->with(['owner', 'caregivers' => fn ($q) => $q->where('status', CaregiverStatus::Active->value)->orderBy('invited_name')])->get();
+        $minhas = $usuario->careProfiles()->with(['members', 'caregivers' => fn ($q) => $q->where('status', '!=', CaregiverStatus::Revoked->value)->orderBy('invited_name')])->orderBy('profile_name')->get();
         $vinculos = ProfileCaregiver::query()->active()->where('user_id', $usuario->id)->get()->keyBy('profile_id');
         $acompanho = $usuario->followedProfiles()->with('owner')->orderBy('profile_name')->get();
 
         return view('livewire.care.care-index', [
             'minhas' => $minhas,
+            'meusEspacos' => $meusEspacos,
             'acompanho' => $acompanho,
             'vinculos' => $vinculos,
             'podeCadastrar' => $servico->canCreate($usuario),
@@ -160,6 +224,16 @@ class CareIndex extends Component
             'temPerfilProprio' => $usuario->ownedProfiles()->exists(),
             'accessOptions' => CaregiverAccess::cases(),
         ]);
+    }
+
+    /** O espaço em que o usuário logado É a pessoa acompanhada (e só ele manda nele). */
+    private function myOwnSpaceOrFail(string $profileId): FinancialProfile
+    {
+        $perfil = auth()->user()->selfCareProfiles()->whereKey($profileId)->firstOrFail();
+
+        Gate::authorize('manageOwnAccess', $perfil);
+
+        return $perfil;
     }
 
     private function ownedOrFail(string $profileId): FinancialProfile

@@ -191,10 +191,10 @@ class HealthCardIndex extends Component
                 // (abaixo, na view) precisa do token pronto na hora de
                 // montar a URL — não só quando alguém pedir a imagem do QR.
                 'card' => $service->ensureEmergencyToken($membro),
-                'allergies' => HealthAllergy::query()->where('member_id', $membro->id)->orderBy('created_at')->get(),
-                'conditions' => HealthCondition::query()->where('member_id', $membro->id)->orderBy('created_at')->get(),
+                'allergies' => HealthAllergy::query()->where('member_id', $membro->id)->with('createdByUser')->orderBy('created_at')->get(),
+                'conditions' => HealthCondition::query()->where('member_id', $membro->id)->with('createdByUser')->orderBy('created_at')->get(),
                 'medications' => HealthMedication::query()->where('member_id', $membro->id)
-                    ->with('changes.changedBy')
+                    ->with(['changes.changedBy', 'changes.changedByUser'])
                     ->orderByDesc('is_active')->get()->sortBy(fn (HealthMedication $m) => mb_strtolower((string) $m->name))->sortByDesc('is_active')->values(),
             ]];
         });

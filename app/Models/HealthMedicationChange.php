@@ -23,7 +23,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 ])]
 class HealthMedicationChange extends Model
 {
-    use BelongsToProfile, HasUuids, IsCoupleHealthData;
+    use BelongsToProfile, HasUuids, IsCoupleHealthData, \App\Models\Concerns\HasActorUser;
 
     protected function casts(): array
     {

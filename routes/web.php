@@ -107,6 +107,9 @@ Route::middleware('guest')->group(function (): void {
 // controlador decide o que mostrar conforme o e-mail convidado.
 Route::get('/convite-cuidador/{token}', [\App\Http\Controllers\Auth\AcceptCaregiverInviteController::class, 'show'])->name('caregiver-invite.accept');
 Route::post('/convite-cuidador/{token}', [\App\Http\Controllers\Auth\AcceptCaregiverInviteController::class, 'store'])->name('caregiver-invite.store');
+// Convite para a PRÓPRIA pessoa acompanhada ter login e ver o espaço dela.
+Route::get('/convite-pessoa/{token}', [\App\Http\Controllers\Auth\AcceptCarePersonInviteController::class, 'show'])->name('care-person-invite.accept');
+Route::post('/convite-pessoa/{token}', [\App\Http\Controllers\Auth\AcceptCarePersonInviteController::class, 'store'])->name('care-person-invite.store');
 
 // QR Code de emergência: pública de propósito (quem escaneia é um
 // socorrista ou familiar sem conta) — token opaco no lugar de login, ver

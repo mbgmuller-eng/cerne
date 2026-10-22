@@ -29,7 +29,7 @@
                                     <span class="ml-1 rounded-full bg-saude-200/40 px-2 py-0.5 text-[10px] font-medium text-saude-800 dark:bg-saude-800/30 dark:text-saude-200">{{ $item->category->label() }}</span>
                                 </p>
                                 <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-                                    {{ $item->member->name }}@if ($item->device_name) · {{ $item->device_name }}@endif · {{ $item->frequencyLabel() }}
+                                    {{ $item->member->name }}@if ($item->device_name) · {{ $item->device_name }}@endif · {{ $item->frequencyLabel() }} <x-registered-by :model="$item" />
                                 </p>
                                 <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
                                     @if ($item->last_done_on)
@@ -83,7 +83,7 @@
                     <li class="flex items-center justify-between gap-3 rounded-xl border border-slate-100 p-3 dark:border-white/10" wire:key="pausado-{{ $item->id }}">
                         <div class="min-w-0">
                             <p class="text-sm font-medium text-slate-600 dark:text-slate-300">{{ $item->name }}</p>
-                            <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{{ $item->member->name }} · {{ $item->frequencyLabel() }}</p>
+                            <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{{ $item->member->name }} · {{ $item->frequencyLabel() }} <x-registered-by :model="$item" /></p>
                         </div>
                         <div class="flex shrink-0 items-center gap-2">
                             <button type="button" data-write wire:click="toggleActive('{{ $item->id }}')" class="btn-secondary px-3 py-1 text-xs">Retomar</button>

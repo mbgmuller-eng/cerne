@@ -33,7 +33,10 @@ class HealthReminderRecipients
 
             $cuidadores = ProfileCaregiver::query()->active()->where('profile_id', $perfil->id)->where('notify_reminders', true)->with('user')->get()->pluck('user');
 
-            return collect([$perfil->owner])->merge($cuidadores)->filter()->unique('id')->values();
+            // A própria pessoa, se já tem login, recebe os avisos dela.
+            $propria = $perfil->activeMembers()->whereNotNull('user_id')->with('user')->get()->pluck('user');
+
+            return collect([$perfil->owner])->merge($cuidadores)->merge($propria)->filter()->unique('id')->values();
         }
 
         return $perfil->activeMembers()->whereNotNull('user_id')->with('user')->get()

@@ -94,6 +94,7 @@
                                 <span>{{ $consulta->member->name }} · {{ $consulta->scheduled_at->format('d/m/Y \à\s H:i') }}</span>
                             </p>
                             <x-appointment-details :consulta="$consulta" />
+                            <p class="mt-0.5"><x-registered-by :model="$consulta" /></p>
                             <x-calendar-actions :consulta="$consulta" :show-person="$membros->count() > 1" />
                         </div>
                         <div class="flex shrink-0 items-center gap-2">
@@ -125,6 +126,7 @@
                                     <span>{{ $consulta->member->name }} · {{ $consulta->scheduled_at->format('d/m/Y') }}</span>
                                 </p>
                                 <x-appointment-details :consulta="$consulta" />
+                            <p class="mt-0.5"><x-registered-by :model="$consulta" /></p>
                             </div>
                             <button type="button" data-write wire:click="editAppointment('{{ $consulta->id }}')" class="btn-ghost shrink-0 px-2 py-1 text-xs">Editar</button>
                         </div>

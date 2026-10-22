@@ -226,6 +226,11 @@ Mãe, pai ou quem mais o usuário ajuda a cuidar: um perfil de cuidado (`Profile
   assinatura na Asaas (a partir da PRÓXIMA cobrança, sem proporcional). Falha da Asaas **não** trava o cuidado: fica em `care_seats_billed` e a rotina `assentos-de-cuidado` corrige. Sem a assinatura direta do dono
   em vigor (`EntitlementService::careProfileEntitled`), a pessoa fica suspensa para todos e ninguém é avisado; os dados continuam guardados. Não vale a assinatura de um profissional vinculado.
 - Os avisos de pessoa acompanhada levam a `care.goto` (escolhe a pessoa depois de autorizar e segue para a agenda ou os cuidados): o link comum abriria o perfil de quem lê.
+- **A própria pessoa com login** (`CarePersonService`, `CarePersonInvite`, `/convite-pessoa/{token}`): o dono a convida; ao aceitar, o login dela é ligado ao membro que já existe (o dado não muda de lugar;
+  dono e cobrança seguem com quem cadastrou) e o consentimento passa a ser DELA (`care_consent_basis = self`). Ela é **membro**, não cuidadora: escreve no próprio espaço, vê quem tem acesso, encerra o
+  acesso de cada cuidador, revoga o consentimento (fecha a saúde e os avisos) e pode apagar o espaço inteiro (dados e arquivos; o dono é avisado e deixa de pagar por ela). Sem perfil financeiro, o espaço dela
+  é a casa dela (`SetProfileContext`, `User::selfCareProfiles`); os avisos chegam também a ela e a cópia de dados dela inclui o espaço (`manageOwnAccess` na policy).
+- O "registrado por Fulano" vem do usuário que gravou (`HasActorUser`, `<x-registered-by>`), só dentro do perfil de uma pessoa acompanhada.
 - Tela `/pessoas` (`CareIndex`) é a porta de entrada, sem perfil ativo (quem só cuida pode não ter perfil próprio). Convite: `/convite-cuidador/{token}`, POST puro.
 
 ### Investimento em outra moeda (USDT, BTC, ETH)

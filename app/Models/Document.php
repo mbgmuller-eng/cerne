@@ -21,7 +21,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 ])]
 class Document extends Model
 {
-    use BelongsToProfile, HasDocumentVisibility, HasUuids;
+    use BelongsToProfile, HasDocumentVisibility, HasUuids, \App\Models\Concerns\HasActorUser;
 
     protected function casts(): array
     {

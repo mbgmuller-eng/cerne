@@ -39,7 +39,7 @@ class Dashboard extends Component
             // Quem só cuida de alguém (sem perfil próprio) começa na lista de pessoas.
             $usuario = auth()->user();
 
-            if ($usuario !== null && ($usuario->careProfiles()->exists() || $usuario->followedProfiles()->exists())) {
+            if ($usuario !== null && $usuario->hasCareAccess()) {
                 $this->redirect(route('care.index'));
 
                 return;

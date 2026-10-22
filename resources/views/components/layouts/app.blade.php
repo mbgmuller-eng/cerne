@@ -65,13 +65,15 @@
 
     // Dentro do perfil de uma pessoa acompanhada (cuidador, ou o dono dela) só existem saúde e documentos: o resto é finança, que ali não há.
     $emPerfilDeCuidado = $profile && ($context->isCaregiver() || $profile->isCare());
+    // A própria pessoa acompanhada, já com login: o espaço é dela, não "alguém que ela acompanha".
+    $souAPessoa = $emPerfilDeCuidado && $context->member()?->user_id === $user?->id;
     if ($emPerfilDeCuidado) {
         $navSections = [
             ['label' => 'Saúde', 'items' => [
                 ['health.card.index', 'Ficha de Saúde', 'Ficha', 'heart'],
                 ['health.appointments.index', 'Agenda de Saúde', 'Agenda', 'calendar'],
                 ['health.care.index', 'Cuidados e itens', 'Cuidados', 'tag'],
-                ['care.index', 'Pessoas que acompanho', 'Pessoas', 'contact'],
+                ['care.index', $souAPessoa ? 'Quem tem acesso' : 'Pessoas que acompanho', $souAPessoa ? 'Acessos' : 'Pessoas', 'contact'],
             ]],
             ['label' => 'Documentos', 'items' => $navDocumentos],
         ];
@@ -583,7 +585,11 @@
         @if ($emPerfilDeCuidado)
             <div class="flex flex-wrap items-center justify-between gap-3 bg-saude-800 px-4 py-2 text-sm text-white">
                 <span>
-                    Você está acompanhando <strong>{{ $profile->profile_name }}</strong>@if ($context->isCaregiver()) · {{ mb_strtolower($context->caregiver()->access_level->label()) }}@endif.
+                    @if ($souAPessoa)
+                        Este é o <strong>seu espaço de saúde</strong>.
+                    @else
+                        Você está acompanhando <strong>{{ $profile->profile_name }}</strong>@if ($context->isCaregiver()) · {{ mb_strtolower($context->caregiver()->access_level->label()) }}@endif.
+                    @endif
                 </span>
                 <span class="flex items-center gap-4">
                     <a href="{{ route('care.index') }}" class="font-medium underline">Pessoas</a>

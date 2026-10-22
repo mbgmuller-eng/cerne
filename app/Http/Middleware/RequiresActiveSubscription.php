@@ -33,12 +33,12 @@ class RequiresActiveSubscription
 
         // Cuidador sem plano próprio entra na pessoa que o liberou (quem paga é o dono dela). O que é dele continua travado: o contexto de
         // cuidador só abre saúde e documentos (RestrictCareContext), e o módulo é conferido na assinatura do dono.
-        if ($usuario === null || app(ProfileContext::class)->isCaregiver() || $this->acesso->hasAccess($usuario)) {
+        if ($usuario === null || app(ProfileContext::class)->isCaregiver() || app(ProfileContext::class)->profile()?->isCare() || $this->acesso->hasAccess($usuario)) {
             return $next($request);
         }
 
         // Quem não tem plano mas acompanha alguém (o irmão que só cuida) não tem o que pagar para fazer isso: vai para a lista de pessoas.
-        if ($usuario->followedProfiles()->exists()) {
+        if ($usuario->followedProfiles()->exists() || $usuario->selfCareProfiles()->exists()) {
             return redirect()->route('care.index');
         }
 

@@ -271,6 +271,21 @@ class CaregiverTest extends TestCase
         HealthAllergy::query()->findOrFail($doDono->id)->delete();
     }
 
+    public function test_a_ficha_mostra_quem_registrou_cada_item_na_pessoa_acompanhada(): void
+    {
+        [$dono, $pessoa, $contexto, $cuidador] = $this->comCuidador(CaregiverAccess::Edit);
+        $cuidador->update(['name' => 'Irmão Paulo']);
+        $membro = ProfileMember::query()->where('profile_id', $pessoa->id)->sole();
+
+        $this->entrarComoCuidador($cuidador, $pessoa);
+        app(HealthCardService::class)->addAllergy($membro, 'Penicilina', null);
+        $contexto->clear();
+
+        // O dono abre a pessoa e vê quem registrou; num perfil comum a linha não aparece.
+        $this->actingAs($dono)->post(route('care.open', $pessoa->id));
+        $this->get(route('health.card.index'))->assertOk()->assertSee('Penicilina')->assertSee('registrado por Irmão Paulo');
+    }
+
     // --- Documentos --------------------------------------------------------------------
 
     public function test_cuidador_ve_so_o_documento_liberado_e_o_que_ele_cadastra_nasce_liberado(): void

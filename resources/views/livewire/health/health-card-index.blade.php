@@ -36,7 +36,7 @@
                         <ul class="mt-2 space-y-1">
                             @foreach ($allergies as $alergia)
                                 <li class="flex items-center justify-between gap-2 text-sm" wire:key="al-{{ $alergia->id }}">
-                                    <span class="text-slate-700 dark:text-slate-300">{{ $alergia->description }}</span>
+                                    <span class="text-slate-700 dark:text-slate-300">{{ $alergia->description }} <x-registered-by :model="$alergia" /></span>
                                     <button type="button" data-write wire:click="removeAllergy('{{ $alergia->id }}')" class="text-xs text-slate-400 hover:text-red-700 dark:hover:text-red-400">remover</button>
                                 </li>
                             @endforeach
@@ -57,7 +57,7 @@
                         <ul class="mt-2 space-y-1">
                             @foreach ($conditions as $condicao)
                                 <li class="flex items-center justify-between gap-2 text-sm" wire:key="co-{{ $condicao->id }}">
-                                    <span class="text-slate-700 dark:text-slate-300">{{ $condicao->description }}</span>
+                                    <span class="text-slate-700 dark:text-slate-300">{{ $condicao->description }} <x-registered-by :model="$condicao" /></span>
                                     <button type="button" data-write wire:click="removeCondition('{{ $condicao->id }}')" class="text-xs text-slate-400 hover:text-red-700 dark:hover:text-red-400">remover</button>
                                 </li>
                             @endforeach
@@ -116,6 +116,8 @@
                                                     @endif
                                                     @if ($mudanca->changedBy)
                                                         <span class="text-slate-400">· por {{ $mudanca->changedBy->name }}</span>
+                                                    @elseif ($mudanca->changedByUser)
+                                                        <span class="text-slate-400">· por {{ $mudanca->changedByUser->name }}</span>
                                                     @endif
                                                 </li>
                                             @endforeach

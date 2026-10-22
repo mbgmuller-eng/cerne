@@ -1,11 +1,15 @@
 <div class="space-y-6">
 
+    @php($soMeuEspaco = $meusEspacos->isNotEmpty() && $minhas->isEmpty() && $acompanho->isEmpty())
+
     <div>
-        <h1 class="font-display text-3xl font-semibold tracking-tight text-slate-900 dark:text-white">Pessoas que acompanho</h1>
-        <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
-            Mãe, pai ou quem mais você ajuda a cuidar: a saúde e os documentos dessa pessoa ficam em um espaço próprio, separado da sua vida financeira.
-            Quem cuida junto vê só isso.
-        </p>
+        <h1 class="font-display text-3xl font-semibold tracking-tight text-slate-900 dark:text-white">{{ $soMeuEspaco ? 'Meu espaço de saúde' : 'Pessoas que acompanho' }}</h1>
+        @unless ($soMeuEspaco)
+            <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                Mãe, pai ou quem mais você ajuda a cuidar: a saúde e os documentos dessa pessoa ficam em um espaço próprio, separado da sua vida financeira.
+                Quem cuida junto vê só isso.
+            </p>
+        @endunless
     </div>
 
     @if (session('care_status'))
@@ -14,6 +18,48 @@
     @if (session('status'))
         <div class="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:bg-amber-950/30 dark:text-amber-200">{{ session('status') }}</div>
     @endif
+
+    {{-- O meu próprio espaço (quando eu sou a pessoa acompanhada) --}}
+    @foreach ($meusEspacos as $espaco)
+        <section class="card space-y-4 p-5" wire:key="espaco-{{ $espaco->id }}">
+            <div class="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                    <p class="eyebrow">O meu espaço de saúde</p>
+                    <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Aqui ficam as suas consultas, remédios, alergias e documentos. Você manda em quem tem acesso.</p>
+                </div>
+                <form method="POST" action="{{ route('care.open', $espaco->id) }}">
+                    @csrf
+                    <button type="submit" class="btn-primary px-3 py-1.5 text-sm">Abrir</button>
+                </form>
+            </div>
+
+            <div>
+                <p class="text-sm font-medium text-slate-800 dark:text-slate-200">Quem tem acesso</p>
+                <ul class="mt-2 space-y-2 text-sm">
+                    <li class="flex flex-wrap items-center justify-between gap-2">
+                        <span class="text-slate-700 dark:text-slate-300">{{ $espaco->owner?->name }} <span class="text-xs text-slate-400">· criou o espaço e é responsável por ele</span></span>
+                    </li>
+                    @foreach ($espaco->caregivers as $cuidador)
+                        <li class="flex flex-wrap items-center justify-between gap-2" wire:key="meu-cuidador-{{ $cuidador->id }}">
+                            <span class="text-slate-700 dark:text-slate-300">{{ $cuidador->invited_name }} <span class="text-xs text-slate-400">· {{ mb_strtolower($cuidador->access_level->label()) }}</span></span>
+                            <button type="button" wire:click="revokeAsPerson('{{ $cuidador->id }}')" wire:confirm="Encerrar o acesso de {{ $cuidador->invited_name }}?" class="text-xs text-red-700 underline dark:text-red-400">Encerrar acesso</button>
+                        </li>
+                    @endforeach
+                </ul>
+            </div>
+
+            <div class="flex flex-wrap items-center gap-4 border-t border-slate-100 pt-3 text-xs dark:border-white/10">
+                @if ($espaco->care_consent_at)
+                    <button type="button" wire:click="revokeMyConsent('{{ $espaco->id }}')" wire:confirm="Revogar o consentimento fecha a saúde deste espaço e para os avisos. Continuar?" class="text-slate-600 underline dark:text-slate-300">Revogar o meu consentimento</button>
+                @else
+                    <button type="button" wire:click="grantMyConsent('{{ $espaco->id }}')" class="text-slate-600 underline dark:text-slate-300">Dar o consentimento de novo</button>
+                @endif
+                <button type="button" wire:click="endMySpace('{{ $espaco->id }}')"
+                    wire:confirm="Apagar o seu espaço e todos os seus dados e documentos? Isso não pode ser desfeito e quem cuida de você perde o acesso."
+                    class="text-red-700 underline dark:text-red-400">Apagar o meu espaço e todos os meus dados</button>
+            </div>
+        </section>
+    @endforeach
 
     {{-- Pessoas que eu cadastrei --}}
     @if ($minhas->isNotEmpty() || $podeCadastrar)
@@ -78,7 +124,7 @@
                         <div class="flex flex-wrap items-center justify-between gap-3">
                             <div class="min-w-0">
                                 <p class="text-base font-medium text-slate-900 dark:text-white">{{ $pessoa->profile_name }}</p>
-                                <p class="text-xs text-slate-500 dark:text-slate-400">{{ $pessoa->caregivers->where('status', \App\Enums\CaregiverStatus::Active)->count() }} cuidador(es) ativo(s) · {{ \App\Support\Money::format(\App\Services\CareBillingService::seatPrice()) }}/mês</p>
+                                <p class="text-xs text-slate-500 dark:text-slate-400">@if ($pessoa->members->first()?->user_id) Tem acesso próprio · @endif{{ $pessoa->caregivers->where('status', \App\Enums\CaregiverStatus::Active)->count() }} cuidador(es) ativo(s) · {{ \App\Support\Money::format(\App\Services\CareBillingService::seatPrice()) }}/mês</p>
                             </div>
                             <div class="flex flex-wrap gap-2">
                                 <form method="POST" action="{{ route('care.open', $pessoa->id) }}">
@@ -138,6 +184,21 @@
                                     @endif
                                 </div>
 
+                                @unless ($pessoa->members->first()?->user_id)
+                                    <div class="space-y-2 rounded-lg bg-slate-50 p-3 dark:bg-white/5">
+                                        <p class="text-xs font-medium text-slate-700 dark:text-slate-300">Convidar {{ $pessoa->profile_name }} para usar o app</p>
+                                        <p class="text-xs text-slate-400">Ela passa a ver o que está registrado, quem tem acesso e pode encerrar o acesso de cada pessoa. Você continua responsável pelo espaço.</p>
+                                        <div class="flex flex-wrap gap-2">
+                                            <input type="email" wire:model="selfEmail" placeholder="E-mail dela" class="input min-w-0 flex-1">
+                                            <button type="button" wire:click="inviteSelf" class="btn-secondary px-3 py-1.5 text-sm">Enviar convite</button>
+                                        </div>
+                                        @error('selfEmail') <p class="text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                                        @if ($lastSelfLink)
+                                            <p class="break-all text-xs text-slate-500 dark:text-slate-400">Se o e-mail não chegar, envie este link: {{ $lastSelfLink }}</p>
+                                        @endif
+                                    </div>
+                                @endunless
+
                                 <button type="button" wire:click="deletePerson('{{ $pessoa->id }}')"
                                     wire:confirm="Apagar {{ $pessoa->profile_name }} e todos os dados e documentos dela? Isso não pode ser desfeito, os cuidadores perdem o acesso e a cobrança dela sai a partir da próxima cobrança."
                                     class="text-xs text-red-700 underline dark:text-red-400">Excluir esta pessoa e todos os dados dela</button>
@@ -184,7 +245,7 @@
         </section>
     @endif
 
-    @if ($minhas->isEmpty() && $acompanho->isEmpty() && ! $podeCadastrar)
+    @if ($minhas->isEmpty() && $acompanho->isEmpty() && $meusEspacos->isEmpty() && ! $podeCadastrar)
         <div class="card p-5 text-sm text-slate-500 dark:text-slate-400">
             @if ($recursoLigado)
                 Você ainda não acompanha ninguém. Para cadastrar uma pessoa é preciso ter uma assinatura com Saúde; quem for convidado a cuidar não precisa de assinatura.

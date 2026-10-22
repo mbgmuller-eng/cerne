@@ -57,6 +57,15 @@ class FinancialProfilePolicy
         return $profile->isCare() && $this->isOwner($user, $profile);
     }
 
+    /**
+     * A própria pessoa acompanhada (com login) manda no acesso ao espaço dela: encerra o acesso de cuidadores, revoga o consentimento e apaga o
+     * espaço. Não muda o dono nem a cobrança.
+     */
+    public function manageOwnAccess(User $user, FinancialProfile $profile): bool
+    {
+        return $profile->isCare() && ProfileMember::query()->where('profile_id', $profile->id)->where('user_id', $user->id)->where('is_active', true)->exists();
+    }
+
     // ---------------------------------------------------------------------
 
     /**

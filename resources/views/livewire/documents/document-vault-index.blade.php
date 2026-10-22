@@ -98,6 +98,7 @@
                             <p class="text-sm font-medium text-slate-800 dark:text-slate-200">{{ $documento->title }}</p>
                             <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
                                 {{ $documento->category->label() }}
+                                <x-registered-by :model="$documento" />
                                 @if ($verTodos && $documento->folder)
                                     · Pasta: {{ $caminhoPorPasta[$documento->folder_id] ?? $documento->folder->name }}
                                 @endif

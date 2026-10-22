@@ -161,6 +161,20 @@ class User extends Authenticatable implements MustVerifyEmail
         return FinancialProfile::withCareProfiles()->where('owner_user_id', $this->id)->where('profile_type', \App\Enums\ProfileType::Care->value);
     }
 
+    /** Espaços de saúde em que este usuário É a pessoa acompanhada (ganhou login depois de os filhos começarem). */
+    public function selfCareProfiles(): \Illuminate\Database\Eloquent\Builder
+    {
+        return FinancialProfile::withCareProfiles()
+            ->where('profile_type', \App\Enums\ProfileType::Care->value)
+            ->whereIn('id', ProfileMember::query()->where('user_id', $this->id)->where('is_active', true)->select('profile_id'));
+    }
+
+    /** Tem alguma pessoa acompanhada na vida: cadastrou, cuida ou é ela mesma. Decide a ida à lista de pessoas quando não há perfil próprio. */
+    public function hasCareAccess(): bool
+    {
+        return $this->careProfiles()->exists() || $this->followedProfiles()->exists() || $this->selfCareProfiles()->exists();
+    }
+
     /** Acessos de cuidador deste usuário (convites aceitos e ainda ativos). */
     public function caregiverLinks(): HasMany
     {

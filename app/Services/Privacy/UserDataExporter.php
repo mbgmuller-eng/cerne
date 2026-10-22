@@ -115,7 +115,11 @@ class UserDataExporter
     /** @return \Illuminate\Support\Collection<int, ProfileMember> */
     private function memberships(User $user)
     {
-        return ProfileMember::query()->where('user_id', $user->id)->with('profile')->get()->filter(fn ($m) => $m->profile !== null)->values();
+        // O perfil de cuidado (a pessoa acompanhada com login) fica escondido por padrão: carrega pelo caminho que o enxerga.
+        return ProfileMember::query()->where('user_id', $user->id)->get()
+            ->each(fn ($m) => $m->setRelation('profile', FinancialProfile::withCareProfiles()->find($m->profile_id)))
+            ->filter(fn ($m) => $m->profile !== null)
+            ->values();
     }
 
     /** @return list<class-string<Model>> */

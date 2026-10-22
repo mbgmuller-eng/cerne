@@ -284,8 +284,8 @@ class HealthAppointmentIndex extends Component
             'coresDosMembros' => $membros->mapWithKeys(fn (ProfileMember $m) => [$m->id => $m->calendarColor()])->all(),
             'paleta' => MemberPalette::COLORS,
             'calendario' => $this->calendarData(),
-            'upcoming' => HealthAppointment::query()->where('profile_id', $profileId)->upcoming()->with('member')->get(),
-            'past' => HealthAppointment::query()->where('profile_id', $profileId)->past()->with('member')->get(),
+            'upcoming' => HealthAppointment::query()->where('profile_id', $profileId)->upcoming()->with(['member', 'createdByUser'])->get(),
+            'past' => HealthAppointment::query()->where('profile_id', $profileId)->past()->with(['member', 'createdByUser'])->get(),
             'editingExisting' => $this->editingId !== null,
             'emPessoaAcompanhada' => app(ProfileContext::class)->isCaregiver() || app(ProfileContext::class)->profile()?->isCare(),
         ] + $this->compromissoAberto());

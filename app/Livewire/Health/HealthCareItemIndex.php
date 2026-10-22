@@ -151,7 +151,7 @@ class HealthCareItemIndex extends Component
     {
         $itens = HealthCareItem::query()
             ->where('profile_id', app(ProfileContext::class)->profileId())
-            ->with('member')
+            ->with(['member', 'createdByUser'])
             ->orderByRaw('next_due_on IS NULL')
             ->orderBy('next_due_on')
             ->get();

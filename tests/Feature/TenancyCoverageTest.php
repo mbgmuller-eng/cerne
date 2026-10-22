@@ -31,6 +31,7 @@ use App\Models\LeadSuggestionDismissal;
 use App\Models\PartnerInvite;
 use App\Models\ProfessionalInvite;
 use App\Models\PolicyCommission;
+use App\Models\CarePersonInvite;
 use App\Models\ProfileCaregiver;
 use App\Models\ProfileMember;
 use App\Models\Subscription;
@@ -113,6 +114,7 @@ class TenancyCoverageTest extends TestCase
         // dependência circular com o próprio código que decide qual é o
         // profile_id ativo. Cada consulta a estes models já filtra
         // profile_id explicitamente no ponto de uso.
+        CarePersonInvite::class => 'convite para a própria pessoa acompanhada ganhar login (como PartnerInvite): consultado pelo dono sobre um perfil de cuidado e por quem abre o link ainda sem perfil, sempre filtrando profile_id ou o token',
         ProfileCaregiver::class => 'decide se alguém abre o perfil de uma pessoa acompanhada (como ProfileMember, é consultado ANTES de existir contexto); o cuidador nunca vê dado fora da lista de permitidos do ProfileScope',
         ProfileMember::class => 'usado para RESOLVER o perfil ativo — não pode depender do contexto que ele ajuda a formar',
     ];

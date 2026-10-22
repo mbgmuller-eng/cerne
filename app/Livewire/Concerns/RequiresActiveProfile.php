@@ -39,7 +39,7 @@ trait RequiresActiveProfile
         // Quem não tem perfil próprio mas acompanha alguém (o irmão que só cuida da mãe) cai na lista de pessoas, não num 404.
         $usuario = auth()->user();
 
-        if ($usuario !== null && ($usuario->careProfiles()->exists() || $usuario->followedProfiles()->exists())) {
+        if ($usuario !== null && $usuario->hasCareAccess()) {
             $this->redirect(route('care.index'));
 
             return;

@@ -92,6 +92,8 @@ class SetProfileContext
 
         // Sem escolha na sessão: cai no perfil próprio do usuário.
         return $user->ownedProfiles()->first()
-            ?? $user->memberships()->where('is_active', true)->first()?->profile;
+            ?? $user->memberships()->where('is_active', true)->first()?->profile
+            // Quem é a própria pessoa acompanhada (sem perfil financeiro): o espaço de saúde dela é a casa dela.
+            ?? $user->selfCareProfiles()->first();
     }
 }
