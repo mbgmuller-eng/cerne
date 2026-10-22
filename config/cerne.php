@@ -238,8 +238,8 @@ return [
     'legal' => [
         // Declaração de quem cadastra uma pessoa acompanhada (ela autorizou, ou ele é o representante legal). Subir quando o texto mudar.
         'care_consent_version' => '2026-10-22',
-        'terms_version' => '2026-10-22',
-        'health_consent_version' => '2026-10-22',
+        'terms_version' => '2026-10-23',
+        'health_consent_version' => '2026-10-23',
         'controller_name' => env('CERNE_CONTROLLER_NAME'),
         'controller_cnpj' => env('CERNE_CONTROLLER_CNPJ'),
         'dpo_name' => env('CERNE_DPO_NAME'),

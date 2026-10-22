@@ -7,7 +7,7 @@
 
     <ul class="mt-4 space-y-2 text-sm text-slate-600 dark:text-slate-300">
         <li><strong>Para quê:</strong> só para você usar a área de Saúde e receber os avisos que você ligou (consulta, troca de item, revisão do treino).</li>
-        <li><strong>Quem vê:</strong> você e, na ficha e na agenda, a pessoa do seu casal que divide o perfil. Consultor e corretor <strong>nunca</strong> veem.</li>
+        <li><strong>Quem vê:</strong> você e, na ficha e na agenda, a pessoa do seu casal que divide o perfil. Se você convidar alguém para acompanhar a sua saúde, essa pessoa também vê, com o acesso que você escolher e só até você encerrá-lo. Consultor e corretor <strong>nunca</strong> veem.</li>
         <li><strong>QR Code de emergência:</strong> só existe se você o gerar, e quem o escaneia vê o que você escolheu mostrar. Você pode trocá-lo quando quiser.</li>
         <li><strong>Como guardamos:</strong> os textos da ficha e da agenda ficam cifrados no banco.</li>
         <li><strong>Seus direitos:</strong> você pode revogar este consentimento a qualquer momento em Minha conta (a área de Saúde fecha e os avisos param),
