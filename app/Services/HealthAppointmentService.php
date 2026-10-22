@@ -187,7 +187,7 @@ class HealthAppointmentService
     /** @return Collection<int, User> */
     private function recipientsFor(HealthAppointment $consulta): Collection
     {
-        return app(HealthReminderRecipients::class)->forProfile($consulta->profile_id);
+        return app(HealthReminderRecipients::class)->forProfile($consulta->profile_id, 'appointments', $consulta->member_id);
     }
 
     private function alreadyNotifiedToday(User $user, string $appointmentId): bool

@@ -20,11 +20,14 @@ class CaregiverInviteMail extends Mailable
         public string $caregiverName,
         public CaregiverAccess $access,
         public string $link,
+        public bool $selfFollow = false,
     ) {}
 
     public function envelope(): Envelope
     {
-        return new Envelope(subject: "{$this->inviter->name} convidou você para acompanhar {$this->personName} no Cerne");
+        return new Envelope(subject: $this->selfFollow
+            ? "{$this->inviter->name} convidou você para acompanhar a saúde no Cerne"
+            : "{$this->inviter->name} convidou você para acompanhar {$this->personName} no Cerne");
     }
 
     public function content(): Content
@@ -35,6 +38,7 @@ class CaregiverInviteMail extends Mailable
             'personName' => $this->personName,
             'access' => $this->access,
             'link' => $this->link,
+            'selfFollow' => $this->selfFollow,
         ]);
     }
 }

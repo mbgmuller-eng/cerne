@@ -221,6 +221,12 @@ Mãe, pai ou quem mais o usuário ajuda a cuidar: um perfil de cuidado (`Profile
 - **Avisos** de consulta e de troca de item vão ao dono e aos cuidadores com `notify_reminders` (a pessoa não lê o app): `HealthReminderRecipients`.
 - **Só o dono** convida, muda o nível, revoga e exclui a pessoa (`FinancialProfilePolicy::manageCaregivers`). Revogar corta na hora (o `SetProfileContext` reautoriza a cada requisição).
   Excluir a pessoa ou a conta do dono apaga dados **e arquivos** (`AccountDeletionService::deleteProfile`).
+- **Quem me acompanha** (o mesmo cuidador, em PERFIL COMUM): qualquer um convida alguém para ver a PRÓPRIA saúde, **sem assinatura** (de quem convida e de quem acompanha; `CaregiverService::inviteFollower`,
+  tela `/pessoas`, seção "Quem me acompanha"). O acesso é **por pessoa**, não por perfil: `profile_caregivers.member_id` diz de quem é, e num casal o cuidador de um **não vê o outro** (`CoupleHealthScope` e
+  `DocumentVisibilityScope` filtram por `grantedMemberIds()`; as listas de pessoas usam `ProfileMember::visibleHere()`; nome do cônjuge nem aparece). O nível (leitura/edição) também vale por pessoa
+  (`ProfileContext::canWriteAsCaregiver($memberId)`, conferido pelo `CaregiverWriteGuard` na linha gravada). Só a própria pessoa convida, muda o nível e revoga (`ProfileCaregiverPolicy::manageGrant`): o titular
+  do perfil não mexe no acesso do cônjuge. O consentimento de saúde que vale é o de QUEM É ACOMPANHADO (`RequiresHealthConsent`); o lembrete só chega ao cuidador das consultas dessa pessoa
+  (`HealthReminderRecipients::forProfile($id, $tipo, $memberId)`). Consultor/corretor com vínculo ao dono abre como profissional, nunca como cuidador. Convidar quem já divide o perfil é recusado.
 - **Cobrança por pessoa** (`CareBillingService`, `Subscription::monthlyPrice()`): cada pessoa soma o preço ao valor da assinatura DIRETA do dono (profissional e cuidador não pagam). `monthlyPrice()` é a fonte
   única: o Pix Automático cobra esse valor a cada ciclo (modo MANUAL, sem nova autorização) e a Asaas recebe o mesmo valor ao criar a assinatura. Em cartão e boleto, cadastrar ou apagar uma pessoa troca o valor da
   assinatura na Asaas (a partir da PRÓXIMA cobrança, sem proporcional). Falha da Asaas **não** trava o cuidado: fica em `care_seats_billed` e a rotina `assentos-de-cuidado` corrige. Sem a assinatura direta do dono

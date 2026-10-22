@@ -3,11 +3,11 @@
     @php($soMeuEspaco = $meusEspacos->isNotEmpty() && $minhas->isEmpty() && $acompanho->isEmpty())
 
     <div>
-        <h1 class="font-display text-3xl font-semibold tracking-tight text-slate-900 dark:text-white">{{ $soMeuEspaco ? 'Meu espaço de saúde' : 'Pessoas que acompanho' }}</h1>
+        <h1 class="font-display text-3xl font-semibold tracking-tight text-slate-900 dark:text-white">{{ $soMeuEspaco ? 'Meu espaço de saúde' : 'Pessoas e acessos' }}</h1>
         @unless ($soMeuEspaco)
             <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                Mãe, pai ou quem mais você ajuda a cuidar: a saúde e os documentos dessa pessoa ficam em um espaço próprio, separado da sua vida financeira.
-                Quem cuida junto vê só isso.
+                Convide quem acompanha a sua saúde e cuide da saúde de quem você ajuda (mãe, pai ou quem mais): a saúde e os documentos ficam separados da vida financeira,
+                e quem acompanha vê só isso.
             </p>
         @endunless
     </div>
@@ -19,6 +19,66 @@
         <div class="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:bg-amber-950/30 dark:text-amber-200">{{ session('status') }}</div>
     @endif
 
+    {{-- Quem me acompanha: convidar alguém para ver a MINHA saúde. Não exige assinatura. --}}
+    @if ($recursoLigado)
+        @foreach ($meusMembros as $eu)
+            <section class="card space-y-4 p-5" wire:key="seguidores-{{ $eu->id }}">
+                <div>
+                    <p class="eyebrow">Quem me acompanha</p>
+                    <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                        Convide alguém de confiança (um filho, um irmão, um amigo) para ver a sua ficha de saúde, a agenda, os cuidados e os documentos que você liberar.
+                        Quem acompanha não vê nada de finanças{{ $eu->profile && $eu->profile->members()->where('is_active', true)->count() > 1 ? ' nem a saúde de quem divide o perfil com você' : '' }}, e você encerra o acesso quando quiser. Não precisa de assinatura.
+                    </p>
+                </div>
+
+                @if ($eu->followers->isEmpty())
+                    <p class="text-xs text-slate-400">Ninguém acompanha a sua saúde ainda.</p>
+                @else
+                    <ul class="space-y-2">
+                        @foreach ($eu->followers as $seguidor)
+                            <li class="flex flex-wrap items-center justify-between gap-2 text-sm" wire:key="seguidor-{{ $seguidor->id }}">
+                                <div class="min-w-0">
+                                    <p class="font-medium text-slate-800 dark:text-slate-200">{{ $seguidor->invited_name }}</p>
+                                    <p class="text-xs text-slate-500 dark:text-slate-400">{{ $seguidor->invited_email }} · {{ $seguidor->status->label() }}</p>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <select wire:change="changeAccess('{{ $seguidor->id }}', $event.target.value)" class="input py-1 text-xs">
+                                        @foreach ($accessOptions as $opcao)
+                                            <option value="{{ $opcao->value }}" @selected($seguidor->access_level === $opcao)>{{ $opcao->label() }}</option>
+                                        @endforeach
+                                    </select>
+                                    <button type="button" wire:click="revoke('{{ $seguidor->id }}')" wire:confirm="Encerrar o acesso de {{ $seguidor->invited_name }}?" class="text-xs text-red-700 underline dark:text-red-400">Encerrar acesso</button>
+                                </div>
+                            </li>
+                        @endforeach
+                    </ul>
+                @endif
+
+                <div class="space-y-2 rounded-lg bg-slate-50 p-3 dark:bg-white/5">
+                    <p class="text-xs font-medium text-slate-700 dark:text-slate-300">Convidar alguém para me acompanhar</p>
+                    <div class="grid gap-2 sm:grid-cols-3">
+                        <div>
+                            <input type="text" wire:model="followName" placeholder="Nome" class="input w-full">
+                            @error('followName') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                        </div>
+                        <div>
+                            <input type="email" wire:model="followEmail" placeholder="E-mail" class="input w-full">
+                            @error('followEmail') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                        </div>
+                        <select wire:model="followAccess" class="input w-full">
+                            @foreach ($accessOptions as $opcao)
+                                <option value="{{ $opcao->value }}">{{ $opcao->label() }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <button type="button" wire:click="inviteFollower('{{ $eu->id }}')" class="btn-primary px-3 py-1.5 text-sm">Enviar convite</button>
+                    @if ($lastFollowLink)
+                        <p class="break-all text-xs text-slate-500 dark:text-slate-400">Se o e-mail não chegar, envie este link: {{ $lastFollowLink }}</p>
+                    @endif
+                </div>
+            </section>
+        @endforeach
+    @endif
     {{-- O meu próprio espaço (quando eu sou a pessoa acompanhada) --}}
     @foreach ($meusEspacos as $espaco)
         <section class="card space-y-4 p-5" wire:key="espaco-{{ $espaco->id }}">
@@ -210,45 +270,42 @@
         </section>
     @endif
 
-    {{-- Pessoas que eu acompanho como cuidador --}}
+    {{-- Pessoas que eu acompanho como cuidador (um acesso por pessoa) --}}
     @if ($acompanho->isNotEmpty())
         <section class="card space-y-3 p-5">
             <p class="eyebrow">Pessoas que me deram acesso</p>
             <ul class="space-y-3">
-                @foreach ($acompanho as $pessoa)
-                    @php($vinculo = $vinculos[$pessoa->id] ?? null)
-                    <li class="rounded-xl border border-slate-100 p-4 dark:border-white/10" wire:key="acompanho-{{ $pessoa->id }}">
+                @foreach ($acompanho as $vinculo)
+                    @php($nome = $vinculo->member?->name ?? $vinculo->profile?->profile_name)
+                    <li class="rounded-xl border border-slate-100 p-4 dark:border-white/10" wire:key="acompanho-{{ $vinculo->id }}">
                         <div class="flex flex-wrap items-center justify-between gap-3">
                             <div class="min-w-0">
-                                <p class="text-base font-medium text-slate-900 dark:text-white">{{ $pessoa->profile_name }}</p>
+                                <p class="text-base font-medium text-slate-900 dark:text-white">{{ $nome }}</p>
                                 <p class="text-xs text-slate-500 dark:text-slate-400">
-                                    Liberado por {{ $pessoa->owner?->name }} · {{ mb_strtolower($vinculo?->access_level->label() ?? '') }}
+                                    Liberado por {{ $vinculo->invitedBy?->name }} · {{ mb_strtolower($vinculo->access_level->label()) }}
                                 </p>
                             </div>
-                            <form method="POST" action="{{ route('care.open', $pessoa->id) }}">
+                            <form method="POST" action="{{ route('care.open', $vinculo->profile_id) }}">
                                 @csrf
                                 <button type="submit" class="btn-primary px-3 py-1.5 text-sm">Abrir</button>
                             </form>
                         </div>
-                        @if ($vinculo)
-                            <div class="mt-3 flex flex-wrap items-center gap-4 text-xs">
-                                <label class="flex items-center gap-2 text-slate-600 dark:text-slate-300">
-                                    <input type="checkbox" wire:click="toggleNotify('{{ $vinculo->id }}')" @checked($vinculo->notify_reminders) class="rounded border-slate-300 text-brand-700 focus:ring-brand-500">
-                                    Avisos de consultas e exames
-                                </label>
-                                <label class="flex items-center gap-2 text-slate-600 dark:text-slate-300">
-                                    <input type="checkbox" wire:click="toggleNotifyItems('{{ $vinculo->id }}')" @checked($vinculo->notify_care_items) class="rounded border-slate-300 text-brand-700 focus:ring-brand-500">
-                                    Avisos de troca de itens de cuidado
-                                </label>
-                                <button type="button" wire:click="leave('{{ $vinculo->id }}')" wire:confirm="Deixar de acompanhar {{ $pessoa->profile_name }}?" class="text-red-700 underline dark:text-red-400">Deixar de acompanhar</button>
-                            </div>
-                        @endif
+                        <div class="mt-3 flex flex-wrap items-center gap-4 text-xs">
+                            <label class="flex items-center gap-2 text-slate-600 dark:text-slate-300">
+                                <input type="checkbox" wire:click="toggleNotify('{{ $vinculo->id }}')" @checked($vinculo->notify_reminders) class="rounded border-slate-300 text-brand-700 focus:ring-brand-500">
+                                Avisos de consultas e exames
+                            </label>
+                            <label class="flex items-center gap-2 text-slate-600 dark:text-slate-300">
+                                <input type="checkbox" wire:click="toggleNotifyItems('{{ $vinculo->id }}')" @checked($vinculo->notify_care_items) class="rounded border-slate-300 text-brand-700 focus:ring-brand-500">
+                                Avisos de troca de itens de cuidado
+                            </label>
+                            <button type="button" wire:click="leave('{{ $vinculo->id }}')" wire:confirm="Deixar de acompanhar {{ $nome }}?" class="text-red-700 underline dark:text-red-400">Deixar de acompanhar</button>
+                        </div>
                     </li>
                 @endforeach
             </ul>
         </section>
     @endif
-
     @if ($minhas->isEmpty() && $acompanho->isEmpty() && $meusEspacos->isEmpty() && ! $podeCadastrar)
         <div class="card p-5 text-sm text-slate-500 dark:text-slate-400">
             @if ($recursoLigado)

@@ -17,8 +17,7 @@ class CareSwitchController extends Controller
     {
         $perfil = FinancialProfile::withCareProfiles()->whereKey($profile)->firstOrFail();
 
-        abort_unless($perfil->isCare(), 404);
-        $this->authorize('view', $perfil);
+        $this->authorizeOpening($request, $perfil);
 
         $request->session()->put(SetProfileContext::SESSION_KEY, $perfil->id);
         $request->session()->forget(ProfileSwitchController::VOLTAR_KEY);
@@ -31,12 +30,24 @@ class CareSwitchController extends Controller
     {
         $perfil = FinancialProfile::withCareProfiles()->whereKey($profile)->firstOrFail();
 
-        abort_unless($perfil->isCare(), 404);
-        $this->authorize('view', $perfil);
+        $this->authorizeOpening($request, $perfil);
 
         $request->session()->put(SetProfileContext::SESSION_KEY, $perfil->id);
 
         return redirect()->route($destino === 'cuidados' ? 'health.care.index' : 'health.appointments.index');
+    }
+
+    /**
+     * Esta rota é só para entrar em quem se acompanha: a pessoa acompanhada (dono, ela mesma ou cuidador) ou o perfil comum em que o usuário é
+     * CUIDADOR. O dono e os membros de um perfil comum, e o consultor, têm o caminho de sempre.
+     */
+    private function authorizeOpening(Request $request, FinancialProfile $perfil): void
+    {
+        $this->authorize('view', $perfil);
+
+        $ehCuidador = \App\Models\ProfileCaregiver::query()->active()->where('profile_id', $perfil->id)->where('user_id', $request->user()->id)->exists();
+
+        abort_unless($perfil->isCare() || $ehCuidador, 404);
     }
 
     /** Volta para o perfil próprio (ou para a lista de pessoas, se quem cuida não tem perfil próprio). */

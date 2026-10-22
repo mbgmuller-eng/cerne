@@ -32,5 +32,10 @@ class CoupleHealthScope implements Scope
         }
 
         $builder->where($model->qualifyColumn('profile_id'), $context->profileId());
+
+        // Quem acompanha uma pessoa de um casal vê a saúde DELA, não a do cônjuge que divide o perfil (a privacidade vale também para o cuidador).
+        if ($context->isCaregiver()) {
+            $builder->whereIn($model->qualifyColumn('member_id'), $context->grantedMemberIds());
+        }
     }
 }

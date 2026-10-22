@@ -22,10 +22,7 @@ class HealthQrCodeController extends Controller
         $context = app(ProfileContext::class);
         abort_unless($context->isHealthParticipant(), 403);
 
-        $membro = ProfileMember::query()
-            ->where('profile_id', $context->profileId())
-            ->where('is_active', true)
-            ->findOrFail($memberId);
+        $membro = ProfileMember::query()->visibleHere()->findOrFail($memberId);
 
         $card = $service->ensureEmergencyToken($membro);
 

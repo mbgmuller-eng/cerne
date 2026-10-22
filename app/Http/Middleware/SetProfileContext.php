@@ -55,14 +55,18 @@ class SetProfileContext
         // Cuidador: nem dono nem membro, mas com acesso ativo a esta pessoa. Resolvido ANTES do papel profissional: um consultor que cuida da
         // própria mãe entra como cuidador (só saúde), nunca como consultor.
         $cuidador = null;
-        if ($profile->owner_user_id !== $user->id && $member === null) {
-            $cuidador = ProfileCaregiver::query()->active()->where('profile_id', $profile->id)->where('user_id', $user->id)->first();
+        $acessos = [];
+        if ($profile->owner_user_id !== $user->id && $member === null && ! $this->isLinkedProfessionalOf($user, $profile)) {
+            $acessos = ProfileCaregiver::query()->active()->where('profile_id', $profile->id)->where('user_id', $user->id)->get()->all();
+            // O acesso "principal" (o de edição, se houver) dá o nível mostrado no banner; o nível de verdade é por pessoa (ProfileContext::grantLevels).
+            $cuidador = collect($acessos)->sortByDesc(fn ($a) => $a->access_level->canWrite())->first();
         }
 
         $context->set(
             profile: $profile,
             member: $member,
             caregiver: $cuidador,
+            grants: $acessos,
             // isLinkedProfessional() (consultor OU corretor) — não só
             // isConsultant(): sem isso, um corretor vendo o perfil de um
             // cliente seria tratado como se fosse o cônjuge dele pela
@@ -74,6 +78,14 @@ class SetProfileContext
         $request->session()->put(self::SESSION_KEY, $profile->id);
 
         return $next($request);
+    }
+
+    /** Consultor ou corretor com vínculo ativo ao dono do perfil: abre como profissional, nunca como cuidador (o acesso de cuidador é só saúde). */
+    private function isLinkedProfessionalOf($user, FinancialProfile $profile): bool
+    {
+        return ! $profile->isCare()
+            && $user->isLinkedProfessional()
+            && \App\Models\ConsultantClient::query()->active()->where('consultant_id', $user->id)->where('client_id', $profile->owner_user_id)->exists();
     }
 
     private function resolveProfile(Request $request, $user): ?FinancialProfile

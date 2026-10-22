@@ -18,10 +18,17 @@ class CareLinks
         return $perfil?->isCare() ? $perfil->id : null;
     }
 
-    public static function to(?string $careProfileId, string $destino, string $rotaComum): string
+    public static function to(?string $careProfileId, string $destino, string $rotaComum, ?string $profileId = null, ?object $notifiable = null): string
     {
-        return $careProfileId !== null
-            ? route('care.goto', ['profile' => $careProfileId, 'destino' => $destino])
+        // Pessoa acompanhada: todo mundo entra por ela. Perfil comum: só quem é cuidador (o dono e os membros abrem a tela de sempre).
+        $alvo = $careProfileId ?? (
+            $profileId !== null && $notifiable !== null && \App\Models\ProfileCaregiver::query()->active()->where('profile_id', $profileId)->where('user_id', $notifiable->id)->exists()
+                ? $profileId
+                : null
+        );
+
+        return $alvo !== null
+            ? route('care.goto', ['profile' => $alvo, 'destino' => $destino])
             : route($rotaComum);
     }
 }

@@ -23,16 +23,16 @@ class CaregiverWriteGuard
     public static function register(string $modelClass): void
     {
         $modelClass::creating(function (Model $model): void {
-            self::assertCanWrite();
+            self::assertCanWrite($model);
             self::stampActor($model);
         });
 
         $modelClass::updating(function (Model $model): void {
-            self::assertCanWrite();
+            self::assertCanWrite($model);
         });
 
         $modelClass::deleting(function (Model $model): void {
-            self::assertCanWrite();
+            self::assertCanWrite($model);
 
             $contexto = app(ProfileContext::class);
 
@@ -42,9 +42,10 @@ class CaregiverWriteGuard
         });
     }
 
-    private static function assertCanWrite(): void
+    private static function assertCanWrite(Model $model): void
     {
-        if (! app(ProfileContext::class)->canWriteAsCaregiver()) {
+        // O nível vale por pessoa: quem tem edição de uma e leitura de outra não grava na segunda.
+        if (! app(ProfileContext::class)->canWriteAsCaregiver($model->getAttribute('member_id'))) {
             throw new AuthorizationException('Seu acesso a esta pessoa é só de leitura.');
         }
     }

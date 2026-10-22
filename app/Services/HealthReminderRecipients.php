@@ -20,7 +20,7 @@ class HealthReminderRecipients
      * @param  string  $kind  'appointments' (consultas e exames) ou 'care_items' (troca de itens): cada cuidador escolhe quais quer receber
      * @return Collection<int, User>
      */
-    public function forProfile(string $profileId, string $kind = 'appointments'): Collection
+    public function forProfile(string $profileId, string $kind = 'appointments', ?string $memberId = null): Collection
     {
         $perfil = FinancialProfile::withCareProfiles()->find($profileId);
 
@@ -42,7 +42,22 @@ class HealthReminderRecipients
             return collect([$perfil->owner])->merge($cuidadores)->merge($propria)->filter()->unique('id')->values();
         }
 
-        return $perfil->activeMembers()->whereNotNull('user_id')->with('user')->get()
-            ->pluck('user')->filter(fn (?User $user) => $user !== null && $user->hasCurrentHealthConsent())->values();
+        $membros = $perfil->activeMembers()->whereNotNull('user_id')->with('user')->get();
+        $destinatarios = $membros->pluck('user')->filter(fn (?User $user) => $user !== null && $user->hasCurrentHealthConsent());
+
+        // Quem acompanha a pessoa de quem é o compromisso (e só dela). Vale o consentimento de saúde de QUEM É ACOMPANHADO: sem ele, ninguém é avisado.
+        $acompanhado = $memberId !== null ? $membros->firstWhere('id', $memberId) : null;
+
+        if ($acompanhado?->user?->hasCurrentHealthConsent()) {
+            $coluna = $kind === 'care_items' ? 'notify_care_items' : 'notify_reminders';
+
+            $seguidores = ProfileCaregiver::query()->active()->where('profile_id', $perfil->id)
+                ->where(fn ($q) => $q->where('member_id', $memberId)->orWhereNull('member_id'))
+                ->where($coluna, true)->with('user')->get()->pluck('user');
+
+            $destinatarios = $destinatarios->merge($seguidores);
+        }
+
+        return $destinatarios->filter()->unique('id')->values();
     }
 }

@@ -20,7 +20,7 @@ use Illuminate\Support\Str;
  * apareceria nos seletores de "de quem é" da agenda, da ficha e dos documentos.
  */
 #[Fillable([
-    'profile_id', 'user_id', 'invited_by_user_id', 'invited_email', 'invited_name', 'access_level', 'status', 'invite_token', 'invite_expires_at',
+    'profile_id', 'member_id', 'user_id', 'invited_by_user_id', 'invited_email', 'invited_name', 'access_level', 'status', 'invite_token', 'invite_expires_at',
     'accepted_at', 'revoked_at', 'notify_reminders', 'notify_care_items',
 ])]
 class ProfileCaregiver extends Model
@@ -45,6 +45,12 @@ class ProfileCaregiver extends Model
         return $this->belongsTo(FinancialProfile::class, 'profile_id')->withoutGlobalScope(CareProfileScope::class);
     }
 
+    /** De quem é o acesso: a pessoa cuja saúde este cuidador acompanha (o membro; na pessoa acompanhada, o único dela). */
+    public function member(): BelongsTo
+    {
+        return $this->belongsTo(ProfileMember::class, 'member_id');
+    }
+
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
@@ -65,13 +71,14 @@ class ProfileCaregiver extends Model
      *
      * @return array{caregiver: self, token: string}
      */
-    public static function issue(FinancialProfile $profile, User $issuer, string $name, string $email, CaregiverAccess $access): array
+    public static function issue(FinancialProfile $profile, ProfileMember $member, User $issuer, string $name, string $email, CaregiverAccess $access): array
     {
         $token = Str::random(48);
         $email = mb_strtolower(trim($email));
 
-        // Reconvidar a mesma pessoa reaproveita a linha (índice único perfil + e-mail): reativa quem foi revogado e renova o link de quem não aceitou.
-        $caregiver = self::query()->where('profile_id', $profile->id)->where('invited_email', $email)->first() ?? new self(['profile_id' => $profile->id, 'invited_email' => $email]);
+        // Reconvidar a mesma pessoa reaproveita a linha (índice único pessoa acompanhada + e-mail): reativa quem foi revogado e renova o link de quem não aceitou.
+        $caregiver = self::query()->where('member_id', $member->id)->where('invited_email', $email)->first()
+            ?? new self(['profile_id' => $profile->id, 'member_id' => $member->id, 'invited_email' => $email]);
 
         $caregiver->fill([
             'invited_by_user_id' => $issuer->id,

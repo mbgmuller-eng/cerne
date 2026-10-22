@@ -48,6 +48,15 @@ class CareIndex extends Component
 
     public ?string $lastSelfLink = null;
 
+    /** Convite para alguém acompanhar a MINHA saúde (não exige assinatura). */
+    public string $followName = '';
+
+    public string $followEmail = '';
+
+    public string $followAccess = 'read';
+
+    public ?string $lastFollowLink = null;
+
     public function startAdding(): void
     {
         abort_unless(app(CareProfileService::class)->canCreate(auth()->user()), 403);
@@ -132,6 +141,30 @@ class CareIndex extends Component
 
         $this->selfEmail = '';
         session()->flash('care_status', 'Convite enviado para a própria pessoa por e-mail.');
+    }
+
+    /** Convida alguém para acompanhar a minha saúde. Cada um do casal convida só para a própria. */
+    public function inviteFollower(string $memberId, CaregiverService $service): void
+    {
+        $membro = ProfileMember::query()->where('user_id', auth()->id())->where('is_active', true)->findOrFail($memberId);
+
+        $dados = $this->validate([
+            'followName' => ['required', 'string', 'max:120'],
+            'followEmail' => ['required', 'email', 'max:190'],
+            'followAccess' => ['required', 'in:read,edit'],
+        ], [], ['followName' => 'nome', 'followEmail' => 'e-mail']);
+
+        try {
+            $this->lastFollowLink = $service->inviteFollower($membro, auth()->user(), trim($dados['followName']), $dados['followEmail'], CaregiverAccess::from($dados['followAccess']));
+        } catch (RuntimeException $e) {
+            $this->addError('followEmail', $e->getMessage());
+
+            return;
+        }
+
+        $this->reset('followName', 'followEmail');
+        $this->followAccess = 'read';
+        session()->flash('care_status', 'Convite enviado por e-mail.');
     }
 
     public function changeAccess(string $caregiverId, string $access, CaregiverService $service): void
@@ -219,14 +252,21 @@ class CareIndex extends Component
 
         $meusEspacos = $usuario->selfCareProfiles()->with(['owner', 'caregivers' => fn ($q) => $q->where('status', CaregiverStatus::Active->value)->orderBy('invited_name')])->get();
         $minhas = $usuario->careProfiles()->with(['members', 'caregivers' => fn ($q) => $q->where('status', '!=', CaregiverStatus::Revoked->value)->orderBy('invited_name')])->orderBy('profile_name')->get();
-        $vinculos = ProfileCaregiver::query()->active()->where('user_id', $usuario->id)->get()->keyBy('profile_id');
-        $acompanho = $usuario->followedProfiles()->with('owner')->orderBy('profile_name')->get();
+        // O que EU acompanho: um acesso por pessoa (num casal, o mesmo cuidador pode acompanhar os dois, cada um com o seu nível).
+        $acompanho = ProfileCaregiver::query()->active()->where('user_id', $usuario->id)->with(['member', 'profile', 'invitedBy'])->get()->sortBy(fn ($a) => $a->member?->name ?? '')->values();
+
+        // Quem ME acompanha: a minha pessoa em perfil comum (a pessoa acompanhada tem a tela própria, acima).
+        $meusMembros = ProfileMember::query()
+            ->where('user_id', $usuario->id)->where('is_active', true)
+            ->whereIn('profile_id', FinancialProfile::query()->select('id'))
+            ->with(['followers' => fn ($q) => $q->where('status', '!=', CaregiverStatus::Revoked->value)->orderBy('invited_name')])
+            ->get();
 
         return view('livewire.care.care-index', [
             'minhas' => $minhas,
             'meusEspacos' => $meusEspacos,
             'acompanho' => $acompanho,
-            'vinculos' => $vinculos,
+            'meusMembros' => $meusMembros,
             'podeCadastrar' => $servico->canCreate($usuario),
             'recursoLigado' => CareProfileService::enabled(),
             'temPerfilProprio' => $usuario->ownedProfiles()->exists(),
@@ -253,10 +293,19 @@ class CareIndex extends Component
         return $perfil;
     }
 
+    /**
+     * O acesso de um cuidador, se for de uma pessoa que EU gerencio: as que cadastrei ou eu mesmo. De quem não é meu a busca não acha (404).
+     */
     private function caregiverOfMineOrFail(string $caregiverId): ProfileCaregiver
     {
-        $vinculo = ProfileCaregiver::query()->findOrFail($caregiverId);
-        $this->ownedOrFail($vinculo->profile_id);
+        $usuario = auth()->user();
+
+        $vinculo = ProfileCaregiver::query()
+            ->where(fn ($q) => $q->whereIn('profile_id', $usuario->careProfiles()->select('id'))
+                ->orWhereIn('member_id', ProfileMember::query()->where('user_id', $usuario->id)->select('id')))
+            ->findOrFail($caregiverId);
+
+        Gate::authorize('manageGrant', $vinculo);
 
         return $vinculo;
     }

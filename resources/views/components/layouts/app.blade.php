@@ -73,7 +73,7 @@
                 ['health.card.index', 'Ficha de Saúde', 'Ficha', 'heart'],
                 ['health.appointments.index', 'Agenda de Saúde', 'Agenda', 'calendar'],
                 ['health.care.index', 'Cuidados e itens', 'Cuidados', 'tag'],
-                ['care.index', $souAPessoa ? 'Quem tem acesso' : 'Pessoas que acompanho', $souAPessoa ? 'Acessos' : 'Pessoas', 'contact'],
+                ['care.index', $souAPessoa ? 'Quem tem acesso' : 'Pessoas e acessos', $souAPessoa ? 'Acessos' : 'Pessoas', 'contact'],
             ]],
             ['label' => 'Documentos', 'items' => $navDocumentos],
         ];
@@ -82,7 +82,7 @@
         // chega pela lista (care.index) e pelo banner.
         $navSections = array_map(function (array $secao) {
             if ($secao['label'] === 'Saúde') {
-                $secao['items'][] = ['care.index', 'Pessoas que acompanho', 'Pessoas', 'contact'];
+                $secao['items'][] = ['care.index', 'Pessoas e acessos', 'Pessoas', 'contact'];
             }
 
             return $secao;
@@ -588,7 +588,7 @@
                     @if ($souAPessoa)
                         Este é o <strong>seu espaço de saúde</strong>.
                     @else
-                        Você está acompanhando <strong>{{ $profile->profile_name }}</strong>@if ($context->isCaregiver()) · {{ mb_strtolower($context->caregiver()->access_level->label()) }}@endif.
+                        Você está acompanhando <strong>{{ $context->isCaregiver() ? $context->followedNames() : $profile->profile_name }}</strong>@if ($context->isCaregiver()) · {{ mb_strtolower($context->caregiver()->access_level->label()) }}@endif.
                     @endif
                 </span>
                 <span class="flex items-center gap-4">

@@ -25,6 +25,26 @@ class ProfileMember extends Model
         ];
     }
 
+    /**
+     * Os membros ativos do perfil ativo que o usuário pode ver. Quem é cuidador só vê as pessoas que o liberaram: num casal, o cuidador de um não
+     * enxerga o nome nem os dados do outro (a privacidade do casal vale também para quem acompanha).
+     */
+    public function scopeVisibleHere(\Illuminate\Database\Eloquent\Builder $query): \Illuminate\Database\Eloquent\Builder
+    {
+        $contexto = app(\App\Support\ProfileContext::class);
+
+        return $query
+            ->where('profile_id', $contexto->profileId())
+            ->where('is_active', true)
+            ->when($contexto->isCaregiver(), fn ($q) => $q->whereIn('id', $contexto->grantedMemberIds()));
+    }
+
+    /** Cuidadores desta pessoa (quem acompanha a saúde dela). */
+    public function followers(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(ProfileCaregiver::class, 'member_id');
+    }
+
     public function profile(): BelongsTo
     {
         return $this->belongsTo(FinancialProfile::class, 'profile_id');

@@ -34,6 +34,7 @@ class HealthAppointmentUpcoming extends Notification implements ShouldQueue
         public ?string $careProfileId = null,
         public ?string $escortUserId = null,
         public ?string $escortName = null,
+        public ?string $profileId = null,
     ) {}
 
     public static function forAppointment(HealthAppointment $appointment): self
@@ -51,13 +52,14 @@ class HealthAppointmentUpcoming extends Notification implements ShouldQueue
             \App\Support\CareLinks::careProfileId($appointment->profile_id),
             $appointment->escort_user_id,
             $appointment->relationLoaded('escort') ? $appointment->escort?->name : null,
+            $appointment->profile_id,
         );
     }
 
     /** Aviso de pessoa acompanhada leva a ela; o de perfil comum, à agenda de sempre. */
-    private function link(): string
+    private function link(?object $notifiable = null): string
     {
-        return \App\Support\CareLinks::to($this->careProfileId, 'agenda', 'health.appointments.index');
+        return \App\Support\CareLinks::to($this->careProfileId, 'agenda', 'health.appointments.index', $this->profileId, $notifiable);
     }
 
     /** @return array<int, string> */
@@ -96,7 +98,7 @@ class HealthAppointmentUpcoming extends Notification implements ShouldQueue
                 'wazeUrl' => $destino ? MapLinks::waze($destino) : null,
                 'dateFormatted' => $quando->format('d/m'),
                 'timeFormatted' => $quando->format('H:i'),
-                'url' => $this->link(),
+                'url' => $this->link($notifiable),
                 'escortName' => $this->escortName,
                 'youAreEscort' => $this->escortUserId !== null && $this->escortUserId === $notifiable->id,
             ]);
@@ -121,6 +123,6 @@ class HealthAppointmentUpcoming extends Notification implements ShouldQueue
         return (new WebPushMessage)
             ->title("{$this->kindLabel} em breve — {$this->memberName}")
             ->body("{$this->title} em {$quando->format('d/m')} às {$quando->format('H:i')}")
-            ->data(['url' => $this->link()]);
+            ->data(['url' => $this->link($notifiable)]);
     }
 }

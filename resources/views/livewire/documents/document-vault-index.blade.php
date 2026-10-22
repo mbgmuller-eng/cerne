@@ -230,10 +230,10 @@
                         </label>
                     @endif
 
-                    @if (app(\App\Support\ProfileContext::class)->profile()?->isCare() && ! app(\App\Support\ProfileContext::class)->isCaregiver())
+                    @if (! app(\App\Support\ProfileContext::class)->isCaregiver() && \App\Models\ProfileCaregiver::query()->where('profile_id', app(\App\Support\ProfileContext::class)->profileId())->where('status', '!=', 'revoked')->exists())
                         <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
                             <input type="checkbox" wire:model="sharedWithCaregivers" class="h-4 w-4 rounded accent-documentos-800">
-                            Liberar este documento para os cuidadores
+                            Liberar este documento para quem acompanha a saúde
                         </label>
                     @endif
 

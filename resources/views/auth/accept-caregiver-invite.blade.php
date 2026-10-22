@@ -8,7 +8,11 @@
     @else
         <h1 class="text-lg font-semibold text-slate-900 dark:text-white">Olá, {{ $convite->invited_name }}</h1>
         <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
-            {{ $convite->invitedBy?->name }} convidou você para acompanhar <strong>{{ $convite->profile->profile_name }}</strong> no Cerne.
+            @if ($convite->member?->user_id !== null && $convite->member->user_id === $convite->invited_by_user_id)
+                {{ $convite->invitedBy?->name }} convidou você para acompanhar a saúde no Cerne.
+            @else
+                {{ $convite->invitedBy?->name }} convidou você para acompanhar <strong>{{ $convite->member?->name ?? $convite->profile->profile_name }}</strong> no Cerne.
+            @endif
             Seu acesso: <strong>{{ mb_strtolower($convite->access_level->label()) }}</strong>.
         </p>
         <ul class="mt-3 list-disc space-y-1 pl-5 text-xs text-slate-500 dark:text-slate-400">

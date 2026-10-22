@@ -210,8 +210,7 @@ class HealthCardIndex extends Component
     private function membros(): Collection
     {
         return ProfileMember::query()
-            ->where('profile_id', app(ProfileContext::class)->profileId())
-            ->where('is_active', true)
+            ->visibleHere()
             ->orderBy('role')
             ->get();
     }
@@ -221,8 +220,7 @@ class HealthCardIndex extends Component
         // findOrFail (não a coleção já carregada): id de outro perfil vira
         // ModelNotFoundException, igual ao resto do app — nunca edita.
         return ProfileMember::query()
-            ->where('profile_id', app(ProfileContext::class)->profileId())
-            ->where('is_active', true)
+            ->visibleHere()
             ->findOrFail($memberId);
     }
 

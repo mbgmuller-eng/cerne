@@ -44,7 +44,7 @@ class RestrictCareContext
 
         // Quem paga é o dono: sem a assinatura dele em vigor, a saúde e os documentos desta pessoa ficam suspensos (os dados continuam guardados).
         // Só a lista de pessoas segue aberta, para ele regularizar ou apagar.
-        if (! app(EntitlementService::class)->careProfileEntitled($profile)) {
+        if ($profile->isCare() && ! app(EntitlementService::class)->careProfileEntitled($profile)) {
             return redirect()->route('care.index')->with('status', 'O acesso a esta pessoa está suspenso: a assinatura de quem a cadastrou não está em vigor.');
         }
 

@@ -87,7 +87,7 @@ class FinancialProfilePolicy
     /** Cuidador com acesso ativo a uma pessoa acompanhada. Abre o perfil, mas não administra nada nele (update/delete/manageMembers seguem do dono). */
     private function isActiveCaregiver(User $user, FinancialProfile $profile): bool
     {
-        return $profile->isCare() && ProfileCaregiver::query()->active()->where('profile_id', $profile->id)->where('user_id', $user->id)->exists();
+        return ProfileCaregiver::query()->active()->where('profile_id', $profile->id)->where('user_id', $user->id)->exists();
     }
 
     private function isOwner(User $user, FinancialProfile $profile): bool

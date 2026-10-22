@@ -51,7 +51,7 @@ class DocumentVaultIndex extends Component
     public string $insurancePolicyId = '';
     public string $expiresOn = '';
     public bool $visibleToProfessional = false;
-    /** Só o dono de uma pessoa acompanhada libera um documento aos cuidadores; o que o cuidador cadastra já nasce liberado. */
+    /** Quem não é cuidador libera um documento a quem o acompanha; o que o cuidador cadastra já nasce liberado. */
     public bool $sharedWithCaregivers = false;
     public $arquivo = null;
 
@@ -132,7 +132,7 @@ class DocumentVaultIndex extends Component
 
         // Quem pode liberar: o dono da pessoa acompanhada. Cuidador não mexe nisso (o documento dele já nasce liberado).
         $contexto = app(ProfileContext::class);
-        if ($contexto->profile()?->isCare() && ! $contexto->isCaregiver()) {
+        if (! $contexto->isCaregiver()) {
             $dados['shared_with_caregivers'] = $this->sharedWithCaregivers;
         }
 
@@ -313,8 +313,7 @@ class DocumentVaultIndex extends Component
     private function membros(): Collection
     {
         return ProfileMember::query()
-            ->where('profile_id', app(ProfileContext::class)->profileId())
-            ->where('is_active', true)
+            ->visibleHere()
             ->orderBy('role')
             ->get();
     }

@@ -31,7 +31,8 @@ class DocumentVisibilityScope implements Scope
 
         // Cuidador: só o documento liberado (pelo dono) ou cadastrado por um cuidador, que já nasce liberado.
         if ($context->isCaregiver()) {
-            $builder->where($model->qualifyColumn('shared_with_caregivers'), true);
+            $builder->where($model->qualifyColumn('shared_with_caregivers'), true)
+                ->where(fn ($q) => $q->whereNull($model->qualifyColumn('member_id'))->orWhereIn($model->qualifyColumn('member_id'), $context->grantedMemberIds()));
 
             return;
         }

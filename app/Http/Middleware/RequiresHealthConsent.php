@@ -29,6 +29,18 @@ class RequiresHealthConsent
             return redirect()->route('care.index')->with('status', 'Esta pessoa ainda não tem a declaração de consentimento. Quem a cadastrou precisa confirmá-la.');
         }
 
+        // Cuidador de uma pessoa de perfil comum: vale o consentimento de saúde de quem está sendo acompanhado, não o de quem acompanha.
+        $contexto = app(ProfileContext::class);
+
+        if ($contexto->isCaregiver() && $perfil !== null) {
+            $consentiu = \App\Models\ProfileMember::query()->whereIn('id', $contexto->grantedMemberIds())->whereNotNull('user_id')->with('user')->get()
+                ->contains(fn ($m) => $m->user?->hasCurrentHealthConsent());
+
+            return $consentiu
+                ? $next($request)
+                : redirect()->route('care.index')->with('status', 'Esta pessoa ainda não deu o consentimento de saúde dela. Sem ele, a área de saúde fica fechada.');
+        }
+
         if ($user === null || $request->session()->has('impersonator_id') || $user->hasCurrentHealthConsent()) {
             return $next($request);
         }

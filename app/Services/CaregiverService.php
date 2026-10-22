@@ -8,6 +8,7 @@ use App\Enums\UserRole;
 use App\Mail\CaregiverInviteMail;
 use App\Models\FinancialProfile;
 use App\Models\ProfileCaregiver;
+use App\Models\ProfileMember;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
@@ -30,11 +31,46 @@ class CaregiverService
             throw new RuntimeException('Você já é o dono: não precisa se convidar.');
         }
 
-        ['token' => $token] = ProfileCaregiver::issue($profile, $owner, $name, $email, $access);
+        // A pessoa acompanhada tem um membro só: o acesso é a ele.
+        $membro = ProfileMember::query()->where('profile_id', $profile->id)->orderBy('created_at')->firstOrFail();
+
+        ['token' => $token] = ProfileCaregiver::issue($profile, $membro, $owner, $name, $email, $access);
 
         $link = route('caregiver-invite.accept', ['token' => $token]);
 
         Mail::to($email)->queue(new CaregiverInviteMail($owner, $profile->profile_name, $name, $access, $link));
+
+        return $link;
+    }
+
+    /**
+     * Convida alguém para acompanhar a MINHA saúde (ou a de quem eu sou): não exige assinatura, de quem convida nem de quem acompanha. Cada um do
+     * casal convida só para a própria saúde; quem acompanha não vê a do cônjuge nem nada de finanças.
+     *
+     * @return string o link do convite
+     */
+    public function inviteFollower(ProfileMember $member, User $inviter, string $name, string $email, CaregiverAccess $access): string
+    {
+        $perfil = FinancialProfile::withCareProfiles()->findOrFail($member->profile_id);
+
+        if ($perfil->isCare() || $member->user_id !== $inviter->id) {
+            throw new RuntimeException('Você só convida alguém para acompanhar a sua própria saúde.');
+        }
+
+        if (mb_strtolower(trim($email)) === mb_strtolower($inviter->email)) {
+            throw new RuntimeException('Você não precisa se convidar.');
+        }
+
+        // Quem já divide o perfil comigo (o cônjuge) já enxerga o que eu cadastro de saúde: convidá-lo como cuidador não faria sentido.
+        if (ProfileMember::query()->where('profile_id', $member->profile_id)->where('is_active', true)->whereHas('user', fn ($q) => $q->whereRaw('lower(email) = ?', [mb_strtolower(trim($email))]))->exists()) {
+            throw new RuntimeException('Essa pessoa já divide o perfil com você e já vê a sua ficha de saúde.');
+        }
+
+        ['token' => $token] = ProfileCaregiver::issue($perfil, $member, $inviter, $name, $email, $access);
+
+        $link = route('caregiver-invite.accept', ['token' => $token]);
+
+        Mail::to($email)->queue(new CaregiverInviteMail($inviter, $member->name, $name, $access, $link, true));
 
         return $link;
     }

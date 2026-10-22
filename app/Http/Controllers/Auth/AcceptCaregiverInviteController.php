@@ -26,7 +26,7 @@ class AcceptCaregiverInviteController extends Controller
 {
     public function show(Request $request, string $token): View|RedirectResponse
     {
-        $convite = ProfileCaregiver::findValidByToken($token)?->load(['invitedBy', 'profile']);
+        $convite = ProfileCaregiver::findValidByToken($token)?->load(['invitedBy', 'profile', 'member']);
 
         if ($convite === null) {
             return view('auth.accept-caregiver-invite', ['convite' => null, 'token' => $token, 'modo' => 'invalido']);

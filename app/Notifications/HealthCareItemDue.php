@@ -28,6 +28,7 @@ class HealthCareItemDue extends Notification implements ShouldQueue
         public string $dueOn,
         public int $daysLeft,
         public ?string $careProfileId = null,
+        public ?string $profileId = null,
     ) {}
 
     public static function forItem(HealthCareItem $item, CarbonImmutable $hoje): self
@@ -40,13 +41,14 @@ class HealthCareItemDue extends Notification implements ShouldQueue
             $item->next_due_on->toDateString(),
             (int) $hoje->startOfDay()->diffInDays($item->next_due_on->startOfDay(), false),
             \App\Support\CareLinks::careProfileId($item->profile_id),
+            $item->profile_id,
         );
     }
 
     /** Aviso de pessoa acompanhada leva a ela; o de perfil comum, à tela de sempre. */
-    private function link(): string
+    private function link(?object $notifiable = null): string
     {
-        return \App\Support\CareLinks::to($this->careProfileId, 'cuidados', 'health.care.index');
+        return \App\Support\CareLinks::to($this->careProfileId, 'cuidados', 'health.care.index', $this->profileId, $notifiable);
     }
 
     /** "é hoje" ou "é amanhã". */

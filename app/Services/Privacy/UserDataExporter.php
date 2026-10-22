@@ -107,6 +107,9 @@ class UserDataExporter
             'assinaturas' => Subscription::query()->where('user_id', $user->id)->get()->map->attributesToArray()->all(),
             'dados_de_cobranca' => $user->billingDetail?->attributesToArray(),
             'notificacoes' => DB::table('notifications')->where('notifiable_id', $user->id)->orderByDesc('created_at')->limit(1000)->get(['type', 'data', 'read_at', 'created_at'])->all(),
+            // Quem tem acesso à minha saúde (e desde quando): é a pessoa que decide, e tem o direito de saber a lista inteira.
+            'quem_me_acompanha' => \App\Models\ProfileCaregiver::query()->whereIn('member_id', ProfileMember::query()->where('user_id', $user->id)->select('id'))
+                ->orderBy('created_at')->get(['invited_name', 'invited_email', 'access_level', 'status', 'accepted_at', 'revoked_at', 'created_at'])->map->attributesToArray()->all(),
             // Transparência: quando a equipe do Cerne entrou na conta para dar suporte, e por quê. Sem o e-mail de quem entrou.
             'acessos_de_suporte' => ImpersonationLog::query()->where('target_user_id', $user->id)->orderBy('started_at')->get(['started_at', 'ended_at', 'reason'])->map->attributesToArray()->all(),
         ];
