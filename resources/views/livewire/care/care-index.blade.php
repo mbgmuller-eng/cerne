@@ -297,7 +297,7 @@
                             </label>
                             <label class="flex items-center gap-2 text-slate-600 dark:text-slate-300">
                                 <input type="checkbox" wire:click="toggleNotifyItems('{{ $vinculo->id }}')" @checked($vinculo->notify_care_items) class="rounded border-slate-300 text-brand-700 focus:ring-brand-500">
-                                Avisos de troca de itens de cuidado
+                                Avisos de troca de itens de cuidado (lembretes e mudanças)
                             </label>
                             <button type="button" wire:click="leave('{{ $vinculo->id }}')" wire:confirm="Deixar de acompanhar {{ $nome }}?" class="text-red-700 underline dark:text-red-400">Deixar de acompanhar</button>
                         </div>

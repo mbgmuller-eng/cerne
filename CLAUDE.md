@@ -244,6 +244,8 @@ Mãe, pai ou quem mais o usuário ajuda a cuidar: um perfil de cuidado (`Profile
   reaberta, removida e quem leva ("fulano vai levar" / "não vai mais levar") avisam quem acompanha a pessoa, **menos quem fez a mudança**. Público (`HealthReminderRecipients::forAppointmentChange`): na pessoa acompanhada, o dono,
   os cuidadores com o aviso de consultas ligado e a própria pessoa; em perfil comum, a pessoa e os cuidadores DELA (o cônjuge não entra). Só o que ainda vai acontecer é novidade: registro de consulta que já passou, ou corrigir um
   registro antigo, não avisa. A comparação do que mudou é pelo texto decifrado (o campo cifrado muda a cada gravação). Falha no aviso nunca derruba a ação (`report`). O escolhido para levar recebe também o aviso próprio (`HealthEscortAssigned`), e só ele.
+- **Avisos de mudança no item de cuidado** (`HealthCareItemChanged`, `HealthCareItemService::announce`): cadastrado, alterado (item, aparelho, categoria, frequência ou próxima data; anotação não conta), troca registrada,
+  pausado, retomado e removido, com a mesma regra de público (`HealthReminderRecipients::forCareItemChange`, que divide o `forChange` com a consulta) mas valendo o aviso de **itens** (`notify_care_items`); item pausado não avisa alteração.
 - **Avisos por tipo**: cada cuidador liga ou desliga separadamente consultas e exames (`notify_reminders`) e troca de itens de cuidado (`notify_care_items`); `HealthReminderRecipients::forProfile($id, $tipo)`.
 - O "registrado por Fulano" vem do usuário que gravou (`HasActorUser`, `<x-registered-by>`), só dentro do perfil de uma pessoa acompanhada.
 - Tela `/pessoas` (`CareIndex`) é a porta de entrada, sem perfil ativo (quem só cuida pode não ter perfil próprio). Convite: `/convite-cuidador/{token}`, POST puro.

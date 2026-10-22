@@ -2,14 +2,17 @@
 
 namespace App\Services;
 
+use App\Enums\HealthCareItemEvent;
 use App\Models\FinancialProfile;
 use App\Models\HealthCareItem;
 use App\Models\ProfileMember;
 use App\Models\User;
+use App\Notifications\HealthCareItemChanged;
 use App\Notifications\HealthCareItemDue;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Notification;
 
 /**
  * Itens de saúde de troca periódica (aparelho auditivo, palmilha, óculos...).
@@ -43,12 +46,16 @@ class HealthCareItemService
         $item->next_due_on = $item->dueAfter($ultima);
         $item->save();
 
+        $this->announce($item, HealthCareItemEvent::Created, ['next_due' => $item->next_due_on?->toDateString()]);
+
         return $item;
     }
 
     /** @param  array<string, mixed>  $dados */
     public function update(HealthCareItem $item, array $dados): HealthCareItem
     {
+        $antes = $this->snapshot($item);
+
         $item->fill([
             'category' => $dados['category'] ?? $item->category,
             'name' => isset($dados['name']) ? trim($dados['name']) : $item->name,
@@ -62,7 +69,58 @@ class HealthCareItemService
         $item->next_due_on = $item->last_done_on !== null ? $item->dueAfter($item->last_done_on) : null;
         $item->save();
 
+        $depois = $this->snapshot($item);
+        $mudou = array_keys(array_filter(self::NOTABLE_FIELDS, fn (string $rotulo, string $campo) => $antes[$campo] !== $depois[$campo], ARRAY_FILTER_USE_BOTH));
+
+        if ($mudou !== [] && $item->is_active) {
+            $this->announce($item, HealthCareItemEvent::Updated, ['changed' => array_map(fn (string $campo) => self::NOTABLE_FIELDS[$campo], $mudou), 'next_due' => $item->next_due_on?->toDateString()]);
+        }
+
         return $item;
+    }
+
+    /** O que, ao mudar, avisa quem acompanha (campo => como aparece no aviso). */
+    private const NOTABLE_FIELDS = [
+        'name' => 'item', 'device_name' => 'aparelho', 'category' => 'categoria', 'frequency' => 'frequência', 'next_due_on' => 'próxima data',
+    ];
+
+    /** @return array<string, ?string> */
+    private function snapshot(HealthCareItem $item): array
+    {
+        return [
+            'name' => $item->name,
+            'device_name' => $item->device_name,
+            'category' => $item->category?->value,
+            'frequency' => $item->interval_value.' '.$item->interval_unit?->value,
+            'next_due_on' => $item->next_due_on?->toDateString(),
+        ];
+    }
+
+    /**
+     * Avisa quem acompanha a pessoa (HealthReminderRecipients::forCareItemChange), menos quem fez a mudança. Nunca atrapalha a ação de quem mexeu:
+     * se o aviso falhar, a falha é registrada e o item segue.
+     *
+     * @param  array<string, mixed>  $extra
+     */
+    private function announce(HealthCareItem $item, HealthCareItemEvent $evento, array $extra = []): void
+    {
+        $ator = auth()->user();
+
+        if ($ator === null) {
+            return;
+        }
+
+        try {
+            $item->loadMissing('member');
+
+            $destinatarios = app(HealthReminderRecipients::class)->forCareItemChange($item)->reject(fn (User $u) => $u->id === $ator->id);
+
+            if ($destinatarios->isNotEmpty()) {
+                Notification::send($destinatarios, HealthCareItemChanged::make($item, $evento, $ator->name, $extra));
+            }
+        } catch (\Throwable $e) {
+            report($e);
+        }
     }
 
     /** Fez a troca/revisão: a próxima conta a partir de agora (ou da data informada), não do vencimento antigo. */
@@ -74,12 +132,15 @@ class HealthCareItemService
         $item->next_due_on = $item->dueAfter($em);
         $item->save();
 
+        $this->announce($item, HealthCareItemEvent::Done, ['done_on' => $em->toDateString(), 'next_due' => $item->next_due_on->toDateString()]);
+
         return $item;
     }
 
     /** Pausa (parou de usar) ou retoma; ao retomar a contagem recomeça de hoje. */
     public function setActive(HealthCareItem $item, bool $ativo): HealthCareItem
     {
+        $mudou = (bool) $item->is_active !== $ativo;
         $item->is_active = $ativo;
 
         if ($ativo) {
@@ -89,11 +150,17 @@ class HealthCareItemService
 
         $item->save();
 
+        if ($mudou) {
+            $this->announce($item, $ativo ? HealthCareItemEvent::Resumed : HealthCareItemEvent::Paused, ['next_due' => $ativo ? $item->next_due_on?->toDateString() : null]);
+        }
+
         return $item;
     }
 
     public function delete(HealthCareItem $item): void
     {
+        $this->announce($item, HealthCareItemEvent::Removed);
+
         $item->delete();
     }
 
