@@ -16,8 +16,11 @@ use Illuminate\Support\Collection;
  */
 class HealthReminderRecipients
 {
-    /** @return Collection<int, User> */
-    public function forProfile(string $profileId): Collection
+    /**
+     * @param  string  $kind  'appointments' (consultas e exames) ou 'care_items' (troca de itens): cada cuidador escolhe quais quer receber
+     * @return Collection<int, User>
+     */
+    public function forProfile(string $profileId, string $kind = 'appointments'): Collection
     {
         $perfil = FinancialProfile::withCareProfiles()->find($profileId);
 
@@ -31,7 +34,7 @@ class HealthReminderRecipients
                 return collect();
             }
 
-            $cuidadores = ProfileCaregiver::query()->active()->where('profile_id', $perfil->id)->where('notify_reminders', true)->with('user')->get()->pluck('user');
+            $cuidadores = ProfileCaregiver::query()->active()->where('profile_id', $perfil->id)->where($kind === 'care_items' ? 'notify_care_items' : 'notify_reminders', true)->with('user')->get()->pluck('user');
 
             // A própria pessoa, se já tem login, recebe os avisos dela.
             $propria = $perfil->activeMembers()->whereNotNull('user_id')->with('user')->get()->pluck('user');

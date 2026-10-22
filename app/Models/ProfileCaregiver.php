@@ -21,7 +21,7 @@ use Illuminate\Support\Str;
  */
 #[Fillable([
     'profile_id', 'user_id', 'invited_by_user_id', 'invited_email', 'invited_name', 'access_level', 'status', 'invite_token', 'invite_expires_at',
-    'accepted_at', 'revoked_at', 'notify_reminders',
+    'accepted_at', 'revoked_at', 'notify_reminders', 'notify_care_items',
 ])]
 class ProfileCaregiver extends Model
 {
@@ -36,6 +36,7 @@ class ProfileCaregiver extends Model
             'accepted_at' => 'datetime',
             'revoked_at' => 'datetime',
             'notify_reminders' => 'boolean',
+            'notify_care_items' => 'boolean',
         ];
     }
 

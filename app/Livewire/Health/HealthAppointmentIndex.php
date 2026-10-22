@@ -267,6 +267,36 @@ class HealthAppointmentIndex extends Component
         $this->showForm = false;
     }
 
+    /** "Eu levo": qualquer participante, inclusive o de leitura (ver HealthAppointmentService::volunteerEscort). */
+    public function takeEscort(string $appointmentId, HealthAppointmentService $service): void
+    {
+        $service->volunteerEscort($this->consultaDeCuidado($appointmentId), auth()->user());
+    }
+
+    public function assignEscort(string $appointmentId, string $userId, HealthAppointmentService $service): void
+    {
+        if ($userId === '') {
+            $service->releaseEscort($this->consultaDeCuidado($appointmentId), auth()->user());
+
+            return;
+        }
+
+        $service->assignEscort($this->consultaDeCuidado($appointmentId), \App\Models\User::query()->findOrFail($userId), auth()->user());
+    }
+
+    public function releaseEscort(string $appointmentId, HealthAppointmentService $service): void
+    {
+        $service->releaseEscort($this->consultaDeCuidado($appointmentId), auth()->user());
+    }
+
+    /** A consulta, só se o perfil ativo é de uma pessoa acompanhada ("quem leva" só existe ali). */
+    private function consultaDeCuidado(string $appointmentId): HealthAppointment
+    {
+        abort_unless(app(ProfileContext::class)->profile()?->isCare(), 404);
+
+        return HealthAppointment::query()->findOrFail($appointmentId);
+    }
+
     public function delete(string $appointmentId, HealthAppointmentService $service): void
     {
         $service->delete(HealthAppointment::query()->findOrFail($appointmentId));
@@ -284,10 +314,13 @@ class HealthAppointmentIndex extends Component
             'coresDosMembros' => $membros->mapWithKeys(fn (ProfileMember $m) => [$m->id => $m->calendarColor()])->all(),
             'paleta' => MemberPalette::COLORS,
             'calendario' => $this->calendarData(),
-            'upcoming' => HealthAppointment::query()->where('profile_id', $profileId)->upcoming()->with(['member', 'createdByUser'])->get(),
+            'upcoming' => HealthAppointment::query()->where('profile_id', $profileId)->upcoming()->with(['member', 'createdByUser', 'escort'])->get(),
             'past' => HealthAppointment::query()->where('profile_id', $profileId)->past()->with(['member', 'createdByUser'])->get(),
             'editingExisting' => $this->editingId !== null,
             'emPessoaAcompanhada' => app(ProfileContext::class)->isCaregiver() || app(ProfileContext::class)->profile()?->isCare(),
+            // Quem pode ser escolhido para levar: dono, cuidadores ativos e a própria pessoa (só dentro de uma pessoa acompanhada).
+            'participantes' => app(ProfileContext::class)->profile()?->isCare() ? app(\App\Services\CareParticipants::class)->forProfile(app(ProfileContext::class)->profile()) : collect(),
+            'podeEscalar' => app(ProfileContext::class)->canWriteAsCaregiver(),
         ] + $this->compromissoAberto());
     }
 

@@ -95,6 +95,9 @@
                             </p>
                             <x-appointment-details :consulta="$consulta" />
                             <p class="mt-0.5"><x-registered-by :model="$consulta" /></p>
+                            @if ($emPessoaAcompanhada && $participantes->isNotEmpty())
+                                <x-escort-line :consulta="$consulta" :participantes="$participantes" :pode-escalar="$podeEscalar" />
+                            @endif
                             <x-calendar-actions :consulta="$consulta" :show-person="$membros->count() > 1" />
                         </div>
                         <div class="flex shrink-0 items-center gap-2">

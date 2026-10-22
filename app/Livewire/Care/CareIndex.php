@@ -198,10 +198,18 @@ class CareIndex extends Component
         session()->flash('care_status', 'Seu espaço foi apagado.');
     }
 
+    /** Avisos de consultas e exames. */
     public function toggleNotify(string $caregiverId): void
     {
         $vinculo = $this->myLinkOrFail($caregiverId);
         $vinculo->update(['notify_reminders' => ! $vinculo->notify_reminders]);
+    }
+
+    /** Avisos de troca de itens de cuidado (filtro do aparelho, palmilha...). */
+    public function toggleNotifyItems(string $caregiverId): void
+    {
+        $vinculo = $this->myLinkOrFail($caregiverId);
+        $vinculo->update(['notify_care_items' => ! $vinculo->notify_care_items]);
     }
 
     public function render()

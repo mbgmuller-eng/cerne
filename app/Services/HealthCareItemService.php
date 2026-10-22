@@ -134,7 +134,7 @@ class HealthCareItemService
     /** @return Collection<int, User> */
     private function recipientsFor(HealthCareItem $item): Collection
     {
-        return app(HealthReminderRecipients::class)->forProfile($item->profile_id);
+        return app(HealthReminderRecipients::class)->forProfile($item->profile_id, 'care_items');
     }
 
     private function alreadyNotifiedToday(User $user, string $itemId): bool

@@ -230,6 +230,11 @@ Mãe, pai ou quem mais o usuário ajuda a cuidar: um perfil de cuidado (`Profile
   dono e cobrança seguem com quem cadastrou) e o consentimento passa a ser DELA (`care_consent_basis = self`). Ela é **membro**, não cuidadora: escreve no próprio espaço, vê quem tem acesso, encerra o
   acesso de cada cuidador, revoga o consentimento (fecha a saúde e os avisos) e pode apagar o espaço inteiro (dados e arquivos; o dono é avisado e deixa de pagar por ela). Sem perfil financeiro, o espaço dela
   é a casa dela (`SetProfileContext`, `User::selfCareProfiles`); os avisos chegam também a ela e a cópia de dados dela inclui o espaço (`manageOwnAccess` na policy).
+- **"Quem leva?"** (`health_appointments.escort_user_id`, `HealthAppointmentService::volunteerEscort/assignEscort/releaseEscort`, `<x-escort-line>`): só em pessoa acompanhada. Quem pode ser escolhido:
+  dono, cuidadores ativos e a própria pessoa (`CareParticipants`). Qualquer participante, **inclusive o cuidador de leitura**, se oferece ("Eu levo"): é a ÚNICA escrita que o leitor faz, e por isso grava só
+  a coluna `escort_user_id` por consulta em lote, sem os eventos do model que barram a escrita dele. Escolher outra pessoa é do dono e do cuidador de edição, e o escolhido é avisado
+  (`HealthEscortAssigned`); o lembrete do dia anterior diz quem leva.
+- **Avisos por tipo**: cada cuidador liga ou desliga separadamente consultas e exames (`notify_reminders`) e troca de itens de cuidado (`notify_care_items`); `HealthReminderRecipients::forProfile($id, $tipo)`.
 - O "registrado por Fulano" vem do usuário que gravou (`HasActorUser`, `<x-registered-by>`), só dentro do perfil de uma pessoa acompanhada.
 - Tela `/pessoas` (`CareIndex`) é a porta de entrada, sem perfil ativo (quem só cuida pode não ter perfil próprio). Convite: `/convite-cuidador/{token}`, POST puro.
 

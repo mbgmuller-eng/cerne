@@ -2,6 +2,14 @@
 # Olá, {{ $recipientName }}
 
 {{ $kindLabel }} de **{{ $memberName }}** em breve: **{{ $title }}**, dia **{{ $dateFormatted }}** às **{{ $timeFormatted }}**.
+@if ($escortName)
+
+@if ($youAreEscort)
+**Você vai levar {{ $memberName }}.**
+@else
+Quem leva: {{ $escortName }}.
+@endif
+@endif
 @if ($location || $address || $phone || $bookedWith)
 
 @if ($location)

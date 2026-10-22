@@ -32,6 +32,8 @@ class HealthAppointmentUpcoming extends Notification implements ShouldQueue
         public ?string $phone = null,
         public ?string $bookedWith = null,
         public ?string $careProfileId = null,
+        public ?string $escortUserId = null,
+        public ?string $escortName = null,
     ) {}
 
     public static function forAppointment(HealthAppointment $appointment): self
@@ -47,6 +49,8 @@ class HealthAppointmentUpcoming extends Notification implements ShouldQueue
             $appointment->phone,
             $appointment->booked_with_name,
             \App\Support\CareLinks::careProfileId($appointment->profile_id),
+            $appointment->escort_user_id,
+            $appointment->relationLoaded('escort') ? $appointment->escort?->name : null,
         );
     }
 
@@ -93,6 +97,8 @@ class HealthAppointmentUpcoming extends Notification implements ShouldQueue
                 'dateFormatted' => $quando->format('d/m'),
                 'timeFormatted' => $quando->format('H:i'),
                 'url' => $this->link(),
+                'escortName' => $this->escortName,
+                'youAreEscort' => $this->escortUserId !== null && $this->escortUserId === $notifiable->id,
             ]);
     }
 

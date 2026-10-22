@@ -15,7 +15,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 /** Uma consulta ou exame — passado (com anotação do que aconteceu) ou futuro (vira lembrete). */
 #[Fillable([
     'profile_id', 'member_id', 'kind', 'title', 'professional_name', 'specialty', 'location', 'address', 'phone',
-    'booked_by_name', 'booked_with_name', 'scheduled_at', 'notes', 'created_by_member_id', 'created_by_user_id',
+    'booked_by_name', 'booked_with_name', 'scheduled_at', 'notes', 'created_by_member_id', 'created_by_user_id', 'escort_user_id',
 ])]
 class HealthAppointment extends Model
 {
@@ -36,6 +36,12 @@ class HealthAppointment extends Model
     public function createdBy(): BelongsTo
     {
         return $this->belongsTo(ProfileMember::class, 'created_by_member_id');
+    }
+
+    /** Quem vai levar a pessoa a esta consulta (um dos que cuidam dela). */
+    public function escort(): BelongsTo
+    {
+        return $this->belongsTo(\App\Models\User::class, 'escort_user_id');
     }
 
     public function scopeUpcoming(Builder $query): Builder

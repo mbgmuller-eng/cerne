@@ -96,6 +96,64 @@ class HealthAppointmentService
     }
 
     /**
+     * "Eu levo": o usuário se oferece para levar a pessoa à consulta. Qualquer um que faz parte do cuidado pode, inclusive o cuidador de LEITURA:
+     * é combinar quem vai, não alterar saúde. Por isso grava só a coluna `escort_user_id`, por consulta em lote (sem os eventos do model, que
+     * barram a escrita de quem só lê), e só quando quem pede é o próprio escolhido.
+     */
+    public function volunteerEscort(HealthAppointment $consulta, User $usuario): void
+    {
+        $this->assertParticipant($consulta, $usuario);
+
+        $this->writeEscort($consulta, $usuario->id);
+    }
+
+    /** Escolhe outra pessoa para levar (dono e cuidadores de edição). Avisa o escolhido, a menos que seja quem escolheu. */
+    public function assignEscort(HealthAppointment $consulta, User $alvo, User $porQuem): void
+    {
+        if (! app(\App\Support\ProfileContext::class)->canWriteAsCaregiver()) {
+            throw new \Illuminate\Auth\Access\AuthorizationException('Seu acesso a esta pessoa é só de leitura: você pode se oferecer para levar, mas não escolher outra pessoa.');
+        }
+
+        $this->assertParticipant($consulta, $alvo);
+        $this->writeEscort($consulta, $alvo->id);
+
+        if ($alvo->id !== $porQuem->id) {
+            $consulta->loadMissing('member');
+
+            $alvo->notify(new \App\Notifications\HealthEscortAssigned(
+                $consulta->profile_id, $consulta->id, $porQuem->name, $consulta->member->name, $consulta->title, $consulta->scheduled_at->toIso8601String(),
+            ));
+        }
+    }
+
+    /** Solta a escolha: quem está escalado desiste, ou quem pode editar libera. */
+    public function releaseEscort(HealthAppointment $consulta, User $usuario): void
+    {
+        $ehOEscalado = $consulta->escort_user_id === $usuario->id;
+
+        if (! $ehOEscalado && ! app(\App\Support\ProfileContext::class)->canWriteAsCaregiver()) {
+            throw new \Illuminate\Auth\Access\AuthorizationException('Só quem vai levar, ou quem pode editar, solta a escolha.');
+        }
+
+        $this->writeEscort($consulta, null);
+    }
+
+    private function writeEscort(HealthAppointment $consulta, ?string $userId): void
+    {
+        HealthAppointment::query()->whereKey($consulta->id)->update(['escort_user_id' => $userId]);
+        $consulta->escort_user_id = $userId;
+    }
+
+    private function assertParticipant(HealthAppointment $consulta, User $usuario): void
+    {
+        $perfil = FinancialProfile::withCareProfiles()->findOrFail($consulta->profile_id);
+
+        if (! $perfil->isCare() || ! app(CareParticipants::class)->forProfile($perfil)->contains('id', $usuario->id)) {
+            throw new \Illuminate\Auth\Access\AuthorizationException('Só quem cuida desta pessoa pode ser escolhido para levá-la.');
+        }
+    }
+
+    /**
      * Roda no cron, sem ProfileContext (atravessa TODOS os perfis de
      * propósito) — mesmo padrão de FixedBillService::notifyUpcomingDueDates().
      */
@@ -108,7 +166,7 @@ class HealthAppointmentService
         HealthAppointment::query()
             ->withoutGlobalScopes()
             ->whereDate('scheduled_at', $alvo)
-            ->with('member')
+            ->with(['member', 'escort'])
             ->chunkById(200, function (Collection $consultas) use (&$notificados): void {
                 foreach ($consultas as $consulta) {
                     foreach ($this->recipientsFor($consulta) as $user) {
