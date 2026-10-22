@@ -6,7 +6,10 @@ use App\Models\FinancialProfile;
 use App\Models\HealthAppointment;
 use App\Models\ProfileMember;
 use App\Models\User;
+use App\Enums\HealthAppointmentEvent;
+use App\Notifications\HealthAppointmentChanged;
 use App\Notifications\HealthAppointmentUpcoming;
+use Illuminate\Support\Facades\Notification;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
 
@@ -28,19 +31,27 @@ class HealthAppointmentService
     {
         $opcionais = $this->opcionais($dados);
 
-        return HealthAppointment::create($opcionais + [
+        $consulta = HealthAppointment::create($opcionais + [
             'member_id' => $membro->id,
             'kind' => $dados['kind'],
             'title' => $this->titulo($dados['title'] ?? '', $opcionais),
             'scheduled_at' => $dados['scheduled_at'],
             'created_by_member_id' => $autor?->id,
         ]);
+
+        // Registro de uma consulta que já passou (histórico) não é novidade para ninguém.
+        if ($consulta->scheduled_at->isFuture()) {
+            $this->announce($consulta, HealthAppointmentEvent::Created);
+        }
+
+        return $consulta;
     }
 
     /** @param  array<string, mixed>  $dados */
     public function update(HealthAppointment $consulta, array $dados): HealthAppointment
     {
         $opcionais = $this->opcionais($dados, $consulta);
+        $antes = $this->snapshot($consulta);
 
         $consulta->update($opcionais + [
             'kind' => $dados['kind'] ?? $consulta->kind,
@@ -48,7 +59,71 @@ class HealthAppointmentService
             'scheduled_at' => $dados['scheduled_at'] ?? $consulta->scheduled_at,
         ]);
 
+        // Só o que ainda vai acontecer é novidade (corrigir um registro antigo não avisa ninguém).
+        if ($consulta->status === \App\Enums\HealthAppointmentStatus::Scheduled && $consulta->scheduled_at->isFuture()) {
+            $depois = $this->snapshot($consulta);
+
+            if ($antes['scheduled_at'] !== $depois['scheduled_at']) {
+                $this->announce($consulta, HealthAppointmentEvent::Rescheduled, null, ['old_at' => $antes['scheduled_at']]);
+            } else {
+                // Compara o texto já decifrado: o campo cifrado muda a cada gravação mesmo sem o texto mudar.
+                $mudou = array_keys(array_filter(self::NOTABLE_FIELDS, fn (string $rotulo, string $campo) => $antes[$campo] !== $depois[$campo], ARRAY_FILTER_USE_BOTH));
+
+                if ($mudou !== []) {
+                    $this->announce($consulta, HealthAppointmentEvent::Updated, null, ['changed' => array_map(fn (string $campo) => self::NOTABLE_FIELDS[$campo], $mudou)]);
+                }
+            }
+        }
+
         return $consulta;
+    }
+
+    /** O que, ao mudar, avisa quem acompanha (campo => como aparece no aviso). */
+    private const NOTABLE_FIELDS = [
+        'title' => 'título', 'kind' => 'tipo', 'professional_name' => 'profissional', 'specialty' => 'especialidade',
+        'location' => 'local', 'address' => 'endereço', 'phone' => 'telefone',
+    ];
+
+    /** @return array<string, ?string> a data e os campos notáveis, em texto (já decifrados), para comparar antes e depois de editar */
+    private function snapshot(HealthAppointment $consulta): array
+    {
+        $retrato = ['scheduled_at' => $consulta->scheduled_at->toIso8601String()];
+
+        foreach (array_keys(self::NOTABLE_FIELDS) as $campo) {
+            $valor = $consulta->getAttribute($campo);
+            $retrato[$campo] = $valor instanceof \BackedEnum ? $valor->value : ($valor === null ? null : (string) $valor);
+        }
+
+        return $retrato;
+    }
+
+    /**
+     * Avisa quem acompanha a pessoa (HealthReminderRecipients::forAppointmentChange), menos quem fez a mudança. Nunca atrapalha a ação de quem
+     * mexeu: se o aviso falhar, a falha é registrada e a consulta segue.
+     *
+     * @param  array<string, mixed>  $extra
+     * @param  list<string>  $excluir  ids de quem já recebeu um aviso mais específico
+     */
+    private function announce(HealthAppointment $consulta, HealthAppointmentEvent $evento, ?User $ator = null, array $extra = [], array $excluir = []): void
+    {
+        $ator ??= auth()->user();
+
+        if ($ator === null) {
+            return;
+        }
+
+        try {
+            $consulta->loadMissing('member');
+
+            $destinatarios = app(HealthReminderRecipients::class)->forAppointmentChange($consulta)
+                ->reject(fn (User $u) => $u->id === $ator->id || in_array($u->id, $excluir, true));
+
+            if ($destinatarios->isNotEmpty()) {
+                Notification::send($destinatarios, HealthAppointmentChanged::make($consulta, $evento, $ator->name, $extra));
+            }
+        } catch (\Throwable $e) {
+            report($e);
+        }
     }
 
     /**
@@ -106,11 +181,23 @@ class HealthAppointmentService
             'status_by_user_id' => $status === \App\Enums\HealthAppointmentStatus::Scheduled ? null : $por->id,
         ]);
 
+        $this->announce($consulta, match ($status) {
+            \App\Enums\HealthAppointmentStatus::Done => HealthAppointmentEvent::Done,
+            \App\Enums\HealthAppointmentStatus::NotDone => HealthAppointmentEvent::NotDone,
+            \App\Enums\HealthAppointmentStatus::Cancelled => HealthAppointmentEvent::Cancelled,
+            \App\Enums\HealthAppointmentStatus::Scheduled => HealthAppointmentEvent::Reopened,
+        }, $por);
+
         return $consulta;
     }
 
     public function delete(HealthAppointment $consulta): void
     {
+        // Remover uma consulta que ainda ia acontecer é novidade; apagar um registro antigo do histórico, não.
+        if ($consulta->status === \App\Enums\HealthAppointmentStatus::Scheduled && $consulta->scheduled_at->isFuture()) {
+            $this->announce($consulta, HealthAppointmentEvent::Removed);
+        }
+
         $consulta->delete();
     }
 
@@ -124,6 +211,7 @@ class HealthAppointmentService
         $this->assertParticipant($consulta, $usuario);
 
         $this->writeEscort($consulta, $usuario->id);
+        $this->announce($consulta, HealthAppointmentEvent::EscortAssigned, $usuario, ['escort' => $usuario->name]);
     }
 
     /** Escolhe outra pessoa para levar (dono e cuidadores de edição). Avisa o escolhido, a menos que seja quem escolheu. */
@@ -135,6 +223,9 @@ class HealthAppointmentService
 
         $this->assertParticipant($consulta, $alvo);
         $this->writeEscort($consulta, $alvo->id);
+
+        // Todos os que cuidam sabem quem leva; quem foi escolhido recebe, além disso, o aviso próprio abaixo.
+        $this->announce($consulta, HealthAppointmentEvent::EscortAssigned, $porQuem, ['escort' => $alvo->name], [$alvo->id]);
 
         if ($alvo->id !== $porQuem->id) {
             $consulta->loadMissing('member');
@@ -154,7 +245,14 @@ class HealthAppointmentService
             throw new \Illuminate\Auth\Access\AuthorizationException('Só quem vai levar, ou quem pode editar, solta a escolha.');
         }
 
+        $consulta->loadMissing('escort');
+        $anterior = $consulta->escort;
+
         $this->writeEscort($consulta, null);
+
+        if ($anterior !== null) {
+            $this->announce($consulta, HealthAppointmentEvent::EscortReleased, $usuario, ['previous_escort' => $anterior->name]);
+        }
     }
 
     private function writeEscort(HealthAppointment $consulta, ?string $userId): void

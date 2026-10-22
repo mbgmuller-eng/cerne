@@ -21,6 +21,9 @@ class HealthAppointment extends Model
 {
     use BelongsToProfile, HasUuids, IsCoupleHealthData, \App\Models\Concerns\HasActorUser;
 
+    /** Nasce agendada (o banco já tem o padrão, mas o model recém-criado precisa saber sem ser relido). */
+    protected $attributes = ['status' => 'scheduled'];
+
     protected function casts(): array
     {
         return [

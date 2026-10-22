@@ -240,6 +240,10 @@ Mãe, pai ou quem mais o usuário ajuda a cuidar: um perfil de cuidado (`Profile
   dono, cuidadores ativos e a própria pessoa (`CareParticipants`). Qualquer participante, **inclusive o cuidador de leitura**, se oferece ("Eu levo"): é a ÚNICA escrita que o leitor faz, e por isso grava só
   a coluna `escort_user_id` por consulta em lote, sem os eventos do model que barram a escrita dele. Escolher outra pessoa é do dono e do cuidador de edição, e o escolhido é avisado
   (`HealthEscortAssigned`); o lembrete do dia anterior diz quem leva.
+- **Avisos de mudança na consulta** (`HealthAppointmentChanged`, `HealthAppointmentService::announce`): agendada, remarcada, alterada (título, tipo, profissional, especialidade, local, endereço, telefone), cancelada, realizada, não realizada,
+  reaberta, removida e quem leva ("fulano vai levar" / "não vai mais levar") avisam quem acompanha a pessoa, **menos quem fez a mudança**. Público (`HealthReminderRecipients::forAppointmentChange`): na pessoa acompanhada, o dono,
+  os cuidadores com o aviso de consultas ligado e a própria pessoa; em perfil comum, a pessoa e os cuidadores DELA (o cônjuge não entra). Só o que ainda vai acontecer é novidade: registro de consulta que já passou, ou corrigir um
+  registro antigo, não avisa. A comparação do que mudou é pelo texto decifrado (o campo cifrado muda a cada gravação). Falha no aviso nunca derruba a ação (`report`). O escolhido para levar recebe também o aviso próprio (`HealthEscortAssigned`), e só ele.
 - **Avisos por tipo**: cada cuidador liga ou desliga separadamente consultas e exames (`notify_reminders`) e troca de itens de cuidado (`notify_care_items`); `HealthReminderRecipients::forProfile($id, $tipo)`.
 - O "registrado por Fulano" vem do usuário que gravou (`HasActorUser`, `<x-registered-by>`), só dentro do perfil de uma pessoa acompanhada.
 - Tela `/pessoas` (`CareIndex`) é a porta de entrada, sem perfil ativo (quem só cuida pode não ter perfil próprio). Convite: `/convite-cuidador/{token}`, POST puro.

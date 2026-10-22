@@ -17,6 +17,41 @@ use Illuminate\Support\Collection;
 class HealthReminderRecipients
 {
     /**
+     * Quem é avisado quando algo muda numa consulta ou exame (agendada, remarcada, cancelada, confirmada, quem leva...): a pessoa de quem é o
+     * compromisso e quem a acompanha. Na pessoa acompanhada, o dono, os cuidadores (que ligaram os avisos de consultas) e a própria pessoa, se tem
+     * login. Num perfil comum, a pessoa e os cuidadores DELA: o cônjuge que divide o perfil não entra (já vê a agenda, e a mudança é de outra pessoa).
+     * Quem fez a mudança sai da lista (quem chama).
+     *
+     * @return Collection<int, User>
+     */
+    public function forAppointmentChange(\App\Models\HealthAppointment $consulta): Collection
+    {
+        $perfil = FinancialProfile::withCareProfiles()->find($consulta->profile_id);
+
+        if ($perfil === null) {
+            return collect();
+        }
+
+        if ($perfil->isCare()) {
+            return $this->forProfile($perfil->id, 'appointments', $consulta->member_id);
+        }
+
+        $membro = \App\Models\ProfileMember::query()->with('user')->find($consulta->member_id);
+        $sujeito = $membro?->user;
+
+        // Vale o consentimento de saúde de quem é acompanhado: sem ele, ninguém é avisado.
+        if ($sujeito === null || ! $sujeito->hasCurrentHealthConsent()) {
+            return collect();
+        }
+
+        $seguidores = ProfileCaregiver::query()->active()->where('profile_id', $perfil->id)
+            ->where(fn ($q) => $q->where('member_id', $membro->id)->orWhereNull('member_id'))
+            ->where('notify_reminders', true)->with('user')->get()->pluck('user');
+
+        return collect([$sujeito])->merge($seguidores)->filter()->unique('id')->values();
+    }
+
+    /**
      * @param  string  $kind  'appointments' (consultas e exames) ou 'care_items' (troca de itens): cada cuidador escolhe quais quer receber
      * @return Collection<int, User>
      */
