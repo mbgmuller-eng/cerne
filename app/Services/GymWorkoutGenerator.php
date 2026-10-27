@@ -6,7 +6,9 @@ use App\Enums\GymEquipmentAccess;
 use App\Enums\GymGoal;
 use App\Enums\GymLevel;
 use App\Enums\GymSeason;
+use App\Models\GymExercise;
 use App\Models\GymExerciseCatalog;
+use App\Models\GymPlan;
 use App\Support\GymExerciseClassifier as C;
 use App\Support\GymGeneratorInput;
 use Illuminate\Support\Collection;
@@ -162,6 +164,44 @@ class GymWorkoutGenerator
         }
 
         return $e['group'] === 'cardio' || C::isConditioning($e['name']) ? $this->cardioRow($e, $in) : $this->row($e, $in);
+    }
+
+    /**
+     * A meta (séries, repetições, pausa) de um exercício que entra num treino já montado, pelo que a pessoa respondeu ao montar a fase
+     * (objetivo, nível, acesso, esporte). Sem respostas guardadas, vale hipertrofia de nível intermediário. Serve à troca de exercício:
+     * o novo não herda a meta do que saiu.
+     *
+     * @return array{sets: int, reps_min: ?int, reps_max: ?int, duration: ?int, rest: ?int, notes: ?string}
+     */
+    public function prescriptionFor(GymExercise $exercicio, ?GymPlan $plano = null): array
+    {
+        $in = new GymGeneratorInput(
+            $plano?->goal ?? GymGoal::Hypertrophy,
+            $plano?->level ?? GymLevel::Intermediate,
+            $plano?->days_per_week ?? 3,
+            $plano?->session_minutes ?? 60,
+            $plano?->equipment_access ?? GymEquipmentAccess::FullGym,
+            [],
+            sport: $plano?->sport,
+            sportDays: $plano?->sport_days ?? 0,
+            season: $plano?->season,
+        );
+
+        $catalogo = GymExerciseCatalog::query()->withoutInstructions()->where('name', $exercicio->name)->first();
+        $grupo = $exercicio->muscle_group->value;
+
+        $e = [
+            'id' => $catalogo?->id ?? '', 'name' => $exercicio->name, 'group' => $grupo, 'label' => $exercicio->muscle_group->label(), 'equipment' => $catalogo?->equipment_hint ?? '',
+            'measure' => $exercicio->measure_type->value, 'calf' => C::isCalf($exercicio->name),
+            'kind' => $catalogo !== null ? $this->kindOf($catalogo) : C::kind($exercicio->name, $grupo),
+        ];
+
+        $linha = $grupo === 'cardio' || C::isConditioning($exercicio->name) ? $this->cardioRow($e, $in) : $this->row($e, $in);
+
+        return [
+            'sets' => $linha['sets'], 'reps_min' => $linha['reps_min'], 'reps_max' => $linha['reps_max'],
+            'duration' => $linha['duration'], 'rest' => $linha['rest'], 'notes' => $linha['notes'],
+        ];
     }
 
     // --- Seleção -----------------------------------------------------------------------------------------------------

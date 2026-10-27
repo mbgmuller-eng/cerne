@@ -20,6 +20,7 @@ use App\Models\ProfileMember;
 use App\Models\Subscription;
 use App\Models\User;
 use App\Services\GymPlanService;
+use App\Services\GymWorkoutGenerator;
 use App\Services\GymSessionService;
 use App\Support\ProfileContext;
 use DomainException;
@@ -60,7 +61,7 @@ class GymExerciseSwapTest extends TestCase
         foreach ([
             ['Supino Reto com Barra', 'chest', 'load_reps', 'Barra livre'], ['Supino Reto com Halteres', 'chest', 'load_reps', 'Halteres'],
             ['Supino na Máquina', 'chest', 'load_reps', 'Máquina'], ['Flexão de Braço', 'chest', 'load_reps', 'Peso do corpo'],
-            ['Remada Baixa', 'back', 'load_reps', 'Cabo/polia baixa'], ['Puxada Frontal', 'back', 'load_reps', 'Cabo/polia alta'], ['Prancha Frontal', 'chest', 'duration', 'Peso do corpo'],
+            ['Remada Baixa', 'back', 'load_reps', 'Cabo/polia baixa'], ['Abdominal Oblíquo (Bicicleta)', 'core', 'load_reps', 'Peso do corpo'], ['Puxada Frontal', 'back', 'load_reps', 'Cabo/polia alta'], ['Prancha Frontal', 'chest', 'duration', 'Peso do corpo'],
         ] as [$nome, $grupo, $tipo, $equip]) {
             GymExerciseCatalog::create(['name' => $nome, 'muscle_group' => $grupo, 'measure_type' => $tipo, 'equipment_hint' => $equip]);
         }
@@ -71,6 +72,12 @@ class GymExerciseSwapTest extends TestCase
             ['target_sets' => 4, 'target_reps_min' => 6, 'target_reps_max' => 10, 'rest_seconds' => 90, 'notes' => 'Cuidado com o ombro']);
         $this->remada = $plano->addExercise($this->treino, $plano->findOrCreateExercise('Remada Baixa', GymMuscleGroup::Back, GymMeasureType::LoadReps),
             ['target_sets' => 3, 'target_reps_min' => 10, 'target_reps_max' => 12, 'rest_seconds' => 60]);
+    }
+
+    /** O texto que a pessoa lê, sem as marcas do Livewire e sem espaços repetidos. */
+    private function textoDaTela($tela): string
+    {
+        return trim(preg_replace('/\s+/u', ' ', strip_tags(preg_replace('/<!--.*?-->/s', '', $tela->html()))));
     }
 
     private function plano(): GymPlanService
@@ -125,7 +132,7 @@ class GymExerciseSwapTest extends TestCase
 
     // --- Troca definitiva -----------------------------------------------------------------------------------------------
 
-    public function test_troca_definitiva_mantem_meta_e_observacao_e_vale_nas_proximas_vezes(): void
+    public function test_troca_definitiva_usa_a_meta_do_exercicio_novo_e_nao_a_do_que_saiu(): void
     {
         [$novo, $equip] = $this->plano()->resolveSwapChoice($this->catalogo('Supino Reto com Halteres'));
 
@@ -133,13 +140,82 @@ class GymExerciseSwapTest extends TestCase
 
         $item = $this->supino->fresh(['exercise', 'defaultEquipment']);
         self::assertSame('Supino Reto com Halteres', $item->exercise->name);
-        self::assertSame(4, $item->target_sets);
+        // Sem histórico do exercício novo, vale o que o treino automático daria (hipertrofia, composto, nível intermediário): 3 x 6 a 10, 90 s.
+        self::assertSame(3, $item->target_sets);
         self::assertSame([6, 10, 90], [$item->target_reps_min, $item->target_reps_max, $item->rest_seconds]);
-        self::assertSame('Cuidado com o ombro', $item->notes);
+        self::assertNull($item->notes, 'a observação do exercício que saiu ("Cuidado com o ombro") não vai junto');
         self::assertSame('Halteres', $item->defaultEquipment->name, 'o equipamento passa a ser o do exercício novo');
         self::assertSame(1, GymExercise::query()->where('name', 'Supino Reto com Halteres')->count());
         self::assertSame(2, $this->treino->workoutExercises()->count(), 'troca, não acrescenta nem remove');
         self::assertSame($this->supino->position, $item->position);
+    }
+
+    public function test_exercicio_de_core_nao_herda_a_meta_de_forca_do_que_saiu(): void
+    {
+        $this->supino->update(['target_sets' => 3, 'target_reps_min' => 6, 'target_reps_max' => 6, 'rest_seconds' => 90, 'notes' => 'Na parede, cada lado. Bola de 3 kg.']);
+        [$abdominal, $equip] = $this->plano()->resolveSwapChoice($this->catalogo('Abdominal Oblíquo (Bicicleta)'));
+
+        $this->plano()->swapExercise($this->supino, $abdominal, $equip);
+
+        $item = $this->supino->fresh();
+        self::assertSame([3, 15, 20, 45], [$item->target_sets, $item->target_reps_min, $item->target_reps_max, $item->rest_seconds]);
+        self::assertNull($item->notes);
+    }
+
+    public function test_o_aquecimento_do_primeiro_exercicio_fica_porque_e_do_espaco_e_nao_do_exercicio(): void
+    {
+        $this->supino->update(['notes' => GymWorkoutGenerator::WARM_UP]);
+        [$novo, $equip] = $this->plano()->resolveSwapChoice($this->catalogo('Supino na Máquina'));
+
+        $this->plano()->swapExercise($this->supino, $novo, $equip);
+
+        self::assertSame(GymWorkoutGenerator::WARM_UP, $this->supino->fresh()->notes);
+    }
+
+    public function test_sem_resposta_guardada_na_fase_e_com_ela_a_meta_acompanha_o_objetivo(): void
+    {
+        $this->treino->plan->update(['goal' => 'strength', 'level' => 'intermediate']);
+        [$novo, $equip] = $this->plano()->resolveSwapChoice($this->catalogo('Supino Reto com Halteres'));
+
+        $this->plano()->swapExercise($this->supino, $novo, $equip);
+
+        $item = $this->supino->fresh();
+        self::assertSame([4, 3, 6, 180], [$item->target_sets, $item->target_reps_min, $item->target_reps_max, $item->rest_seconds], 'força, composto, intermediário');
+    }
+
+    public function test_quem_ja_tem_o_exercicio_em_outro_treino_ou_fase_leva_a_meta_que_definiu(): void
+    {
+        $plano = $this->plano();
+        $outraFase = $plano->addWorkout($plano->createPlan('Fase antiga'), 'Treino X', null);
+        $halteres = $plano->findOrCreateExercise('Supino Reto com Halteres', GymMuscleGroup::Chest, GymMeasureType::LoadReps);
+        $plano->addExercise($outraFase, $halteres, ['target_sets' => 5, 'target_reps_min' => 4, 'target_reps_max' => 6, 'rest_seconds' => 150, 'notes' => 'Pausa na descida']);
+        [$novo, $equip] = $plano->resolveSwapChoice($this->catalogo('Supino Reto com Halteres'));
+
+        $plano->swapExercise($this->supino->fresh(), $novo, $equip);
+
+        $item = $this->supino->fresh(['defaultEquipment']);
+        self::assertSame([5, 4, 6, 150], [$item->target_sets, $item->target_reps_min, $item->target_reps_max, $item->rest_seconds]);
+        self::assertSame('Pausa na descida', $item->notes, 'a observação do próprio exercício acompanha');
+    }
+
+    public function test_quem_ja_fez_o_exercicio_leva_series_e_repeticoes_do_ultimo_treino(): void
+    {
+        $plano = $this->plano();
+        $halteres = $plano->findOrCreateExercise('Supino Reto com Halteres', GymMuscleGroup::Chest, GymMeasureType::LoadReps);
+        $sessao = $this->sessoes()->start($this->treino);
+
+        foreach ([[1, 8], [2, 7], [3, 6], [4, 6]] as [$n, $reps]) {
+            GymSetLog::create(['session_id' => $sessao->id, 'exercise_id' => $halteres->id, 'set_number' => $n, 'reps' => $reps, 'load_value' => '30', 'load_mode' => 'total', 'completed_at' => now()]);
+        }
+
+        $this->sessoes()->finish($sessao);
+        [$novo, $equip] = $plano->resolveSwapChoice($this->catalogo('Supino Reto com Halteres'));
+
+        $plano->swapExercise($this->supino->fresh(), $novo, $equip);
+
+        $item = $this->supino->fresh();
+        self::assertSame([4, 6, 8], [$item->target_sets, $item->target_reps_min, $item->target_reps_max], 'o que a pessoa realmente fez');
+        self::assertSame(90, $item->rest_seconds, 'a pausa vem da regra do objetivo');
     }
 
     public function test_troca_para_exercicio_em_tempo_ajusta_a_meta_e_de_volta_para_carga_tambem(): void
@@ -148,7 +224,7 @@ class GymExerciseSwapTest extends TestCase
         $this->plano()->swapExercise($this->supino, $prancha);
 
         $item = $this->supino->fresh();
-        self::assertSame(30, $item->target_duration_seconds);
+        self::assertSame(40, $item->target_duration_seconds);
         self::assertNull($item->rest_seconds);
         self::assertNull($item->target_reps_min);
 
@@ -157,8 +233,8 @@ class GymExerciseSwapTest extends TestCase
 
         $item = $this->supino->fresh();
         self::assertNull($item->target_duration_seconds);
-        self::assertSame(60, $item->rest_seconds);
-        self::assertSame([8, 12], [$item->target_reps_min, $item->target_reps_max]);
+        self::assertSame(90, $item->rest_seconds);
+        self::assertSame([6, 10], [$item->target_reps_min, $item->target_reps_max]);
     }
 
     public function test_o_historico_nao_muda_quando_o_exercicio_do_treino_e_trocado(): void
@@ -253,6 +329,38 @@ class GymExerciseSwapTest extends TestCase
         Livewire::test(GymSessionRun::class, ['session' => $sessao->id])->assertSee('Flexão de Braço')->assertDontSee('Supino Reto com Barra');
         $proxima = $this->sessoes()->start($this->treino);
         Livewire::test(GymSessionRun::class, ['session' => $proxima->id])->assertSee('Supino Reto com Barra')->assertDontSee('Flexão de Braço');
+    }
+
+    public function test_so_por_hoje_mostra_a_meta_do_exercicio_de_hoje_e_o_plano_continua_com_a_dele(): void
+    {
+        $sessao = $this->sessoes()->start($this->treino);
+        $this->supino->update(['notes' => 'Cuidado com o ombro']);
+
+        $tela = Livewire::test(GymSessionRun::class, ['session' => $sessao->id])
+            ->call('openSwap', $this->supino->id)
+            ->set('swapScope', 'today')
+            ->call('swapTo', $this->catalogo('Abdominal Oblíquo (Bicicleta)'));
+
+        $troca = GymSessionSwap::query()->where('session_id', $sessao->id)->sole();
+        self::assertSame([3, 15, 20, 45], [$troca->target_sets, $troca->target_reps_min, $troca->target_reps_max, $troca->rest_seconds]);
+        self::assertNull($troca->notes);
+
+        $tela->assertSee('Abdominal Oblíquo (Bicicleta)')->assertDontSee('Cuidado com o ombro')->assertDontSee('6–10');
+        self::assertStringContainsString('Core · meta 3× 15–20 · pausa 45s', $this->textoDaTela($tela));
+
+        // O plano segue com a meta e a observação do supino.
+        $item = $this->supino->fresh();
+        self::assertSame([4, 6, 10, 90, 'Cuidado com o ombro'], [$item->target_sets, $item->target_reps_min, $item->target_reps_max, $item->rest_seconds, $item->notes]);
+    }
+
+    public function test_troca_de_hoje_antiga_sem_meta_guardada_segue_com_a_meta_do_item(): void
+    {
+        $sessao = $this->sessoes()->start($this->treino);
+        $flexao = $this->plano()->findOrCreateExercise('Flexão de Braço', GymMuscleGroup::Chest, GymMeasureType::LoadReps);
+        GymSessionSwap::create(['session_id' => $sessao->id, 'workout_exercise_id' => $this->supino->id, 'exercise_id' => $flexao->id]);
+
+        $tela = Livewire::test(GymSessionRun::class, ['session' => $sessao->id])->assertSee('Flexão de Braço');
+        self::assertStringContainsString('Peito · meta 4× 6–10 · pausa 90s', $this->textoDaTela($tela));
     }
 
     public function test_salvar_no_treino_pela_sessao_troca_o_item_e_vale_nas_proximas_vezes(): void

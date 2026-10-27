@@ -318,11 +318,16 @@ Dado de saúde pessoal (só o dono vê; `IsPersonalHealthData`). Regras que não
 - **Cada série guarda o exercício que foi feito** (`gym_set_logs.exercise_id`), por isso trocar o exercício de um item do treino
   (`GymPlanService::swapExercise`) **não muda o histórico**. O detalhe de uma sessão **finalizada** é montado pelas séries gravadas
   (`GymSessionRun::historyRows`), nunca pelo plano de hoje: se voltasse a ler o plano, a troca apagaria o que foi feito na tela.
-- **Troca definitiva** (no plano ou na sessão): muda o item, mantém séries, repetições, pausa e observação, e vale nas próximas
-  vezes. Recusa trocar exercício que já tem série numa sessão em andamento e exercício que já está no treino.
+- **Troca definitiva** (no plano ou na sessão): muda o item e vale nas próximas vezes. Recusa trocar exercício que já tem série numa
+  sessão em andamento e exercício que já está no treino. **A meta é a do exercício NOVO, nunca a do que saiu** (`GymPlanService::prescriptionFor`):
+  1) o que a pessoa já definiu para ele em outro treino ou fase (meta e observação dele); 2) sem isso, a regra do treino automático para o
+  objetivo, nível e esporte da fase (`GymWorkoutGenerator::prescriptionFor`), ajustada por séries e repetições do último treino finalizado em que
+  ele foi feito; 3) sem respostas guardadas na fase, hipertrofia de nível intermediário. A observação do exercício que saiu não vai junto; só o
+  aquecimento do 1º exercício do dia, que é do espaço (`GymWorkoutGenerator::WARM_UP`).
 - **Troca "só por hoje"** (`GymSessionSwap`, só na sessão): o plano não muda; `GymSessionService::applySwaps` troca o exercício do item
-  **só na memória** (a tela da sessão nunca salva o item). Só antes da primeira série do item; a troca definitiva do mesmo item
-  substitui a de hoje.
+  **só na memória** (a tela da sessão nunca salva o item). A meta de hoje (mesma regra acima) fica guardada na própria troca (`target_*`,
+  `rest_seconds`, `notes`, `default_equipment_id`); troca antiga, sem meta guardada, segue com a do item. Só antes da primeira série do item;
+  a troca definitiva do mesmo item substitui a de hoje.
 - **Treino automático** (`GymPlanGenerator` → `GymWorkoutGenerator`, `GymExerciseClassifier`): regras fixas, sem IA e sem gravar nada
   até a pessoa revisar e salvar (`GymPlanService::createPlanFromDraft`, tudo ou nada; encerra a fase ativa). Usa só o catálogo.
   O catálogo não traz "composto/isolado", nível nem equipamento padronizado: o classificador infere por palavra-chave no nome e na

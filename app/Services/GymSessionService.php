@@ -86,7 +86,7 @@ class GymSessionService
     /** @return Collection<string, GymSessionSwap> as trocas "só por hoje" da sessão, pelo id do item do treino */
     public function swapsOf(GymSession $session): Collection
     {
-        return GymSessionSwap::query()->where('session_id', $session->id)->with('exercise')->get()->keyBy('workout_exercise_id');
+        return GymSessionSwap::query()->where('session_id', $session->id)->with('exercise', 'equipment')->get()->keyBy('workout_exercise_id');
     }
 
     /**
@@ -106,6 +106,16 @@ class GymSessionService
             if ($troca !== null) {
                 $item->exercise_id = $troca->exercise_id;
                 $item->setRelation('exercise', $troca->exercise);
+
+                // A meta é a do exercício de hoje, não a do que saiu (troca antiga, sem meta guardada, segue com a do item).
+                if ($troca->target_sets !== null) {
+                    $item->forceFill([
+                        'target_sets' => $troca->target_sets, 'target_reps_min' => $troca->target_reps_min, 'target_reps_max' => $troca->target_reps_max,
+                        'target_duration_seconds' => $troca->target_duration_seconds, 'rest_seconds' => $troca->rest_seconds,
+                        'notes' => $troca->notes, 'default_equipment_id' => $troca->default_equipment_id,
+                    ]);
+                    $item->setRelation('defaultEquipment', $troca->equipment);
+                }
             }
         });
     }
@@ -114,7 +124,7 @@ class GymSessionService
      * Faz o item com outro exercício só nesta sessão; o plano não muda. Só antes de registrar série nele, e nunca com um
      * exercício que já esteja em outro item da sessão (as séries são guardadas por exercício).
      */
-    public function swapToday(GymSession $session, GymWorkoutExercise $item, GymExercise $novo): void
+    public function swapToday(GymSession $session, GymWorkoutExercise $item, GymExercise $novo, ?string $equipamento = null): void
     {
         $this->assertEditable($session, $item);
 
@@ -135,9 +145,11 @@ class GymSessionService
             return;
         }
 
+        $meta = app(GymPlanService::class)->prescriptionFor($item, $novo, $equipamento);
+
         GymSessionSwap::query()->updateOrCreate(
             ['session_id' => $session->id, 'workout_exercise_id' => $item->id],
-            ['exercise_id' => $novo->id],
+            ['exercise_id' => $novo->id] + $meta,
         );
     }
 

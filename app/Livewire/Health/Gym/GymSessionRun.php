@@ -245,7 +245,7 @@ class GymSessionRun extends Component
         $doTreino = $this->planItem((string) $this->swapItemId);
 
         $ok = $this->swapScope === 'today'
-            ? $this->guard(fn () => $service->swapToday($sessao, $doTreino, $novo) ?? true)
+            ? $this->guard(fn () => $service->swapToday($sessao, $doTreino, $novo, $equipamento) ?? true)
             : $this->guard(function () use ($plano, $service, $sessao, $doTreino, $novo, $equipamento): bool {
                 $plano->swapExercise($doTreino, $novo, $equipamento);
                 // A troca definitiva substitui a de hoje, se havia.

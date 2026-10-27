@@ -414,9 +414,9 @@ class GymPlanService
     }
 
     /**
-     * Troca o exercício de um item do treino e MANTÉM o treino assim para as próximas vezes: séries, repetições, pausa e
-     * observação continuam; o equipamento passa a ser o do exercício novo. O histórico não muda, porque cada série gravada
-     * guarda o exercício que foi feito.
+     * Troca o exercício de um item do treino e MANTÉM o treino assim para as próximas vezes. A meta (séries, repetições, pausa,
+     * observação e equipamento) é a do exercício NOVO (ver prescriptionFor), não a do que saiu. O histórico não muda, porque cada
+     * série gravada guarda o exercício que foi feito.
      *
      * Treino em andamento com série já feita no exercício atual não troca: ela ficaria sem lugar na tela.
      */
@@ -438,21 +438,74 @@ class GymPlanService
             throw new DomainException('Este exercício já está neste treino.');
         }
 
-        $tempo = $novo->measure_type->usesStopwatch();
-        $meta = [
-            'target_sets' => $item->target_sets,
-            'target_reps_min' => $item->target_reps_min ?? ($tempo ? null : 8),
-            'target_reps_max' => $item->target_reps_max ?? ($tempo ? null : 12),
-            'target_duration_seconds' => $item->target_duration_seconds ?? ($tempo ? 30 : null),
-            'rest_seconds' => $item->rest_seconds ?? ($tempo ? null : 60),
-            'default_equipment_id' => $this->findOrCreateEquipment($equipamento)?->id,
-            'notes' => $item->notes,
-        ];
+        $meta = $this->prescriptionFor($item, $novo, $equipamento);
 
         $item->update($this->sanitize($novo, $meta) + ['exercise_id' => $novo->id]);
         $item->setRelation('exercise', $novo);
 
         return $item;
+    }
+
+    /**
+     * A meta do exercício que entra no lugar de outro. Vale, nesta ordem: o que a pessoa já tem para ele em outro treino ou fase (a
+     * própria meta e a observação dela); o que ela já fez nele (séries e repetições do último treino finalizado); e, sem histórico,
+     * a meta que o treino automático daria a esse exercício para o objetivo e o nível da fase. A observação do exercício que saiu
+     * nunca vai junto, só o aquecimento do primeiro exercício do dia, que é do espaço e não do exercício.
+     *
+     * @return array<string, mixed>  campos de GymWorkoutExercise: target_*, rest_seconds, default_equipment_id e notes
+     */
+    public function prescriptionFor(GymWorkoutExercise $item, GymExercise $novo, ?string $equipamento = null): array
+    {
+        $plano = GymWorkout::query()->with('plan')->find($item->workout_id)?->plan;
+        $aquecimento = $item->notes === GymWorkoutGenerator::WARM_UP ? GymWorkoutGenerator::WARM_UP : null;
+
+        $anterior = GymWorkoutExercise::query()->where('exercise_id', $novo->id)->where('id', '!=', $item->id)->latest('updated_at')->first();
+
+        if ($anterior !== null) {
+            return [
+                'target_sets' => $anterior->target_sets,
+                'target_reps_min' => $anterior->target_reps_min,
+                'target_reps_max' => $anterior->target_reps_max,
+                'target_duration_seconds' => $anterior->target_duration_seconds,
+                'rest_seconds' => $anterior->rest_seconds,
+                'default_equipment_id' => $this->findOrCreateEquipment($equipamento)?->id ?? $anterior->default_equipment_id,
+                'notes' => $anterior->notes ?? $aquecimento,
+            ];
+        }
+
+        $base = app(GymWorkoutGenerator::class)->prescriptionFor($novo, $plano);
+        $meta = [
+            'target_sets' => $base['sets'],
+            'target_reps_min' => $base['reps_min'],
+            'target_reps_max' => $base['reps_max'],
+            'target_duration_seconds' => $base['duration'],
+            'rest_seconds' => $base['rest'],
+            'default_equipment_id' => $this->findOrCreateEquipment($equipamento)?->id,
+            'notes' => $aquecimento ?? $base['notes'],
+        ];
+
+        // Já fez esse exercício: o que a pessoa realmente fez vale mais que a regra geral.
+        $ultimo = GymSetLog::query()->where('exercise_id', $novo->id)
+            ->whereIn('session_id', GymSession::query()->whereNotNull('finished_at')->select('id'))
+            ->orderByDesc('completed_at')->first();
+
+        if ($ultimo !== null) {
+            $series = GymSetLog::query()->where('session_id', $ultimo->session_id)->where('exercise_id', $novo->id)->get();
+            $meta['target_sets'] = max(1, min(6, $series->count()));
+
+            if ($novo->measure_type->usesStopwatch()) {
+                $media = (int) round($series->whereNotNull('duration_seconds')->avg('duration_seconds') ?? 0);
+                $meta['target_duration_seconds'] = $media > 0 ? $media : $meta['target_duration_seconds'];
+            } else {
+                $reps = $series->pluck('reps')->filter()->values();
+                $meta['target_reps_min'] = $reps->isNotEmpty() ? (int) $reps->min() : $meta['target_reps_min'];
+                $meta['target_reps_max'] = $reps->isNotEmpty() ? (int) $reps->max() : $meta['target_reps_max'];
+            }
+
+            $meta['default_equipment_id'] ??= $ultimo->equipment_id;
+        }
+
+        return $meta;
     }
 
     /**
