@@ -57,17 +57,17 @@
 
         @foreach ($workouts as $treino)
             <section class="card p-5" wire:key="w-{{ $treino->id }}">
-                <div class="flex flex-wrap items-start justify-between gap-2">
+                <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div class="min-w-0">
-                        <h2 class="text-sm font-semibold text-slate-900 dark:text-white">{{ $treino->name }}</h2>
+                        <h2 class="text-base font-semibold text-slate-900 sm:text-sm dark:text-white">{{ $treino->name }}</h2>
                         @if ($treino->focus)
-                            <p class="text-xs text-slate-500 dark:text-slate-400">{{ $treino->focus }}</p>
+                            <p class="text-sm text-slate-500 sm:text-xs dark:text-slate-400">{{ $treino->focus }}</p>
                         @endif
                     </div>
-                    <div class="flex items-center gap-1">
-                        <button type="button" wire:click="moveWorkout('{{ $treino->id }}', -1)" @disabled($loop->first) class="btn-ghost px-2 py-1 text-xs disabled:opacity-30" aria-label="Subir treino">↑</button>
-                        <button type="button" wire:click="moveWorkout('{{ $treino->id }}', 1)" @disabled($loop->last) class="btn-ghost px-2 py-1 text-xs disabled:opacity-30" aria-label="Descer treino">↓</button>
-                        <button type="button" wire:click="deleteWorkout('{{ $treino->id }}')" wire:confirm="Excluir {{ $treino->name }} e seus exercícios?" class="btn-ghost px-2 py-1 text-xs text-red-700 dark:text-red-400">Excluir</button>
+                    <div class="flex items-center gap-2 sm:gap-1">
+                        <button type="button" wire:click="moveWorkout('{{ $treino->id }}', -1)" @disabled($loop->first) class="btn-ghost w-10 border border-slate-200 px-0 py-2 text-sm disabled:opacity-30 sm:w-auto sm:px-2 sm:border-0 sm:px-2 sm:py-1 sm:text-xs dark:border-white/10" aria-label="Subir treino">↑</button>
+                        <button type="button" wire:click="moveWorkout('{{ $treino->id }}', 1)" @disabled($loop->last) class="btn-ghost w-10 border border-slate-200 px-0 py-2 text-sm disabled:opacity-30 sm:w-auto sm:px-2 sm:border-0 sm:px-2 sm:py-1 sm:text-xs dark:border-white/10" aria-label="Descer treino">↓</button>
+                        <button type="button" wire:click="deleteWorkout('{{ $treino->id }}')" wire:confirm="Excluir {{ $treino->name }} e seus exercícios?" class="btn-ghost flex-1 border border-red-200 px-2 py-2 text-sm text-red-700 sm:flex-none sm:border-0 sm:px-2 sm:py-1 sm:text-xs dark:border-red-500/20 dark:text-red-400">Excluir treino</button>
                     </div>
                 </div>
 
@@ -76,37 +76,38 @@
                 @else
                     <ul class="mt-4 divide-y divide-slate-100 dark:divide-white/10">
                         @foreach ($treino->workoutExercises as $item)
-                            <li class="flex items-start justify-between gap-3 py-3" wire:key="i-{{ $item->id }}">
+                            <li class="flex flex-col gap-3 py-4 sm:flex-row sm:items-start sm:justify-between sm:py-3" wire:key="i-{{ $item->id }}">
                                 <div class="flex min-w-0 items-start gap-3">
-                                    <x-gym.exercise-photo :exercise="$item->exercise" size="h-12 w-12 rounded-lg" />
+                                    <x-gym.exercise-photo :exercise="$item->exercise" size="h-16 w-16 shrink-0 rounded-xl sm:h-12 sm:w-12 sm:rounded-lg" />
                                     <div class="min-w-0">
-                                    <p class="text-sm text-slate-800 dark:text-slate-200">{{ $item->exercise->name }}</p>
-                                    <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-                                        {{ $item->exercise->muscle_group->label() }}
-                                        · {{ $item->target_sets }}×
-                                        @if ($item->target_duration_seconds)
-                                            {{ $item->target_duration_seconds }}s
-                                        @elseif ($item->target_reps_min && $item->target_reps_max && $item->target_reps_min !== $item->target_reps_max)
-                                            {{ $item->target_reps_min }}–{{ $item->target_reps_max }}
-                                        @elseif ($item->target_reps_min || $item->target_reps_max)
-                                            {{ $item->target_reps_min ?? $item->target_reps_max }}
-                                        @else
-                                            —
+                                        <p class="text-base font-medium leading-snug text-slate-900 sm:text-sm sm:font-normal dark:text-white sm:dark:text-slate-200">{{ $item->exercise->name }}</p>
+                                        <p class="mt-1 text-sm text-slate-600 sm:mt-0.5 sm:text-xs dark:text-slate-300 sm:dark:text-slate-400">
+                                            {{ $item->exercise->muscle_group->label() }}
+                                            · {{ $item->target_sets }}×
+                                            @if ($item->target_duration_seconds)
+                                                {{ $item->target_duration_seconds }}s
+                                            @elseif ($item->target_reps_min && $item->target_reps_max && $item->target_reps_min !== $item->target_reps_max)
+                                                {{ $item->target_reps_min }}–{{ $item->target_reps_max }}
+                                            @elseif ($item->target_reps_min || $item->target_reps_max)
+                                                {{ $item->target_reps_min ?? $item->target_reps_max }}
+                                            @else
+                                                —
+                                            @endif
+                                            @if ($item->rest_seconds !== null) · pausa {{ $item->rest_seconds }}s @endif
+                                            @if ($item->defaultEquipment) · {{ $item->defaultEquipment->name }} @endif
+                                        </p>
+                                        @if ($item->notes)
+                                            <p class="mt-1 text-sm leading-snug text-slate-500 sm:mt-0.5 sm:text-xs sm:text-slate-400 dark:text-slate-400">{{ $item->notes }}</p>
                                         @endif
-                                        @if ($item->rest_seconds !== null) · pausa {{ $item->rest_seconds }}s @endif
-                                        @if ($item->defaultEquipment) · {{ $item->defaultEquipment->name }} @endif
-                                    </p>
-                                    @if ($item->notes)
-                                        <p class="mt-0.5 text-xs text-slate-400">{{ $item->notes }}</p>
-                                    @endif
                                     </div>
                                 </div>
-                                <div class="flex shrink-0 items-center gap-1">
-                                    <button type="button" wire:click="moveExercise('{{ $item->id }}', -1)" @disabled($loop->first) class="btn-ghost px-2 py-1 text-xs disabled:opacity-30" aria-label="Subir exercício">↑</button>
-                                    <button type="button" wire:click="moveExercise('{{ $item->id }}', 1)" @disabled($loop->last) class="btn-ghost px-2 py-1 text-xs disabled:opacity-30" aria-label="Descer exercício">↓</button>
-                                    <button type="button" wire:click="openSwap('{{ $item->id }}')" class="btn-ghost px-2 py-1 text-xs">Trocar</button>
-                                    <button type="button" wire:click="editExercise('{{ $item->id }}')" class="btn-ghost px-2 py-1 text-xs">Editar</button>
-                                    <button type="button" wire:click="removeExercise('{{ $item->id }}')" wire:confirm="Remover {{ $item->exercise->name }} deste treino?" class="btn-ghost px-2 py-1 text-xs text-red-700 dark:text-red-400">Remover</button>
+                                {{-- No celular os botões descem para uma linha própria, com área de toque maior; a partir de sm ficam ao lado. --}}
+                                <div class="flex shrink-0 items-center gap-1.5 sm:gap-1">
+                                    <button type="button" wire:click="moveExercise('{{ $item->id }}', -1)" @disabled($loop->first) class="btn-ghost w-10 border border-slate-200 px-0 py-2 text-sm disabled:opacity-30 sm:w-auto sm:px-2 sm:border-0 sm:px-2 sm:py-1 sm:text-xs dark:border-white/10" aria-label="Subir exercício">↑</button>
+                                    <button type="button" wire:click="moveExercise('{{ $item->id }}', 1)" @disabled($loop->last) class="btn-ghost w-10 border border-slate-200 px-0 py-2 text-sm disabled:opacity-30 sm:w-auto sm:px-2 sm:border-0 sm:px-2 sm:py-1 sm:text-xs dark:border-white/10" aria-label="Descer exercício">↓</button>
+                                    <button type="button" wire:click="openSwap('{{ $item->id }}')" class="btn-ghost flex-1 border border-slate-200 px-2 py-2 text-sm sm:flex-none sm:border-0 sm:px-2 sm:py-1 sm:text-xs dark:border-white/10">Trocar</button>
+                                    <button type="button" wire:click="editExercise('{{ $item->id }}')" class="btn-ghost flex-1 border border-slate-200 px-2 py-2 text-sm sm:flex-none sm:border-0 sm:px-2 sm:py-1 sm:text-xs dark:border-white/10">Editar</button>
+                                    <button type="button" wire:click="removeExercise('{{ $item->id }}')" wire:confirm="Remover {{ $item->exercise->name }} deste treino?" class="btn-ghost flex-1 border border-red-200 px-2 py-2 text-sm text-red-700 sm:flex-none sm:border-0 sm:px-2 sm:py-1 sm:text-xs dark:border-red-500/20 dark:text-red-400">Remover</button>
                                 </div>
                             </li>
                         @endforeach
