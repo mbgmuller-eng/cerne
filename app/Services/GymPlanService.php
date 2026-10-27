@@ -509,8 +509,10 @@ class GymPlanService
     }
 
     /**
-     * Exercício medido em tempo (prancha, esteira) usa cronômetro, não
-     * pausa entre séries — então não guarda repetições nem descanso.
+     * Exercício medido em tempo (prancha, esteira) usa cronômetro e não guarda
+     * repetições. A pausa entre séries é opcional: vazia na prancha, e o tempo
+     * leve entre os esforços no condicionamento intervalado (8 séries de 30 s
+     * com 60 s de pausa).
      *
      * @param  array<string, mixed>  $meta
      * @return array<string, mixed>
@@ -524,7 +526,7 @@ class GymPlanService
             'target_reps_min' => $timed ? null : ($meta['target_reps_min'] ?? null),
             'target_reps_max' => $timed ? null : ($meta['target_reps_max'] ?? null),
             'target_duration_seconds' => $timed ? ($meta['target_duration_seconds'] ?? null) : null,
-            'rest_seconds' => $timed ? null : ($meta['rest_seconds'] ?? null),
+            'rest_seconds' => $meta['rest_seconds'] ?? null,
             'default_equipment_id' => $meta['default_equipment_id'] ?? null,
             'notes' => isset($meta['notes']) && trim((string) $meta['notes']) !== '' ? trim((string) $meta['notes']) : null,
         ];

@@ -224,7 +224,12 @@
                         <input type="number" min="5" wire:model="exDuration" class="input mt-1.5" placeholder="Ex.: 60">
                         @error('exDuration') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
                     </div>
-                    <p class="text-xs text-slate-400 @sm:col-span-2">Exercício em tempo usa cronômetro (iniciar → concluir), sem pausa entre séries.</p>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Pausa entre séries (segundos)</label>
+                        <input type="number" min="0" max="600" wire:model="exRest" class="input mt-1.5" placeholder="Opcional">
+                        @error('exRest') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                    </div>
+                    <p class="text-xs text-slate-400 @sm:col-span-2">Exercício em tempo usa cronômetro (iniciar → concluir). Cada série é uma rodada do cronômetro: em um intervalado de 8 esforços de 30 s com 60 s leve, use 8 séries, 30 s e pausa 60. Sem pausa, deixe em branco.</p>
                 @else
                     <div>
                         <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Repetições (mín.)</label>

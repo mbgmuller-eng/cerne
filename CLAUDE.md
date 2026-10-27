@@ -334,6 +334,10 @@ Dado de saúde pessoal (só o dono vê; `IsPersonalHealthData`). Regras que não
   dica de equipamento (decisão: marcar o catálogo à mão fica para depois). Entradas: objetivo, nível, dias (2 a 6), tempo, onde treina
   e regiões a proteger. É orientação geral, não prescrição: a tela avisa. Exercício de reabilitação ou muito específico nunca entra
   sozinho (`NEVER_AUTO`), condicionamento (salto, corda, burpee) só no bloco de cardio.
+- **Exercício em tempo e séries**: cada série é uma rodada do cronômetro (prancha 3 × 40 s). A pausa entre séries é **opcional** também em tempo
+  (`rest_seconds`; vazia na prancha) e conta em regressiva depois de cada série, **menos da última** (`GymSessionRun::completeTimedSet`).
+  Condicionamento **intervalado** (HIIT) nasce como séries de esforço com pausa leve (8 × 30 s + 60 s), nunca um cronômetro único e longo
+  (`GymWorkoutGenerator::cardioRow`: rodadas = tempo do bloco ÷ (esforço + pausa), de 4 a 12); cardio contínuo segue com 1 série.
 - **A fase guarda as respostas do gerador** (`gym_plans.goal/level/days_per_week/session_minutes/equipment_access/restrictions`, preenchidas
   por `createPlanFromDraft`; fase montada à mão fica sem objetivo até a pessoa defini-lo na tela da Academia, `setPlanGoal`).
 - **Hora de trocar a fase** (`GymPhaseReviewService::review`, status ok/soon/due/slow): prazo por objetivo (hipertrofia e saúde geral 8 a 12

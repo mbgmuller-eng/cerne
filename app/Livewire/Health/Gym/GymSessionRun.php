@@ -156,8 +156,8 @@ class GymSessionRun extends Component
             'equipment_id' => $this->equipmentId($d['equipment']),
         ]));
 
-        // Cronômetro não tem pausa em contagem regressiva — só marca a série.
-        $this->afterSet($log, $item, rest: false);
+        // Em tempo a pausa é opcional (intervalado): conta depois de cada esforço, menos do último.
+        $this->afterSet($log, $item, rest: $setNumber < $item->target_sets);
     }
 
     public function undoSet(string $itemId, GymSessionService $service): void

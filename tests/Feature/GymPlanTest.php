@@ -117,7 +117,7 @@ class GymPlanTest extends TestCase
         );
     }
 
-    public function test_exercicio_em_tempo_nao_guarda_repeticoes_nem_pausa(): void
+    public function test_exercicio_em_tempo_nao_guarda_repeticoes_e_a_pausa_entre_series_e_opcional(): void
     {
         $this->entrarComoDono();
         $servico = app(GymPlanService::class);
@@ -130,8 +130,11 @@ class GymPlanTest extends TestCase
         ]);
 
         self::assertNull($item->target_reps_min);
-        self::assertNull($item->rest_seconds);
+        self::assertSame(60, $item->rest_seconds, 'intervalado: o tempo leve entre os esforços');
         self::assertSame(45, $item->target_duration_seconds);
+
+        $semPausa = $servico->addExercise($treino, $servico->findOrCreateExercise('Prancha lateral', GymMuscleGroup::Core, GymMeasureType::Duration), ['target_sets' => 3, 'target_duration_seconds' => 30]);
+        self::assertNull($semPausa->rest_seconds);
     }
 
     public function test_mover_e_remover_exercicio_mantem_a_ordem_sem_buracos(): void

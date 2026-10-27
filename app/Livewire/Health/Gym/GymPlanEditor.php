@@ -311,7 +311,7 @@ class GymPlanEditor extends Component
         $service->moveExercise(GymWorkoutExercise::query()->findOrFail($itemId), $direction < 0 ? -1 : 1);
     }
 
-    /** Ao mudar o tipo, a pausa some (cronômetro no lugar) ou volta ao padrão. */
+    /** Ao mudar o tipo, o cronômetro entra no lugar das repetições e a pausa volta ao padrão da carga (em tempo ela é opcional). */
     public function updatedExType(): void
     {
         if (GymMeasureType::tryFrom($this->exType)?->usesStopwatch()) {

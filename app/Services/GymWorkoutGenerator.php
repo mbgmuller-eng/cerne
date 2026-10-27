@@ -482,6 +482,19 @@ class GymWorkoutGenerator
             ];
         }
 
+        // Intervalado (HIIT): cada série é um esforço forte no cronômetro, com a pausa leve entre elas, e o total cabe no tempo do treino.
+        if (str_contains(C::normalize($e['name']), 'hiit') || str_contains(C::normalize($e['name']), 'intervalo')) {
+            $forte = $in->level === GymLevel::Beginner ? 20 : 30;
+            $leve = 60;
+            $rounds = max(4, min(12, intdiv($segundos, $forte + $leve)));
+
+            return [
+                'catalog_id' => $e['id'], 'name' => $e['name'], 'group' => $e['label'], 'group_value' => 'cardio', 'equipment' => $e['equipment'],
+                'measure' => $e['measure'], 'kind' => 'cardio', 'sets' => $rounds, 'reps_min' => null, 'reps_max' => null, 'duration' => $forte, 'rest' => $leve,
+                'notes' => "{$rounds} esforços de {$forte}s forte (esforço alto, 8 de 10), com {$leve}s leve entre eles.",
+            ];
+        }
+
         return [
             'catalog_id' => $e['id'], 'name' => $e['name'], 'group' => $e['label'], 'group_value' => 'cardio', 'equipment' => $e['equipment'],
             'measure' => $e['measure'], 'kind' => 'cardio', 'sets' => 1, 'reps_min' => null, 'reps_max' => null, 'duration' => $segundos, 'rest' => null,
