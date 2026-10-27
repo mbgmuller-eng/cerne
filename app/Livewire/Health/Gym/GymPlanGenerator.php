@@ -229,7 +229,22 @@ class GymPlanGenerator extends Component
 
     public function save(GymPlanService $service): void
     {
-        $this->validate(['draft.name' => ['required', 'string', 'max:80']], attributes: ['draft.name' => 'nome da fase']);
+        $this->validate([
+            'draft.name' => ['required', 'string', 'max:80'],
+            'draft.workouts.*.exercises.*.rest' => ['nullable', 'integer', 'min:0', 'max:600'],
+        ], [
+            'draft.workouts.*.exercises.*.rest.integer' => 'A pausa deve ser um número inteiro de segundos.',
+            'draft.workouts.*.exercises.*.rest.min' => 'A pausa não pode ser negativa.',
+            'draft.workouts.*.exercises.*.rest.max' => 'A pausa pode ter no máximo 600 segundos (10 minutos).',
+        ], attributes: ['draft.name' => 'nome da fase']);
+
+        // Campo vazio ou zero = sem pausa. Salva sempre número inteiro ou nulo.
+        foreach ($this->draft['workouts'] as $w => $treino) {
+            foreach ($treino['exercises'] as $i => $e) {
+                $pausa = $e['rest'] ?? null;
+                $this->draft['workouts'][$w]['exercises'][$i]['rest'] = $pausa === null || $pausa === '' || (int) $pausa === 0 ? null : (int) $pausa;
+            }
+        }
 
         $temExercicio = collect($this->draft['workouts'] ?? [])->contains(fn (array $w) => $w['exercises'] !== []);
 

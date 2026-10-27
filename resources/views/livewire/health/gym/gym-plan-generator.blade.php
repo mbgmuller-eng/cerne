@@ -305,10 +305,18 @@
                                         @elseif ($e['reps_min'] && $e['reps_max'])
                                             {{ $e['reps_min'] }}–{{ $e['reps_max'] }}
                                         @endif
-                                        @if ($e['rest']) · pausa {{ $e['rest'] }}s @endif
                                     </p>
+                                    {{-- A pausa vem da regra do objetivo, mas quem treina sabe o quanto precisa: dá para mudar antes de salvar. Série única não tem pausa. --}}
+                                    @if ($e['sets'] > 1)
+                                        <div class="mt-1.5 flex items-center gap-2">
+                                            <label for="pausa-{{ $w }}-{{ $i }}" class="text-xs text-slate-500 dark:text-slate-400">Pausa entre séries</label>
+                                            <input id="pausa-{{ $w }}-{{ $i }}" type="number" inputmode="numeric" min="0" max="600" step="5" wire:model.blur="draft.workouts.{{ $w }}.exercises.{{ $i }}.rest" placeholder="sem" class="input w-20 px-2 py-1 text-sm" aria-label="Pausa entre séries de {{ $e['name'] }}, em segundos">
+                                            <span class="text-xs text-slate-400">segundos</span>
+                                        </div>
+                                        @error("draft.workouts.$w.exercises.$i.rest") <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                                    @endif
                                     @if ($e['notes'])
-                                        <p class="mt-0.5 text-xs text-slate-400">{{ $e['notes'] }}</p>
+                                        <p class="mt-1 text-xs text-slate-400">{{ $e['notes'] }}</p>
                                     @endif
                                 </div>
                                 <div class="flex shrink-0 items-center gap-1">

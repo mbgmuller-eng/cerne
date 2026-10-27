@@ -372,6 +372,40 @@ class GymWorkoutGeneratorTest extends TestCase
         self::assertTrue($itens->every(fn ($i) => $i->target_sets >= 1 && $i->position >= 1));
     }
 
+    public function test_a_pausa_de_cada_exercicio_pode_ser_editada_no_rascunho_antes_de_salvar(): void
+    {
+        $tela = Livewire::test(GymPlanGenerator::class)->set('days', 3)->set('level', 'intermediate')->call('generate');
+
+        // O campo aparece nos exercícios com mais de uma série, já com o valor da regra.
+        $tela->assertSeeHtml('Pausa entre séries');
+        $nome = $tela->get('draft.workouts.0.exercises.0.name');
+        self::assertNotNull($tela->get('draft.workouts.0.exercises.0.rest'));
+
+        $tela->set('draft.workouts.0.exercises.0.rest', '150')
+            ->set('draft.workouts.0.exercises.1.rest', '')
+            ->set('draft.workouts.0.exercises.2.rest', '0')
+            ->set('draft.name', 'Pausas ajustadas')->call('save')->assertHasNoErrors()->assertRedirect(route('health.gym.index'));
+
+        $itens = GymWorkoutExercise::query()->whereIn('workout_id', app(GymPlanService::class)->activePlan()->workouts()->pluck('id'))->with('exercise')
+            ->join('gym_workouts', 'gym_workouts.id', '=', 'gym_workout_exercises.workout_id')->orderBy('gym_workouts.position')->orderBy('gym_workout_exercises.position')
+            ->select('gym_workout_exercises.*')->get();
+
+        $primeiroDoTreinoA = $itens->where('workout_id', $itens->first()->workout_id)->values();
+        self::assertSame($nome, $primeiroDoTreinoA[0]->exercise->name);
+        self::assertSame(150, $primeiroDoTreinoA[0]->rest_seconds);
+        self::assertNull($primeiroDoTreinoA[1]->rest_seconds, 'vazio = sem pausa');
+        self::assertNull($primeiroDoTreinoA[2]->rest_seconds, 'zero = sem pausa');
+    }
+
+    public function test_pausa_invalida_no_rascunho_nao_salva(): void
+    {
+        foreach (['abc', '-5', '601', '12.5'] as $invalido) {
+            Livewire::test(GymPlanGenerator::class)->set('days', 3)->call('generate')
+                ->set('draft.workouts.0.exercises.0.rest', $invalido)->call('save')->assertHasErrors('draft.workouts.0.exercises.0.rest');
+        }
+
+        self::assertSame(0, GymPlan::query()->count());
+    }
     public function test_salvar_e_tudo_ou_nada(): void
     {
         $antiga = app(GymPlanService::class)->createPlan('Fase antiga');
