@@ -63,9 +63,9 @@ class EngagementService
         ])->save();
 
         if ($novo) {
-            $this->avisos->toOtherSide($v, 'meeting_scheduled', 'Reunião marcada', 'Sua reunião de acompanhamento foi marcada para '.$reuniao->scheduled_at->format('d/m \à\s H:i').'.');
+            $this->avisos->meetingToOtherSide($v, $reuniao, 'meeting_scheduled', 'scheduled');
         } elseif ($antes !== null && ! $antes->equalTo($reuniao->scheduled_at)) {
-            $this->avisos->toOtherSide($v, 'meeting_rescheduled', 'Reunião remarcada', 'A reunião de acompanhamento agora é em '.$reuniao->scheduled_at->format('d/m \à\s H:i').'.');
+            $this->avisos->meetingToOtherSide($v, $reuniao, 'meeting_rescheduled', 'rescheduled', $antes);
         }
 
         return $reuniao;
@@ -160,7 +160,7 @@ class EngagementService
         }
 
         $reuniao->update(['status' => EngagementMeetingStatus::Cancelled]);
-        $this->avisos->toOtherSide($v, 'meeting_cancelled', 'Reunião cancelada', 'A reunião de '.$reuniao->scheduled_at->format('d/m \à\s H:i').' foi cancelada.');
+        $this->avisos->meetingToOtherSide($v, $reuniao, 'meeting_cancelled', 'cancelled');
 
         return $reuniao;
     }

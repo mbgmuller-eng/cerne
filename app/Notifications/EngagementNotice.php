@@ -22,7 +22,22 @@ class EngagementNotice extends Notification implements ShouldQueue
         public string $kind,
         public string $heading,
         public string $message,
+        /** Só para reunião: `consultant_id`, `parties` (consultant, client), `details` (rótulo e valor) e `meeting_id`. */
+        public array $extra = [],
     ) {}
+
+    /** "{outro}" vira o nome de quem está do outro lado: o cliente para o consultor, o consultor para o cliente. */
+    private function text(string $texto, object $notifiable): string
+    {
+        if (! str_contains($texto, '{outro}')) {
+            return $texto;
+        }
+
+        $parties = $this->extra['parties'] ?? [];
+        $outro = ($this->extra['consultant_id'] ?? null) === $notifiable->id ? ($parties['client'] ?? 'o cliente') : ($parties['consultant'] ?? 'o consultor');
+
+        return str_replace('{outro}', $outro, $texto);
+    }
 
     /** @return array<int, string> */
     public function via(object $notifiable): array
@@ -42,12 +57,16 @@ class EngagementNotice extends Notification implements ShouldQueue
 
     public function toMail(object $notifiable): MailMessage
     {
+        $heading = $this->text($this->heading, $notifiable);
+
         return (new MailMessage)
-            ->subject($this->heading)
+            ->subject($heading)
             ->markdown('mail.engagement-notice', [
                 'recipientName' => $notifiable->name,
-                'heading' => $this->heading,
-                'message' => $this->message,
+                'heading' => $heading,
+                'message' => $this->text($this->message, $notifiable),
+                'details' => $this->extra['details'] ?? [],
+                'calendarUrl' => isset($this->extra['meeting_id']) ? route('engagement.meeting.ics', $this->extra['meeting_id']) : null,
                 'url' => route('engagement.index'),
             ]);
     }
@@ -58,8 +77,8 @@ class EngagementNotice extends Notification implements ShouldQueue
         return [
             'kind' => 'engagement_notice',
             'notice' => $this->kind,
-            'title' => $this->heading,
-            'message' => $this->message,
+            'title' => $this->text($this->heading, $notifiable),
+            'message' => $this->text($this->message, $notifiable),
             'profile_id' => $this->profileId,
         ];
     }
@@ -67,8 +86,8 @@ class EngagementNotice extends Notification implements ShouldQueue
     public function toWebPush(object $notifiable, self $notification): WebPushMessage
     {
         return (new WebPushMessage)
-            ->title($this->heading)
-            ->body($this->message)
+            ->title($this->text($this->heading, $notifiable))
+            ->body($this->text($this->message, $notifiable))
             ->data(['url' => route('engagement.index')]);
     }
 }

@@ -41,9 +41,10 @@ class EngagementReminderService
             ->get();
 
         foreach ($reunioes as $reuniao) {
+            ['heading' => $titulo, 'message' => $mensagem, 'extra' => $extra] = $this->avisos->meetingNotice($reuniao, 'tomorrow');
+
             $enviados += $this->remind(
-                $reuniao->profile_id, $reuniao->consultant_id, 'meeting', $reuniao->id, 'meeting_tomorrow', 'both',
-                'Reunião amanhã', 'Sua reunião de acompanhamento é amanhã, às '.$reuniao->scheduled_at->format('H:i').'.',
+                $reuniao->profile_id, $reuniao->consultant_id, 'meeting', $reuniao->id, 'meeting_tomorrow', 'both', $titulo, $mensagem, $extra,
             );
         }
 
@@ -74,7 +75,7 @@ class EngagementReminderService
         return $enviados;
     }
 
-    private function remind(string $profileId, string $consultantId, string $tipoAssunto, string $assuntoId, string $tipo, string $lado, string $titulo, string $mensagem): int
+    private function remind(string $profileId, string $consultantId, string $tipoAssunto, string $assuntoId, string $tipo, string $lado, string $titulo, string $mensagem, array $extra = []): int
     {
         $perfil = FinancialProfile::query()->find($profileId);
 
@@ -92,7 +93,7 @@ class EngagementReminderService
 
         $novos = $usuarios->filter(fn (User $u) => $this->livro->claim($u->id, $tipoAssunto, $assuntoId, $tipo))->values();
 
-        $this->avisos->send($novos, $perfil->id, $tipo, $titulo, $mensagem);
+        $this->avisos->send($novos, $perfil->id, $tipo, $titulo, $mensagem, $extra);
 
         return $novos->count();
     }
