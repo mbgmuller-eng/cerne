@@ -9,13 +9,19 @@ use App\Models\CreditCard;
 use App\Models\CreditCardInvoice;
 use App\Models\FinancialProfile;
 use App\Models\FixedBill;
+use App\Models\DocumentUpload;
 use App\Models\FixedBillPayment;
+use App\Livewire\FixedBills\FixedBillsIndex;
 use App\Models\ProfileMember;
+use App\Models\RecurringIncome;
+use App\Models\RecurringIncomeOccurrence;
 use App\Models\User;
 use App\Services\DashboardService;
 use App\Support\ProfileContext;
 use Carbon\CarbonImmutable;
+use App\Enums\RecurringIncomeStatus;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Livewire\Livewire;
 use Tests\TestCase;
 
 /**
@@ -109,6 +115,59 @@ class SpousePrivacyAggregatesTest extends TestCase
 
         $this->assertSame(2, CreditCardInvoice::query()->count());
         $this->assertSame(2, FixedBillPayment::query()->count());
+    }
+
+    public function test_o_conjuge_nao_ve_a_ocorrencia_nem_soma_a_receita_recorrente_que_o_outro_escondeu(): void
+    {
+        $this->entrar($this->ana, $this->membroAna);
+        $hoje = CarbonImmutable::now();
+        // A tela gera a ocorrência do mês no dia de vencimento da receita: o dado de teste já nasce nesse dia, para não duplicar.
+        $dia = min($hoje->day, 28);
+        $vencimento = $hoje->setDay($dia)->toDateString();
+
+        foreach ([['Salário da Ana', false, '3000.00'], ['Bico escondido da Ana', true, '800.00']] as [$nome, $privada, $valor]) {
+            $receita = RecurringIncome::factory()->for($this->perfil, 'profile')->create(['member_id' => $this->membroAna->id, 'name' => $nome, 'amount' => $valor, 'is_private' => $privada, 'is_active' => true, 'due_day' => $dia]);
+            RecurringIncomeOccurrence::query()->create([
+                'profile_id' => $this->perfil->id, 'recurring_income_id' => $receita->id, 'year' => $hoje->year, 'month' => $hoje->month, 'due_date' => $vencimento,
+                'status' => RecurringIncomeStatus::Pending,
+            ]);
+        }
+
+        $this->assertSame(2, RecurringIncomeOccurrence::query()->count(), 'a Ana vê as duas');
+
+        $this->entrar($this->bruno, $this->membroBruno);
+
+        $this->assertSame(1, RecurringIncomeOccurrence::query()->count());
+
+        $tela = Livewire::test(FixedBillsIndex::class)->call('setTab', 'receitas')->set('viewAs', $this->membroAna->id)->assertSee('Salário da Ana')->assertDontSee('Bico escondido');
+        $this->assertSame('3000.00', $tela->instance()->incomeTotal, 'o total do mês não soma o que o Bruno não enxerga');
+        $this->assertSame('3000.00', $tela->instance()->incomeOutstanding);
+    }
+
+    public function test_o_conjuge_nao_ve_a_importacao_do_extrato_de_conta_ou_cartao_que_o_outro_escondeu(): void
+    {
+        $this->entrar($this->ana, $this->membroAna);
+        $aberta = \App\Models\BankAccount::factory()->for($this->perfil, 'profile')->create(['member_id' => $this->membroAna->id, 'visible_to_partner' => true, 'is_joint' => false]);
+        $secreta = \App\Models\BankAccount::factory()->for($this->perfil, 'profile')->create(['member_id' => $this->membroAna->id, 'visible_to_partner' => false, 'is_joint' => false]);
+        $cartaoSecreto = CreditCard::query()->where('card_name', 'Cartão secreto da Ana')->sole();
+
+        $envio = fn (string $nome, array $alvo) => DocumentUpload::query()->create([
+            'profile_id' => $this->perfil->id, 'uploaded_by_user_id' => $this->ana->id, 'member_id' => $this->membroAna->id, 'document_type' => 'bank_statement',
+            'original_filename' => $nome, 'storage_path' => 'importacoes/'.$nome, 'processing_status' => 'completed',
+        ] + $alvo);
+        $envio('extrato-aberto.pdf', ['bank_account_id' => $aberta->id]);
+        $envio('extrato-secreto.pdf', ['bank_account_id' => $secreta->id]);
+        $envio('fatura-secreta.pdf', ['credit_card_id' => $cartaoSecreto->id]);
+        $envio('relatorio-do-perfil.pdf', []);
+
+        $this->assertSame(4, DocumentUpload::query()->count(), 'quem enviou vê todas as suas');
+
+        $this->entrar($this->bruno, $this->membroBruno);
+        $this->assertEqualsCanonicalizing(['extrato-aberto.pdf', 'relatorio-do-perfil.pdf'], DocumentUpload::query()->pluck('original_filename')->all());
+
+        // E o processamento em fila, sem perfil ativo, continua achando todas.
+        app(ProfileContext::class)->clear();
+        $this->assertSame(4, DocumentUpload::withoutProfileScope()->count());
     }
 
     public function test_as_rotinas_sem_perfil_ativo_continuam_atravessando_os_perfis(): void

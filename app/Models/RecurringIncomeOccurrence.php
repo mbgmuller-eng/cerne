@@ -40,6 +40,12 @@ class RecurringIncomeOccurrence extends Model
         ];
     }
 
+    protected static function booted(): void
+    {
+        // Herda a privacidade da receita de origem para quem opera dentro de um perfil (ver o escopo): a tela soma e lista as ocorrências direto.
+        static::addGlobalScope(new \App\Models\Scopes\ParentPrivacyScope('recurringIncome'));
+    }
+
     public function recurringIncome(): BelongsTo
     {
         return $this->belongsTo(RecurringIncome::class);

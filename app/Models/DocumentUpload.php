@@ -25,6 +25,12 @@ class DocumentUpload extends Model
 {
     use Auditable, BelongsToProfile, HasFactory, HasUuids;
 
+    protected static function booted(): void
+    {
+        // A importação herda a privacidade da conta ou do cartão a que se refere (ver o escopo).
+        static::addGlobalScope(new \App\Models\Scopes\UploadPrivacyScope);
+    }
+
     /** Sem dizer nada, importar atualiza o saldo (extrato sempre foi assim); só relatório de outro app pode optar por não. */
     protected $attributes = ['applies_to_balance' => true];
 
