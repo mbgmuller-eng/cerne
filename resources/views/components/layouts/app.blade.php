@@ -312,7 +312,7 @@
              só o acento do item ativo (ver $corAtivoEscuroDesktop) — por
              isso os textos aqui usam tom fixo (branco translúcido), que
              funciona em cima de QUALQUER um dos dois fundos escuros. --}}
-        <aside @class(['sticky top-0 hidden h-screen w-64 shrink-0 flex-col lg:flex dark:bg-slate-900', $corBarraModulo])>
+        <aside @class(['sticky top-0 z-30 hidden h-screen w-64 shrink-0 flex-col lg:flex dark:bg-slate-900', $corBarraModulo])>
             <div class="px-6 pt-6 pb-4">
                 <a href="{{ route('dashboard') }}" class="flex items-center gap-2">
                     <x-brand-mark class="h-7 w-7" />
@@ -421,7 +421,7 @@
         </aside>
     @elseif ($areaConsultor)
         {{-- Área de gestão do consultor: carteira e clientes, não um perfil. --}}
-        <aside class="sticky top-0 hidden h-screen w-64 shrink-0 flex-col border-r border-brand-950/5 bg-white lg:flex dark:border-white/10 dark:bg-slate-900">
+        <aside class="sticky top-0 z-30 hidden h-screen w-64 shrink-0 flex-col border-r border-brand-950/5 bg-white lg:flex dark:border-white/10 dark:bg-slate-900">
             <div class="px-6 pt-6 pb-4">
                 <a href="{{ route($homeRouteProfissional) }}" class="flex items-center gap-2">
                     <x-brand-mark class="h-7 w-7" />
@@ -491,7 +491,7 @@
         </aside>
     @elseif ($areaAdmin)
         {{-- Área de gestão da plataforma: toda conta, todo perfil. --}}
-        <aside class="sticky top-0 hidden h-screen w-64 shrink-0 flex-col border-r border-brand-950/5 bg-white lg:flex dark:border-white/10 dark:bg-slate-900">
+        <aside class="sticky top-0 z-30 hidden h-screen w-64 shrink-0 flex-col border-r border-brand-950/5 bg-white lg:flex dark:border-white/10 dark:bg-slate-900">
             <div class="px-6 pt-6 pb-4">
                 <a href="{{ route('admin.users') }}" class="flex items-center gap-2">
                     <x-brand-mark class="h-7 w-7" />
