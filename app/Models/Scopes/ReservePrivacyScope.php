@@ -2,6 +2,7 @@
 
 namespace App\Models\Scopes;
 
+use App\Enums\EssentialSource;
 use App\Enums\Necessity;
 use App\Support\ProfileContext;
 use Illuminate\Database\Eloquent\Builder;
@@ -17,6 +18,9 @@ use Illuminate\Database\Eloquent\Scope;
  * InvestorProfile::peaceReserveTarget()). Por isso a reserva individual
  * fica oculta do cônjuge automaticamente, sem precisar de uma segunda
  * decisão que a pessoa teria que lembrar de tomar.
+ *
+ * O mesmo vale para quem informou o gasto essencial à mão (investor_profiles.essential_source = manual): o total da reserva
+ * é o valor digitado x meses, então a reserva fica só dele.
  *
  * Reserva compartilhada (member_id nulo) nunca esconde — é calculada só a
  * partir do que já é visível aos dois.
@@ -36,12 +40,22 @@ class ReservePrivacyScope implements Scope
         $builder->where(function (Builder $query) use ($model, $memberId): void {
             $query->where($model->qualifyColumn('member_id'), $memberId)
                 ->orWhereNull($model->qualifyColumn('member_id'))
-                ->orWhereNotExists(function ($sub) use ($model): void {
-                    $sub->selectRaw('1')
-                        ->from('expense_records')
-                        ->whereColumn('expense_records.member_id', $model->qualifyColumn('member_id'))
-                        ->where('expense_records.necessity', Necessity::Essential->value)
-                        ->where('expense_records.is_private', true);
+                ->orWhere(function (Builder $visivel) use ($model): void {
+                    $visivel->whereNotExists(function ($sub) use ($model): void {
+                        $sub->selectRaw('1')
+                            ->from('expense_records')
+                            ->whereColumn('expense_records.member_id', $model->qualifyColumn('member_id'))
+                            ->where('expense_records.necessity', Necessity::Essential->value)
+                            ->where('expense_records.is_private', true);
+                    })
+                        // O gasto essencial que a pessoa digitou também é só dela: a reserva calculada dele entregaria o valor.
+                        ->whereNotExists(function ($sub) use ($model): void {
+                            $sub->selectRaw('1')
+                                ->from('investor_profiles')
+                                ->whereColumn('investor_profiles.member_id', $model->qualifyColumn('member_id'))
+                                ->where('investor_profiles.essential_source', EssentialSource::Manual->value)
+                                ->whereNotNull('investor_profiles.essential_monthly_manual');
+                        });
                 });
         });
     }

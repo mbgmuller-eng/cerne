@@ -250,6 +250,18 @@ Mãe, pai ou quem mais o usuário ajuda a cuidar: um perfil de cuidado (`Profile
 - O "registrado por Fulano" vem do usuário que gravou (`HasActorUser`, `<x-registered-by>`), só dentro do perfil de uma pessoa acompanhada.
 - Tela `/pessoas` (`CareIndex`) é a porta de entrada, sem perfil ativo (quem só cuida pode não ter perfil próprio). Convite: `/convite-cuidador/{token}`, POST puro.
 
+### Reserva de paz: gasto essencial automático ou informado
+
+A meta da reserva de paz é o gasto essencial mensal x os meses do tipo de atuação (`InvestorProfile::peaceReserveTarget`). A base tem duas origens,
+**por pessoa** (`investor_profiles.essential_source`, enum `EssentialSource`; padrão `auto`): média dos meses fechados do fluxo de caixa, ou o valor
+digitado (`essential_monthly_manual`, para quem usa o Cerne só nos investimentos). Regras que não se quebram:
+
+- **Manual = reserva individual**: valor x meses, sem olhar lançamento nem divisão da casa. Quem informa à mão **sai da divisão** entre os provedores
+  (`scopeAutoEssential`, em `providersCount` e na reserva do casal). Modo manual sem valor não vale (cai no automático). Voltar ao automático guarda o valor digitado.
+- **O valor digitado é só da pessoa (e do consultor)**: `InvestmentsIndex::canManageEssential` governa ver e mudar; o cônjuge que edita o perfil de outro não altera nem lê o
+  campo (o servidor ignora). A reserva de quem informou à mão fica oculta do cônjuge (`ReservePrivacyScope`), como a de quem tem gasto essencial oculto: o total entregaria o valor.
+- **A data só anda quando o valor muda** (`essential_manual_updated_at`); com mais de 6 meses a tela pergunta se quer revisar (`manualEssentialIsStale`).
+
 ### Investimento em outra moeda (USDT, BTC, ETH)
 
 Tipos de ativo `usdt`, `btc`, `eth` e `brl` (`AssetClass`; `brl` é saldo em reais numa corretora). Regras que não se quebram:

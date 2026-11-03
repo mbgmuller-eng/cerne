@@ -5,6 +5,7 @@ namespace App\Livewire\Investments;
 use App\Enums\AllocationAssetClass;
 use App\Enums\AssetClass;
 use App\Enums\EmploymentType;
+use App\Enums\EssentialSource;
 use App\Enums\InvestmentSector;
 use App\Enums\InvestorType;
 use App\Enums\PortfolioDisplayGroup;
@@ -95,6 +96,10 @@ class InvestmentsIndex extends Component
     public string $investorTypeInput = '';
 
     public string $employmentTypeInput = '';
+
+    public string $essentialSourceInput = 'auto';
+
+    public string $essentialManualInput = '';
 
     // -----------------------------------------------------------------
     // Formulário — Novo investimento
@@ -418,6 +423,8 @@ class InvestmentsIndex extends Component
         $this->investorProfileMemberId = $membro->id;
         $this->investorTypeInput = $perfil?->investor_type?->value ?? '';
         $this->employmentTypeInput = $perfil?->employment_type?->value ?? '';
+        $this->essentialSourceInput = $perfil?->essential_source?->value ?? EssentialSource::Auto->value;
+        $this->essentialManualInput = $this->canManageEssential($membro->id) && $perfil?->essential_monthly_manual !== null ? (string) $perfil->essential_monthly_manual : '';
         $this->showInvestorProfileForm = true;
         $this->resetErrorBag();
     }
@@ -440,13 +447,24 @@ class InvestmentsIndex extends Component
      */
     public function saveInvestorProfile(): void
     {
+        // O gasto essencial informado à mão é da própria pessoa (e do consultor): quem edita o perfil de outra pessoa não o altera nem o lê.
+        $podeEssencial = $this->canManageEssential($this->investorProfileMemberId);
+        $manual = $podeEssencial && $this->essentialSourceInput === EssentialSource::Manual->value;
+
         $data = $this->validate([
             'investorProfileMemberId' => ['required'],
             'investorTypeInput' => ['required', Rule::enum(InvestorType::class)],
             'employmentTypeInput' => ['required', Rule::enum(EmploymentType::class)],
+            'essentialSourceInput' => $podeEssencial ? ['required', Rule::enum(EssentialSource::class)] : ['nullable'],
+            'essentialManualInput' => $manual ? ['required', 'numeric', 'gt:0', 'max:9999999999999'] : ['nullable'],
+        ], [
+            'essentialManualInput.required' => 'Informe o gasto essencial mensal.',
+            'essentialManualInput.numeric' => 'Informe um valor em reais, por exemplo 4500 ou 4500,50.',
+            'essentialManualInput.gt' => 'O gasto essencial deve ser maior que zero.',
         ], attributes: [
             'investorTypeInput' => 'perfil de investidor',
             'employmentTypeInput' => 'tipo de atuação',
+            'essentialSourceInput' => 'origem do gasto essencial',
         ]);
 
         $membro = ProfileMember::query()
@@ -454,13 +472,27 @@ class InvestmentsIndex extends Component
             ->where('id', $data['investorProfileMemberId'])
             ->firstOrFail();
 
-        $perfil = InvestorProfile::query()->updateOrCreate(
-            ['member_id' => $membro->id],
-            [
-                'investor_type' => $data['investorTypeInput'],
-                'employment_type' => $data['employmentTypeInput'],
-            ],
-        );
+        $campos = [
+            'investor_type' => $data['investorTypeInput'],
+            'employment_type' => $data['employmentTypeInput'],
+        ];
+
+        if ($podeEssencial) {
+            $anterior = InvestorProfile::query()->where('member_id', $membro->id)->first();
+            $campos['essential_source'] = $data['essentialSourceInput'];
+
+            if ($manual) {
+                $valor = Money::parse($data['essentialManualInput']);
+                $campos['essential_monthly_manual'] = $valor;
+
+                // A data só anda quando a pessoa passou a informar ou mudou o valor: é ela que diz se o número está velho.
+                if ($anterior === null || ! $anterior->usesManualEssential() || bccomp((string) $anterior->essential_monthly_manual, $valor, 2) !== 0) {
+                    $campos['essential_manual_updated_at'] = now();
+                }
+            }
+        }
+
+        $perfil = InvestorProfile::query()->updateOrCreate(['member_id' => $membro->id], $campos);
 
         foreach ($perfil->investor_type->recommendedAllocations() as $classe => $percentual) {
             RecommendedAllocation::query()->updateOrCreate(
@@ -490,9 +522,20 @@ class InvestmentsIndex extends Component
         $this->resetInvestorProfileForm();
     }
 
+    /**
+     * Pode ver e mudar o gasto essencial informado à mão deste membro: ele mesmo, ou o consultor vinculado. O cônjuge não (o valor
+     * é a base da reserva, que fica só de quem digitou).
+     */
+    public function canManageEssential(string $memberId): bool
+    {
+        $contexto = app(ProfileContext::class);
+
+        return $contexto->isConsultant() || $contexto->memberId() === $memberId;
+    }
+
     private function resetInvestorProfileForm(): void
     {
-        $this->reset('investorProfileMemberId', 'investorTypeInput', 'employmentTypeInput');
+        $this->reset('investorProfileMemberId', 'investorTypeInput', 'employmentTypeInput', 'essentialSourceInput', 'essentialManualInput');
         $this->resetErrorBag();
     }
 

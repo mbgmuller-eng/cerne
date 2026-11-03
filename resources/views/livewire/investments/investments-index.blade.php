@@ -2,6 +2,7 @@
 @use('App\Enums\PortfolioDisplayGroup')
 @use('App\Enums\InvestorType')
 @use('App\Enums\EmploymentType')
+@use('App\Enums\EssentialSource')
 @use('App\Enums\AssetClass')
 @use('App\Enums\ReserveType')
 
@@ -362,6 +363,46 @@
                                         <p class="mt-1 text-xs text-slate-400">Define quantos meses de gasto essencial a reserva de paz precisa cobrir.</p>
                                     </div>
 
+                                    {{-- Base da reserva de paz: o fluxo de caixa calcula, ou a pessoa informa (quem usa o Cerne só nos investimentos). Só ela e o consultor veem e mudam. --}}
+                                    @if ($this->canManageEssential($membro->id))
+                                        <fieldset>
+                                            <legend class="text-xs font-medium text-slate-600 dark:text-slate-300">Gastos essenciais do mês</legend>
+                                            <div class="mt-1.5 space-y-2">
+                                                <label class="flex items-start gap-2 text-sm text-slate-700 dark:text-slate-300">
+                                                    <input type="radio" wire:model.live="essentialSourceInput" value="auto" class="mt-1">
+                                                    <span>
+                                                        {{ EssentialSource::Auto->label() }}
+                                                        @php $media = $perfil?->essentialMonthlyAverage() ?? '0.00'; @endphp
+                                                        <span class="block text-xs text-slate-400">
+                                                            @if (bccomp($media, '0', 2) > 0)
+                                                                Média dos meses fechados: {{ Money::format($media) }} por mês.
+                                                            @else
+                                                                Ainda não há gasto essencial lançado nos meses fechados, então a meta da reserva fica em zero.
+                                                            @endif
+                                                        </span>
+                                                    </span>
+                                                </label>
+                                                <label class="flex items-start gap-2 text-sm text-slate-700 dark:text-slate-300">
+                                                    <input type="radio" wire:model.live="essentialSourceInput" value="manual" class="mt-1">
+                                                    <span>
+                                                        {{ EssentialSource::Manual->label() }}
+                                                        <span class="block text-xs text-slate-400">Para quem usa o Cerne só nos investimentos: quanto você gasta, em média, por mês no que é essencial.</span>
+                                                    </span>
+                                                </label>
+                                            </div>
+
+                                            @if ($essentialSourceInput === 'manual')
+                                                <div class="mt-2">
+                                                    <label class="block text-xs font-medium text-slate-600 dark:text-slate-300">Gasto essencial por mês (R$)</label>
+                                                    <input type="number" step="0.01" min="0" wire:model="essentialManualInput" class="input mt-1.5 w-full" placeholder="Ex.: 6500">
+                                                    @error('essentialManualInput') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                                                    <p class="mt-1 text-xs text-slate-400">Moradia, alimentação, saúde, transporte e contas fixas. Só você (e o seu consultor) veem esse valor.</p>
+                                                </div>
+                                            @endif
+                                            @error('essentialSourceInput') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                                        </fieldset>
+                                    @endif
+
                                     <button type="button" wire:click="saveInvestorProfile" class="btn-primary w-full">Salvar</button>
                                 </div>
                             @elseif ($perfil === null)
@@ -370,6 +411,21 @@
                                 {{-- Reserva de paz já aparece com progresso e valor na seção
                                      "Reservas" acima — repetir aqui só duplicava o mesmo número. --}}
                                 <p class="mt-3 text-xs text-slate-400">{{ $perfil->employment_type->label() }} · {{ $perfil->employment_type->reserveMonths() }} meses de gasto essencial</p>
+
+                                @if ($perfil->usesManualEssential())
+                                    @if ($this->canManageEssential($membro->id))
+                                        <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                                            Gasto essencial informado: {{ Money::format($perfil->essential_monthly_manual) }} por mês{{ $perfil->essential_manual_updated_at ? ' (atualizado em '.$perfil->essential_manual_updated_at->format('d/m/Y').')' : '' }}.
+                                        </p>
+                                        @if ($perfil->manualEssentialIsStale())
+                                            <p class="mt-1 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:bg-amber-500/10 dark:text-amber-300">
+                                                Esse valor foi informado há mais de 6 meses. Quer revisar? Toque em Editar e confirme ou atualize o gasto essencial.
+                                            </p>
+                                        @endif
+                                    @else
+                                        <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Gasto essencial informado pela própria pessoa.</p>
+                                    @endif
+                                @endif
 
                                 @if ($categorias->isEmpty())
                                     <p class="mt-4 text-xs text-slate-400">Sem investimentos alocáveis cadastrados ainda para comparar com a recomendação.</p>

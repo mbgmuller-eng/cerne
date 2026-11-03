@@ -168,7 +168,9 @@ class HealthAppointmentDetailsTest extends TestCase
 
         // Na lista de próximas (o calendário mostra o título dele, que é outra tela): o título e quem atende são a mesma coisa.
         $html = Livewire::test(HealthAppointmentIndex::class)->html();
-        $lista = substr($html, (int) strpos($html, '<p class="eyebrow">Próximas</p>'), (int) strpos($html, '<p class="eyebrow">Histórico</p>') - (int) strpos($html, '<p class="eyebrow">Próximas</p>'));
+        // Só a seção da lista (até o fim dela): o calendário vem depois e repete o título quando a consulta cai no mês exibido, o que depende do dia em que o teste roda.
+        $inicio = (int) strpos($html, '<p class="eyebrow">Próximas</p>');
+        $lista = substr($html, $inicio, (int) strpos($html, '</section>', $inicio) - $inicio);
 
         self::assertSame(1, substr_count($lista, 'Otorrinolaringologia · Dr. João Silva'));
     }

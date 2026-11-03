@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\EmploymentType;
+use App\Enums\EssentialSource;
 use App\Enums\InvestorType;
 use App\Enums\Necessity;
 use App\Models\Concerns\Auditable;
@@ -10,6 +11,7 @@ use App\Models\Concerns\BelongsToProfile;
 use App\Support\Money;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -17,17 +19,46 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Collection;
 
-#[Fillable(['profile_id', 'member_id', 'investor_type', 'employment_type'])]
+#[Fillable(['profile_id', 'member_id', 'investor_type', 'employment_type', 'essential_source', 'essential_monthly_manual', 'essential_manual_updated_at'])]
 class InvestorProfile extends Model
 {
     use Auditable, BelongsToProfile, HasFactory, HasUuids;
+
+    protected $attributes = ['essential_source' => 'auto'];
 
     protected function casts(): array
     {
         return [
             'investor_type' => InvestorType::class,
             'employment_type' => EmploymentType::class,
+            'essential_source' => EssentialSource::class,
+            'essential_monthly_manual' => 'decimal:2',
+            'essential_manual_updated_at' => 'datetime',
         ];
+    }
+
+    /**
+     * Perfis cujo gasto essencial vem do fluxo de caixa. Quem informou o valor à mão fica de fora: a reserva dele é só dele (valor x
+     * meses) e ele não entra na divisão da casa entre os provedores.
+     *
+     * @param  Builder<InvestorProfile>  $query
+     */
+    public function scopeAutoEssential(Builder $query): Builder
+    {
+        return $query->where(fn (Builder $q) => $q->where('essential_source', '!=', EssentialSource::Manual->value)->orWhereNull('essential_monthly_manual'));
+    }
+
+    /** Informou o gasto essencial à mão (e o valor existe): é ele que vale, não o fluxo de caixa. */
+    public function usesManualEssential(): bool
+    {
+        return $this->essential_source === EssentialSource::Manual && $this->essential_monthly_manual !== null;
+    }
+
+    /** O valor informado à mão tem mais de 6 meses: vale perguntar se ainda é esse. */
+    public function manualEssentialIsStale(): bool
+    {
+        return $this->usesManualEssential()
+            && ($this->essential_manual_updated_at === null || $this->essential_manual_updated_at->lt(now()->subMonths(6)));
     }
 
     public function member(): BelongsTo
@@ -155,6 +186,11 @@ class InvestorProfile extends Model
             return '0.00';
         }
 
+        // Valor informado à mão: é a base dele, sem dividir a casa nem olhar o que está oculto.
+        if ($this->usesManualEssential()) {
+            return bcmul($this->essential_monthly_manual, (string) $this->employment_type->reserveMonths(), 2);
+        }
+
         if ($this->providersCount() < 2) {
             return bcmul($this->essentialMonthlyAverage(), (string) $this->employment_type->reserveMonths(), 2);
         }
@@ -204,6 +240,7 @@ class InvestorProfile extends Model
         $provedores = self::query()
             ->where('profile_id', $this->profile_id)
             ->whereNotNull('employment_type')
+            ->autoEssential()
             ->get();
 
         $fatia = bcdiv($this->sharedEssentialMonthlyAverage(), (string) $provedores->count(), 2);
@@ -254,6 +291,7 @@ class InvestorProfile extends Model
         return max(1, InvestorProfile::query()
             ->where('profile_id', $this->profile_id)
             ->whereNotNull('employment_type')
+            ->autoEssential()
             ->count());
     }
 
