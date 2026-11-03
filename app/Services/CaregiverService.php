@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Enums\CaregiverAccess;
+use App\Enums\CaregiverGrantBasis;
 use App\Enums\CaregiverStatus;
 use App\Enums\UserRole;
 use App\Mail\CaregiverInviteMail;
@@ -10,8 +11,10 @@ use App\Models\FinancialProfile;
 use App\Models\ProfileCaregiver;
 use App\Models\ProfileMember;
 use App\Models\User;
+use App\Notifications\FamilyAccessGranted;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Notification;
 use RuntimeException;
 
 /**
@@ -44,17 +47,24 @@ class CaregiverService
     }
 
     /**
-     * Convida alguém para acompanhar a MINHA saúde (ou a de quem eu sou): não exige assinatura, de quem convida nem de quem acompanha. Cada um do
-     * casal convida só para a própria saúde; quem acompanha não vê a do cônjuge nem nada de finanças.
+     * Convida alguém para acompanhar a MINHA saúde e/ou as MINHAS finanças: não exige assinatura, de quem convida nem de quem acompanha. Cada um do
+     * casal convida só para o que é seu; quem acompanha não vê o do cônjuge. Finanças são sempre só leitura e só o que não é privado.
      *
      * @return string o link do convite
      */
-    public function inviteFollower(ProfileMember $member, User $inviter, string $name, string $email, CaregiverAccess $access): string
+    public function inviteFollower(ProfileMember $member, User $inviter, string $name, string $email, CaregiverAccess $access, bool $health = true, bool $finance = false): string
     {
+        if (! $health && ! $finance) {
+            throw new RuntimeException('Escolha o que a pessoa vai acompanhar: a saúde, as finanças ou as duas.');
+        }
+
+        // Finanças são só leitura: o nível de edição vale apenas para a saúde.
+        $access = $health ? $access : CaregiverAccess::Read;
+
         $perfil = FinancialProfile::withCareProfiles()->findOrFail($member->profile_id);
 
         if ($perfil->isCare() || $member->user_id !== $inviter->id) {
-            throw new RuntimeException('Você só convida alguém para acompanhar a sua própria saúde.');
+            throw new RuntimeException('Você só convida alguém para acompanhar a sua própria saúde e as suas próprias finanças.');
         }
 
         if (mb_strtolower(trim($email)) === mb_strtolower($inviter->email)) {
@@ -63,16 +73,90 @@ class CaregiverService
 
         // Quem já divide o perfil comigo (o cônjuge) já enxerga o que eu cadastro de saúde: convidá-lo como cuidador não faria sentido.
         if (ProfileMember::query()->where('profile_id', $member->profile_id)->where('is_active', true)->whereHas('user', fn ($q) => $q->whereRaw('lower(email) = ?', [mb_strtolower(trim($email))]))->exists()) {
-            throw new RuntimeException('Essa pessoa já divide o perfil com você e já vê a sua ficha de saúde.');
+            throw new RuntimeException('Essa pessoa já divide o perfil com você e já vê o que você cadastra.');
         }
 
-        ['token' => $token] = ProfileCaregiver::issue($perfil, $member, $inviter, $name, $email, $access);
+        ['token' => $token] = ProfileCaregiver::issue($perfil, $member, $inviter, $name, $email, $access, $health, $finance, CaregiverGrantBasis::Self);
 
         $link = route('caregiver-invite.accept', ['token' => $token]);
 
-        Mail::to($email)->queue(new CaregiverInviteMail($inviter, $member->name, $name, $access, $link, true));
+        Mail::to($email)->queue(new CaregiverInviteMail($inviter, $member->name, $name, $access, $link, true, $health, $finance));
 
         return $link;
+    }
+
+    /**
+     * CONVITE ASSISTIDO: o consultor vinculado monta o acesso de um familiar em nome da pessoa (ou das pessoas) do perfil, para quem não consegue fazer
+     * isso sozinho. Fica registrado quem, quando e com que base (a pessoa autorizou, ou o consultor a representa legalmente), cada pessoa com login é
+     * avisada na hora e pode encerrar o acesso quando quiser. Um e-mail só vai ao familiar, e um aceite ativa todos os acessos do mesmo lote.
+     *
+     * @param  list<string>  $memberIds  as pessoas do perfil cujos dados o familiar passa a acompanhar
+     * @return string o link do convite
+     */
+    public function assistedGrant(FinancialProfile $profile, User $consultant, array $memberIds, string $name, string $email, bool $health, CaregiverAccess $access, bool $finance, CaregiverGrantBasis $basis): string
+    {
+        if ($profile->isCare() || ! (new \App\Policies\FinancialProfilePolicy)->manageFamilyAccess($consultant, $profile)) {
+            throw new RuntimeException('Só o consultor vinculado ao cliente monta o acesso da família.');
+        }
+
+        if ($basis === CaregiverGrantBasis::Self) {
+            throw new RuntimeException('Informe a base do acesso: a pessoa autorizou, ou o representante legal.');
+        }
+
+        if (! $health && ! $finance) {
+            throw new RuntimeException('Escolha o que o familiar vai acompanhar: a saúde, as finanças ou as duas.');
+        }
+
+        $access = $health ? $access : CaregiverAccess::Read;
+        $email = mb_strtolower(trim($email));
+
+        $membros = ProfileMember::query()->where('profile_id', $profile->id)->where('is_active', true)->whereIn('id', $memberIds)->with('user')->get();
+
+        if ($membros->isEmpty() || $membros->count() !== count(array_unique($memberIds))) {
+            throw new RuntimeException('Escolha pelo menos uma pessoa deste perfil.');
+        }
+
+        // Quem já divide o perfil (o cônjuge) já enxerga o que a outra pessoa cadastra: convidá-lo como familiar não faria sentido.
+        if (ProfileMember::query()->where('profile_id', $profile->id)->where('is_active', true)->whereHas('user', fn ($q) => $q->whereRaw('lower(email) = ?', [$email]))->exists()) {
+            throw new RuntimeException('Essa pessoa já divide o perfil e já vê o que a outra cadastra.');
+        }
+
+        $link = DB::transaction(function () use ($profile, $consultant, $membros, $name, $email, $access, $health, $finance, $basis): string {
+            $primeiroToken = null;
+
+            foreach ($membros as $membro) {
+                ['token' => $token] = ProfileCaregiver::issue($profile, $membro, $consultant, $name, $email, $access, $health, $finance, $basis, $consultant);
+                $primeiroToken ??= $token;
+            }
+
+            return route('caregiver-invite.accept', ['token' => $primeiroToken]);
+        });
+
+        $nomes = $membros->pluck('name')->sort()->join(', ', ' e ');
+        Mail::to($email)->queue(new CaregiverInviteMail($consultant, $nomes, $name, $access, $link, false, $health, $finance, true));
+
+        // Cada pessoa com login sabe, na hora, quem passou a acompanhá-la e com que base.
+        $escopo = collect([$health ? 'a saúde' : null, $finance ? 'as finanças (só para ver)' : null])->filter()->join(' e ');
+        foreach ($membros->filter(fn (ProfileMember $m) => $m->user !== null) as $membro) {
+            Notification::send($membro->user, new FamilyAccessGranted($consultant->name, $name, $escopo, mb_strtolower($basis->label())));
+        }
+
+        return $link;
+    }
+
+    /** Muda o que o familiar enxerga (saúde, finanças ou as duas). Sempre fica pelo menos uma. */
+    public function changeScope(ProfileCaregiver $caregiver, bool $health, bool $finance): void
+    {
+        if (! $health && ! $finance) {
+            throw new RuntimeException('O acesso precisa incluir a saúde, as finanças ou as duas. Para tirar tudo, encerre o acesso.');
+        }
+
+        $caregiver->update([
+            'can_view_health' => $health,
+            'can_view_finance' => $finance,
+            // Finanças são só leitura: sem a saúde, o nível de edição não tem o que editar.
+            'access_level' => $health ? $caregiver->access_level : CaregiverAccess::Read,
+        ]);
     }
 
     /** Aceite por quem já tem conta: o e-mail da conta precisa ser o do convite. */
@@ -82,13 +166,24 @@ class CaregiverService
             throw new RuntimeException('Este convite é para outro e-mail. Entre com a conta do e-mail convidado.');
         }
 
-        $caregiver->update([
+        $ativar = [
             'user_id' => $user->id,
             'status' => CaregiverStatus::Active,
             'accepted_at' => now(),
             'invite_token' => null,
             'invite_expires_at' => null,
-        ]);
+        ];
+
+        $caregiver->update($ativar);
+
+        // Convite assistido: o consultor montou o acesso a mais de uma pessoa do mesmo perfil de uma vez, e um aceite só ativa o lote inteiro.
+        if ($caregiver->granted_by_user_id !== null) {
+            ProfileCaregiver::query()
+                ->where('profile_id', $caregiver->profile_id)->where('invited_email', $caregiver->invited_email)
+                ->where('granted_by_user_id', $caregiver->granted_by_user_id)
+                ->where('status', CaregiverStatus::Invited->value)->where('id', '!=', $caregiver->id)
+                ->get()->each(fn (ProfileCaregiver $irmao) => $irmao->update($ativar));
+        }
 
         return $caregiver;
     }

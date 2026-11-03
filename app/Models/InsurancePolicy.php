@@ -28,7 +28,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 ])]
 class InsurancePolicy extends Model
 {
-    use Auditable, BelongsToProfile, HasBadgeInitials, InvalidatesDashboard, HasFactory, HasUuids, RespectsBrokerVisibility, RespectsMemberPrivacy;
+    use Auditable, BelongsToProfile, HasBadgeInitials, InvalidatesDashboard, HasFactory, HasUuids, RespectsBrokerVisibility, RespectsMemberPrivacy, \App\Models\Concerns\VisibleToFamily;
 
     protected function casts(): array
     {

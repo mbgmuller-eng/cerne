@@ -28,6 +28,11 @@ class ProfileCaregiverPolicy
             return $perfis->manageCaregivers($user, $perfil) || $perfis->manageOwnAccess($user, $perfil);
         }
 
+        // O consultor que montou o acesso em nome da pessoa (convite assistido) também o encerra: é quem ajuda quem não consegue fazer sozinho.
+        if ($acesso->granted_by_user_id !== null && $acesso->granted_by_user_id === $user->id && (new FinancialProfilePolicy)->manageFamilyAccess($user, $perfil)) {
+            return true;
+        }
+
         return $acesso->member_id !== null
             && ProfileMember::query()->whereKey($acesso->member_id)->where('user_id', $user->id)->where('is_active', true)->exists();
     }

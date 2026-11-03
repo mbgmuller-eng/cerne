@@ -26,13 +26,18 @@ class ProfileScope implements Scope
             return;
         }
 
-        // Cuidador: LISTA DE PERMITIDOS. Só o model que se declara visível ao cuidador (visibleToCaregiver(), hoje a ficha de saúde e os
-        // documentos) devolve linhas; qualquer model de finanças, seguros ou academia, existente ou futuro, devolve zero sem que ninguém precise
-        // lembrar. O TenancyCoverageTest/CaregiverIsolationTest trava a lista.
-        if ($context->isCaregiver() && ! (method_exists($model, 'visibleToCaregiver') && $model::visibleToCaregiver())) {
-            $builder->whereRaw('1 = 0');
+        // Quem acompanha: LISTA DE PERMITIDOS, uma para cada coisa que a pessoa pode ter liberado. Saúde (visibleToCaregiver(): a ficha, a agenda e
+        // os documentos) só com acesso à saúde; finanças (visibleToFamily()) só com acesso às finanças. O que não se declara, existente ou futuro,
+        // devolve zero sem que ninguém precise lembrar. O CaregiverTest trava as duas listas.
+        if ($context->isCaregiver()) {
+            $saude = $context->hasHealthAccess() && method_exists($model, 'visibleToCaregiver') && $model::visibleToCaregiver();
+            $familia = $context->hasFinanceAccess() && method_exists($model, 'visibleToFamily') && $model::visibleToFamily();
 
-            return;
+            if (! $saude && ! $familia) {
+                $builder->whereRaw('1 = 0');
+
+                return;
+            }
         }
 
         $builder->where($model->qualifyColumn('profile_id'), $profileId);

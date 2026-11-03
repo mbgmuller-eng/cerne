@@ -230,6 +230,8 @@ class InvoiceService
                         $user->notify(CreditCardInvoiceDueSoon::forInvoice($fatura));
                         $notificados++;
                     }
+
+                    $notificados += app(FamilyNotifier::class)->invoiceDueSoon($fatura);
                 }
             });
 

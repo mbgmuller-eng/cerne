@@ -9,7 +9,7 @@ use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
- * Dentro do perfil de uma pessoa acompanhada (cuidador, ou o dono do perfil de cuidado) só existem saúde e documentos.
+ * Dentro do perfil de uma pessoa acompanhada (cuidador, ou o dono do perfil de cuidado) só existem saúde e documentos. Quem acompanha as finanças de alguém (perfil comum) só abre as telas de leitura da família (family.*) e, com acesso à saúde, as de saúde.
  *
  * É a segunda trava, por rota. A primeira é a de dados (ProfileScope devolve zero linhas de finanças para o cuidador), mas uma tela de
  * finanças vazia sugeriria "essa pessoa não tem dívidas", em vez de dizer que ali não é lugar dele. A lista é de rotas PERMITIDAS: rota
@@ -28,6 +28,9 @@ class RestrictCareContext
         'health.consent', 'health.consent.store', 'health.consent.revoke',
         'legal.*', 'logout', 'theme.update', 'push.subscribe', 'privacy.export.download',
     ];
+
+    /** As telas de leitura das finanças da família: só para quem tem acesso às finanças. */
+    private const FAMILY = ['family.*'];
 
     public function handle(Request $request, Closure $next): Response
     {
@@ -48,12 +51,20 @@ class RestrictCareContext
             return redirect()->route('care.index')->with('status', 'O acesso a esta pessoa está suspenso: a assinatura de quem a cadastrou não está em vigor.');
         }
 
-        if ($request->routeIs(...self::ALLOWED)) {
+        // Finanças em leitura: só com o acesso liberado e só fora do perfil de cuidado (que não tem finanças).
+        if ($context->isCaregiver() && ! $profile->isCare() && $context->hasFinanceAccess() && $request->routeIs(...self::FAMILY)) {
+            return $next($request);
+        }
+
+        // Saúde e documentos: quem acompanha só as finanças não os abre.
+        $saudeLiberada = ! $context->isCaregiver() || $context->hasHealthAccess();
+
+        if ($saudeLiberada && $request->routeIs(...self::ALLOWED)) {
             return $next($request);
         }
 
         abort_unless($request->isMethod('GET'), 403);
 
-        return redirect()->route('care.index');
+        return redirect()->route($context->isCaregiver() && ! $context->hasHealthAccess() && $context->hasFinanceAccess() ? 'family.index' : 'care.index');
     }
 }

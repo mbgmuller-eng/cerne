@@ -33,6 +33,10 @@
     if ($profile && app(\App\Services\EngagementAccess::class)->viewer() !== null) {
         array_splice($navFinancas, 6, 0, [['engagement.index', 'Acompanhamento', 'Consultoria', 'contact']]);
     }
+    // Convite assistido: só o consultor, dentro do perfil de um cliente dele (nunca o corretor).
+    if ($profile && $context->isConsultant() && $user?->isConsultant()) {
+        array_splice($navFinancas, 7, 0, [['consultant.family-access', 'Acesso da família', 'Família', 'contact']]);
+    }
     $navSeguros = [
         ['insurance.index', 'Apólices', 'Seguros', 'shield'],
     ];
@@ -68,15 +72,24 @@
     // A própria pessoa acompanhada, já com login: o espaço é dela, não "alguém que ela acompanha".
     $souAPessoa = $emPerfilDeCuidado && $context->member()?->user_id === $user?->id;
     if ($emPerfilDeCuidado) {
-        $navSections = [
-            ['label' => 'Saúde', 'items' => [
+        // Quem acompanha pode ter só a saúde, só as finanças (leitura) ou as duas: o menu mostra o que ele pode abrir.
+        $comSaude = ! $context->isCaregiver() || $context->hasHealthAccess();
+        $comFinancas = $context->isCaregiver() && $context->hasFinanceAccess() && ! $profile->isCare();
+        $itemPessoas = ['care.index', $souAPessoa ? 'Quem tem acesso' : 'Pessoas e acessos', $souAPessoa ? 'Acessos' : 'Pessoas', 'contact'];
+
+        $navSections = array_values(array_filter([
+            $comSaude ? ['label' => 'Saúde', 'items' => [
                 ['health.card.index', 'Ficha de Saúde', 'Ficha', 'heart'],
                 ['health.appointments.index', 'Agenda de Saúde', 'Agenda', 'calendar'],
                 ['health.care.index', 'Cuidados e itens', 'Cuidados', 'tag'],
-                ['care.index', $souAPessoa ? 'Quem tem acesso' : 'Pessoas e acessos', $souAPessoa ? 'Acessos' : 'Pessoas', 'contact'],
-            ]],
-            ['label' => 'Documentos', 'items' => $navDocumentos],
-        ];
+                $itemPessoas,
+            ]] : null,
+            $comFinancas ? ['label' => 'Finanças', 'items' => array_values(array_filter([
+                ['family.index', 'Finanças da família', 'Finanças', 'home'],
+                $comSaude ? null : $itemPessoas,
+            ]))] : null,
+            $comSaude ? ['label' => 'Documentos', 'items' => $navDocumentos] : null,
+        ]));
     } elseif ($user && \App\Services\CareProfileService::enabled()) {
         // "Pessoas que acompanho" entra na seção de Saúde de quem pode cadastrar alguém (recurso ligado). Quem só cuida, sem plano próprio,
         // chega pela lista (care.index) e pelo banner.
@@ -588,7 +601,7 @@
                     @if ($souAPessoa)
                         Este é o <strong>seu espaço de saúde</strong>.
                     @else
-                        Você está acompanhando <strong>{{ $context->isCaregiver() ? $context->followedNames() : $profile->profile_name }}</strong>@if ($context->isCaregiver()) · {{ mb_strtolower($context->caregiver()->access_level->label()) }}@endif.
+                        Você está acompanhando <strong>{{ $context->isCaregiver() ? $context->followedNames() : $profile->profile_name }}</strong>@if ($context->isCaregiver()) · {{ implode(' e ', array_filter([$context->hasHealthAccess() ? 'saúde ('.mb_strtolower($context->caregiver()->access_level->label()).')' : null, $context->hasFinanceAccess() ? 'finanças (só leitura)' : null])) }}@endif.
                     @endif
                 </span>
                 <span class="flex items-center gap-4">

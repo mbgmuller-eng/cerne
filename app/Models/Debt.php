@@ -41,7 +41,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 ])]
 class Debt extends Model
 {
-    use Auditable, BelongsToProfile, HasUuids, InvalidatesDashboard, RespectsMemberPrivacy;
+    use Auditable, BelongsToProfile, HasUuids, InvalidatesDashboard, RespectsMemberPrivacy, \App\Models\Concerns\VisibleToFamily;
 
     protected function casts(): array
     {

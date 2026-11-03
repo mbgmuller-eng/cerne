@@ -36,6 +36,30 @@ class MemberPrivacyScope implements Scope
         $hasJointFlag = $model::hasJointFlag();
         $hasVisibleToPartnerFlag = $model::hasVisibleToPartnerFlag();
 
+        // Familiar que acompanha as finanças (só chega aqui um model liberado pelo ProfileScope): vê o da família, o conjunto e o que as PESSOAS QUE
+        // ELE ACOMPANHA não marcaram como privado. Nunca o que alguém escondeu, nem mesmo do cônjuge: o que é privado entre o casal é privado
+        // também para os filhos.
+        if ($context->isCaregiver()) {
+            $ids = $context->financeMemberIds();
+
+            $builder->where(function (Builder $query) use ($model, $ids, $hasJointFlag, $hasVisibleToPartnerFlag): void {
+                $query->whereNull($model->qualifyColumn('member_id'))
+                    ->orWhere(function (Builder $proprio) use ($model, $ids, $hasVisibleToPartnerFlag): void {
+                        $proprio->whereIn($model->qualifyColumn('member_id'), $ids);
+
+                        $hasVisibleToPartnerFlag
+                            ? $proprio->where($model->qualifyColumn('visible_to_partner'), true)
+                            : $proprio->where($model->qualifyColumn('is_private'), false);
+                    });
+
+                if ($hasJointFlag) {
+                    $query->orWhere($model->qualifyColumn('is_joint'), true);
+                }
+            });
+
+            return;
+        }
+
         $builder->where(function (Builder $query) use ($model, $memberId, $hasJointFlag, $hasVisibleToPartnerFlag): void {
             $query->where($model->qualifyColumn('member_id'), $memberId)
                 // member_id nulo = registro da família, visível a todos.

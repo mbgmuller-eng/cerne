@@ -21,7 +21,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 ])]
 class DebtInstallment extends Model
 {
-    use BelongsToProfile, HasUuids, InvalidatesDashboard, RespectsMemberPrivacy;
+    use BelongsToProfile, HasUuids, InvalidatesDashboard, RespectsMemberPrivacy, \App\Models\Concerns\VisibleToFamily;
 
     protected function casts(): array
     {

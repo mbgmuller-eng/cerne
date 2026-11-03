@@ -263,9 +263,7 @@ class HealthAppointmentService
 
     private function assertParticipant(HealthAppointment $consulta, User $usuario): void
     {
-        $perfil = FinancialProfile::withCareProfiles()->findOrFail($consulta->profile_id);
-
-        if (! $perfil->isCare() || ! app(CareParticipants::class)->forProfile($perfil)->contains('id', $usuario->id)) {
+        if (! app(CareParticipants::class)->forAppointment($consulta)->contains('id', $usuario->id)) {
             throw new \Illuminate\Auth\Access\AuthorizationException('Só quem cuida desta pessoa pode ser escolhido para levá-la.');
         }
     }

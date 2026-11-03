@@ -27,7 +27,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 ])]
 class CreditCardInvoice extends Model
 {
-    use Auditable, BelongsToProfile, InvalidatesDashboard, HasFactory, HasUuids;
+    use Auditable, BelongsToProfile, InvalidatesDashboard, HasFactory, HasUuids, \App\Models\Concerns\VisibleToFamily;
 
     protected function casts(): array
     {
@@ -41,6 +41,12 @@ class CreditCardInvoice extends Model
             'paid_at' => 'date',
             'status' => InvoiceStatus::class,
         ];
+    }
+
+    protected static function booted(): void
+    {
+        // Herda a privacidade do pai também para quem acompanha as finanças (ver o escopo).
+        static::addGlobalScope(new \App\Models\Scopes\ParentPrivacyForFamilyScope('creditCard'));
     }
 
     public function creditCard(): BelongsTo

@@ -26,8 +26,9 @@
                 <div>
                     <p class="eyebrow">Quem me acompanha</p>
                     <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                        Convide alguém de confiança (um filho, um irmão, um amigo) para ver a sua ficha de saúde, a agenda, os cuidados e os documentos que você liberar.
-                        Quem acompanha não vê nada de finanças{{ $eu->profile && $eu->profile->members()->where('is_active', true)->count() > 1 ? ' nem a saúde de quem divide o perfil com você' : '' }}, e você encerra o acesso quando quiser. Não precisa de assinatura.
+                        Convide alguém de confiança (um filho, um irmão, um amigo) para acompanhar a sua <strong>saúde</strong> (ficha, agenda, cuidados e os documentos que você liberar)
+                        e/ou as suas <strong>finanças, só para ver</strong>. O que você marcou como privado nunca aparece, a pessoa não altera nada{{ $eu->profile && $eu->profile->members()->where('is_active', true)->count() > 1 ? ' e não vê o que é do seu cônjuge' : '' }},
+                        e você encerra o acesso quando quiser. Não precisa de assinatura.
                     </p>
                 </div>
 
@@ -40,13 +41,28 @@
                                 <div class="min-w-0">
                                     <p class="font-medium text-slate-800 dark:text-slate-200">{{ $seguidor->invited_name }}</p>
                                     <p class="text-xs text-slate-500 dark:text-slate-400">{{ $seguidor->invited_email }} · {{ $seguidor->status->label() }}</p>
+                                    @if ($seguidor->granted_by_user_id)
+                                        <p class="text-xs text-slate-400">Liberado por {{ $seguidor->grantedBy?->name ?? 'seu consultor' }} em {{ $seguidor->granted_declared_at?->format('d/m/Y') }} · {{ mb_strtolower($seguidor->grant_basis?->label() ?? '') }}</p>
+                                    @endif
+                                    <div class="mt-1 flex flex-wrap items-center gap-3 text-xs">
+                                        <label class="flex items-center gap-1.5 text-slate-600 dark:text-slate-300">
+                                            <input type="checkbox" wire:click="toggleFollowerHealth('{{ $seguidor->id }}')" @checked($seguidor->can_view_health) class="rounded border-slate-300 text-brand-700 focus:ring-brand-500">
+                                            Saúde
+                                        </label>
+                                        <label class="flex items-center gap-1.5 text-slate-600 dark:text-slate-300">
+                                            <input type="checkbox" wire:click="toggleFollowerFinance('{{ $seguidor->id }}')" @checked($seguidor->can_view_finance) class="rounded border-slate-300 text-brand-700 focus:ring-brand-500">
+                                            Finanças (só ver)
+                                        </label>
+                                    </div>
                                 </div>
                                 <div class="flex items-center gap-2">
-                                    <select wire:change="changeAccess('{{ $seguidor->id }}', $event.target.value)" class="input py-1 text-xs">
-                                        @foreach ($accessOptions as $opcao)
-                                            <option value="{{ $opcao->value }}" @selected($seguidor->access_level === $opcao)>{{ $opcao->label() }}</option>
-                                        @endforeach
-                                    </select>
+                                    @if ($seguidor->can_view_health)
+                                        <select wire:change="changeAccess('{{ $seguidor->id }}', $event.target.value)" class="input py-1 text-xs" aria-label="Nível do acesso à saúde">
+                                            @foreach ($accessOptions as $opcao)
+                                                <option value="{{ $opcao->value }}" @selected($seguidor->access_level === $opcao)>{{ $opcao->label() }}</option>
+                                            @endforeach
+                                        </select>
+                                    @endif
                                     <button type="button" wire:click="revoke('{{ $seguidor->id }}')" wire:confirm="Encerrar o acesso de {{ $seguidor->invited_name }}?" class="text-xs text-red-700 underline dark:text-red-400">Encerrar acesso</button>
                                 </div>
                             </li>
@@ -65,17 +81,39 @@
                             <input type="email" wire:model="followEmail" placeholder="E-mail" class="input w-full">
                             @error('followEmail') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
                         </div>
-                        <select wire:model="followAccess" class="input w-full">
+                        <select wire:model="followAccess" class="input w-full" aria-label="Nível do acesso à saúde" @disabled(! $followHealth)>
                             @foreach ($accessOptions as $opcao)
                                 <option value="{{ $opcao->value }}">{{ $opcao->label() }}</option>
                             @endforeach
                         </select>
                     </div>
+                    <div class="flex flex-wrap items-center gap-4 text-sm">
+                        <label class="flex items-center gap-2 text-slate-700 dark:text-slate-300">
+                            <input type="checkbox" wire:model.live="followHealth" class="rounded border-slate-300 text-brand-700 focus:ring-brand-500"> Saúde
+                        </label>
+                        <label class="flex items-center gap-2 text-slate-700 dark:text-slate-300">
+                            <input type="checkbox" wire:model.live="followFinance" class="rounded border-slate-300 text-brand-700 focus:ring-brand-500"> Finanças, só para ver
+                        </label>
+                    </div>
+                    <p class="text-xs text-slate-400">As finanças são sempre só leitura e sem o que você marcou como privado. A saúde pode ser só leitura ou também edição.</p>
                     <button type="button" wire:click="inviteFollower('{{ $eu->id }}')" class="btn-primary px-3 py-1.5 text-sm">Enviar convite</button>
                     @if ($lastFollowLink)
                         <p class="break-all text-xs text-slate-500 dark:text-slate-400">Se o e-mail não chegar, envie este link: {{ $lastFollowLink }}</p>
                     @endif
                 </div>
+
+                @if ($eu->followers->contains('can_view_finance', true))
+                    <div class="space-y-2 rounded-lg bg-slate-50 p-3 dark:bg-white/5">
+                        <p class="text-xs font-medium text-slate-700 dark:text-slate-300">Avisar quem acompanha as finanças de um gasto alto</p>
+                        <div class="flex flex-wrap items-center gap-2">
+                            <span class="text-sm text-slate-600 dark:text-slate-300">Gasto a partir de R$</span>
+                            <input type="number" min="0" step="0.01" wire:model="alertThreshold.{{ $eu->profile_id }}" class="input w-32" placeholder="Desligado" aria-label="Limite de gasto que avisa a família">
+                            <button type="button" wire:click="saveAlertThreshold('{{ $eu->profile_id }}')" class="btn-secondary px-3 py-1.5 text-sm">Salvar</button>
+                        </div>
+                        @error("alertThreshold.{$eu->profile_id}") <p class="text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                        <p class="text-xs text-slate-400">Quando um gasto que não é privado chega a esse valor, quem acompanha as finanças recebe um aviso. Deixe vazio para desligar.</p>
+                    </div>
+                @endif
             </section>
         @endforeach
     @endif
@@ -282,7 +320,8 @@
                             <div class="min-w-0">
                                 <p class="text-base font-medium text-slate-900 dark:text-white">{{ $nome }}</p>
                                 <p class="text-xs text-slate-500 dark:text-slate-400">
-                                    Liberado por {{ $vinculo->invitedBy?->name }} · {{ mb_strtolower($vinculo->access_level->label()) }}
+                                    Liberado por {{ $vinculo->invitedBy?->name }} ·
+                                    {{ implode(' e ', array_filter([$vinculo->can_view_health ? 'saúde ('.mb_strtolower($vinculo->access_level->label()).')' : null, $vinculo->can_view_finance ? 'finanças (só leitura)' : null])) }}
                                 </p>
                             </div>
                             <form method="POST" action="{{ route('care.open', $vinculo->profile_id) }}">
@@ -291,14 +330,30 @@
                             </form>
                         </div>
                         <div class="mt-3 flex flex-wrap items-center gap-4 text-xs">
-                            <label class="flex items-center gap-2 text-slate-600 dark:text-slate-300">
-                                <input type="checkbox" wire:click="toggleNotify('{{ $vinculo->id }}')" @checked($vinculo->notify_reminders) class="rounded border-slate-300 text-brand-700 focus:ring-brand-500">
-                                Avisos de consultas e exames (lembretes e mudanças)
-                            </label>
-                            <label class="flex items-center gap-2 text-slate-600 dark:text-slate-300">
-                                <input type="checkbox" wire:click="toggleNotifyItems('{{ $vinculo->id }}')" @checked($vinculo->notify_care_items) class="rounded border-slate-300 text-brand-700 focus:ring-brand-500">
-                                Avisos de troca de itens de cuidado (lembretes e mudanças)
-                            </label>
+                            @if ($vinculo->can_view_health)
+                                <label class="flex items-center gap-2 text-slate-600 dark:text-slate-300">
+                                    <input type="checkbox" wire:click="toggleNotify('{{ $vinculo->id }}')" @checked($vinculo->notify_reminders) class="rounded border-slate-300 text-brand-700 focus:ring-brand-500">
+                                    Avisos de consultas e exames (lembretes e mudanças)
+                                </label>
+                                <label class="flex items-center gap-2 text-slate-600 dark:text-slate-300">
+                                    <input type="checkbox" wire:click="toggleNotifyItems('{{ $vinculo->id }}')" @checked($vinculo->notify_care_items) class="rounded border-slate-300 text-brand-700 focus:ring-brand-500">
+                                    Avisos de troca de itens de cuidado (lembretes e mudanças)
+                                </label>
+                            @endif
+                            @if ($vinculo->can_view_finance)
+                                <label class="flex items-center gap-2 text-slate-600 dark:text-slate-300">
+                                    <input type="checkbox" wire:click="toggleNotifyFinance('{{ $vinculo->id }}')" @checked($vinculo->notify_finance) class="rounded border-slate-300 text-brand-700 focus:ring-brand-500">
+                                    Avisos de conta a vencer ou atrasada
+                                </label>
+                                <label class="flex items-center gap-2 text-slate-600 dark:text-slate-300">
+                                    <input type="checkbox" wire:click="toggleNotifyWeekly('{{ $vinculo->id }}')" @checked($vinculo->notify_weekly) class="rounded border-slate-300 text-brand-700 focus:ring-brand-500">
+                                    Resumo semanal das finanças
+                                </label>
+                                <label class="flex items-center gap-2 text-slate-600 dark:text-slate-300">
+                                    <input type="checkbox" wire:click="toggleNotifyAlerts('{{ $vinculo->id }}')" @checked($vinculo->notify_alerts) class="rounded border-slate-300 text-brand-700 focus:ring-brand-500">
+                                    Avisos de gasto alto
+                                </label>
+                            @endif
                             <button type="button" wire:click="leave('{{ $vinculo->id }}')" wire:confirm="Deixar de acompanhar {{ $nome }}?" class="text-red-700 underline dark:text-red-400">Deixar de acompanhar</button>
                         </div>
                     </li>

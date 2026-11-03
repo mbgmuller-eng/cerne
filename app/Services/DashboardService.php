@@ -295,9 +295,16 @@ class DashboardService
             return $callback();
         }
 
+        // Familiar que acompanha: chave própria por conjunto de pessoas acompanhadas. Sem isso ele cairia em "dono" e receberia o total calculado
+        // com o que é privado.
+        $ids = $this->context->financeMemberIds();
+        sort($ids);
+
         $quem = $this->context->isConsultant()
             ? 'consultor'
-            : ($this->context->memberId() ?? 'dono');
+            : ($this->context->isCaregiver()
+                ? 'familia-'.substr(sha1(implode(',', $ids)), 0, 12)
+                : ($this->context->memberId() ?? 'dono'));
 
         return Cache::remember(
             sprintf(

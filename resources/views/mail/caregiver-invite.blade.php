@@ -1,14 +1,24 @@
 <x-mail::message>
 # Olá, {{ $caregiverName }}
 
-@if ($selfFollow)
-**{{ $inviterName }}** convidou você para acompanhar a saúde no Cerne.
+@if ($assisted)
+**{{ $inviterName }}**, consultor de **{{ $personName }}**, liberou o seu acesso no Cerne, em nome e com a autorização de quem você vai acompanhar.
+@elseif ($selfFollow)
+**{{ $inviterName }}** convidou você para acompanhar o que ele ou ela liberar no Cerne.
 @else
 **{{ $inviterName }}** convidou você para acompanhar **{{ $personName }}** no Cerne.
 @endif
 
-Você poderá ver a ficha de saúde, a agenda de consultas e exames, os itens de cuidado e os documentos que forem liberados.
-Seu acesso será: **{{ mb_strtolower($access->label()) }}**. Você não verá nada além disso, e quem convidou pode mudar ou encerrar o acesso quando quiser.
+Você poderá ver:
+
+@if ($health)
+- **Saúde:** a ficha de saúde, a agenda de consultas e exames, os itens de cuidado e os documentos que forem liberados ({{ mb_strtolower($access->label()) }}).
+@endif
+@if ($finance)
+- **Finanças, só para ver:** contas, cartões, lançamentos, contas a vencer, investimentos, dívidas, seguros e metas. O que a pessoa marcou como privado não aparece, e você não altera nada.
+@endif
+
+Você não verá nada além disso, e quem você acompanha pode mudar ou encerrar o acesso quando quiser.
 
 <x-mail::button :url="$link">
 Aceitar o convite

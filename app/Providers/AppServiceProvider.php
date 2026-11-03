@@ -26,5 +26,14 @@ class AppServiceProvider extends ServiceProvider
         // Datas imutáveis: a geração de parcelas avança um mês por iteração,
         // e um Carbon mutável alterado dentro do laço é um bug clássico.
         Date::use(CarbonImmutable::class);
+
+        // Gasto novo que chega ao limite combinado com a família: avisa quem acompanha as finanças. Nunca derruba quem estava lançando.
+        \App\Models\ExpenseRecord::created(function (\App\Models\ExpenseRecord $despesa): void {
+            try {
+                app(\App\Services\FamilyNotifier::class)->expenseAlert($despesa);
+            } catch (\Throwable $e) {
+                report($e);
+            }
+        });
     }
 }

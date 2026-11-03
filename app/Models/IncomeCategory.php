@@ -13,7 +13,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 #[Fillable(['profile_id', 'name', 'icon', 'is_default', 'is_active', 'sort_order'])]
 class IncomeCategory extends Model
 {
-    use BelongsToProfileOrShared, HasFactory, HasUuids;
+    use BelongsToProfileOrShared, HasFactory, HasUuids, \App\Models\Concerns\VisibleToFamily;
 
     protected function casts(): array
     {

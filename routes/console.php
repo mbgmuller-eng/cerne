@@ -1,5 +1,6 @@
 <?php
 
+use App\Services\FamilyNotifier;
 use App\Services\FixedBillService;
 use App\Services\HealthAppointmentService;
 use App\Services\HealthCareItemService;
@@ -47,6 +48,10 @@ Schedule::call(function (): void {
     logger()->info('Contas fixas', $resultado);
 })->dailyAt('03:10')->name('contas-fixas')->withoutOverlapping();
 
+// Resumo da semana para quem acompanha as finanças de alguém (segunda-feira de manhã). Cada familiar recebe o que o acompanhamento dele cobre; o livro
+// de lembretes (usuário, perfil, semana) torna a rotina idempotente.
+Schedule::call(fn () => app(FamilyNotifier::class)->sendWeeklySummaries())->weeklyOn(1, '08:20')->name('resumo-da-familia')->withoutOverlapping();
+
 // Receitas recorrentes: gera os recebimentos do mês e marca os atrasos.
 Schedule::call(function (): void {
     $resultado = app(RecurringIncomeService::class)->runDailyMaintenance();
@@ -61,6 +66,8 @@ Schedule::call(function (): void {
     $service = app(InvoiceService::class);
     $resultado = $service->runDailyMaintenance();
     $resultado['notificados'] = $service->notifyUpcomingDueDates();
+    // Depois de fechar e marcar as vencidas: conta e fatura em atraso avisam quem acompanha as finanças da casa (uma vez por vencimento).
+    $resultado['familia_em_atraso'] = app(FamilyNotifier::class)->notifyOverdue();
 
     logger()->info('Faturas', $resultado);
 })->dailyAt('03:20')->name('faturas')->withoutOverlapping();

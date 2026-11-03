@@ -31,6 +31,17 @@ trait BelongsToProfile
     {
         static::addGlobalScope(new ProfileScope);
 
+        // Quem acompanha só grava saúde (e ainda com a trava por pessoa de CaregiverWriteGuard). Finanças são leitura: esconder o botão não impede
+        // uma chamada direta, então a recusa mora aqui, no model.
+        $somenteLeitura = function (Model $model): void {
+            if (app(ProfileContext::class)->isCaregiver() && ! (method_exists($model, 'visibleToCaregiver') && $model::visibleToCaregiver())) {
+                throw new \Illuminate\Auth\Access\AuthorizationException('Quem acompanha só pode ver as finanças, não alterá-las.');
+            }
+        };
+        static::creating($somenteLeitura);
+        static::updating($somenteLeitura);
+        static::deleting($somenteLeitura);
+
         // Todo registro nasce carimbado com o perfil ativo.
         static::creating(function (Model $model): void {
             if ($model->getAttribute('profile_id') === null) {

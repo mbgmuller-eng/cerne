@@ -20,7 +20,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 ])]
 class IncomeRecord extends Model
 {
-    use Auditable, BelongsToProfile, InvalidatesDashboard, HasCompetence, HasFactory, HasUuids, RespectsMemberPrivacy;
+    use Auditable, BelongsToProfile, InvalidatesDashboard, HasCompetence, HasFactory, HasUuids, RespectsMemberPrivacy, \App\Models\Concerns\VisibleToFamily;
 
     protected static string $competenceDate = 'received_date';
 

@@ -124,6 +124,7 @@ Todas idempotentes (regra 4). O cron da Hostinger chama `schedule:run` a cada mi
 | cobrança (`lembrete-pix`, `pix-automatico-*`, `nota-fiscal-pendentes`, `lembrete-fim-do-teste`, `aviso-acesso-encerrando`) | 03:35 a 04:00 | assinatura e Asaas |
 | `acompanhamento-roteiro` | 06:30 | reavalia os itens automáticos do passo a passo dos clientes com vínculo ativo (só grava o que mudou de estado) |
 | `acompanhamento-lembretes` | 07:45 | lembrete de reunião no dia seguinte e de tarefa que vence amanhã ou venceu (só com vínculo ativo; índice único em `engagement_reminders`) |
+| `resumo-da-familia` | segunda, 08:20 | resumo da semana das finanças a cada familiar que as acompanha (só o que ele enxerga; `FamilyNotifier::sendWeeklySummaries`, livro `engagement_reminders` tipo `weekly`) |
 | `honorarios-previstos` | 04:05 | estende, para cada contrato de honorário ativo, os recebimentos previstos (12 meses à frente; índice único `fee_agreement_id` + `due_on`) |
 | `comissoes-de-seguros` | 04:07 | vincula as apólices que cada profissional vendeu e refaz a previsão de comissão e agenciamento (chave `origin_key` única por profissional) |
 | `percentual-patrimonio` | 04:09 | refaz a previsão do percentual sobre patrimônio de cada consultor (estimativa com o patrimônio de hoje) |
@@ -252,6 +253,31 @@ Mãe, pai ou quem mais o usuário ajuda a cuidar: um perfil de cuidado (`Profile
 - **Avisos por tipo**: cada cuidador liga ou desliga separadamente consultas e exames (`notify_reminders`) e troca de itens de cuidado (`notify_care_items`); `HealthReminderRecipients::forProfile($id, $tipo)`.
 - O "registrado por Fulano" vem do usuário que gravou (`HasActorUser`, `<x-registered-by>`), só dentro do perfil de uma pessoa acompanhada.
 - Tela `/pessoas` (`CareIndex`) é a porta de entrada, sem perfil ativo (quem só cuida pode não ter perfil próprio). Convite: `/convite-cuidador/{token}`, POST puro.
+
+### Família acompanha as finanças (só leitura) e convite assistido
+
+O acesso de quem acompanha (`ProfileCaregiver`) diz **o que** a pessoa vê: `can_view_health` (padrão, como sempre foi) e/ou `can_view_finance`. Finanças são **sempre só leitura**
+e **só o que não é privado**. Regras que não se quebram:
+
+- **Lista de permitidos das finanças** (`VisibleToFamily`, `visibleToFamily()`), irmã da `visibleToCaregiver()` da saúde: `ProfileScope` só devolve linhas de finanças a quem tem
+  `hasFinanceAccess()`, e só dos models que se declaram. Model novo nasce fechado. `FamilyFinanceAccessTest` trava a lista (inclui as categorias; bancos, seguradoras e o catálogo da academia
+  seguem fechados em `SharedTaxonomyScope`). A saúde só abre com `hasHealthAccess()`: `grantLevels()`/`grantedMemberIds()` contam **só** os acessos de saúde.
+- **Privacidade do casal vale também para os filhos** (`MemberPrivacyScope`, ramo de quem acompanha): vê o da família (`member_id` nulo), o conjunto (`is_joint`) e o que as pessoas que
+  ele acompanha **não** marcaram como privado. O que um cônjuge escondeu do outro fica escondido deles. **Fatura e vencimento de conta fixa não herdavam a privacidade do pai**:
+  `ParentPrivacyForFamilyScope` exige, só para quem acompanha, que o cartão/a conta de origem esteja visível. O cache do painel tem chave própria por conjunto de pessoas acompanhadas
+  (`DashboardService::remember`; sem isso o filho receberia o total do dono).
+- **Nunca grava**: `BelongsToProfile` recusa criar, alterar e apagar de quem acompanha em tudo que não é saúde (a saúde segue a trava por pessoa do `CaregiverWriteGuard`). As telas são
+  próprias e sem botão de gravar (`FamilyFinance`, rota `family.index`), não as telas de finanças com o botão escondido. `RestrictCareContext` só abre `family.*` a quem tem finanças e só
+  abre as rotas de saúde a quem tem saúde; quem só acompanha finanças entra direto em `family.index` (`CareSwitchController`). Rota de consultor **não** usa o prefixo `family.*`.
+- **Dois jeitos de liberar**: (1) a própria pessoa, em "Quem me acompanha" (`CaregiverService::inviteFollower`, saúde, finanças ou as duas; cada um do casal só para o que é seu);
+  (2) **convite assistido** (`assistedGrant`, `FamilyAccessAssist`, rota `consultant.family-access`, só o consultor vinculado, `FinancialProfilePolicy::manageFamilyAccess`): ele escolhe as pessoas
+  do perfil e **declara a base** (`CaregiverGrantBasis`: a pessoa autorizou, ou representante legal). Fica gravado `granted_by_user_id`, `grant_basis` e `granted_declared_at`; **um** e-mail vai ao
+  familiar e um aceite ativa o lote inteiro; cada pessoa com login é avisada na hora (`FamilyAccessGranted`) e encerra quando quiser; o consultor encerra o que ele montou (`ProfileCaregiverPolicy::manageGrant`).
+- **Avisos** (`FamilyNotifier`, `FamilyFinanceNotice`, flags `notify_finance`, `notify_alerts`, `notify_weekly` por acesso): conta e fatura a vencer (ganchos nos serviços de contas fixas e de
+  faturas), atraso uma vez por vencimento até 30 dias (`notifyOverdue`, na rotina `faturas`), gasto a partir do limite do perfil (`financial_profiles.family_alert_threshold`, vazio = desligado;
+  ignora privado, estorno, parcela que não é a 1ª e data com mais de 3 dias) e o **resumo da semana** (rotina `resumo-da-familia`, segunda 08:20, calculado sob o contexto do próprio familiar,
+  idempotente pelo livro de lembretes com o assunto em hash porque a coluna cabe 36 caracteres). Todos seguem a mesma regra: nada privado, só as pessoas que o familiar acompanha.
+- **"Quem leva?" em perfil comum** (`CareParticipants::forMember/forAppointment`): só existe para a pessoa cuja **saúde** alguém de fora acompanha; participantes: ela, quem divide o perfil e esses familiares.
 
 ### Reserva de paz: gasto essencial automático ou informado
 

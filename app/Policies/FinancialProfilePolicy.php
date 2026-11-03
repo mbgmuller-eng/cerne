@@ -58,6 +58,15 @@ class FinancialProfilePolicy
     }
 
     /**
+     * Convite assistido: só o consultor vinculado ao cliente monta o acesso de um familiar em nome da pessoa (com a base declarada). Nunca o corretor,
+     * nunca o perfil de cuidado (que tem o próprio caminho).
+     */
+    public function manageFamilyAccess(User $user, FinancialProfile $profile): bool
+    {
+        return ! $profile->isCare() && $this->isLinkedConsultant($user, $profile);
+    }
+
+    /**
      * A própria pessoa acompanhada (com login) manda no acesso ao espaço dela: encerra o acesso de cuidadores, revoga o consentimento e apaga o
      * espaço. Não muda o dono nem a cobrança.
      */

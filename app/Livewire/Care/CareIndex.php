@@ -55,6 +55,14 @@ class CareIndex extends Component
 
     public string $followAccess = 'read';
 
+    /** O que o convidado acompanha: a saúde e/ou as finanças (só leitura). */
+    public bool $followHealth = true;
+
+    public bool $followFinance = false;
+
+    /** Limite de gasto que avisa a família, por perfil (id do perfil => valor digitado). */
+    public array $alertThreshold = [];
+
     public ?string $lastFollowLink = null;
 
     public function startAdding(): void
@@ -152,17 +160,20 @@ class CareIndex extends Component
             'followName' => ['required', 'string', 'max:120'],
             'followEmail' => ['required', 'email', 'max:190'],
             'followAccess' => ['required', 'in:read,edit'],
+            'followHealth' => ['boolean'],
+            'followFinance' => ['boolean'],
         ], [], ['followName' => 'nome', 'followEmail' => 'e-mail']);
 
         try {
-            $this->lastFollowLink = $service->inviteFollower($membro, auth()->user(), trim($dados['followName']), $dados['followEmail'], CaregiverAccess::from($dados['followAccess']));
+            $this->lastFollowLink = $service->inviteFollower($membro, auth()->user(), trim($dados['followName']), $dados['followEmail'], CaregiverAccess::from($dados['followAccess']), $this->followHealth, $this->followFinance);
         } catch (RuntimeException $e) {
             $this->addError('followEmail', $e->getMessage());
 
             return;
         }
 
-        $this->reset('followName', 'followEmail');
+        $this->reset('followName', 'followEmail', 'followFinance');
+        $this->followHealth = true;
         $this->followAccess = 'read';
         session()->flash('care_status', 'Convite enviado por e-mail.');
     }
@@ -170,6 +181,44 @@ class CareIndex extends Component
     public function changeAccess(string $caregiverId, string $access, CaregiverService $service): void
     {
         $service->changeAccess($this->caregiverOfMineOrFail($caregiverId), CaregiverAccess::from($access));
+    }
+
+    /** Liga ou desliga a saúde no acesso de alguém que me acompanha. Sempre sobra pelo menos uma coisa. */
+    public function toggleFollowerHealth(string $caregiverId, CaregiverService $service): void
+    {
+        $acesso = $this->caregiverOfMineOrFail($caregiverId);
+        $this->changeScopeOrError($service, $acesso, ! $acesso->can_view_health, (bool) $acesso->can_view_finance);
+    }
+
+    /** Liga ou desliga as finanças (só leitura) no acesso de alguém que me acompanha. */
+    public function toggleFollowerFinance(string $caregiverId, CaregiverService $service): void
+    {
+        $acesso = $this->caregiverOfMineOrFail($caregiverId);
+        $this->changeScopeOrError($service, $acesso, (bool) $acesso->can_view_health, ! $acesso->can_view_finance);
+    }
+
+    private function changeScopeOrError(CaregiverService $service, ProfileCaregiver $acesso, bool $saude, bool $financas): void
+    {
+        try {
+            $service->changeScope($acesso, $saude, $financas);
+        } catch (RuntimeException $e) {
+            $this->addError('followEmail', $e->getMessage());
+        }
+    }
+
+    /** Limite de gasto que avisa quem acompanha as minhas finanças (vazio ou zero desliga). Qualquer pessoa do perfil pode ajustar. */
+    public function saveAlertThreshold(string $profileId): void
+    {
+        $membro = ProfileMember::query()->where('user_id', auth()->id())->where('is_active', true)->where('profile_id', $profileId)->firstOrFail();
+        $perfil = FinancialProfile::withCareProfiles()->findOrFail($membro->profile_id);
+
+        $valor = trim((string) ($this->alertThreshold[$profileId] ?? ''));
+
+        $this->validate(["alertThreshold.{$profileId}" => ['nullable', 'numeric', 'min:0', 'max:9999999999999']], [], ["alertThreshold.{$profileId}" => 'limite']);
+
+        $perfil->update(['family_alert_threshold' => $valor === '' || (float) $valor <= 0 ? null : \App\Support\Money::parse($valor)]);
+
+        session()->flash('care_status', $perfil->family_alert_threshold === null ? 'Aviso de gasto alto desligado.' : 'Limite salvo.');
     }
 
     public function revoke(string $caregiverId, CaregiverService $service): void
@@ -238,6 +287,27 @@ class CareIndex extends Component
         $vinculo->update(['notify_reminders' => ! $vinculo->notify_reminders]);
     }
 
+    /** Avisos de conta que vence ou está atrasada (finanças). */
+    public function toggleNotifyFinance(string $caregiverId): void
+    {
+        $vinculo = $this->myLinkOrFail($caregiverId);
+        $vinculo->update(['notify_finance' => ! $vinculo->notify_finance]);
+    }
+
+    /** Resumo semanal das finanças. */
+    public function toggleNotifyWeekly(string $caregiverId): void
+    {
+        $vinculo = $this->myLinkOrFail($caregiverId);
+        $vinculo->update(['notify_weekly' => ! $vinculo->notify_weekly]);
+    }
+
+    /** Avisos de gasto acima do limite combinado. */
+    public function toggleNotifyAlerts(string $caregiverId): void
+    {
+        $vinculo = $this->myLinkOrFail($caregiverId);
+        $vinculo->update(['notify_alerts' => ! $vinculo->notify_alerts]);
+    }
+
     /** Avisos de troca de itens de cuidado (filtro do aparelho, palmilha...). */
     public function toggleNotifyItems(string $caregiverId): void
     {
@@ -259,8 +329,13 @@ class CareIndex extends Component
         $meusMembros = ProfileMember::query()
             ->where('user_id', $usuario->id)->where('is_active', true)
             ->whereIn('profile_id', FinancialProfile::query()->select('id'))
-            ->with(['followers' => fn ($q) => $q->where('status', '!=', CaregiverStatus::Revoked->value)->orderBy('invited_name')])
+            ->with(['profile', 'followers' => fn ($q) => $q->where('status', '!=', CaregiverStatus::Revoked->value)->orderBy('invited_name')])
             ->get();
+
+        // O limite de gasto que avisa a família parte do que já está salvo no perfil.
+        foreach ($meusMembros as $eu) {
+            $this->alertThreshold[$eu->profile_id] ??= $eu->profile?->family_alert_threshold !== null ? (string) $eu->profile->family_alert_threshold : '';
+        }
 
         return view('livewire.care.care-index', [
             'minhas' => $minhas,

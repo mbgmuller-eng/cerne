@@ -18,7 +18,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  *
  * Note que ESTE model não usa BelongsToProfile — ele é o próprio tenant.
  */
-#[Fillable(['owner_user_id', 'profile_name', 'profile_type', 'base_currency', 'reference_month', 'care_consent_by_user_id', 'care_consent_at', 'care_consent_basis', 'care_consent_version'])]
+#[Fillable(['owner_user_id', 'profile_name', 'profile_type', 'base_currency', 'reference_month', 'care_consent_by_user_id', 'care_consent_at', 'care_consent_basis', 'care_consent_version', 'family_alert_threshold'])]
 class FinancialProfile extends Model
 {
     use HasFactory, HasUuids;

@@ -30,8 +30,9 @@ class SharedTaxonomyScope implements Scope
         $profileId = $context->profileId();
         $coluna = $model->qualifyColumn('profile_id');
 
-        // Categorias são finanças: o cuidador (lista de permitidos, ver ProfileScope) não vê nenhuma.
-        if ($context->isCaregiver()) {
+        // Categorias são finanças: quem acompanha só a saúde não vê nenhuma, e quem acompanha as finanças vê só as que se declaram visíveis à família
+        // (VisibleToFamily). Bancos, seguradoras e o catálogo da academia, que usam o mesmo escopo, continuam fechados para quem acompanha.
+        if ($context->isCaregiver() && ! ($context->hasFinanceAccess() && method_exists($model, 'visibleToFamily') && $model::visibleToFamily())) {
             $builder->whereRaw('1 = 0');
 
             return;

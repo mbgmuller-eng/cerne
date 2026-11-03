@@ -14,6 +14,11 @@ class CaregiverInviteMail extends Mailable
 {
     use Queueable, SerializesModels;
 
+    /**
+     * @param  bool  $health  o convite inclui a saúde
+     * @param  bool  $finance  o convite inclui as finanças (só leitura)
+     * @param  bool  $assisted  o consultor liberou em nome da pessoa (convite assistido), com a autorização dela
+     */
     public function __construct(
         public User $inviter,
         public string $personName,
@@ -21,13 +26,20 @@ class CaregiverInviteMail extends Mailable
         public CaregiverAccess $access,
         public string $link,
         public bool $selfFollow = false,
+        public bool $health = true,
+        public bool $finance = false,
+        public bool $assisted = false,
     ) {}
 
     public function envelope(): Envelope
     {
-        return new Envelope(subject: $this->selfFollow
-            ? "{$this->inviter->name} convidou você para acompanhar a saúde no Cerne"
-            : "{$this->inviter->name} convidou você para acompanhar {$this->personName} no Cerne");
+        $assunto = match (true) {
+            $this->assisted => "{$this->inviter->name} liberou o seu acesso a {$this->personName} no Cerne",
+            $this->selfFollow => "{$this->inviter->name} convidou você para acompanhar o Cerne",
+            default => "{$this->inviter->name} convidou você para acompanhar {$this->personName} no Cerne",
+        };
+
+        return new Envelope(subject: $assunto);
     }
 
     public function content(): Content
@@ -39,6 +51,9 @@ class CaregiverInviteMail extends Mailable
             'access' => $this->access,
             'link' => $this->link,
             'selfFollow' => $this->selfFollow,
+            'health' => $this->health,
+            'finance' => $this->finance,
+            'assisted' => $this->assisted,
         ]);
     }
 }

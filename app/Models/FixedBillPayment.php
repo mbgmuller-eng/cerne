@@ -25,7 +25,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 ])]
 class FixedBillPayment extends Model
 {
-    use Auditable, BelongsToProfile, InvalidatesDashboard, HasFactory, HasUuids;
+    use Auditable, BelongsToProfile, InvalidatesDashboard, HasFactory, HasUuids, \App\Models\Concerns\VisibleToFamily;
 
     protected function casts(): array
     {
@@ -37,6 +37,12 @@ class FixedBillPayment extends Model
             'paid_at' => 'date',
             'status' => FixedBillPaymentStatus::class,
         ];
+    }
+
+    protected static function booted(): void
+    {
+        // Herda a privacidade do pai também para quem acompanha as finanças (ver o escopo).
+        static::addGlobalScope(new \App\Models\Scopes\ParentPrivacyForFamilyScope('fixedBill'));
     }
 
     public function fixedBill(): BelongsTo

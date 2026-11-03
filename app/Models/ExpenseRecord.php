@@ -24,7 +24,7 @@ use LogicException;
 ])]
 class ExpenseRecord extends Model
 {
-    use Auditable, BelongsToProfile, InvalidatesDashboard, HasCompetence, HasFactory, HasUuids, RespectsMemberPrivacy;
+    use Auditable, BelongsToProfile, InvalidatesDashboard, HasCompetence, HasFactory, HasUuids, RespectsMemberPrivacy, \App\Models\Concerns\VisibleToFamily;
 
     protected static string $competenceDate = 'expense_date';
 

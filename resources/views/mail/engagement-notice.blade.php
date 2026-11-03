@@ -19,7 +19,7 @@
 @endif
 @endforeach
 <x-mail::button :url="$url">
-Abrir o acompanhamento
+{{ $buttonLabel ?? 'Abrir o acompanhamento' }}
 </x-mail::button>
 
 @if (! empty($calendarUrl))

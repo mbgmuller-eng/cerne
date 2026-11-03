@@ -22,7 +22,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 #[Fillable(['profile_id', 'name', 'icon', 'color_hex', 'necessity', 'is_default', 'is_active', 'sort_order'])]
 class ExpenseCategory extends Model
 {
-    use BelongsToProfileOrShared, HasFactory, HasUuids;
+    use BelongsToProfileOrShared, HasFactory, HasUuids, \App\Models\Concerns\VisibleToFamily;
 
     protected function casts(): array
     {

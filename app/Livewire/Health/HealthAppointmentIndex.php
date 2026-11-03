@@ -302,9 +302,12 @@ class HealthAppointmentIndex extends Component
     /** A consulta, só se o perfil ativo é de uma pessoa acompanhada ("quem leva" só existe ali). */
     private function consultaDeCuidado(string $appointmentId): HealthAppointment
     {
-        abort_unless(app(ProfileContext::class)->profile()?->isCare(), 404);
+        $consulta = HealthAppointment::query()->findOrFail($appointmentId);
 
-        return HealthAppointment::query()->findOrFail($appointmentId);
+        // Em pessoa acompanhada, e em perfil comum só quando um familiar acompanha a saúde da pessoa (quem pode ser escolhido é conferido no serviço).
+        abort_if(app(\App\Services\CareParticipants::class)->forAppointment($consulta)->isEmpty(), 404);
+
+        return $consulta;
     }
 
     public function delete(string $appointmentId, HealthAppointmentService $service): void
@@ -328,10 +331,30 @@ class HealthAppointmentIndex extends Component
             'past' => HealthAppointment::query()->where('profile_id', $profileId)->past()->with(['member', 'createdByUser', 'statusBy'])->get(),
             'editingExisting' => $this->editingId !== null,
             'emPessoaAcompanhada' => app(ProfileContext::class)->isCaregiver() || app(ProfileContext::class)->profile()?->isCare(),
-            // Quem pode ser escolhido para levar: dono, cuidadores ativos e a própria pessoa (só dentro de uma pessoa acompanhada).
-            'participantes' => app(ProfileContext::class)->profile()?->isCare() ? app(\App\Services\CareParticipants::class)->forProfile(app(ProfileContext::class)->profile()) : collect(),
+            // Quem pode ser escolhido para levar cada pessoa: na pessoa acompanhada, o dono, os cuidadores e ela; em perfil comum, ela, o cônjuge e os
+            // familiares que acompanham a SAÚDE dela (vazio, e sem "quem leva", se ninguém de fora acompanha).
+            'participantes' => $this->participantesPorPessoa($membros),
             'podeEscalar' => app(ProfileContext::class)->canWriteAsCaregiver(),
         ] + $this->compromissoAberto());
+    }
+
+    /** @return array<string, Collection<int, \App\Models\User>> id da pessoa => quem pode levá-la */
+    private function participantesPorPessoa(Collection $membros): array
+    {
+        $perfil = app(ProfileContext::class)->profile();
+        $servico = app(\App\Services\CareParticipants::class);
+
+        if ($perfil === null || app(ProfileContext::class)->isConsultant()) {
+            return [];
+        }
+
+        if ($perfil->isCare()) {
+            $todos = $servico->forProfile($perfil);
+
+            return $membros->mapWithKeys(fn (ProfileMember $m) => [$m->id => $todos])->all();
+        }
+
+        return $membros->mapWithKeys(fn (ProfileMember $m) => [$m->id => $servico->forMember($perfil, $m)])->all();
     }
 
     private function membros(): Collection

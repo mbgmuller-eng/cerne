@@ -32,7 +32,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 ])]
 class InvestmentRecord extends Model
 {
-    use Auditable, BelongsToProfile, HasBadgeInitials, InvalidatesDashboard, HasFactory, HasUuids, RespectsMemberPrivacy;
+    use Auditable, BelongsToProfile, HasBadgeInitials, InvalidatesDashboard, HasFactory, HasUuids, RespectsMemberPrivacy, \App\Models\Concerns\VisibleToFamily;
 
     protected function casts(): array
     {

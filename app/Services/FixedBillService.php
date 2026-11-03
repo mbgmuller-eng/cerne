@@ -275,6 +275,9 @@ class FixedBillService
                         $user->notify(FixedBillDueSoon::forPayment($pagamento));
                         $notificados++;
                     }
+
+                    // Quem acompanha as finanças da casa (os filhos): só o que não é privado e das pessoas que cada um acompanha.
+                    $notificados += app(FamilyNotifier::class)->billDueSoon($pagamento);
                 }
             });
 

@@ -23,7 +23,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 ])]
 class CreditCard extends Model
 {
-    use Auditable, BelongsToProfile, HasBadgeInitials, HasFactory, HasSharingFlags, HasUuids, RespectsMemberPrivacy;
+    use Auditable, BelongsToProfile, HasBadgeInitials, HasFactory, HasSharingFlags, HasUuids, RespectsMemberPrivacy, \App\Models\Concerns\VisibleToFamily;
 
     protected function casts(): array
     {

@@ -22,7 +22,8 @@ class CareSwitchController extends Controller
         $request->session()->put(SetProfileContext::SESSION_KEY, $perfil->id);
         $request->session()->forget(ProfileSwitchController::VOLTAR_KEY);
 
-        return redirect()->route('health.card.index');
+        // Quem só acompanha as finanças não tem ficha de saúde para abrir: entra direto na leitura das finanças.
+        return redirect()->route($this->soFinancas($request, $perfil) ? 'family.index' : 'health.card.index');
     }
 
     /** Entra na pessoa e segue para a agenda ou os cuidados dela (o link dos avisos). */
@@ -34,7 +35,11 @@ class CareSwitchController extends Controller
 
         $request->session()->put(SetProfileContext::SESSION_KEY, $perfil->id);
 
-        return redirect()->route($destino === 'cuidados' ? 'health.care.index' : 'health.appointments.index');
+        return redirect()->route(match ($destino) {
+            'cuidados' => 'health.care.index',
+            'financas' => 'family.index',
+            default => 'health.appointments.index',
+        });
     }
 
     /**
@@ -48,6 +53,14 @@ class CareSwitchController extends Controller
         $ehCuidador = \App\Models\ProfileCaregiver::query()->active()->where('profile_id', $perfil->id)->where('user_id', $request->user()->id)->exists();
 
         abort_unless($perfil->isCare() || $ehCuidador, 404);
+    }
+
+    /** O acesso do usuário a este perfil é só de finanças (sem saúde)? */
+    private function soFinancas(Request $request, FinancialProfile $perfil): bool
+    {
+        $acessos = \App\Models\ProfileCaregiver::query()->active()->where('profile_id', $perfil->id)->where('user_id', $request->user()->id)->get();
+
+        return ! $perfil->isCare() && $acessos->isNotEmpty() && ! $acessos->contains('can_view_health', true) && $acessos->contains('can_view_finance', true);
     }
 
     /** Volta para o perfil próprio (ou para a lista de pessoas, se quem cuida não tem perfil próprio). */

@@ -22,14 +22,17 @@ class ProfileContext
     /** Consultor operando sobre o perfil de um cliente. */
     private bool $asConsultant = false;
 
-    /** Cuidador de uma pessoa acompanhada: vê só saúde e documentos liberados, com leitura ou edição. */
+    /** Quem acompanha: vê o que a pessoa liberou (saúde e documentos, com leitura ou edição; e/ou finanças, só leitura). */
     private ?ProfileCaregiver $caregiver = null;
 
     /** Todos os acessos de cuidador do usuário NESTE perfil (um por pessoa acompanhada). */
     private array $grants = [];
 
-    /** @var array<string, string>|null id da pessoa => 'read'|'edit' (calculado sob demanda) */
+    /** @var array<string, string>|null id da pessoa => 'read'|'edit' (calculado sob demanda; só os acessos de SAÚDE) */
     private ?array $levels = null;
+
+    /** @var list<string>|null id das pessoas cujas finanças este acompanhante vê */
+    private ?array $financeIds = null;
 
     /** @param  list<ProfileCaregiver>  $grants todos os acessos do cuidador neste perfil; sem a lista vale só $caregiver */
     public function set(FinancialProfile $profile, ?ProfileMember $member = null, bool $asConsultant = false, ?ProfileCaregiver $caregiver = null, array $grants = []): void
@@ -37,6 +40,7 @@ class ProfileContext
         $this->caregiver = $caregiver;
         $this->grants = $grants !== [] ? $grants : ($caregiver !== null ? [$caregiver] : []);
         $this->levels = null;
+        $this->financeIds = null;
         $this->profile = $profile;
         $this->member = $member;
         $this->asConsultant = $asConsultant;
@@ -50,6 +54,7 @@ class ProfileContext
         $this->caregiver = null;
         $this->grants = [];
         $this->levels = null;
+        $this->financeIds = null;
     }
 
     /**
@@ -60,12 +65,61 @@ class ProfileContext
     {
         return $this->profile !== null
             && ! $this->asConsultant
-            && ($this->member !== null || $this->caregiver !== null || $this->profile->isCare());
+            && ($this->member !== null || $this->hasHealthAccess() || $this->profile->isCare());
     }
 
     public function isCaregiver(): bool
     {
         return $this->caregiver !== null;
+    }
+
+    /** Algum acesso deste acompanhante inclui a saúde? */
+    public function hasHealthAccess(): bool
+    {
+        foreach ($this->grants as $acesso) {
+            if ($acesso->can_view_health) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /** Algum acesso deste acompanhante inclui as finanças (só leitura)? */
+    public function hasFinanceAccess(): bool
+    {
+        foreach ($this->grants as $acesso) {
+            if ($acesso->can_view_finance) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * As pessoas cujas finanças este acompanhante vê neste perfil. Acesso sem pessoa marcada vale para todos os membros. O que cada uma marcou como
+     * privado nunca entra (MemberPrivacyScope).
+     *
+     * @return list<string>
+     */
+    public function financeMemberIds(): array
+    {
+        if ($this->financeIds !== null) {
+            return $this->financeIds;
+        }
+
+        $ids = [];
+
+        foreach ($this->grants as $acesso) {
+            if (! $acesso->can_view_finance) {
+                continue;
+            }
+
+            $ids = array_merge($ids, $acesso->member_id !== null ? [$acesso->member_id] : ProfileMember::query()->where('profile_id', $acesso->profile_id)->pluck('id')->all());
+        }
+
+        return $this->financeIds = array_values(array_unique($ids));
     }
 
     public function caregiver(): ?ProfileCaregiver
@@ -105,7 +159,8 @@ class ProfileContext
     /** "Maria" ou "Maria e João": as pessoas que este cuidador acompanha, para mostrar na tela. */
     public function followedNames(): string
     {
-        $nomes = ProfileMember::query()->whereIn('id', $this->grantedMemberIds())->orderBy('name')->pluck('name')->all();
+        $ids = array_values(array_unique(array_merge($this->grantedMemberIds(), $this->financeMemberIds())));
+        $nomes = ProfileMember::query()->whereIn('id', $ids)->orderBy('name')->pluck('name')->all();
 
         return $nomes !== [] ? implode(' e ', $nomes) : (string) $this->profile?->profile_name;
     }
@@ -120,6 +175,11 @@ class ProfileContext
         $niveis = [];
 
         foreach ($this->grants as $acesso) {
+            // Só o acesso à SAÚDE entra aqui: quem só acompanha as finanças não ganha ficha, agenda nem documentos de ninguém.
+            if (! $acesso->can_view_health) {
+                continue;
+            }
+
             $ids = $acesso->member_id !== null
                 ? [$acesso->member_id]
                 : ProfileMember::query()->where('profile_id', $acesso->profile_id)->pluck('id')->all();

@@ -23,7 +23,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 ])]
 class FixedBill extends Model
 {
-    use Auditable, BelongsToProfile, HasFactory, HasUuids, RespectsMemberPrivacy;
+    use Auditable, BelongsToProfile, HasFactory, HasUuids, RespectsMemberPrivacy, \App\Models\Concerns\VisibleToFamily;
 
     protected function casts(): array
     {

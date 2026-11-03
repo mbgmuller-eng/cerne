@@ -184,10 +184,11 @@ Route::middleware(['auth', 'verified', 'termos', 'cuidado'])->group(function ():
 
     // Pessoas que acompanho: fora do bloqueio por assinatura (quem só cuida, como o irmão, pode não ter plano) e sem perfil ativo.
     Route::get('/pessoas', \App\Livewire\Care\CareIndex::class)->name('care.index');
+    Route::get('/familia', \App\Livewire\Family\FamilyFinance::class)->name('family.index');
     Route::post('/pessoas/sair', [\App\Http\Controllers\CareSwitchController::class, 'leave'])->name('care.exit');
     Route::post('/pessoas/{profile}/abrir', [\App\Http\Controllers\CareSwitchController::class, 'open'])->name('care.open');
     // Link dos avisos (e-mail e push): escolhe a pessoa e vai direto à agenda ou aos cuidados dela. Só escolhe o contexto, depois de autorizar.
-    Route::get('/pessoas/{profile}/ir/{destino}', [\App\Http\Controllers\CareSwitchController::class, 'goto'])->whereIn('destino', ['agenda', 'cuidados'])->name('care.goto');
+    Route::get('/pessoas/{profile}/ir/{destino}', [\App\Http\Controllers\CareSwitchController::class, 'goto'])->whereIn('destino', ['agenda', 'cuidados', 'financas'])->name('care.goto');
 
     Route::middleware('assinatura')->group(function (): void {
         Route::get('/painel', Dashboard::class)->name('dashboard');
@@ -251,6 +252,8 @@ Route::middleware(['auth', 'verified', 'termos', 'cuidado'])->group(function ():
         Route::get('/carteira/dividas', \App\Livewire\Consultant\PortfolioDebts::class)->name('consultant.portfolio.debts');
         Route::get('/carteira/datas-importantes', ImportantDates::class)->name('consultant.portfolio.important-dates');
         Route::get('/semana', \App\Livewire\Consultant\EngagementWeek::class)->name('consultant.week');
+        // Convite assistido (consultor): fora do prefixo family.* de propósito, que é o das telas de leitura de quem acompanha as finanças.
+        Route::get('/acesso-da-familia', \App\Livewire\Family\FamilyAccessAssist::class)->name('consultant.family-access');
         Route::get('/agenda', \App\Livewire\Consultant\ConsultantCalendar::class)->name('consultant.calendar');
         Route::get('/recebimentos', \App\Livewire\Consultant\ProfessionalIncome::class)->name('consultant.income');
         Route::get('/modelos-de-roteiro', \App\Livewire\Consultant\EngagementTemplates::class)->name('consultant.plan-templates');
