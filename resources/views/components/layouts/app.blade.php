@@ -181,8 +181,10 @@
     // mesmo layout da área do consultor. Sem isto caíam no "nenhuma área"
     // (sem barra lateral, cabeçalho compacto mesmo no PC) por não ter
     // $profile nem bater com consultant.* — sem jeito nenhum de navegar.
+    // Qualquer tela do app de um profissional sem cliente aberto é DELE (Pessoas e acessos, Minha conta, Assinatura...): sem isto ficava sem barra
+    // inferior e sem lateral, e o celular não tinha por onde navegar.
     $areaConsultor = request()->routeIs('consultant.*')
-        || ($profile === null && $user?->isLinkedProfessional() && request()->routeIs(['my-account', 'subscription.index']));
+        || ($profile === null && $user?->isLinkedProfessional() && ! request()->routeIs('admin.*'));
     $areaAdmin = request()->routeIs('admin.*');
     $dentroDoPerfil = $profile && ! $areaConsultor && ! $areaAdmin;
     $mostraAsideDesktop = $dentroDoPerfil || $areaConsultor || $areaAdmin;
@@ -669,27 +671,7 @@
                             ])>{{ $user?->isBroker() ? 'corretor' : 'consultor' }}</span>
                         @endif
 
-                        {{-- Os atalhos de tela só valem DENTRO do perfil de um cliente
-                             (único jeito de voltar à área do profissional no celular).
-                             Na área do profissional e no admin a barra inferior já
-                             traz todas essas telas — repetir aqui só duplicava. --}}
-                        @if ($user?->isLinkedProfessional() && ! $areaConsultor && ! $areaAdmin)
-                            @foreach ($navConsultor as [$route, $label, $curto, $icone])
-                                @if ($route !== 'admin.users')
-                                    <a href="{{ route($route) }}" @class(['btn-ghost', '!text-white/60' => $dentroDoPerfil]) title="{{ $label }}">
-                                        <x-nav-icon :name="$icone" class="h-4 w-4" />
-                                        <span class="ml-1.5 hidden sm:inline">{{ $curto }}</span>
-                                    </a>
-                                @endif
-                            @endforeach
-                        @endif
-
-                        @if ($user?->isPlatformAdmin() && ! $areaConsultor && ! $areaAdmin)
-                            <a href="{{ route('admin.users') }}" @class(['btn-ghost', '!text-white/60' => $dentroDoPerfil]) title="Painel admin">
-                                <x-nav-icon name="admin" class="h-4 w-4" />
-                                <span class="ml-1.5 hidden sm:inline">Admin</span>
-                            </a>
-                        @endif
+                        {{-- O caminho de volta à área do profissional, no celular, é a aba "Carteira" da barra inferior (com todas as telas dele). --}}
 
                         <x-theme-switcher :current="$theme" />
 
@@ -738,6 +720,18 @@
 {{-- ============================================================
      Barra inferior (celular e tablet)
      ============================================================ --}}
+@if ($dentroDoPerfil || $areaConsultor || $areaAdmin)
+    {{-- Fundo da gaveta, FORA do contêiner da barra de propósito: o contêiner usa transform (para a barra não sumir na rolagem), e um elemento fixed
+         dentro de um ancestral com transform passa a se posicionar por ele, não pela tela. Aqui ele cobre a tela inteira e tocar fora fecha a gaveta. --}}
+    <div
+        x-show="secao !== null"
+        x-transition.opacity
+        x-cloak
+        @click="secao = null"
+        class="fixed inset-0 z-30 bg-brand-950/30 backdrop-blur-sm lg:hidden"
+        aria-hidden="true"
+    ></div>
+@endif
 @if ($dentroDoPerfil)
     {{-- transform-gpu/will-change-transform: em alguns Android (Chrome,
          principalmente com o app instalado na tela inicial), um elemento
@@ -745,16 +739,9 @@
          navegador falha em recompor a camada em GPUs mais fracas. Forçar
          a própria camada de composição evita isso; não muda nada visual
          nos aparelhos que já funcionavam. --}}
-    <div class="fixed inset-x-0 bottom-0 z-30 lg:hidden transform-gpu will-change-transform">
+    <div data-barra="cliente" class="fixed inset-x-0 bottom-0 z-30 lg:hidden transform-gpu will-change-transform">
         {{-- Gaveta da categoria tocada: as telas dela, no mesmo desenho de
              sempre. Fecha tocando fora ou na aba de novo. --}}
-        <div
-            x-show="secao !== null"
-            x-transition.opacity
-            x-cloak
-            @click="secao = null"
-            class="fixed inset-0 bg-brand-950/30 backdrop-blur-sm"
-        ></div>
         <div
             x-show="secao !== null"
             x-transition:enter="transition ease-out duration-200"
@@ -783,6 +770,25 @@
                         </div>
                     @endunless
                 @endforeach
+
+                {{-- O profissional dentro do perfil de um cliente: todas as telas dele, em grupos, a um toque (era uma faixa de ícones sem nome no cabeçalho). --}}
+                @if ($user?->isLinkedProfessional())
+                    <div x-show="secao === 'profissional'" x-cloak data-gaveta-profissional class="pb-1">
+                        @foreach ($abasProfissional as $grupo)
+                            <div @class(['pt-3' => ! $loop->first])>
+                                <p class="px-1 pb-2 text-[10px] font-semibold tracking-wide text-white/40 uppercase">{{ $grupo['label'] }}</p>
+                                <div class="grid grid-cols-4 gap-1">
+                                    @foreach ($grupo['items'] as [$route, $label, $curto, $icone])
+                                        <a href="{{ route($route) }}" class="tab-item-chrome rounded-xl py-3">
+                                            <x-nav-icon :name="$icone" class="h-6 w-6" />
+                                            <span>{{ $curto }}</span>
+                                        </a>
+                                    @endforeach
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+                @endif
             </div>
         </div>
 
@@ -807,6 +813,19 @@
                     </button>
                 @endif
             @endforeach
+            @if ($user?->isLinkedProfessional())
+                <button
+                    type="button"
+                    @click="secao = secao === 'profissional' ? null : 'profissional'"
+                    class="tab-item-chrome"
+                    :class="secao === 'profissional' ? 'text-white' : ''"
+                    :aria-expanded="secao === 'profissional'"
+                    title="{{ $voltarAoPainel['nome'] ?? 'Minha área' }}"
+                >
+                    <x-nav-icon name="back" class="h-6 w-6" />
+                    <span>Carteira</span>
+                </button>
+            @endif
             <a href="{{ route('my-account') }}" @class(['tab-item-chrome', 'tab-item-chrome-active' => $naMinhaConta])>
                 <x-nav-icon name="users" class="h-6 w-6" />
                 <span>Minha conta</span>
@@ -814,15 +833,8 @@
         </nav>
     </div>
 @elseif ($areaConsultor)
-    <div class="fixed inset-x-0 bottom-0 z-30 lg:hidden transform-gpu will-change-transform">
+    <div data-barra="profissional" class="fixed inset-x-0 bottom-0 z-30 lg:hidden transform-gpu will-change-transform">
         {{-- Gaveta do grupo tocado --}}
-        <div
-            x-show="secao !== null"
-            x-transition.opacity
-            x-cloak
-            @click="secao = null"
-            class="fixed inset-0 bg-brand-950/30 backdrop-blur-sm"
-        ></div>
         <div
             x-show="secao !== null"
             x-transition:enter="transition ease-out duration-200"
@@ -835,6 +847,7 @@
             class="relative rounded-t-3xl border-t border-brand-950/5 bg-white px-4 pt-3 pb-4 shadow-[0_-8px_32px_-8px_rgb(11_29_58_/_0.2)] dark:border-white/10 dark:bg-slate-900"
         >
             <div class="mx-auto mb-3 h-1 w-10 rounded-full bg-slate-200 dark:bg-white/20"></div>
+            <div class="max-h-[60vh] overflow-y-auto">
             @foreach ($abasProfissional as $aba)
                 @unless ($aba['direta'])
                     <div x-show="secao === '{{ $aba['chave'] }}'" x-cloak class="pb-1">
@@ -850,6 +863,7 @@
                     </div>
                 @endunless
             @endforeach
+            </div>
         </div>
 
         {{-- Abas --}}
@@ -883,15 +897,8 @@
         </nav>
     </div>
 @elseif ($areaAdmin)
-    <div class="fixed inset-x-0 bottom-0 z-30 lg:hidden transform-gpu will-change-transform">
+    <div data-barra="admin" class="fixed inset-x-0 bottom-0 z-30 lg:hidden transform-gpu will-change-transform">
         {{-- Gaveta de Cadastros: mesmo desenho da barra do profissional. --}}
-        <div
-            x-show="secao !== null"
-            x-transition.opacity
-            x-cloak
-            @click="secao = null"
-            class="fixed inset-0 bg-brand-950/30 backdrop-blur-sm"
-        ></div>
         <div
             x-show="secao !== null"
             x-transition:enter="transition ease-out duration-200"
@@ -904,6 +911,7 @@
             class="relative rounded-t-3xl border-t border-brand-950/5 bg-white px-4 pt-3 pb-4 shadow-[0_-8px_32px_-8px_rgb(11_29_58_/_0.2)] dark:border-white/10 dark:bg-slate-900"
         >
             <div class="mx-auto mb-3 h-1 w-10 rounded-full bg-slate-200 dark:bg-white/20"></div>
+            <div class="max-h-[60vh] overflow-y-auto">
             <div x-show="secao === 'cadastros'" x-cloak class="pb-1">
                 <p class="px-1 pb-2 text-[10px] font-semibold tracking-wide text-slate-400 uppercase dark:text-slate-500">Cadastros</p>
                 <div class="grid grid-cols-3 gap-1">
@@ -917,6 +925,7 @@
                         </a>
                     @endforeach
                 </div>
+            </div>
             </div>
         </div>
 

@@ -410,6 +410,15 @@ Dado de saúde pessoal (só o dono vê; `IsPersonalHealthData`). Regras que não
   A temporada limita os dias (fora 6, pré 4, competição 3; esporte 5+ vezes por semana, 3) e, em competição, tira uma série dos exercícios de carga.
   Prazo de troca da fase com esporte: pré-temporada 4 a 6 semanas, o resto 8 a 12. A revisão pergunta a temporada de novo (é o que mais muda). Listas que carregam o catálogo inteiro usam `withoutInstructions()`.
 
+### Navegação no celular (barra inferior)
+
+Três barras, no layout (`components/layouts/app.blade.php`, `data-barra`): `cliente` (dentro de um perfil), `profissional` (consultor e corretor na área deles) e `admin`. Regras:
+
+- **Todo profissional sem cliente aberto tem a barra dele em qualquer tela do app** (`$areaConsultor` não depende mais da lista de rotas): Pessoas e acessos, Minha conta e Assinatura incluídas.
+- **Dentro do perfil de um cliente, o profissional tem a aba "Carteira"** (5ª aba, antes de Minha conta), que abre uma gaveta (`data-gaveta-profissional`) com TODAS as telas dele em grupos (Consultoria, Seguros, Gestão, Plataforma). Não volte a pôr atalhos de ícone no cabeçalho: era uma faixa de 192 px que rolava e escondia 6 de 10 telas.
+- **O fundo da gaveta é um só, fora do contêiner da barra**: o contêiner usa `transform-gpu` (a barra não pode sumir na rolagem do Android) e um `fixed` dentro de um ancestral com `transform` se posiciona por ele, não pela tela. Gaveta nova rola em `max-h-[60vh]`.
+- `ProfessionalMobileNavTest` trava tudo isto.
+
 ### Calendário (Saúde e agenda do profissional)
 
 Um módulo só desenha o calendário: `<x-calendar>` (mês, semana e dia, no estilo de uma agenda) alimentado por `CalendarBuilder` e

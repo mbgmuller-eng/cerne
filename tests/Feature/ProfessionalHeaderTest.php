@@ -67,7 +67,7 @@ class ProfessionalHeaderTest extends TestCase
             ->assertSee(route('logout'), false);
     }
 
-    public function test_dentro_do_perfil_do_cliente_o_consultor_mantem_os_atalhos_de_volta(): void
+    public function test_dentro_do_perfil_do_cliente_o_consultor_tem_o_caminho_de_volta_na_aba_carteira_e_o_sair_no_cabecalho(): void
     {
         $cliente = User::factory()->create();
         $perfil = FinancialProfile::factory()->create(['owner_user_id' => $cliente->id]);
@@ -81,7 +81,10 @@ class ProfessionalHeaderTest extends TestCase
             ->actingAs($consultor)->get(route('dashboard'))->assertOk()->getContent();
         $cabecalho = $this->cabecalho($html);
 
-        self::assertStringContainsString('href="'.route('consultant.portfolio').'"', $cabecalho);
+        // O caminho de volta à área do profissional é a aba "Carteira" da barra inferior (gaveta com todas as telas dele), não mais uma faixa de ícones no cabeçalho.
+        $gaveta = substr($html, (int) strpos($html, 'data-gaveta-profissional'));
+        self::assertStringContainsString('href="'.route('consultant.portfolio').'"', substr($gaveta, 0, (int) strpos($gaveta, '<nav')));
+        self::assertStringNotContainsString('href="'.route('consultant.portfolio').'"', $cabecalho);
         self::assertStringContainsString(route('logout'), $cabecalho);
     }
 
