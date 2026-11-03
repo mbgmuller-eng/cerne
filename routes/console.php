@@ -11,6 +11,7 @@ use App\Services\RecurringIncomeService;
 use App\Services\InvoiceSettingsService;
 use App\Services\PixAutomaticBillingService;
 use App\Services\SubscriptionReminderService;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Schedule;
 
@@ -65,7 +66,9 @@ Schedule::call(function (): void {
 })->dailyAt('03:20')->name('faturas')->withoutOverlapping();
 
 // Relatório de erros da plataforma do dia anterior, por e-mail. Também importa o que ficou no arquivo de reserva e limpa o antigo.
-Schedule::command('cerne:error-report')->dailyAt('08:10')->name('relatorio-de-erros')->withoutOverlapping();
+// Na hospedagem compartilhada o PHP da linha de comando não abre subprocesso (proc_open desligado): Schedule::command() falha com
+// "The Process class relies on proc_open". Por isso as rotinas chamam o comando dentro do mesmo processo (Artisan::call).
+Schedule::call(fn () => Artisan::call('cerne:error-report'))->dailyAt('08:10')->name('relatorio-de-erros')->withoutOverlapping();
 
 // Cotação de USDT, BTC e ETH em reais e novo valor dos investimentos nessas moedas. Roda antes da foto mensal (03:30), que lê esse valor.
 Schedule::call(function (): void {
@@ -245,7 +248,7 @@ Schedule::call(function (): void {
 
 // Leads: anexos de contatos perdidos há mais do prazo de retenção saem do servidor.
 // Idempotente: o que já foi apagado não aparece de novo.
-Schedule::command('cerne:purge-lead-files')->dailyAt('04:10')->name('anexos-de-leads')->withoutOverlapping();
+Schedule::call(fn () => Artisan::call('cerne:purge-lead-files'))->dailyAt('04:10')->name('anexos-de-leads')->withoutOverlapping();
 
 // Documentos: os que ficaram "Na fila" porque a ANTHROPIC_API_KEY ainda
 // não estava configurada no envio. Idempotente pelo próprio estado — um

@@ -138,6 +138,9 @@ Todas idempotentes (regra 4). O cron da Hostinger chama `schedule:run` a cada mi
 | `resumo-de-leads` | 08:00 | uma notificação por profissional com o que pede atenção nos leads |
 | `documentos-pendentes` | a cada 5 min | despacha leitura por IA dos envios que ficaram na fila sem chave da API |
 
+**Rotina agendada nunca abre subprocesso**: o PHP da linha de comando da hospedagem não tem `proc_open`, então `Schedule::command()` e `exec()` falham todo dia
+com "The Process class relies on proc_open". Use `Schedule::call(fn () => Artisan::call('comando'))`. `ScheduleHostingTest` barra.
+
 A leitura por IA roda em fila do banco (`queue:work --stop-when-empty` no cron):
 `ProcessDocumentJob` (documentos) e `ExtractLeadQuoteJob` (simulação de lead).
 
