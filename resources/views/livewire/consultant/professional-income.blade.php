@@ -42,10 +42,11 @@
             ? ['recebimentos' => 'Recebimentos', 'contratos' => 'Contratos de honorário', 'regras' => 'Regras de comissionamento']
             : ['recebimentos' => 'Recebimentos', 'regras' => 'Regras de comissionamento'];
     @endphp
-    <div class="flex gap-1 rounded-lg bg-slate-100 p-1 dark:bg-white/5" role="tablist" aria-label="Recebimentos">
+    {{-- No celular os três rótulos não cabem lado a lado ("comissionamento" sozinho passa da largura): a faixa rola por dentro em vez de alargar a página. --}}
+    <div class="flex gap-1 overflow-x-auto rounded-lg bg-slate-100 p-1 dark:bg-white/5" role="tablist" aria-label="Recebimentos">
         @foreach ($abas as $chave => $rotulo)
             <button type="button" role="tab" wire:click="setAba('{{ $chave }}')" @class([
-                'flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition',
+                'flex-1 shrink-0 whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-medium transition',
                 'bg-white text-slate-900 shadow-sm dark:bg-slate-700 dark:text-white' => $aba === $chave,
                 'text-slate-500 dark:text-slate-400' => $aba !== $chave,
             ])>{{ $rotulo }}</button>

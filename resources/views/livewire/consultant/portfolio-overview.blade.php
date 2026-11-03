@@ -269,13 +269,14 @@
             @else
                 <div class="card mt-3 divide-y divide-slate-100 dark:divide-white/10">
                     @foreach ($dados['sem_seguro_vida'] as $cliente)
-                        <div class="flex items-center justify-between px-5 py-3">
-                            <div>
-                                <p class="text-sm font-medium text-slate-800 dark:text-slate-200">{{ $cliente['name'] }}</p>
-                                <p class="text-xs text-slate-500 dark:text-slate-400">{{ $cliente['email'] }}</p>
+                        {{-- No celular o nome fica numa linha e o patrimônio e os botões abaixo, quebrando se faltar largura: com tudo numa linha só a linha passava de 500 px e a página inteira ficava mais larga que a tela (a barra de baixo saía do lugar). --}}
+                        <div class="flex flex-col gap-2 px-5 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+                            <div class="min-w-0">
+                                <p class="truncate text-sm font-medium text-slate-800 dark:text-slate-200">{{ $cliente['name'] }}</p>
+                                <p class="truncate text-xs text-slate-500 dark:text-slate-400">{{ $cliente['email'] }}</p>
                             </div>
-                            <div class="flex items-center gap-4">
-                                <div class="text-right">
+                            <div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 sm:shrink-0 sm:justify-end">
+                                <div class="text-left sm:text-right">
                                     <p class="figure text-sm text-slate-700 dark:text-slate-300">{{ Money::format($cliente['patrimonio']) }}</p>
                                     <p class="text-xs text-slate-400">cliente desde {{ $cliente['since']?->translatedFormat('m/Y') ?? '—' }}</p>
                                 </div>

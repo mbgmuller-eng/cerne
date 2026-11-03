@@ -122,6 +122,20 @@ class ProfessionalMobileNavTest extends TestCase
         $this->assertLessThan(strpos($html, 'data-barra="cliente"'), strpos($html, 'bg-brand-950/30'), 'o fundo vem antes do contêiner com transform, não dentro dele');
     }
 
+    public function test_as_linhas_de_cliente_da_carteira_empilham_no_celular_em_vez_de_alargar_a_pagina(): void
+    {
+        $consultor = User::factory()->consultant()->create();
+        $this->vincular($consultor);
+
+        $html = $this->actingAs($consultor)->get(route('consultant.portfolio'))->assertOk()->getContent();
+
+        // Com nome, patrimônio e dois botões numa linha só, a linha passava de 500 px num celular de 375: a página ficava mais larga que a tela, a barra
+        // fixa saía do lugar e as gavetas apareciam cortadas. No celular a linha empilha e o bloco da direita quebra; só no sm ela volta a ser uma linha.
+        $this->assertStringContainsString('flex flex-col gap-2 px-5 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4', $html);
+        $this->assertStringContainsString('flex flex-wrap items-center justify-between gap-x-4 gap-y-2 sm:shrink-0 sm:justify-end', $html);
+        $this->assertStringNotContainsString('<div class="flex items-center justify-between px-5 py-3">', $html);
+    }
+
     public function test_as_gavetas_do_profissional_e_do_admin_rolam_quando_passam_de_60_por_cento_da_tela(): void
     {
         $consultor = User::factory()->consultant()->create();
