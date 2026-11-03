@@ -41,8 +41,8 @@ class FixedBillPayment extends Model
 
     protected static function booted(): void
     {
-        // Herda a privacidade do pai também para quem acompanha as finanças (ver o escopo).
-        static::addGlobalScope(new \App\Models\Scopes\ParentPrivacyForFamilyScope('fixedBill'));
+        // Herda a privacidade do pai (do cartão, da conta) para quem opera dentro de um perfil (ver o escopo).
+        static::addGlobalScope(new \App\Models\Scopes\ParentPrivacyScope('fixedBill'));
     }
 
     public function fixedBill(): BelongsTo

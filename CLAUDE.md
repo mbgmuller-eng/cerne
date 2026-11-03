@@ -264,7 +264,7 @@ e **só o que não é privado**. Regras que não se quebram:
   seguem fechados em `SharedTaxonomyScope`). A saúde só abre com `hasHealthAccess()`: `grantLevels()`/`grantedMemberIds()` contam **só** os acessos de saúde.
 - **Privacidade do casal vale também para os filhos** (`MemberPrivacyScope`, ramo de quem acompanha): vê o da família (`member_id` nulo), o conjunto (`is_joint`) e o que as pessoas que
   ele acompanha **não** marcaram como privado. O que um cônjuge escondeu do outro fica escondido deles. **Fatura e vencimento de conta fixa não herdavam a privacidade do pai**:
-  `ParentPrivacyForFamilyScope` exige, só para quem acompanha, que o cartão/a conta de origem esteja visível. O cache do painel tem chave própria por conjunto de pessoas acompanhadas
+  `ParentPrivacyScope` exige, de **todo** o que opera dentro de um perfil (cônjuge e familiar; não o consultor nem as rotinas sem perfil), que o cartão/a conta de origem esteja visível. O cache do painel tem chave própria por conjunto de pessoas acompanhadas
   (`DashboardService::remember`; sem isso o filho receberia o total do dono).
 - **Nunca grava**: `BelongsToProfile` recusa criar, alterar e apagar de quem acompanha em tudo que não é saúde (a saúde segue a trava por pessoa do `CaregiverWriteGuard`). As telas são
   próprias e sem botão de gravar (`FamilyFinance`, rota `family.index`), não as telas de finanças com o botão escondido. `RestrictCareContext` só abre `family.*` a quem tem finanças e só
