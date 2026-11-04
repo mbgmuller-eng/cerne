@@ -15,6 +15,7 @@ use App\Models\Scopes\ProfileScope;
 use App\Notifications\FixedBillDueSoon;
 use App\Support\Money;
 use Carbon\CarbonImmutable;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
@@ -130,15 +131,19 @@ class FixedBillService
                 continue;
             }
 
-            FixedBillPayment::withoutProfileScope()->create([
-                'profile_id' => $conta->profile_id,
-                'fixed_bill_id' => $conta->id,
-                'year' => $vencimento->year,
-                'month' => $vencimento->month,
-                'due_date' => $vencimento,
-                'status' => FixedBillPaymentStatus::Pending,
-            ]);
-            $criados++;
+            try {
+                FixedBillPayment::withoutProfileScope()->create([
+                    'profile_id' => $conta->profile_id,
+                    'fixed_bill_id' => $conta->id,
+                    'year' => $vencimento->year,
+                    'month' => $vencimento->month,
+                    'due_date' => $vencimento,
+                    'status' => FixedBillPaymentStatus::Pending,
+                ]);
+                $criados++;
+            } catch (UniqueConstraintViolationException) {
+                // Outra execução (o cron, ou a mesma tela aberta em duas abas) criou entre a conferência e a gravação: o índice único segurou, que é o que a idempotência pede.
+            }
         }
 
         return $criados;

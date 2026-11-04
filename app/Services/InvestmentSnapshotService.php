@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\InvestmentRecord;
 use App\Models\InvestmentSnapshot;
 use Carbon\CarbonImmutable;
+use Illuminate\Database\UniqueConstraintViolationException;
 
 /**
  * Foto mensal da carteira.
@@ -45,16 +46,20 @@ class InvestmentSnapshotService
                         continue;
                     }
 
-                    InvestmentSnapshot::withoutProfileScope()->create([
-                        'profile_id' => $ativo->profile_id,
-                        'investment_id' => $ativo->id,
-                        'year' => $year,
-                        'month' => $month,
-                        'amount' => $ativo->current_amount,
-                        'quantity' => $ativo->quantity,
-                    ]);
+                    try {
+                        InvestmentSnapshot::withoutProfileScope()->create([
+                            'profile_id' => $ativo->profile_id,
+                            'investment_id' => $ativo->id,
+                            'year' => $year,
+                            'month' => $month,
+                            'amount' => $ativo->current_amount,
+                            'quantity' => $ativo->quantity,
+                        ]);
 
-                    $criadas++;
+                        $criadas++;
+                    } catch (UniqueConstraintViolationException) {
+                        // Outra execução (o cron, ou a mesma tela aberta em duas abas) criou entre a conferência e a gravação: o índice único segurou, que é o que a idempotência pede.
+                    }
                 }
             });
 

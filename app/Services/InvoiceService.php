@@ -6,6 +6,7 @@ use App\Enums\InvoiceStatus;
 use App\Models\BankAccount;
 use App\Models\CreditCard;
 use App\Models\CreditCardInvoice;
+use Illuminate\Database\UniqueConstraintViolationException;
 use App\Models\FinancialProfile;
 use App\Models\ProfileMember;
 use App\Models\Scopes\MemberPrivacyScope;
@@ -27,20 +28,24 @@ class InvoiceService
      */
     public function ensureInvoice(CreditCard $card, int $year, int $month): CreditCardInvoice
     {
-        return CreditCardInvoice::firstOrCreate(
-            [
-                'credit_card_id' => $card->id,
-                'year' => $year,
-                'month' => $month,
-            ],
-            [
-                'profile_id' => $card->profile_id,
-                'closing_date' => $card->closingDateFor($year, $month),
-                'due_date' => $card->dueDateFor($year, $month),
-                'total_amount' => '0.00',
-                'status' => InvoiceStatus::Open,
-            ],
-        );
+        $chave = ['credit_card_id' => $card->id, 'year' => $year, 'month' => $month];
+
+        try {
+            return CreditCardInvoice::firstOrCreate(
+                $chave,
+                [
+                    'profile_id' => $card->profile_id,
+                    'closing_date' => $card->closingDateFor($year, $month),
+                    'due_date' => $card->dueDateFor($year, $month),
+                    'total_amount' => '0.00',
+                    'status' => InvoiceStatus::Open,
+                ],
+            );
+        } catch (UniqueConstraintViolationException) {
+            // Outra execução criou a fatura entre a busca e a gravação (firstOrCreate não é atômico): o índice único segurou, devolve a que já existe.
+            // Sem o escopo de perfil: a rotina do cron não tem perfil ativo e a fatura é do cartão que acabamos de receber.
+            return CreditCardInvoice::withoutProfileScope()->where($chave)->firstOrFail();
+        }
     }
 
     /** A fatura em que uma compra desta data cai. */

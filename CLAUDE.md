@@ -62,7 +62,8 @@ dashboard tem a identidade de quem pergunta na chave.
 ### 4. Toda rotina agendada é idempotente
 
 O cron da hospedagem compartilhada pode disparar concorrente ou repetido. A
-proteção é **índice único**, não `if (existe)` — que perde a corrida.
+proteção é **índice único**, não `if (existe)` — que perde a corrida. Quem grava ao abrir uma tela (vencimentos de conta fixa, ocorrência de receita) corre também contra o cron e contra outra aba:
+`create` dentro de `try/catch (UniqueConstraintViolationException)` (ou `createOrFirst`), nunca `exists()` seguido de `create` sozinho.
 
 Já existem em: `credit_card_invoices(credit_card_id, year, month)`,
 `fixed_bill_payments(fixed_bill_id, year, month)`,

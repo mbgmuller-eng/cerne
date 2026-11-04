@@ -9,6 +9,7 @@ use App\Models\RecurringIncome;
 use App\Models\RecurringIncomeOccurrence;
 use App\Support\Money;
 use Carbon\CarbonImmutable;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -106,15 +107,19 @@ class RecurringIncomeService
                 continue;
             }
 
-            RecurringIncomeOccurrence::withoutProfileScope()->create([
-                'profile_id' => $receita->profile_id,
-                'recurring_income_id' => $receita->id,
-                'year' => $data->year,
-                'month' => $data->month,
-                'due_date' => $data,
-                'status' => RecurringIncomeStatus::Pending,
-            ]);
-            $criados++;
+            try {
+                RecurringIncomeOccurrence::withoutProfileScope()->create([
+                    'profile_id' => $receita->profile_id,
+                    'recurring_income_id' => $receita->id,
+                    'year' => $data->year,
+                    'month' => $data->month,
+                    'due_date' => $data,
+                    'status' => RecurringIncomeStatus::Pending,
+                ]);
+                $criados++;
+            } catch (UniqueConstraintViolationException) {
+                // Outra execução (o cron, ou a mesma tela aberta em duas abas) criou entre a conferência e a gravação: o índice único segurou, que é o que a idempotência pede.
+            }
         }
 
         return $criados;
