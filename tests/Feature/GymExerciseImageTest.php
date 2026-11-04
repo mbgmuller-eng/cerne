@@ -154,6 +154,34 @@ class GymExerciseImageTest extends TestCase
         self::assertStringStartsWith('image/', $resposta->headers->get('Content-Type'));
     }
 
+    public function test_a_foto_fica_em_cache_longo_porque_o_endereco_muda_quando_a_foto_muda(): void
+    {
+        $item = $this->criarExercicioComFoto();
+
+        $cabecalho = (string) $this->get($item->exercise->imageUrl())->assertOk()->headers->get('Cache-Control');
+
+        // Cada abertura que não chega ao PHP poupa uma conexão com o banco da hospedagem compartilhada (erro 2002 ao ler a sessão).
+        $this->assertStringContainsString('private', $cabecalho);
+        $this->assertStringContainsString('immutable', $cabecalho);
+        $this->assertStringContainsString('max-age=2592000', $cabecalho);
+        $this->assertStringContainsString('?v=', $item->exercise->imageUrl(), 'o endereço leva a versão: trocar a foto muda a URL');
+    }
+
+    public function test_a_tela_busca_as_fotos_pela_fila_e_nao_todas_de_uma_vez(): void
+    {
+        $item = $this->criarExercicioComFoto();
+
+        $html = view('components.gym.exercise-photo', ['exercise' => $item->exercise])->render();
+
+        $this->assertStringContainsString('gymPhoto([', $html);
+        $this->assertStringNotContainsString('setInterval', $html, 'o cronômetro do 2º quadro mora no gymPhoto, que só o liga depois de o quadro chegar');
+        $this->assertStringNotContainsString('src="'.$item->exercise->imageUrl().'"', $html, 'a imagem não nasce com o endereço direto: espera a vez na fila');
+
+        $js = (string) file_get_contents(resource_path('js/app.js'));
+        $this->assertStringContainsString('FOTOS_AO_MESMO_TEMPO', $js);
+        $this->assertStringContainsString("Alpine.data('gymPhoto'", $js);
+    }
+
     public function test_rota_nao_serve_a_foto_para_o_conjuge_nem_para_o_consultor(): void
     {
         $item = $this->criarExercicioComFoto();

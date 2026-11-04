@@ -30,9 +30,9 @@ class GymExerciseImageController extends Controller
 
         return response($disco->get($caminho), 200, [
             'Content-Type' => $disco->mimeType($caminho) ?: 'application/octet-stream',
-            // Privado: é foto de dado de saúde, não pode ficar em cache
-            // compartilhado (proxy, CDN) nem num aparelho de uso comum.
-            'Cache-Control' => 'private, max-age=86400',
+            // Privado: não fica em cache compartilhado (proxy, CDN). A URL leva `?v=` com a data de alteração, então trocar a foto muda o endereço e o
+            // navegador pode guardar esta por muito tempo: cada abertura que não vai ao PHP poupa uma conexão com o banco da hospedagem.
+            'Cache-Control' => 'private, max-age=2592000, immutable',
         ]);
     }
 }

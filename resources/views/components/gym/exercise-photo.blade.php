@@ -11,36 +11,28 @@
 
     `prefers-reduced-motion` desliga a troca — mostra só o primeiro
     quadro parado.
+
+    Quem busca os quadros é o `gymPhoto` (resources/js/app.js): numa fila
+    de poucas por vez, com nova tentativa se falhar. Cada foto é uma
+    requisição ao PHP e a hospedagem recusa conexões demais de uma vez.
 --}}
 @if ($exercise->imageUrl())
     {{-- display:contents: a div não entra no layout (grid/flex do chamador vê só o <img>) --}}
     <div
         class="contents"
-        x-data="{
-            frames: [@js($exercise->imageUrl(1)), @js($exercise->imageUrl(2))],
-            i: 0,
-            src: @js($exercise->imageUrl(1)),
-            open: false,
-            timer: null,
-            init() {
-                if (! {{ $exercise->hasAnimatedImage() ? 'true' : 'false' }}) return;
-                if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-                this.timer = setInterval(() => { this.i = 1 - this.i; this.src = this.frames[this.i]; }, 1100);
-            },
-            destroy() { clearInterval(this.timer); },
-        }"
+        x-data="gymPhoto([@js($exercise->imageUrl(1)), @js($exercise->imageUrl(2))], {{ $exercise->hasAnimatedImage() ? 'true' : 'false' }})"
     >
         <img
-            :src="src"
+            :src="src || null"
             alt=""
-            loading="lazy"
+            decoding="async"
             x-on:click="open = true"
             {{ $attributes->merge(['class' => $size.' shrink-0 cursor-zoom-in object-cover ring-1 ring-slate-200 dark:ring-white/10']) }}
         >
 
         <div x-show="open" x-cloak x-on:keydown.escape.window="open = false"
              class="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4" x-on:click="open = false">
-            <img :src="src" alt="{{ $exercise->name }}" class="max-h-[85vh] max-w-full rounded-xl object-contain">
+            <img :src="src || null" alt="{{ $exercise->name }}" class="max-h-[85vh] max-w-full rounded-xl object-contain">
             <button type="button" x-on:click.stop="open = false"
                     class="absolute right-4 top-4 flex h-9 w-9 items-center justify-center rounded-full bg-black/40 text-lg text-white/90"
                     aria-label="Fechar">✕</button>

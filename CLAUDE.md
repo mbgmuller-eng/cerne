@@ -402,6 +402,10 @@ Dado de saúde pessoal (só o dono vê; `IsPersonalHealthData`). Regras que não
   conhecido, equipamento do dia a dia, sem variação rara); a troca à mão enxerga tudo. A biblioteca guarda `source_level/mechanic/category`, que o
   gerador usa no lugar das palavras do nome (nível e composto/isolado) nos importados; o `--force` não é preciso para completar a metadata: ela
   só é preenchida quando falta, para nunca desfazer uma escolha do admin.
+- **Fotos dos exercícios são uma requisição ao PHP cada** (disco privado, a rota confere quem pede), e a hospedagem compartilhada recusa conexões demais ao banco ao mesmo tempo
+  (`SQLSTATE[HY000] [2002] Operation not permitted` ao ler a sessão, em `health.gym.exercise-image`). Por isso `<x-gym.exercise-photo>` não põe `src` direto: o `gymPhoto` (`resources/js/app.js`) busca
+  as fotos numa fila de 3 por vez, repete com pausa se falhar e só pede o 2º quadro depois do 1º. As rotas de imagem respondem com cache longo e `immutable` (a URL leva `?v=` da última alteração). Foto nova em
+  tela de lista: use o componente, nunca um `<img src>` direto. Mudou o JS: `npm run build` (assets versionados).
 - **Foco esportivo** (`GymSport`, `GymSeason`; colunas `gym_plans.sport/sport_days/season`): o esporte **não é um objetivo a mais**. O objetivo continua
   dizendo como prescrever (séries, repetições, descanso); o esporte diz **quais exercícios** ganham prioridade (`emphasis`: o maior peso que bater, nunca
   soma), quais **espaços extras** entram no lugar dos últimos do dia (`extraSlots`, revezando entre os treinos), o que sai do "nunca automático" só

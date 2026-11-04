@@ -115,6 +115,92 @@ async function baixarArquivo(url, nomeArquivo) {
     URL.revokeObjectURL(blobUrl);
 }
 
+/*
+ * Fotos de exercício. Cada foto é uma requisição ao PHP (o disco é privado e a rota confere quem pede), e na hospedagem compartilhada o banco
+ * recusa conexões demais ao mesmo tempo ("Operation not permitted" ao ler a sessão). Uma tela de treino com 10 exercícios e 2 quadros cada
+ * disparava 20 requisições de uma vez. Aqui as fotos entram numa fila de poucas por vez, repetem com pausa se uma falhar e o 2º quadro só é
+ * buscado depois que o 1º chegou. O navegador guarda o arquivo (cache longo), então só a primeira visita paga.
+ */
+const FOTOS_AO_MESMO_TEMPO = 3;
+const fotos = { ativas: 0, fila: [] };
+
+function proximaFoto() {
+    while (fotos.ativas < FOTOS_AO_MESMO_TEMPO && fotos.fila.length > 0) {
+        fotos.ativas++;
+        const { url, resolver } = fotos.fila.shift();
+        const imagem = new Image();
+        const terminar = (ok) => {
+            fotos.ativas--;
+            resolver(ok);
+            proximaFoto();
+        };
+        imagem.onload = () => terminar(true);
+        imagem.onerror = () => terminar(false);
+        imagem.src = url;
+    }
+}
+
+/** Resolve true quando a imagem chegou (e ficou no cache do navegador), false depois de esgotar as tentativas. */
+async function carregarFoto(url, tentativas = 3) {
+    for (let i = 0; i < tentativas; i++) {
+        // `r` muda a URL só nas repetições: o navegador não reaproveita uma resposta de erro.
+        const alvo = i === 0 ? url : `${url}${url.includes('?') ? '&' : '?'}r=${i}`;
+        const ok = await new Promise((resolver) => {
+            fotos.fila.push({ url: alvo, resolver });
+            proximaFoto();
+        });
+
+        if (ok) {
+            return alvo;
+        }
+
+        await new Promise((r) => setTimeout(r, 1500 * (i + 1) + Math.random() * 1000));
+    }
+
+    return null;
+}
+
+document.addEventListener('alpine:init', () => {
+    Alpine.data('gymPhoto', (frames, animated) => ({
+        frames,
+        i: 0,
+        src: '',
+        open: false,
+        timer: null,
+
+        async init() {
+            const primeiro = await carregarFoto(frames[0]);
+
+            if (primeiro === null) {
+                return;
+            }
+
+            this.frames[0] = primeiro;
+            this.src = primeiro;
+
+            if (! animated || window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+                return;
+            }
+
+            // Só alterna quando o 2º quadro já chegou: trocar para uma URL ainda não carregada piscava a foto quebrada.
+            const segundo = await carregarFoto(frames[1]);
+
+            if (segundo === null) {
+                return;
+            }
+
+            this.frames[1] = segundo;
+            this.timer = setInterval(() => {
+                this.i = 1 - this.i;
+                this.src = this.frames[this.i];
+            }, 1100);
+        },
+
+        destroy() {
+            clearInterval(this.timer);
+        },
+    }));
+});
 document.addEventListener('alpine:init', () => {
     Alpine.data('voiceExpense', () => ({
         suportado: false,
