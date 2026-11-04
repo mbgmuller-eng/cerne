@@ -53,7 +53,7 @@
                 @foreach ($openTasks as $t)
                     <tr>
                         <td>{{ $t->title }}@if ($t->description)<p class="nota">{{ $t->description }}</p>@endif</td>
-                        <td>{{ $t->owner->label() }}</td>
+                        <td>{{ $t->responsibleLabel() }}</td>
                         <td>{{ $t->due_date?->format('d/m/Y') ?? '—' }}</td>
                         <td>{{ $t->status->label() }}</td>
                     </tr>
@@ -68,7 +68,7 @@
             <thead><tr><th>Tarefa</th><th>Responsável</th><th>Concluída em</th></tr></thead>
             <tbody>
                 @foreach ($doneTasks as $t)
-                    <tr><td>{{ $t->title }}</td><td>{{ $t->owner->label() }}</td><td>{{ $t->completed_at?->format('d/m/Y') ?? '—' }}</td></tr>
+                    <tr><td>{{ $t->title }}</td><td>{{ $t->responsibleLabel() }}</td><td>{{ $t->completed_at?->format('d/m/Y') ?? '—' }}</td></tr>
                 @endforeach
             </tbody>
         </table>

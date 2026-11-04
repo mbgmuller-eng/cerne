@@ -153,7 +153,7 @@ final class CalendarEvent
             end: $dia->addDay(),
             allDay: true,
             location: null,
-            description: 'Responsável: '.$tarefa->owner->label().(filled($tarefa->description) ? "\n".trim($tarefa->description) : ''),
+            description: 'Responsável: '.$tarefa->responsibleLabel().(filled($tarefa->description) ? "\n".trim($tarefa->description) : ''),
             notes: null,
             modifiedAt: $tarefa->updated_at ?? $dia,
         );

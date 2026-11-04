@@ -68,7 +68,7 @@ class EngagementWeekService
             ],
             'meetings' => $proximas->take(8)->map(fn (EngagementMeeting $m) => ['profile_id' => $m->profile_id, 'client' => $nome($m->profile_id), 'at' => $m->scheduled_at, 'agenda_ready' => $m->agendaItems() !== []])->values()->all(),
             'awaiting_summary' => $semAta->map(fn (EngagementMeeting $m) => ['profile_id' => $m->profile_id, 'client' => $nome($m->profile_id), 'at' => $m->scheduled_at])->values()->all(),
-            'overdue_tasks' => $vencidas->take(10)->map(fn (EngagementTask $t) => ['profile_id' => $t->profile_id, 'client' => $nome($t->profile_id), 'title' => $t->title, 'due' => $t->due_date, 'owner' => $t->owner])->all(),
+            'overdue_tasks' => $vencidas->take(10)->map(fn (EngagementTask $t) => ['profile_id' => $t->profile_id, 'client' => $nome($t->profile_id), 'title' => $t->title, 'due' => $t->due_date, 'owner' => $t->owner, 'responsible' => $t->responsibleLabel()])->all(),
             'open_requests' => $demandas->take(10)->map(fn (EngagementRequest $d) => ['profile_id' => $d->profile_id, 'client' => $nome($d->profile_id), 'title' => $d->title, 'since' => $d->created_at])->all(),
             'clients_without_meeting' => $semReuniao->map(fn (FinancialProfile $p) => ['profile_id' => $p->id, 'client' => $p->profile_name])->all(),
         ];

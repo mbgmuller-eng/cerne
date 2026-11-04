@@ -28,7 +28,7 @@
                         <div class="min-w-0">
                             <p class="text-sm text-slate-800 dark:text-slate-200">{{ $t->title }}</p>
                             <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-                                {{ $t->owner->label() }}
+                                {{ $t->responsibleLabel() }}
                                 @if ($t->due_date) · até {{ $t->due_date->format('d/m') }} @endif
                             </p>
                             @if ($t->description)

@@ -69,13 +69,14 @@ class EngagementReminderService
                 $tarefa->owner === EngagementTaskOwner::Client ? 'client' : 'consultant',
                 $amanha ? 'Tarefa vence amanhã' : 'Tarefa atrasada',
                 $tarefa->title.($amanha ? ' vence amanhã.' : ' venceu em '.$tarefa->due_date->format('d/m').'.'),
+                usuarioId: $tarefa->assignee?->user_id,
             );
         }
 
         return $enviados;
     }
 
-    private function remind(string $profileId, string $consultantId, string $tipoAssunto, string $assuntoId, string $tipo, string $lado, string $titulo, string $mensagem, array $extra = []): int
+    private function remind(string $profileId, string $consultantId, string $tipoAssunto, string $assuntoId, string $tipo, string $lado, string $titulo, string $mensagem, array $extra = [], ?string $usuarioId = null): int
     {
         $perfil = FinancialProfile::query()->find($profileId);
 
@@ -86,7 +87,8 @@ class EngagementReminderService
 
         $consultor = User::query()->find($consultantId);
         $usuarios = match ($lado) {
-            'client' => $this->access->clientUsers($perfil),
+            // Tarefa de uma pessoa do casal com login: só ela é lembrada. Sem login (ou sem pessoa), o cliente todo.
+            'client' => $usuarioId !== null ? $this->access->clientUsers($perfil)->where('id', $usuarioId)->values() : $this->access->clientUsers($perfil),
             'consultant' => collect([$consultor])->filter(),
             default => $this->access->clientUsers($perfil)->push($consultor)->filter()->unique('id'),
         };

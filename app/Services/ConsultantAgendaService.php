@@ -150,7 +150,7 @@ class ConsultantAgendaService
                     allDay: true,
                     color: self::COLORS[self::TASKS],
                     tag: 'Prazo de tarefa',
-                    lines: [$cliente, 'Tarefa do '.($t->owner->value === 'client' ? 'cliente' : 'consultor')],
+                    lines: [$cliente, 'Responsável: '.$t->responsibleLabel()],
                     hollow: true,
                     shortTitle: $cliente.': '.$t->title,
                     meta: ['type' => self::TASKS, 'profile_id' => $t->profile_id, 'client' => $cliente, 'description' => $t->description],

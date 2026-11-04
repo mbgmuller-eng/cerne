@@ -14,6 +14,8 @@ use App\Models\EngagementNote;
 use App\Models\EngagementRequest;
 use App\Models\EngagementRequestComment;
 use App\Models\EngagementTask;
+use App\Models\ProfileMember;
+use App\Models\User;
 use App\Models\FinancialProfile;
 use App\Support\Engagement\EngagementDocuments;
 use App\Support\Engagement\EngagementViewer;
@@ -168,7 +170,7 @@ class EngagementService
     // ------------------------------------------------------------------ tarefas
 
     /**
-     * @param  array{title: string, description?: ?string, owner: string, due_date?: ?CarbonInterface, meeting_id?: ?string}  $dados
+     * @param  array{title: string, description?: ?string, owner: string, assignee_member_id?: ?string, due_date?: ?CarbonInterface, meeting_id?: ?string}  $dados
      */
     public function saveTask(EngagementViewer $v, ?EngagementTask $tarefa, array $dados): EngagementTask
     {
@@ -183,8 +185,21 @@ class EngagementService
             throw new AuthorizationException('Reunião de outra relação de consultoria.');
         }
 
+        // A pessoa do casal só vale para tarefa do cliente e se for do perfil desta relação.
+        $pessoaId = $dono === EngagementTaskOwner::Client ? ($dados['assignee_member_id'] ?? null) : null;
+        $pessoa = null;
+
+        if ($pessoaId !== null) {
+            $pessoa = ProfileMember::withoutGlobalScopes()->where('profile_id', $v->profileId)->where('is_active', true)->find($pessoaId);
+
+            if ($pessoa === null) {
+                throw new AuthorizationException('Pessoa de outro perfil.');
+            }
+        }
+
         $novo = $tarefa === null;
         $donoAntes = $tarefa?->owner;
+        $pessoaAntes = $tarefa?->assignee_member_id;
 
         $tarefa ??= new EngagementTask(['profile_id' => $v->profileId, 'consultant_id' => $v->consultantId(), 'created_by_user_id' => $v->userId, 'status' => EngagementTaskStatus::Todo]);
 
@@ -192,18 +207,26 @@ class EngagementService
             'title' => $dados['title'],
             'description' => $dados['description'] ?? null,
             'owner' => $dono,
+            'assignee_member_id' => $pessoa?->id,
             'due_date' => $dados['due_date'] ?? null,
             'meeting_id' => $dados['meeting_id'] ?? null,
         ])->save();
 
         // Quem recebeu a tarefa de outra pessoa é avisado; quem cria a própria tarefa não precisa de aviso.
-        $paraOutroLado = $dono === EngagementTaskOwner::Client ? $v->isConsultant() : $v->isClient();
-
-        if ($paraOutroLado && ($novo || $donoAntes !== $dono)) {
+        if ($novo || $donoAntes !== $dono || $pessoaAntes !== $pessoa?->id) {
             $prazo = $tarefa->due_date !== null ? ' Prazo: '.$tarefa->due_date->format('d/m').'.' : '';
-            $this->avisos->toOtherSide($v, 'task_assigned', 'Nova tarefa para você', $tarefa->title.'.'.$prazo);
-        }
+            $texto = $tarefa->title.'.'.$prazo;
 
+            if ($pessoa?->user_id !== null) {
+                // Tarefa de uma pessoa do casal: só ela é avisada (a outra não tem o que fazer), a menos que tenha sido ela mesma a criar.
+                if ($pessoa->user_id !== $v->userId) {
+                    $this->avisos->send(User::query()->whereKey($pessoa->user_id)->get(), $v->profileId, 'task_assigned', 'Nova tarefa para você', $texto);
+                }
+            } elseif ($dono === EngagementTaskOwner::Client ? $v->isConsultant() : $v->isClient()) {
+                // Dos dois (ou de quem não tem login): o outro lado da relação é quem precisa saber.
+                $this->avisos->toOtherSide($v, 'task_assigned', 'Nova tarefa para você', $texto);
+            }
+        }
         return $tarefa;
     }
 

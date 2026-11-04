@@ -74,7 +74,7 @@
                 <div class="flex items-center justify-between gap-3 border-t border-slate-100 py-2.5 first:border-t-0 dark:border-white/10">
                     <div class="min-w-0">
                         <p class="truncate text-sm text-slate-800 dark:text-slate-200">{{ $t['client'] }} · {{ $t['title'] }}</p>
-                        <p class="text-xs text-slate-500 dark:text-slate-400">tarefa do {{ $t['owner']->value === 'client' ? 'cliente' : 'consultor' }}, venceu em {{ $t['due']->format('d/m') }}</p>
+                        <p class="text-xs text-slate-500 dark:text-slate-400">tarefa de {{ $t['responsible'] }}, venceu em {{ $t['due']->format('d/m') }}</p>
                     </div>
                     {!! $abrir($t['profile_id'], 'Abrir') !!}
                 </div>

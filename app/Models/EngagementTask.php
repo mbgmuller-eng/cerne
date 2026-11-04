@@ -17,10 +17,13 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  *
  * Visível só dentro da relação de consultoria (EngagementScope), além do isolamento por perfil.
  */
-#[Fillable(['profile_id', 'consultant_id', 'meeting_id', 'title', 'description', 'owner', 'due_date', 'status', 'completed_at', 'created_by_user_id'])]
+#[Fillable(['profile_id', 'consultant_id', 'meeting_id', 'title', 'description', 'owner', 'assignee_member_id', 'due_date', 'status', 'completed_at', 'created_by_user_id'])]
 class EngagementTask extends Model
 {
     use BelongsToProfile, HasUuids;
+
+    /** O nome de quem é responsável aparece em toda lista de tarefas: carregar junto evita a consulta por linha (e o lazy loading barrado fora de produção). */
+    protected $with = ['assignee'];
 
     protected static function booted(): void
     {
@@ -35,6 +38,21 @@ class EngagementTask extends Model
             'owner' => EngagementTaskOwner::class,
             'status' => EngagementTaskStatus::class,
         ];
+    }
+
+    /**
+     * A pessoa do casal a quem a tarefa foi dada (só quando o dono é o cliente). Sem os escopos de perfil de propósito: o consultor lê tarefas de vários
+     * clientes de uma vez (agenda, semana) e o escopo esconderia o nome; quem vê a tarefa já vê quem é o responsável.
+     */
+    public function assignee(): BelongsTo
+    {
+        return $this->belongsTo(ProfileMember::class, 'assignee_member_id')->withoutGlobalScopes();
+    }
+
+    /** "Ana" quando a tarefa é de uma pessoa do casal; senão "Cliente" ou "Consultor". */
+    public function responsibleLabel(): string
+    {
+        return $this->assignee?->name ?? $this->owner->label();
     }
 
     public function consultant(): BelongsTo
