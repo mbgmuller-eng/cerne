@@ -5,6 +5,9 @@
     $context = app(\App\Support\ProfileContext::class);
     $profile = $context->profile();
     $user = auth()->user();
+    // Tela com tutorial ganha o botão "?" e o cartão de primeira visita (ver App\Support\Tutorials\TutorialCatalog).
+    $rotaAtual = request()->route()?->getName();
+    $temTutorial = \App\Support\Tutorials\TutorialCatalog::has($rotaAtual);
 
     // [rota, rótulo completo, rótulo curto para a barra inferior, ícone]
     // Corretor dentro do perfil de um cliente só vê Seguros — o resto é
@@ -424,6 +427,9 @@
                          (usado no cabeçalho também, com fundo claro) — o
                          seletor aqui força a cor certa só nesta instância,
                          sem mexer no componente em si. --}}
+                    @if ($temTutorial)
+                        <x-help-button class="!text-white/60" />
+                    @endif
                     <div class="[&>div>button]:!text-white/60">
                         <livewire:notifications.notification-center direction="up" />
                     </div>
@@ -496,6 +502,9 @@
                             <x-nav-icon name="logout" class="h-4 w-4" />
                         </button>
                     </form>
+                    @if ($temTutorial)
+                        <x-help-button />
+                    @endif
                     <livewire:notifications.notification-center direction="up" />
                 </div>
 
@@ -582,6 +591,9 @@
                             <x-nav-icon name="logout" class="h-4 w-4" />
                         </button>
                     </form>
+                    @if ($temTutorial)
+                        <x-help-button />
+                    @endif
                     <livewire:notifications.notification-center direction="up" />
                 </div>
 
@@ -688,6 +700,10 @@
                         @endunless
                     </div>
 
+                    @if ($temTutorial)
+                        <x-help-button class="shrink-0 {{ $dentroDoPerfil ? '!text-white/60' : '' }}" />
+                    @endif
+
                     @auth
                         <div @class(['shrink-0', '[&>div>button]:!text-white/60' => $dentroDoPerfil])>
                             <livewire:notifications.notification-center />
@@ -711,6 +727,8 @@
                     {{ session('status') }}
                 </div>
             @endif
+
+            <livewire:tutorial.page-help :route-name="$rotaAtual" />
 
             {{ $slot }}
         </main>

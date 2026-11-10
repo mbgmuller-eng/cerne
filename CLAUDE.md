@@ -425,6 +425,17 @@ Três barras, no layout (`components/layouts/app.blade.php`, `data-barra`): `cli
 - **Nada passa da largura da tela no celular.** Um elemento mais largo que a tela (linha com nome + valor + dois botões sem quebrar, faixa de abas com rótulo longo) alarga a PÁGINA INTEIRA no Chrome do Android: a barra `fixed` sai do lugar ("tenho que rolar para o menu aparecer"), a tela fica deslocável para o lado e as gavetas aparecem cortadas. Linha de lista com vários blocos empilha (`flex-col ... sm:flex-row`, `min-w-0` + `truncate` no texto) e faixa de abas longa rola por dentro (`overflow-x-auto`), nunca o documento. Tabela larga vai dentro de `overflow-x-auto`. Para conferir uma tela: no celular emulado, `document.documentElement.scrollWidth` tem de ser igual a `innerWidth`.
 - `ProfessionalMobileNavTest` trava tudo isto.
 
+### Tutoriais das telas (botão "?" e cartão de primeira visita)
+
+O conteúdo mora em `config/tutorials.php`, indexado pelo **nome da rota**, e `App\Support\Tutorials\TutorialCatalog` o lê. Regras que não se quebram:
+
+- **Tela sem entrada no catálogo não ganha botão nem cartão**: nunca existe um "?" sem conteúdo por trás. O layout (`$temTutorial`) mostra o `<x-help-button>` nos quatro lugares do sino (barras laterais do cliente, do profissional e do admin, e o cabeçalho do celular) e põe `<livewire:tutorial.page-help>` no topo do conteúdo.
+- **Tela nova importante = entrada nova no catálogo** (título, resumo de até 110 caracteres, de 3 a 6 passos, `tip` opcional). Só tela fixa: rota com parâmetro na URL (`debts.show`...) não entra. `TutorialCatalogTest` confere rota existente, de 3 a 6 passos, tom (sem travessão, sem "pra" ou "num") e resumo curto.
+- **O que a pessoa viu é da CONTA, não do perfil** (`tutorial_progress`, uma linha por usuário e tela, índice único): o consultor que entra em 40 perfis vê o cartão uma vez por tela. `TutorialProgress` está em `EXEMPT` do `TenancyCoverageTest`. Abrir o tutorial grava `viewed`, dispensar o cartão grava `dismissed`; **abrir vale mais que dispensar** (nunca o contrário) e a gravação é `upsert` / `insertOrIgnore` por causa do índice único (duas abas). Apagar a conta apaga as linhas (cascata).
+- **Quem está vendo como outra pessoa ("Entrar como", `session('impersonator_id')`) não grava nada** na conta dela, e não vê o cartão.
+- `PageHelp` recebe o nome da rota na montagem (`#[Locked]`): numa ação do Livewire a requisição já é a do Livewire, e `request()->route()` não diria mais em que tela a pessoa está. Em Minha conta, `ResetTutorials` apaga só o progresso de quem pediu ("Mostrar os avisos de novo").
+- Ainda **sem vídeo**: a entrada do catálogo é só texto. O espaço do vídeo (e a medição de quem viu e dispensou) entram depois; o progresso já guarda o suficiente para contar.
+
 ### Calendário (Saúde e agenda do profissional)
 
 Um módulo só desenha o calendário: `<x-calendar>` (mês, semana e dia, no estilo de uma agenda) alimentado por `CalendarBuilder` e

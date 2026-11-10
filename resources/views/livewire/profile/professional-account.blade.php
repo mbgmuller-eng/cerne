@@ -103,6 +103,8 @@
 
     @include('livewire.profile.partials.notifications')
 
+    <livewire:tutorial.reset-tutorials />
+
     <livewire:profile.privacy-center />
 
     @include('livewire.profile.partials.logout-mobile')
