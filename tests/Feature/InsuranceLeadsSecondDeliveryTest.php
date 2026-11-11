@@ -407,15 +407,9 @@ class InsuranceLeadsSecondDeliveryTest extends TestCase
         $meu = $this->lead();
 
         $this->actingAs($this->corretor);
-        $tela = Livewire::test(LeadsIndex::class)->call('openQuotes', $meu->id);
-
         foreach (['readWithAi', 'reviewReading', 'discardReading'] as $acao) {
-            try {
-                $tela->call($acao, $anexoDeOutro->id);
-                self::fail("$acao deveria falhar");
-            } catch (\Illuminate\Database\Eloquent\ModelNotFoundException) {
-                // esperado: o anexo não é de um lead aberto na janela
-            }
+            // O anexo não é de um lead aberto na janela. Cada tentativa usa uma tela nova: a recusada encerra o componente.
+            Livewire::test(LeadsIndex::class)->call('openQuotes', $meu->id)->call($acao, $anexoDeOutro->id)->assertNotFound();
         }
 
         Queue::assertNothingPushed();

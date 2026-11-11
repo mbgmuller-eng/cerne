@@ -258,8 +258,7 @@ class GoalFormTest extends TestCase
 
         Livewire::test(GoalsIndex::class)->assertDontSee('Presente surpresa');
 
-        $this->expectException(ModelNotFoundException::class);
-        Livewire::test(GoalsIndex::class)->call('delete', $privado->id);
+        Livewire::test(GoalsIndex::class)->call('delete', $privado->id)->assertNotFound();
     }
 
     public function test_guarda_dono_e_privacidade_so_quando_ha_dono(): void

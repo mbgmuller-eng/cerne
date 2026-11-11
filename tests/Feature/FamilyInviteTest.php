@@ -142,8 +142,7 @@ class FamilyInviteTest extends TestCase
             'access_level' => CaregiverAccess::Read, 'status' => CaregiverStatus::Active, 'can_view_finance' => true,
         ]);
 
-        $this->expectException(\Illuminate\Database\Eloquent\ModelNotFoundException::class);
-        Livewire::actingAs($this->mae)->test(CareIndex::class)->call('toggleFollowerFinance', $acesso->id);
+        Livewire::actingAs($this->mae)->test(CareIndex::class)->call('toggleFollowerFinance', $acesso->id)->assertNotFound();
     }
 
     public function test_o_limite_de_gasto_que_avisa_a_familia_e_salvo_por_quem_e_do_perfil(): void
@@ -158,8 +157,7 @@ class FamilyInviteTest extends TestCase
         $this->assertNull($this->perfil->fresh()->family_alert_threshold, 'vazio desliga');
 
         $outro = User::factory()->create();
-        $this->expectException(\Illuminate\Database\Eloquent\ModelNotFoundException::class);
-        Livewire::actingAs($outro)->test(CareIndex::class)->set('alertThreshold.'.$this->perfil->id, '100')->call('saveAlertThreshold', $this->perfil->id);
+        Livewire::actingAs($outro)->test(CareIndex::class)->set('alertThreshold.'.$this->perfil->id, '100')->call('saveAlertThreshold', $this->perfil->id)->assertNotFound();
     }
 
     // --- Convite assistido pelo consultor -------------------------------------------------------------------------------------

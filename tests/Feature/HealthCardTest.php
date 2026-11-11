@@ -290,9 +290,7 @@ class HealthCardTest extends TestCase
         $outroPerfil = FinancialProfile::factory()->create(['owner_user_id' => $outroUsuario->id]);
         $outroMembro = ProfileMember::factory()->create(['profile_id' => $outroPerfil->id, 'user_id' => $outroUsuario->id]);
 
-        $this->expectException(\Illuminate\Database\Eloquent\ModelNotFoundException::class);
-
-        Livewire::test(HealthCardIndex::class)->call('newMedication', $outroMembro->id);
+        Livewire::test(HealthCardIndex::class)->call('newMedication', $outroMembro->id)->assertNotFound();
     }
 
     public function test_consultor_leva_403(): void

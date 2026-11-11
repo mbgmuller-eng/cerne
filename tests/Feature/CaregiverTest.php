@@ -356,12 +356,7 @@ class CaregiverTest extends TestCase
 
         // Cuidador de edição não convida nem revoga.
         $this->actingAs($cuidador);
-        try {
-            Livewire::test(CareIndex::class)->call('revoke', $vinculo->id);
-            $this->fail('Cuidador não pode revogar.');
-        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException) {
-            // o painel só acha o que é do próprio dono
-        }
+        Livewire::test(CareIndex::class)->call('revoke', $vinculo->id)->assertNotFound();
         $this->assertSame(CaregiverStatus::Active, $vinculo->fresh()->status);
 
         $this->actingAs($dono);

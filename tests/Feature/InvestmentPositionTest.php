@@ -490,9 +490,7 @@ class InvestmentPositionTest extends TestCase
         $outroMembro = ProfileMember::factory()->create(['profile_id' => $outroPerfil->id]);
         $alheio = InvestmentRecord::factory()->for($outroPerfil, 'profile')->for($outroMembro, 'member')->create(['asset_class' => AssetClass::Fii]);
 
-        $this->expectException(ModelNotFoundException::class);
-
-        Livewire::test(PositionActions::class)->call('open', $alheio->id, 'buy');
+        Livewire::test(PositionActions::class)->call('open', $alheio->id, 'buy')->assertNotFound();
     }
 
     public function test_ativo_oculto_do_conjuge_nao_abre(): void
@@ -505,9 +503,7 @@ class InvestmentPositionTest extends TestCase
         $this->actingAs($bruno->user);
         app(ProfileContext::class)->set($perfil, $bruno);
 
-        $this->expectException(ModelNotFoundException::class);
-
-        Livewire::test(PositionActions::class)->call('open', $oculto->id, 'buy');
+        Livewire::test(PositionActions::class)->call('open', $oculto->id, 'buy')->assertNotFound();
     }
 
     public function test_corretor_nao_abre_a_janela(): void

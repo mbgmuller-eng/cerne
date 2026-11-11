@@ -213,8 +213,7 @@ class InsurancePdfImportTest extends TestCase
         $tela = Livewire::test(InsuranceImport::class);
         self::assertSame([$minha->id], $tela->instance()->leituras->pluck('id')->all());
 
-        $this->expectException(ModelNotFoundException::class);
-        $tela->call('revisar', $dela->id);
+        $tela->call('revisar', $dela->id)->assertNotFound();
     }
 
     // ---- revisão

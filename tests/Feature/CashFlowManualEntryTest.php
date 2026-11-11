@@ -309,8 +309,6 @@ class CashFlowManualEntryTest extends TestCase
         // Contexto ativo é OUTRO perfil — a categoria acima não é dele.
         $this->criarPerfil();
 
-        $this->expectException(\Illuminate\Database\Eloquent\ModelNotFoundException::class);
-
         Livewire::test(CashFlowIndex::class)
             ->set('expenseDescription', 'Categoria alheia')
             ->set('expenseAmount', '10.00')
@@ -321,7 +319,7 @@ class CashFlowManualEntryTest extends TestCase
             // checagem de obrigatoriedade — quem tem que barrar aqui é a
             // categoria de outro perfil, não a subcategoria.
             ->set('expenseSubcategoryId', 'qualquer-coisa')
-            ->call('saveExpense');
+            ->call('saveExpense')->assertNotFound();
     }
 
     /** @return array{0: FinancialProfile, 1: ProfileMember} perfil ativo no ProfileContext + o membro titular */

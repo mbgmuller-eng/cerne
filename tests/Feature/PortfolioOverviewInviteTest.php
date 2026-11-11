@@ -112,9 +112,7 @@ class PortfolioOverviewInviteTest extends TestCase
 
         $this->actingAs($consultor);
 
-        $this->expectException(\Illuminate\Database\Eloquent\ModelNotFoundException::class);
-
-        Livewire::test(PortfolioOverview::class)->call('reenviarConvite', $convite->id);
+        Livewire::test(PortfolioOverview::class)->call('reenviarConvite', $convite->id)->assertNotFound();
     }
 
     public function test_reenviar_convite_ja_aceito_falha(): void
@@ -125,9 +123,7 @@ class PortfolioOverviewInviteTest extends TestCase
 
         $this->actingAs($consultor);
 
-        $this->expectException(\Illuminate\Database\Eloquent\ModelNotFoundException::class);
-
-        Livewire::test(PortfolioOverview::class)->call('reenviarConvite', $convite->id);
+        Livewire::test(PortfolioOverview::class)->call('reenviarConvite', $convite->id)->assertNotFound();
     }
 
     /**
@@ -174,9 +170,7 @@ class PortfolioOverviewInviteTest extends TestCase
 
         $this->actingAs($consultor);
 
-        $this->expectException(\Illuminate\Database\Eloquent\ModelNotFoundException::class);
-
-        Livewire::test(PortfolioOverview::class)->call('enviarConviteDeAcesso', $perfil->id);
+        Livewire::test(PortfolioOverview::class)->call('enviarConviteDeAcesso', $perfil->id)->assertNotFound();
     }
 
     public function test_convite_bloqueado_quando_atinge_o_teto_da_faixa(): void

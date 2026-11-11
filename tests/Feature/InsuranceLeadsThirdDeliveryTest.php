@@ -230,9 +230,7 @@ class InsuranceLeadsThirdDeliveryTest extends TestCase
         $lead = Lead::factory()->insurance()->create(['consultant_id' => $dono->id, 'client_profile_id' => FinancialProfile::factory()->create()->id]);
         $this->actingAs($outro);
 
-        $this->expectException(\Illuminate\Database\Eloquent\ModelNotFoundException::class);
-
-        Livewire::test(LeadsIndex::class)->call('closeDeal', $lead->id);
+        Livewire::test(LeadsIndex::class)->call('closeDeal', $lead->id)->assertNotFound();
     }
 
     public function test_excluir_o_cliente_ou_a_apolice_nao_apaga_o_lead(): void

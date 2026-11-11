@@ -43,9 +43,7 @@ class LeadsIndexTest extends TestCase
 
         $this->actingAs($consultor);
 
-        $this->expectException(\Illuminate\Database\Eloquent\ModelNotFoundException::class);
-
-        Livewire::test(LeadsIndex::class)->call('editLead', $leadDeOutro->id);
+        Livewire::test(LeadsIndex::class)->call('editLead', $leadDeOutro->id)->assertNotFound();
     }
 
     public function test_quadro_separa_pipeline_aberto_de_convertidos_e_perdidos(): void

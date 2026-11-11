@@ -434,12 +434,7 @@ class HealthAgendaCalendarTest extends TestCase
         $outroPerfil = FinancialProfile::factory()->create(['owner_user_id' => $outroUsuario->id]);
         $estranho = ProfileMember::factory()->create(['profile_id' => $outroPerfil->id, 'user_id' => $outroUsuario->id, 'color_hex' => null]);
 
-        try {
-            Livewire::test(HealthAppointmentIndex::class)->call('setMemberColor', $estranho->id, '#16A34A');
-            self::fail('deveria falhar');
-        } catch (ModelNotFoundException) {
-            // esperado
-        }
+        Livewire::test(HealthAppointmentIndex::class)->call('setMemberColor', $estranho->id, '#16A34A')->assertNotFound();
 
         self::assertNull($estranho->fresh()->color_hex);
     }

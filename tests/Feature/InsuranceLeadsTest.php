@@ -639,9 +639,7 @@ class InsuranceLeadsTest extends TestCase
         $leadDeOutro = Lead::factory()->insurance()->create(['consultant_id' => User::factory()->broker()->create()->id]);
         $this->actingAs($this->corretor);
 
-        $this->expectException(\Illuminate\Database\Eloquent\ModelNotFoundException::class);
-
-        Livewire::test(LeadsIndex::class)->call('openQuotes', $leadDeOutro->id);
+        Livewire::test(LeadsIndex::class)->call('openQuotes', $leadDeOutro->id)->assertNotFound();
     }
 
     public function test_nao_mexe_em_cotacao_de_outro_lead_nem_de_outro_profissional(): void
@@ -649,15 +647,8 @@ class InsuranceLeadsTest extends TestCase
         $meu = $this->lead();
         $cotacaoAlheia = $this->quote(Lead::factory()->insurance()->create(['consultant_id' => User::factory()->broker()->create()->id]));
 
-        $tela = $this->abrirCotacoes($meu);
-
         foreach (['editQuote', 'deleteQuote'] as $acao) {
-            try {
-                $tela->call($acao, $cotacaoAlheia->id);
-                self::fail("$acao deveria falhar");
-            } catch (\Illuminate\Database\Eloquent\ModelNotFoundException) {
-                // esperado
-            }
+            $this->abrirCotacoes($meu)->call($acao, $cotacaoAlheia->id)->assertNotFound();
         }
 
         self::assertNotNull($cotacaoAlheia->fresh());

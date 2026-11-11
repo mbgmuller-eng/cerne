@@ -429,7 +429,6 @@ class GymExerciseSwapTest extends TestCase
         app(ProfileContext::class)->set($perfilB, $membroB);
         Subscription::create(['user_id' => $outro->id, 'kind' => SubscriptionKind::Direct, 'bundle' => SubscriptionBundle::Completo, 'status' => SubscriptionStatus::Active, 'started_at' => now()]);
 
-        $this->expectException(\Illuminate\Database\Eloquent\ModelNotFoundException::class);
-        Livewire::test(GymPlanEditor::class)->call('openSwap', $this->supino->id);
+        Livewire::test(GymPlanEditor::class)->call('openSwap', $this->supino->id)->assertNotFound();
     }
 }

@@ -126,11 +126,7 @@ class FollowMeTest extends TestCase
 
         // Marcelo é o dono do perfil, mas o acesso é à saúde da Helena: quem manda é ela.
         $this->actingAs($marcelo);
-        try {
-            Livewire::test(CareIndex::class)->call('revoke', $vinculo->id);
-            $this->fail('O titular não revoga o acesso à saúde do cônjuge.');
-        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException) {
-        }
+        Livewire::test(CareIndex::class)->call('revoke', $vinculo->id)->assertNotFound();
         $this->assertSame(CaregiverStatus::Active, $vinculo->fresh()->status);
 
         $this->actingAs($helena);

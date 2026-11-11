@@ -159,11 +159,7 @@ class CarePersonTest extends TestCase
         $this->actingAs($estranho);
 
         foreach (['revokeAsPerson' => [$vinculo->id], 'revokeMyConsent' => [$pessoa->id], 'endMySpace' => [$pessoa->id]] as $acao => $args) {
-            try {
-                Livewire::test(CareIndex::class)->call($acao, ...$args);
-                $this->fail("$acao não pode ser feito por quem não é a pessoa.");
-            } catch (\Illuminate\Database\Eloquent\ModelNotFoundException) {
-            }
+            Livewire::test(CareIndex::class)->call($acao, ...$args)->assertNotFound();
         }
 
         $this->assertSame(CaregiverStatus::Active, $vinculo->fresh()->status);

@@ -319,9 +319,7 @@ class CategorizationRulesManagementTest extends TestCase
         $component = Livewire::test(CategorizationRulesIndex::class);
         self::assertTrue($component->get('expenseRules')->doesntContain('id', $regraDeOutroPerfil->id));
 
-        $this->expectException(\Illuminate\Database\Eloquent\ModelNotFoundException::class);
-
-        $component->call('editExpenseRule', $regraDeOutroPerfil->id);
+        $component->call('editExpenseRule', $regraDeOutroPerfil->id)->assertNotFound();
     }
 
     /** @return array{0: FinancialProfile} */

@@ -318,9 +318,7 @@ class InvestmentManualEntryTest extends TestCase
         $outroMembro = ProfileMember::factory()->create(['profile_id' => $outroPerfil->id]);
         $investimentoAlheio = InvestmentRecord::factory()->for($outroPerfil, 'profile')->for($outroMembro, 'member')->create();
 
-        $this->expectException(\Illuminate\Database\Eloquent\ModelNotFoundException::class);
-
-        Livewire::test(InvestmentsIndex::class)->call('editInvestment', $investimentoAlheio->id);
+        Livewire::test(InvestmentsIndex::class)->call('editInvestment', $investimentoAlheio->id)->assertNotFound();
     }
 
     public function test_membro_de_outro_perfil_nao_e_aceito(): void

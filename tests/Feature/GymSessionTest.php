@@ -255,11 +255,9 @@ class GymSessionTest extends TestCase
         $doB = $plano->addExercise($treinoB, $this->supino->exercise, ['target_sets' => 3]);
         $sessao = app(GymSessionService::class)->start($this->treino);
 
-        $this->expectException(\Illuminate\Database\Eloquent\ModelNotFoundException::class);
-
         Livewire::test(GymSessionRun::class, ['session' => $sessao->id])
             ->set("draft.{$doB->id}.reps", '10') // chave inexistente: não deve nem chegar a gravar
-            ->call('completeSet', $doB->id, 1);
+            ->call('completeSet', $doB->id, 1)->assertNotFound();
     }
 
     public function test_descartar_apaga_a_sessao_e_as_series(): void

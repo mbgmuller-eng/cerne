@@ -473,8 +473,7 @@ class ConsortiumImportTest extends TestCase
         app(ProfileContext::class)->set($this->perfil, $this->membro);
 
         Livewire::test(ConsortiumImport::class)->assertDontSee('extrato.pdf');
-        $this->expectException(\Illuminate\Database\Eloquent\ModelNotFoundException::class);
-        Livewire::test(ConsortiumImport::class)->call('revisar', $leitura->id);
+        Livewire::test(ConsortiumImport::class)->call('revisar', $leitura->id)->assertNotFound();
     }
 
     public function test_a_leitura_de_extrato_nao_aparece_na_tela_importar(): void

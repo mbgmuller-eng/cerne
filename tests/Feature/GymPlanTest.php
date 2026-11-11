@@ -270,9 +270,7 @@ class GymPlanTest extends TestCase
         $this->actingAs($conjuge->user);
         app(ProfileContext::class)->set($perfil, $conjuge);
 
-        $this->expectException(\Illuminate\Database\Eloquent\ModelNotFoundException::class);
-
-        Livewire::test(GymPlanEditor::class)->call('deleteWorkout', $treinoDoTitular->id);
+        Livewire::test(GymPlanEditor::class)->call('deleteWorkout', $treinoDoTitular->id)->assertNotFound();
     }
 
     public function test_cliente_abre_a_academia_e_ve_o_item_no_menu(): void

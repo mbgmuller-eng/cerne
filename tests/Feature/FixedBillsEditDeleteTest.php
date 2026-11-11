@@ -157,9 +157,7 @@ class FixedBillsEditDeleteTest extends TestCase
 
         $this->criarPerfil();
 
-        $this->expectException(\Illuminate\Database\Eloquent\ModelNotFoundException::class);
-
-        Livewire::test(FixedBillsIndex::class)->call('deleteBill', $contaDeOutroPerfil->id);
+        Livewire::test(FixedBillsIndex::class)->call('deleteBill', $contaDeOutroPerfil->id)->assertNotFound();
     }
 
     /** @return array{0: FinancialProfile, 1: ProfileMember} */
