@@ -31,7 +31,7 @@ return [
                 'Use “+ Despesa” e “+ Receita” para lançar, e as setas no alto para mudar de mês.',
                 'Na despesa, “Conta / dinheiro” debita o saldo da conta na hora, e “Cartão de crédito” leva a compra para a fatura.',
                 'Compra parcelada vira uma despesa por parcela, cada uma na fatura do seu ciclo.',
-                'Marque “Estorno / cashback” quando for dinheiro de volta: o valor abate os totais.',
+                'Marque “Estorno ou cashback” quando for dinheiro de volta: o valor abate os totais.',
                 'Em casal, “Ocultar do meu cônjuge” deixa o lançamento só com você.',
                 'Os filtros por necessidade, categoria e membro ajudam a achar o que procura.',
             ],

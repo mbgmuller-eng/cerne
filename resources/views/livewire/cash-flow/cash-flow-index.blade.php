@@ -82,21 +82,22 @@
 
                 <div>
                     <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Valor</label>
-                    <input type="number" step="0.01" min="0.01" wire:model="expenseAmount" class="input mt-1.5" placeholder="0,00">
+                    <input type="number" step="0.01" min="0.01" wire:model.live.blur="expenseAmount" class="input mt-1.5" placeholder="0,00">
                     @error('expenseAmount') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
                 </div>
 
                 <div>
                     <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Data</label>
-                    <input type="date" wire:model="expenseDate" class="input mt-1.5">
+                    <input type="date" wire:model.live="expenseDate" class="input mt-1.5">
                     @error('expenseDate') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
                 </div>
 
                 <div class="@sm:col-span-2 @lg:col-span-3 flex items-center gap-2 rounded-lg bg-emerald-50 px-3 py-2 dark:bg-emerald-500/10">
                     <input type="checkbox" wire:model.live="expenseIsRefund" id="expenseIsRefund" class="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500">
-                    <label for="expenseIsRefund" class="text-sm text-emerald-900 dark:text-emerald-200">
-                        Estorno / cashback — dinheiro de volta, sem necessidade de categorizar
-                    </label>
+                    <div>
+                        <label for="expenseIsRefund" class="text-sm font-medium text-emerald-900 dark:text-emerald-200">Estorno ou cashback</label>
+                        <p class="text-xs text-emerald-900/70 dark:text-emerald-200/70">Dinheiro de volta: abate a fatura ou o mês e dispensa categoria.</p>
+                    </div>
                 </div>
 
                 @unless ($expenseIsRefund)
@@ -109,6 +110,7 @@
                             @endforeach
                         </select>
                         @error('expenseNecessity') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                        <p class="mt-1 text-xs text-slate-400">Define as categorias da lista. Investimento mostra só categorias de investimento.</p>
                     </div>
 
                     <div>
@@ -137,6 +139,7 @@
                         <div>
                             <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Ou crie uma subcategoria</label>
                             <input type="text" wire:model="expenseNewSubcategory" class="input mt-1.5" placeholder="Ex.: Terapia">
+                            <p class="mt-1 text-xs text-slate-400">Se preencher, a nova subcategoria é criada e usada no lugar da lista ao lado.</p>
                         </div>
                     @endunless
                 @endunless
@@ -149,12 +152,16 @@
                             <option value="{{ $membro->id }}">{{ $membro->name }}</option>
                         @endforeach
                     </select>
+                    <p class="mt-1 text-xs text-slate-400">Sem membro, a despesa é da família. Em compra no cartão, vale o dono do cartão.</p>
                 </div>
 
                 @if ($privacyMembers->count() >= 2 && $expenseMemberId !== '')
-                    <div class="flex items-center gap-2 pt-5">
-                        <input type="checkbox" wire:model="expenseIsPrivate" id="expenseIsPrivate" class="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500">
-                        <label for="expenseIsPrivate" class="text-sm text-slate-600 dark:text-slate-400">Ocultar do meu cônjuge</label>
+                    <div class="pt-5">
+                        <div class="flex items-center gap-2">
+                            <input type="checkbox" wire:model.live="expenseIsPrivate" id="expenseIsPrivate" class="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500">
+                            <label for="expenseIsPrivate" class="text-sm text-slate-600 dark:text-slate-400">Ocultar do meu cônjuge</label>
+                        </div>
+                        <p class="mt-1 text-xs text-slate-400">Só {{ $members->firstWhere('id', $expenseMemberId)?->name ?? 'o membro escolhido' }} e o consultor verão este lançamento.</p>
                     </div>
                 @endif
 
@@ -163,7 +170,7 @@
                          estrutural (fatura, parcelamento), não cabe aqui. --}}
                     @if ($expensePaymentMethod === 'cartao')
                         <div class="@sm:col-span-2 @lg:col-span-3 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-500 dark:bg-slate-700 dark:text-slate-400">
-                            Despesa de cartão — cartão e parcelamento não podem ser alterados por aqui.
+                            Despesa de cartão: o cartão e o parcelamento não podem ser alterados por aqui.
                         </div>
                     @else
                         <div>
@@ -188,7 +195,7 @@
                     @if ($expensePaymentMethod === 'cartao')
                         <div>
                             <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Cartão</label>
-                            <select wire:model="expenseCreditCardId" class="select mt-1.5 w-full">
+                            <select wire:model.live="expenseCreditCardId" class="select mt-1.5 w-full">
                                 <option value="">Selecione</option>
                                 @foreach ($creditCards as $cartao)
                                     <option value="{{ $cartao->id }}">{{ $cartao->displayName() }}</option>
@@ -200,20 +207,21 @@
                         @unless ($expenseIsRefund)
                             <div>
                                 <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Parcelas</label>
-                                <input type="number" min="1" max="{{ $maxInstallments }}" wire:model="expenseInstallments" class="input mt-1.5">
+                                <input type="number" min="1" max="{{ $maxInstallments }}" wire:model.live.blur="expenseInstallments" class="input mt-1.5">
                                 @error('expenseInstallments') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
-                                <p class="mt-1 text-xs text-slate-400">1x = à vista no cartão.</p>
+                                <p class="mt-1 text-xs text-slate-400">1x = à vista. Em 2x ou mais, o valor informado é o total e será dividido igualmente.</p>
                             </div>
                         @endunless
                     @else
                         <div>
                             <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Conta (opcional)</label>
-                            <select wire:model="expenseBankAccountId" class="select mt-1.5 w-full">
+                            <select wire:model.live="expenseBankAccountId" class="select mt-1.5 w-full">
                                 <option value="">Sem débito em conta</option>
                                 @foreach ($bankAccounts as $conta)
                                     <option value="{{ $conta->id }}">{{ $conta->displayName() }}</option>
                                 @endforeach
                             </select>
+                            <p class="mt-1 text-xs text-slate-400">O saldo da conta é atualizado ao salvar.</p>
                         </div>
                     @endif
                 @endif
@@ -223,6 +231,8 @@
                     <textarea wire:model="expenseNotes" rows="2" class="input mt-1.5"></textarea>
                 </div>
             </div>
+
+            <x-form-consequence :lines="$expenseConsequence" />
 
             <div class="flex justify-end gap-2">
                 <button type="submit" class="btn-primary px-4 py-2" wire:loading.attr="disabled">{{ $editingExpenseId ? 'Salvar alterações' : 'Salvar despesa' }}</button>
@@ -246,13 +256,13 @@
 
                 <div>
                     <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Valor</label>
-                    <input type="number" step="0.01" min="0.01" wire:model="incomeAmount" class="input mt-1.5" placeholder="0,00">
+                    <input type="number" step="0.01" min="0.01" wire:model.live.blur="incomeAmount" class="input mt-1.5" placeholder="0,00">
                     @error('incomeAmount') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
                 </div>
 
                 <div>
                     <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Data de recebimento</label>
-                    <input type="date" wire:model="incomeDate" class="input mt-1.5">
+                    <input type="date" wire:model.live="incomeDate" class="input mt-1.5">
                     @error('incomeDate') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
                 </div>
 
@@ -278,25 +288,32 @@
                 </div>
 
                 @if ($privacyMembers->count() >= 2 && $incomeMemberId !== '')
-                    <div class="flex items-center gap-2 pt-5">
-                        <input type="checkbox" wire:model="incomeIsPrivate" id="incomeIsPrivate" class="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500">
-                        <label for="incomeIsPrivate" class="text-sm text-slate-600 dark:text-slate-400">Ocultar do meu cônjuge</label>
+                    <div class="pt-5">
+                        <div class="flex items-center gap-2">
+                            <input type="checkbox" wire:model.live="incomeIsPrivate" id="incomeIsPrivate" class="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500">
+                            <label for="incomeIsPrivate" class="text-sm text-slate-600 dark:text-slate-400">Ocultar do meu cônjuge</label>
+                        </div>
+                        <p class="mt-1 text-xs text-slate-400">Só {{ $members->firstWhere('id', $incomeMemberId)?->name ?? 'o membro escolhido' }} e o consultor verão este lançamento.</p>
                     </div>
                 @endif
 
                 <div>
                     <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Conta (opcional)</label>
-                    <select wire:model="incomeBankAccountId" class="select mt-1.5 w-full">
+                    <select wire:model.live="incomeBankAccountId" class="select mt-1.5 w-full">
                         <option value="">Sem crédito em conta</option>
                         @foreach ($bankAccounts as $conta)
                             <option value="{{ $conta->id }}">{{ $conta->displayName() }}</option>
                         @endforeach
                     </select>
+                    <p class="mt-1 text-xs text-slate-400">O saldo da conta é atualizado ao salvar.</p>
                 </div>
 
-                <div class="flex items-center gap-2 pt-5">
-                    <input type="checkbox" wire:model="incomeRecurring" id="incomeRecurring" class="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500">
-                    <label for="incomeRecurring" class="text-sm text-slate-600 dark:text-slate-400">Recorrente</label>
+                <div class="pt-5">
+                    <div class="flex items-center gap-2">
+                        <input type="checkbox" wire:model="incomeRecurring" id="incomeRecurring" class="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500">
+                        <label for="incomeRecurring" class="text-sm text-slate-600 dark:text-slate-400">Recorrente</label>
+                    </div>
+                    <p class="mt-1 text-xs text-slate-400">Só coloca a etiqueta “recorrente” neste lançamento. Para repetir todo mês, use Contas fixas.</p>
                 </div>
 
                 <div class="@sm:col-span-2 @lg:col-span-3">
@@ -304,6 +321,8 @@
                     <textarea wire:model="incomeNotes" rows="2" class="input mt-1.5"></textarea>
                 </div>
             </div>
+
+            <x-form-consequence :lines="$incomeConsequence" />
 
             <div class="flex justify-end gap-2">
                 <button type="submit" class="btn-primary px-4 py-2" wire:loading.attr="disabled">{{ $editingIncomeId ? 'Salvar alterações' : 'Salvar receita' }}</button>

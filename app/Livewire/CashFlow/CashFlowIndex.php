@@ -8,6 +8,7 @@ use App\Livewire\Concerns\HasPrivacyTabs;
 use App\Livewire\Concerns\RequiresActiveProfile;
 use App\Models\BankAccount;
 use App\Models\CreditCard;
+use App\Models\CreditCardInvoice;
 use App\Models\ExpenseCategory;
 use App\Models\ExpenseRecord;
 use App\Models\ExpenseSubcategory;
@@ -17,6 +18,7 @@ use App\Models\ProfileMember;
 use App\Services\Extraction\VoiceExpenseExtractionService;
 use App\Services\InstallmentService;
 use App\Services\InvoiceService;
+use App\Support\Forms\FormConsequence;
 use App\Support\Money;
 use App\Support\ProfileContext;
 use Carbon\CarbonImmutable;
@@ -520,12 +522,17 @@ class CashFlowIndex extends Component
             'expenseNotes' => ['nullable', 'string'],
         ];
 
-        $data = $this->validate($rules, attributes: [
+        // O required_if cru diria "quando expense payment method for cartao": mensagens próprias para o que a pessoa vê.
+        $data = $this->validate($rules, messages: [
+            'expenseCreditCardId.required_if' => 'Escolha o cartão da compra.',
+            'expenseInstallments.required_if' => 'Informe o número de parcelas (1 para à vista).',
+        ], attributes: [
             'expenseDescription' => 'descrição',
             'expenseAmount' => 'valor',
             'expenseDate' => 'data',
             'expenseNecessity' => 'necessidade',
             'expenseCategoryId' => 'categoria',
+            'expensePaymentMethod' => 'forma de pagamento',
             'expenseCreditCardId' => 'cartão',
             'expenseInstallments' => 'parcelas',
         ]);
@@ -1277,11 +1284,120 @@ class CashFlowIndex extends Component
         return $totais;
     }
 
+    /**
+     * "O que vai acontecer ao salvar" de uma despesa nova (ver FormConsequence). Só ao cadastrar: ao editar, o efeito depende do que já estava gravado.
+     *
+     * @param  Collection<int, BankAccount>  $contas
+     * @param  Collection<int, CreditCard>  $cartoes
+     * @return list<string>
+     */
+    private function expenseConsequence(Collection $contas, Collection $cartoes): array
+    {
+        if (! $this->showExpenseForm || $this->editingExpenseId !== null) {
+            return [];
+        }
+
+        $valor = Money::parse($this->expenseAmount);
+
+        if (bccomp($valor, '0', 2) <= 0) {
+            return [];
+        }
+
+        $data = $this->dateOrNull($this->expenseDate);
+        $linhas = [];
+        $outroMes = $data !== null && $this->year !== null && $this->month !== null
+            ? FormConsequence::otherMonth($data, $this->year, $this->month)
+            : null;
+
+        if ($outroMes !== null) {
+            $linhas[] = $outroMes;
+        }
+
+        if ($this->expensePaymentMethod === 'cartao') {
+            $cartao = $cartoes->firstWhere('id', $this->expenseCreditCardId);
+
+            if ($cartao !== null && $data !== null) {
+                $parcelas = $this->expenseIsRefund ? 1 : max(1, $this->expenseInstallments);
+                $linhas = [...$linhas, ...FormConsequence::cardPurchase($cartao, $data, $valor, $parcelas, $this->expenseIsRefund)];
+
+                [$ano, $mes] = $cartao->billingPeriodFor($data);
+                $jaPaga = CreditCardInvoice::query()
+                    ->where('credit_card_id', $cartao->id)->where('year', $ano)->where('month', $mes)
+                    ->where('status', InvoiceStatus::Paid->value)->exists();
+
+                if ($jaPaga) {
+                    // O pagamento guarda o valor pago à parte: o lançamento novo soma no total da fatura e o valor pago não muda.
+                    $linhas[] = 'A fatura de '.FormConsequence::monthYear($ano, $mes).' já está paga. Este lançamento será somado ao total dela, e o valor pago continua o mesmo.';
+                }
+            }
+
+            return $linhas;
+        }
+
+        $conta = $contas->firstWhere('id', $this->expenseBankAccountId);
+
+        if ($conta !== null) {
+            $linhas[] = FormConsequence::accountBalance($conta->displayName(), (string) $conta->current_balance, $valor, debito: ! $this->expenseIsRefund);
+        }
+
+        return $linhas;
+    }
+
+    /**
+     * "O que vai acontecer ao salvar" de uma receita nova: o mês em que ela aparece e o saldo da conta, que sobe na hora.
+     *
+     * @param  Collection<int, BankAccount>  $contas
+     * @return list<string>
+     */
+    private function incomeConsequence(Collection $contas): array
+    {
+        if (! $this->showIncomeForm || $this->editingIncomeId !== null) {
+            return [];
+        }
+
+        $valor = Money::parse($this->incomeAmount);
+
+        if (bccomp($valor, '0', 2) <= 0) {
+            return [];
+        }
+
+        $data = $this->dateOrNull($this->incomeDate);
+        $linhas = [];
+        $outroMes = $data !== null && $this->year !== null && $this->month !== null
+            ? FormConsequence::otherMonth($data, $this->year, $this->month)
+            : null;
+
+        if ($outroMes !== null) {
+            $linhas[] = $outroMes;
+        }
+
+        $conta = $contas->firstWhere('id', $this->incomeBankAccountId);
+
+        if ($conta !== null) {
+            $linhas[] = FormConsequence::accountBalance($conta->displayName(), (string) $conta->current_balance, $valor, debito: false);
+        }
+
+        return $linhas;
+    }
+
+    private function dateOrNull(?string $valor): ?CarbonImmutable
+    {
+        try {
+            return $valor ? CarbonImmutable::parse($valor) : null;
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
     public function render()
     {
         $profileId = app(ProfileContext::class)->profileId();
+        $bankAccounts = BankAccount::query()->active()->orderBy('bank_name')->get();
+        $creditCards = CreditCard::query()->active()->orderBy('card_name')->get();
 
         return view('livewire.cash-flow.cash-flow-index', [
+            'expenseConsequence' => $this->expenseConsequence($bankAccounts, $creditCards),
+            'incomeConsequence' => $this->incomeConsequence($bankAccounts),
             'showPrivacyTabs' => $this->showPrivacyTabs,
             'privacyMembers' => $this->privacyMembers,
             'expenses' => $this->expenses,
@@ -1296,8 +1412,8 @@ class CashFlowIndex extends Component
             'expenseSubcategories' => $this->expenseSubcategories,
             'bulkFormCategories' => $this->bulkFormCategories,
             'bulkSubcategories' => $this->bulkSubcategories,
-            'bankAccounts' => BankAccount::query()->active()->orderBy('bank_name')->get(),
-            'creditCards' => CreditCard::query()->active()->orderBy('card_name')->get(),
+            'bankAccounts' => $bankAccounts,
+            'creditCards' => $creditCards,
             'members' => ProfileMember::query()
                 ->where('profile_id', $profileId)
                 ->where('is_active', true)

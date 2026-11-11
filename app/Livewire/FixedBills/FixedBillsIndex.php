@@ -19,6 +19,7 @@ use App\Models\RecurringIncome;
 use App\Models\RecurringIncomeOccurrence;
 use App\Services\FixedBillService;
 use App\Services\RecurringIncomeService;
+use App\Support\Forms\FormConsequence;
 use App\Support\Money;
 use App\Support\ProfileContext;
 use Carbon\CarbonImmutable;
@@ -326,6 +327,11 @@ class FixedBillsIndex extends Component
             'billMemberId' => ['nullable'],
             'billBankAccountId' => ['nullable'],
             'billNotes' => ['nullable', 'string'],
+        ], messages: [
+            // O required_if cru diria "quando recorrência for monthly": o valor do enum sai em inglês.
+            'billDueDay.required_if' => 'Informe o dia do vencimento.',
+            'billDueWeekday.required_if' => 'Escolha o dia da semana.',
+            'billDueMonth.required_if' => 'Escolha o mês do vencimento.',
         ], attributes: [
             'billName' => 'nome',
             'billAmount' => 'valor',
@@ -549,6 +555,10 @@ class FixedBillsIndex extends Component
             'incomeMemberId' => ['nullable'],
             'incomeBankAccountId' => ['nullable'],
             'incomeNotes' => ['nullable', 'string'],
+        ], messages: [
+            'incomeDueDay.required_if' => 'Informe o dia do recebimento.',
+            'incomeDueWeekday.required_if' => 'Escolha o dia da semana.',
+            'incomeDueMonth.required_if' => 'Escolha o mês do recebimento.',
         ], attributes: [
             'incomeName' => 'nome',
             'incomeAmount' => 'valor',
@@ -676,11 +686,110 @@ class FixedBillsIndex extends Component
         return $membro?->id;
     }
 
+    /**
+     * Os vencimentos (ou recebimentos) do MÊS CORRENTE que o cadastro cria na hora, com a mesma regra de recorrência que grava de verdade
+     * (FixedBill::occurrencesInMonth). Vazio enquanto a recorrência não tem os campos que ela pede.
+     *
+     * @return list<CarbonImmutable>
+     */
+    private function datasDoMes(FixedBill|RecurringIncome $modelo, string $recorrencia, string $dia, string $semana, string $mes): array
+    {
+        $tipo = RecurrenceType::tryFrom($recorrencia);
+        $diaValido = ctype_digit($dia) && (int) $dia >= 1 && (int) $dia <= 31;
+
+        $completo = match ($tipo) {
+            RecurrenceType::Monthly => $diaValido,
+            RecurrenceType::Annual => $diaValido && ctype_digit($mes) && (int) $mes >= 1 && (int) $mes <= 12,
+            RecurrenceType::Weekly => ctype_digit($semana) && (int) $semana <= 6,
+            default => false,
+        };
+
+        if (! $completo) {
+            return [];
+        }
+
+        $hoje = CarbonImmutable::now();
+        $modelo->forceFill([
+            'recurrence' => $tipo,
+            'due_day' => $diaValido ? (int) $dia : null,
+            'due_weekday' => ctype_digit($semana) ? (int) $semana : null,
+            'due_month' => ctype_digit($mes) ? (int) $mes : null,
+        ]);
+
+        return $modelo->occurrencesInMonth($hoje->year, $hoje->month);
+    }
+
+    /**
+     * "O que vai acontecer ao salvar" da conta fixa (ver FormConsequence).
+     *
+     * @param  Collection<int, BankAccount>  $contas
+     * @return list<string>
+     */
+    private function billConsequence(Collection $contas): array
+    {
+        if (! $this->showBillForm) {
+            return [];
+        }
+
+        if ($this->editingBillId !== null) {
+            return ['Valor, categoria e conta valem a partir do próximo pagamento. O dia do vencimento vale só para meses ainda não gerados.'];
+        }
+
+        $linhas = [];
+        $criacao = FormConsequence::recurringCreation($this->datasDoMes(new FixedBill, $this->billRecurrence, $this->billDueDay, $this->billDueWeekday, $this->billDueMonth));
+
+        if ($criacao !== null) {
+            $linhas[] = $criacao;
+        }
+
+        $conta = $contas->firstWhere('id', $this->billBankAccountId);
+        $categoria = $this->billFormCategories->firstWhere('id', $this->billCategoryId)?->name ?? 'a categoria escolhida';
+        $linhas[] = FormConsequence::payBill($conta?->displayName(), $this->billAmount, $this->billIsVariable, $categoria);
+
+        return $linhas;
+    }
+
+    /**
+     * "O que vai acontecer ao salvar" da receita recorrente.
+     *
+     * @param  Collection<int, BankAccount>  $contas
+     * @return list<string>
+     */
+    private function incomeConsequence(Collection $contas): array
+    {
+        if (! $this->showIncomeForm) {
+            return [];
+        }
+
+        if ($this->editingIncomeId !== null) {
+            return ['Valor, categoria e conta valem a partir do próximo recebimento. O dia do recebimento vale só para meses ainda não gerados.'];
+        }
+
+        $linhas = [];
+        $criacao = FormConsequence::recurringCreation(
+            $this->datasDoMes(new RecurringIncome, $this->incomeRecurrence, $this->incomeDueDay, $this->incomeDueWeekday, $this->incomeDueMonth),
+            'recebimento',
+        );
+
+        if ($criacao !== null) {
+            $linhas[] = $criacao;
+        }
+
+        $conta = $contas->firstWhere('id', $this->incomeBankAccountId);
+        $categoria = IncomeCategory::available()->get()->firstWhere('id', $this->incomeCategoryId)?->name ?? 'a categoria escolhida';
+        $linhas[] = FormConsequence::receiveIncome($conta?->displayName(), $this->incomeAmount, $this->incomeIsVariable, $categoria);
+
+        return $linhas;
+    }
+
     public function render()
     {
         $profileId = app(ProfileContext::class)->profileId();
+        $bankAccounts = BankAccount::query()->active()->orderBy('bank_name')->get();
 
         return view('livewire.fixed-bills.fixed-bills-index', [
+            'billConsequence' => $this->billConsequence($bankAccounts),
+            'incomeConsequence' => $this->incomeConsequence($bankAccounts),
             'showPrivacyTabs' => $this->showPrivacyTabs,
             'privacyMembers' => $this->privacyMembers,
             'payments' => $this->payments,
@@ -695,7 +804,7 @@ class FixedBillsIndex extends Component
             'billFormCategories' => $this->billFormCategories,
             'billSubcategories' => $this->billSubcategories,
             'incomeCategories' => IncomeCategory::available()->get(),
-            'bankAccounts' => BankAccount::query()->active()->orderBy('bank_name')->get(),
+            'bankAccounts' => $bankAccounts,
             'members' => ProfileMember::query()
                 ->where('profile_id', $profileId)
                 ->where('is_active', true)

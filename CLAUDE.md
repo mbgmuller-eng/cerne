@@ -440,6 +440,16 @@ O conteúdo mora em `config/tutorials.php`, indexado pelo **nome da rota**, e `A
 - `PageHelp` recebe o nome da rota na montagem (`#[Locked]`): numa ação do Livewire a requisição já é a do Livewire, e `request()->route()` não diria mais em que tela a pessoa está. Em Minha conta, `ResetTutorials` apaga só o progresso de quem pediu ("Mostrar os avisos de novo").
 - Ainda **sem vídeo**: a entrada do catálogo é só texto. O espaço do vídeo (e a medição de quem viu e dispensou) entram depois; o progresso já guarda o suficiente para contar.
 
+### Dicas e avisos "Ao salvar" nos formulários de cadastro
+
+Auditoria dos 6 formulários mais usados (lançamento, conta fixa, conta e cartão, investimento, dívida, apólice) achou campos que a pessoa entendia errado e efeitos que ela não via antes de salvar. Regras:
+
+- **Dica sob o campo** (`<p class="mt-1 text-xs text-slate-400">`, convenção de Formulários) para o que o campo REALMENTE faz, escrita a partir do código, não da intenção: "Recorrente" na receita só põe uma etiqueta (não repete nada), "Ocultar do meu cônjuge" vale para o MEMBRO escolhido (não para quem digita), conta bancária no lançamento mexe no saldo na hora, sem conta o "Pagar" da conta fixa só marca como paga. Texto de tela novo: sem travessão, sem "pra" nem "num".
+- **Quadro "Ao salvar"** (`<x-form-consequence :lines="...">`) mostra o que vai acontecer, com os valores da própria pessoa. **O texto sai de `App\Support\Forms\FormConsequence`, que chama a MESMA conta que grava** (`CreditCard::billingPeriodFor` e `dueDateFor` para a fatura, `Money::split` para as parcelas, `FixedBill::occurrencesInMonth` para os vencimentos do mês): se a regra mudar lá, o aviso muda junto. Nunca reescreva a conta dentro do aviso.
+- Só ao **cadastrar**: na edição o efeito depende do que já estava gravado (o aviso fica vazio, ou diz a partir de quando a mudança vale). Os campos que alimentam o aviso usam `wire:model.live` (`.live.blur` em número e valor, para não pedir ao servidor a cada tecla).
+- **Mensagem de validação em português**: `required_if` cru sai como "quando recorrência for monthly". Dê `messages:` próprias ao campo e `attributes:` ao que for citado. Cada aviso novo tem teste que confere o texto **e o que é gravado** (`CashFlowConsequenceTest`, `FixedBillsConsequenceTest`).
+- Feito: Fluxo de caixa (despesa e receita) e Contas fixas (conta fixa e receita recorrente). **Faltam** conta e cartão, apólice, investimento e dívida (o levantamento está na conversa de 11/11/2026: "Saldo atual", "Número da conta", fechamento e vencimento do cartão, "Valor de cada parcela" da apólice, preço da compra vira cotação, parcelas já pagas da dívida, e o erro de dívida que aparece sob o campo "Nome").
+
 ### Calendário (Saúde e agenda do profissional)
 
 Um módulo só desenha o calendário: `<x-calendar>` (mês, semana e dia, no estilo de uma agenda) alimentado por `CalendarBuilder` e

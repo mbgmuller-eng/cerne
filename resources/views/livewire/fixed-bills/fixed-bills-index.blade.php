@@ -61,8 +61,11 @@
 
                     <div>
                         <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Valor {{ $billIsVariable ? '(estimado)' : '' }}</label>
-                        <input type="number" step="0.01" min="0.01" wire:model="billAmount" class="input mt-1.5" placeholder="0,00">
+                        <input type="number" step="0.01" min="0.01" wire:model.live.blur="billAmount" class="input mt-1.5" placeholder="0,00">
                         @error('billAmount') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                        @if ($billIsVariable)
+                            <p class="mt-1 text-xs text-slate-400">Ao pagar, você informa o valor real. Este é só uma estimativa.</p>
+                        @endif
                     </div>
 
                     <div>
@@ -77,7 +80,7 @@
                     @if ($billRecurrence === 'weekly')
                         <div wire:key="bill-field-due-weekday">
                             <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Dia da semana</label>
-                            <select wire:model="billDueWeekday" class="select mt-1.5 w-full">
+                            <select wire:model.live="billDueWeekday" class="select mt-1.5 w-full">
                                 <option value="">Selecione</option>
                                 <option value="0">Domingo</option>
                                 <option value="1">Segunda</option>
@@ -93,7 +96,7 @@
                         @if ($billRecurrence === 'annual')
                             <div wire:key="bill-field-due-month">
                                 <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Mês</label>
-                                <select wire:model="billDueMonth" class="select mt-1.5 w-full">
+                                <select wire:model.live="billDueMonth" class="select mt-1.5 w-full">
                                     <option value="">Selecione</option>
                                     @foreach (['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'] as $i => $nomeMes)
                                         <option value="{{ $i + 1 }}">{{ $nomeMes }}</option>
@@ -104,8 +107,9 @@
                         @endif
                         <div wire:key="bill-field-due-day">
                             <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Dia do vencimento</label>
-                            <input type="number" min="1" max="31" wire:model="billDueDay" class="input mt-1.5" placeholder="Ex.: 5">
+                            <input type="number" min="1" max="31" wire:model.live.blur="billDueDay" class="input mt-1.5" placeholder="Ex.: 5">
                             @error('billDueDay') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                            <p class="mt-1 text-xs text-slate-400">Dia 29, 30 ou 31 vale como o último dia nos meses mais curtos.</p>
                         </div>
                     @endif
 
@@ -160,24 +164,28 @@
                     </div>
 
                     @if ($privacyMembers->count() >= 2 && $billMemberId !== '')
-                        <div class="flex items-center gap-2 pt-5">
-                            <input type="checkbox" wire:model="billIsPrivate" id="billIsPrivate" class="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500">
-                            <label for="billIsPrivate" class="text-sm text-slate-600 dark:text-slate-400">Ocultar do meu cônjuge</label>
+                        <div class="pt-5">
+                            <div class="flex items-center gap-2">
+                                <input type="checkbox" wire:model="billIsPrivate" id="billIsPrivate" class="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500">
+                                <label for="billIsPrivate" class="text-sm text-slate-600 dark:text-slate-400">Ocultar do meu cônjuge</label>
+                            </div>
+                            <p class="mt-1 text-xs text-slate-400">Só {{ $members->firstWhere('id', $billMemberId)?->name ?? 'o membro escolhido' }} e o consultor verão esta conta e a despesa criada ao pagar.</p>
                         </div>
                     @endif
 
                     <div>
                         <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Conta para debitar (opcional)</label>
-                        <select wire:model="billBankAccountId" class="select mt-1.5 w-full">
-                            <option value="">Nenhuma — só lembrete</option>
+                        <select wire:model.live="billBankAccountId" class="select mt-1.5 w-full">
+                            <option value="">Nenhuma (só lembrete)</option>
                             @foreach ($bankAccounts as $conta)
                                 <option value="{{ $conta->id }}">{{ $conta->displayName() }}</option>
                             @endforeach
                         </select>
+                        <p class="mt-1 text-xs text-slate-400">Sem conta, “Pagar” só marca como paga: nenhuma despesa é criada.</p>
                     </div>
 
                     <div class="flex items-center gap-2 pt-5">
-                        <input type="checkbox" wire:model="billIsVariable" id="billIsVariable" class="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500">
+                        <input type="checkbox" wire:model.live="billIsVariable" id="billIsVariable" class="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500">
                         <label for="billIsVariable" class="text-sm text-slate-600 dark:text-slate-400">Valor variável (luz, água...)</label>
                     </div>
 
@@ -186,6 +194,8 @@
                         <textarea wire:model="billNotes" rows="2" class="input mt-1.5"></textarea>
                     </div>
                 </div>
+
+                <x-form-consequence :lines="$billConsequence" />
 
                 <div class="flex justify-end">
                     <button type="submit" class="btn-primary px-4 py-2" wire:loading.attr="disabled">{{ $editingBillId ? 'Salvar alterações' : 'Salvar conta fixa' }}</button>
@@ -312,8 +322,11 @@
 
                     <div>
                         <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Valor {{ $incomeIsVariable ? '(estimado)' : '' }}</label>
-                        <input type="number" step="0.01" min="0.01" wire:model="incomeAmount" class="input mt-1.5" placeholder="0,00">
+                        <input type="number" step="0.01" min="0.01" wire:model.live.blur="incomeAmount" class="input mt-1.5" placeholder="0,00">
                         @error('incomeAmount') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                        @if ($incomeIsVariable)
+                            <p class="mt-1 text-xs text-slate-400">Ao receber, você informa o valor real. Este é só uma estimativa.</p>
+                        @endif
                     </div>
 
                     <div>
@@ -328,7 +341,7 @@
                     @if ($incomeRecurrence === 'weekly')
                         <div wire:key="income-field-due-weekday">
                             <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Dia da semana</label>
-                            <select wire:model="incomeDueWeekday" class="select mt-1.5 w-full">
+                            <select wire:model.live="incomeDueWeekday" class="select mt-1.5 w-full">
                                 <option value="">Selecione</option>
                                 <option value="0">Domingo</option>
                                 <option value="1">Segunda</option>
@@ -344,7 +357,7 @@
                         @if ($incomeRecurrence === 'annual')
                             <div wire:key="income-field-due-month">
                                 <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Mês</label>
-                                <select wire:model="incomeDueMonth" class="select mt-1.5 w-full">
+                                <select wire:model.live="incomeDueMonth" class="select mt-1.5 w-full">
                                     <option value="">Selecione</option>
                                     @foreach (['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'] as $i => $nomeMes)
                                         <option value="{{ $i + 1 }}">{{ $nomeMes }}</option>
@@ -355,14 +368,15 @@
                         @endif
                         <div wire:key="income-field-due-day">
                             <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Dia do recebimento</label>
-                            <input type="number" min="1" max="31" wire:model="incomeDueDay" class="input mt-1.5" placeholder="Ex.: 5">
+                            <input type="number" min="1" max="31" wire:model.live.blur="incomeDueDay" class="input mt-1.5" placeholder="Ex.: 5">
                             @error('incomeDueDay') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                            <p class="mt-1 text-xs text-slate-400">Dia 29, 30 ou 31 vale como o último dia nos meses mais curtos.</p>
                         </div>
                     @endif
 
                     <div>
                         <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Categoria</label>
-                        <select wire:model="incomeCategoryId" class="select mt-1.5 w-full">
+                        <select wire:model.live="incomeCategoryId" class="select mt-1.5 w-full">
                             <option value="">Selecione</option>
                             @foreach ($incomeCategories as $categoria)
                                 <option value="{{ $categoria->id }}">{{ $categoria->name }}</option>
@@ -382,24 +396,28 @@
                     </div>
 
                     @if ($privacyMembers->count() >= 2 && $incomeMemberId !== '')
-                        <div class="flex items-center gap-2 pt-5">
-                            <input type="checkbox" wire:model="incomeIsPrivate" id="incomeIsPrivate" class="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500">
-                            <label for="incomeIsPrivate" class="text-sm text-slate-600 dark:text-slate-400">Ocultar do meu cônjuge</label>
+                        <div class="pt-5">
+                            <div class="flex items-center gap-2">
+                                <input type="checkbox" wire:model="incomeIsPrivate" id="incomeIsPrivate" class="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500">
+                                <label for="incomeIsPrivate" class="text-sm text-slate-600 dark:text-slate-400">Ocultar do meu cônjuge</label>
+                            </div>
+                            <p class="mt-1 text-xs text-slate-400">Só {{ $members->firstWhere('id', $incomeMemberId)?->name ?? 'o membro escolhido' }} e o consultor verão esta receita e o lançamento criado ao receber.</p>
                         </div>
                     @endif
 
                     <div>
                         <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Conta para creditar (opcional)</label>
-                        <select wire:model="incomeBankAccountId" class="select mt-1.5 w-full">
-                            <option value="">Nenhuma — só lembrete</option>
+                        <select wire:model.live="incomeBankAccountId" class="select mt-1.5 w-full">
+                            <option value="">Nenhuma (só lembrete)</option>
                             @foreach ($bankAccounts as $conta)
                                 <option value="{{ $conta->id }}">{{ $conta->displayName() }}</option>
                             @endforeach
                         </select>
+                        <p class="mt-1 text-xs text-slate-400">Sem conta, “Receber” só marca como recebida: nenhuma receita é criada.</p>
                     </div>
 
                     <div class="flex items-center gap-2 pt-5">
-                        <input type="checkbox" wire:model="incomeIsVariable" id="incomeIsVariable" class="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500">
+                        <input type="checkbox" wire:model.live="incomeIsVariable" id="incomeIsVariable" class="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500">
                         <label for="incomeIsVariable" class="text-sm text-slate-600 dark:text-slate-400">Valor variável (comissão, freela...)</label>
                     </div>
 
@@ -408,6 +426,8 @@
                         <textarea wire:model="incomeNotes" rows="2" class="input mt-1.5"></textarea>
                     </div>
                 </div>
+
+                <x-form-consequence :lines="$incomeConsequence" />
 
                 <div class="flex justify-end">
                     <button type="submit" class="btn-primary px-4 py-2" wire:loading.attr="disabled">{{ $editingIncomeId ? 'Salvar alterações' : 'Salvar receita recorrente' }}</button>
