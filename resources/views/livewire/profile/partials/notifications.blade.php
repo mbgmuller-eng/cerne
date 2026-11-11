@@ -20,4 +20,5 @@
             Notificações push (neste navegador)
         </label>
     </div>
+    <p class="mt-3 text-xs text-slate-400">Cada marca vale na hora, sem botão de salvar. O push só liga depois que o navegador autorizar.</p>
 </section>

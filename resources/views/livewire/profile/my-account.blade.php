@@ -27,6 +27,7 @@
                             <button type="button" wire:click="saveOwnBirthdate" class="btn-primary px-2 py-1 text-xs">Salvar</button>
                             <button type="button" wire:click="toggleOwnBirthdate" class="btn-ghost px-2 py-1 text-xs">Cancelar</button>
                         </dd>
+                        <p class="mt-1 text-xs text-slate-400">O consultor ou corretor vinculado é avisado {{ $birthdayNoticeDays }} dias antes do aniversário.</p>
                         @error('ownBirthdateInput') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
                     @else
                         <dd class="mt-0.5 flex items-center gap-2 text-sm text-slate-800 dark:text-slate-200">
@@ -121,6 +122,7 @@
                                 <button type="button" wire:click="savePartnerBirthdate" class="btn-primary px-2 py-1 text-xs">Salvar</button>
                                 <button type="button" wire:click="togglePartnerBirthdate" class="btn-ghost px-2 py-1 text-xs">Cancelar</button>
                             </dd>
+                            <p class="mt-1 text-xs text-slate-400">O consultor ou corretor vinculado é avisado {{ $birthdayNoticeDays }} dias antes do aniversário.</p>
                             @error('partnerBirthdateInput') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
                         @else
                             <dd class="mt-0.5 flex items-center gap-2 text-sm text-slate-800 dark:text-slate-200">
@@ -174,10 +176,12 @@
 
                     <div>
                         <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">E-mail</label>
-                        <input type="email" wire:model="partnerEmail" class="input mt-1.5" placeholder="email@exemplo.com">
+                        <input type="email" wire:model.live.blur="partnerEmail" class="input mt-1.5" placeholder="email@exemplo.com">
                         @error('partnerEmail') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
                     </div>
                 </div>
+
+                <x-form-consequence :lines="$inviteConsequence" />
 
                 <button type="submit" class="btn-primary" wire:loading.attr="disabled">Convidar</button>
 
@@ -207,9 +211,11 @@
 
                 <div>
                     <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Nome</label>
-                    <input type="text" wire:model="partnerOnlyName" class="input mt-1.5" placeholder="Nome do cônjuge">
+                    <input type="text" wire:model.live.blur="partnerOnlyName" class="input mt-1.5" placeholder="Nome do cônjuge">
                     @error('partnerOnlyName') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
                 </div>
+
+                <x-form-consequence :lines="$partnerOnlyConsequence" />
 
                 <button type="submit" class="btn-primary" wire:loading.attr="disabled">Cadastrar</button>
             </form>

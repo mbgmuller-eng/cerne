@@ -263,6 +263,84 @@ class GoalsIndex extends Component
             ->get();
     }
 
+    /**
+     * O que "Salvar" vai deixar na tela de objetivos, com o que a pessoa digitou. Monta um Goal sem gravar e usa os mesmos métodos que a lista
+     * (`accumulated`, `progressPercentage`, `monthlyNeeded`), então o número do aviso é o que a lista vai mostrar depois de salvar.
+     *
+     * @return list<string>
+     */
+    private function goalConsequence(): array
+    {
+        if (! $this->showForm) {
+            return [];
+        }
+
+        $valor = Money::parse($this->estimatedValue);
+
+        if (bccomp($valor, '0', 2) <= 0 || preg_match('/^[0-9.,\s]+$/', $this->estimatedValue) !== 1) {
+            return [];
+        }
+
+        $investimento = $this->linkType === 'investment' && $this->linkedInvestmentId !== '' ? InvestmentRecord::query()->active()->find($this->linkedInvestmentId) : null;
+        $consorcio = $this->linkType === 'debt' && $this->linkedDebtId !== '' ? $this->consorcios()->firstWhere('id', $this->linkedDebtId) : null;
+        $semLigacao = $investimento === null && $consorcio === null;
+
+        $objetivo = (new Goal)->forceFill([
+            'estimated_value' => $valor,
+            'target_date' => preg_match('/^\d{4}-\d{2}-\d{2}$/', $this->targetDate) === 1 ? $this->targetDate : null,
+            'current_amount' => $semLigacao && preg_match('/^[0-9.,\s]+$/', $this->currentAmount) === 1 ? Money::parse($this->currentAmount) : '0.00',
+            'linked_investment_id' => $investimento?->id,
+            'linked_debt_id' => $consorcio?->id,
+        ]);
+        $objetivo->setRelation('linkedInvestment', $investimento);
+        $objetivo->setRelation('linkedDebt', $consorcio);
+
+        $linhas = [];
+        $pct = number_format($objetivo->progressPercentage(), 1, ',', '.').'%';
+
+        if ($investimento !== null) {
+            $linhas[] = 'O avanço vem do saldo de '.$investimento->displayName().': '.Money::format($objetivo->accumulated()).' de '.Money::format($valor).' ('.$pct.'). Você não precisa informar quanto já tem.';
+        } elseif ($consorcio !== null) {
+            $progresso = $objetivo->installmentProgress();
+            $linhas[] = 'O avanço vem das parcelas pagas do consórcio: '.$progresso['paid'].' de '.$progresso['total'].' ('.$pct.' de '.Money::format($valor).').';
+        } else {
+            $linhas[] = 'Com '.Money::format($objetivo->accumulated()).' de '.Money::format($valor).', o objetivo fica em '.$pct.'.';
+        }
+
+        $falta = $objetivo->remaining();
+
+        if (bccomp($falta, '0', 2) > 0) {
+            $mensal = $objetivo->monthlyNeeded();
+
+            if ($mensal !== null) {
+                $linhas[] = 'Faltam '.Money::format($falta).' até '.$objetivo->target_date->format('d/m/Y').': cerca de '.Money::format($mensal).' por mês.';
+            } elseif ($objetivo->target_date !== null) {
+                $linhas[] = 'A data-alvo já passou, então o Cerne não calcula quanto guardar por mês.';
+            } else {
+                $linhas[] = 'Sem data-alvo, o Cerne não calcula quanto guardar por mês.';
+            }
+        }
+
+        if ($this->editingId !== null) {
+            $antes = Goal::query()->find($this->editingId);
+
+            if (! $semLigacao && $antes !== null && $antes->linked_investment_id === null && $antes->linked_debt_id === null && bccomp((string) $antes->current_amount, '0', 2) > 0) {
+                $linhas[] = 'O valor que estava em "Quanto já tem" ('.Money::format($antes->current_amount).') deixa de valer: o avanço passa a vir da ligação escolhida.';
+            }
+
+            if ($this->status === GoalStatus::Achieved->value && $antes?->status !== GoalStatus::Achieved) {
+                $linhas[] = 'Conquistado: o objetivo sai da lista em andamento e deixa de entrar nos totais do topo. Você pode reabrir depois.';
+            }
+        }
+
+        if ($this->memberId !== '' && $this->isPrivate) {
+            $nome = $this->membros()->firstWhere('id', $this->memberId)?->name ?? 'a pessoa escolhida';
+            $linhas[] = 'Só '.$nome.' e o consultor verão este objetivo.';
+        }
+
+        return $linhas;
+    }
+
     // ------------------------------------------------------------------ leitura
 
     /** @return Collection<int, Goal> */
@@ -314,6 +392,7 @@ class GoalsIndex extends Component
             'investimentos' => $this->showForm ? InvestmentRecord::query()->active()->orderBy('institution')->orderBy('name')->get() : collect(),
             'consorcios' => $this->showForm ? $this->consorcios() : collect(),
             'metodos' => FundingMethod::options(),
+            'goalConsequence' => $this->goalConsequence(),
         ]);
     }
 }

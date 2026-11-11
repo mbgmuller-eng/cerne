@@ -144,7 +144,7 @@
                 @if ($linkType === 'investment')
                     <div class="@sm:col-span-2">
                         <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Investimento</label>
-                        <select wire:model="linkedInvestmentId" class="select mt-1.5 w-full">
+                        <select wire:model.live="linkedInvestmentId" class="select mt-1.5 w-full">
                             <option value="">Escolha</option>
                             @foreach ($investimentos as $inv)
                                 <option value="{{ $inv->id }}">{{ $inv->institution ? $inv->institution.' · ' : '' }}{{ $inv->displayName() }}</option>
@@ -169,12 +169,13 @@
 
                 <div>
                     <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Valor do objetivo</label>
-                    <input type="text" wire:model="estimatedValue" inputmode="decimal" class="input mt-1.5" placeholder="Ex.: 100000,00">
+                    <input type="text" wire:model.live.blur="estimatedValue" inputmode="decimal" class="input mt-1.5" placeholder="Ex.: 100000,00">
                     @error('estimatedValue') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
                 </div>
                 <div>
                     <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Data-alvo <span class="font-normal text-slate-400">(opcional)</span></label>
-                    <input type="date" wire:model="targetDate" class="input mt-1.5">
+                    <input type="date" wire:model.live="targetDate" class="input mt-1.5">
+                    <p class="mt-1 text-xs text-slate-400">Com a data, o Cerne calcula quanto guardar por mês.</p>
                     @error('targetDate') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
                 </div>
 
@@ -186,11 +187,13 @@
                                 <option value="{{ $valor }}">{{ $rotulo }}</option>
                             @endforeach
                         </select>
+                        <p class="mt-1 text-xs text-slate-400">Só descreve o objetivo na lista. Não muda o cálculo de quanto guardar por mês.</p>
                     </div>
                     @if ($fundingMethod === 'installments')
                         <div>
                             <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Valor da parcela</label>
                             <input type="text" wire:model="installmentAmount" inputmode="decimal" class="input mt-1.5" placeholder="Ex.: 1500,00">
+                            <p class="mt-1 text-xs text-slate-400">Fica guardado com o objetivo. Não entra no cálculo de quanto guardar por mês.</p>
                             @error('installmentAmount') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
                         </div>
                     @endif
@@ -199,7 +202,8 @@
                 @if ($linkType === '')
                     <div>
                         <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Quanto já tem</label>
-                        <input type="text" wire:model="currentAmount" inputmode="decimal" class="input mt-1.5" placeholder="Ex.: 5000,00">
+                        <input type="text" wire:model.live.blur="currentAmount" inputmode="decimal" class="input mt-1.5" placeholder="Ex.: 5000,00">
+                        <p class="mt-1 text-xs text-slate-400">É o valor que você informa e atualiza à mão. Com investimento ou consórcio ligado, ele não vale.</p>
                         @error('currentAmount') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
                     </div>
                 @endif
@@ -214,7 +218,7 @@
                 @if ($editingId)
                     <div>
                         <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Situação</label>
-                        <select wire:model="status" class="select mt-1.5 w-full">
+                        <select wire:model.live="status" class="select mt-1.5 w-full">
                             <option value="active">Em andamento</option>
                             <option value="achieved">Conquistado</option>
                         </select>
@@ -234,7 +238,7 @@
                     @if ($memberId !== '')
                         <div class="flex items-end">
                             <label class="inline-flex items-center gap-2 pb-2 text-xs text-slate-600 dark:text-slate-300">
-                                <input type="checkbox" wire:model="isPrivate" class="rounded border-slate-300">
+                                <input type="checkbox" wire:model.live="isPrivate" class="rounded border-slate-300">
                                 Só esta pessoa vê
                             </label>
                         </div>
@@ -246,6 +250,8 @@
                     <textarea wire:model="notes" rows="2" maxlength="2000" class="input mt-1.5"></textarea>
                 </div>
             </div>
+
+            <x-form-consequence :lines="$goalConsequence" />
 
             <div class="flex flex-wrap items-center justify-between gap-3">
                 @if ($editingId)

@@ -377,6 +377,43 @@ class CategorizationRulesIndex extends Component
         $this->regraAplicavelExistentes = null;
     }
 
+    /**
+     * O que "Salvar regra" vai fazer. A regra vale para as próximas importações (a linha vem sugerida, e a pessoa confirma na revisão) e, ao salvar,
+     * o Cerne só OFERECE recategorizar os lançamentos que já existem: a contagem usa a mesma consulta de `detectarLancamentosExistentesParaRegra`.
+     *
+     * @return list<string>
+     */
+    private function ruleConsequence(string $tipo): array
+    {
+        $despesa = $tipo === 'despesa';
+        $pattern = $despesa ? $this->expensePattern : $this->incomePattern;
+
+        if (! ($despesa ? $this->showExpenseForm : $this->showIncomeForm) || trim($pattern) === '') {
+            return [];
+        }
+
+        if ($despesa) {
+            $categoria = $this->expenseCategoryId !== '' ? ExpenseCategory::query()->find($this->expenseCategoryId)?->name : null;
+            $subcategoria = $this->expenseSubcategoryId !== '' ? ExpenseSubcategory::query()->find($this->expenseSubcategoryId)?->name : null;
+            $destino = $categoria !== null ? $categoria.($subcategoria !== null ? ' › '.$subcategoria : '').' ('.mb_strtolower(Necessity::tryFrom($this->expenseNecessity)?->label() ?? '').')' : null;
+        } else {
+            $destino = $this->incomeCategoryId !== '' ? IncomeCategory::query()->find($this->incomeCategoryId)?->name : null;
+        }
+
+        $linhas = [
+            'Nas próximas importações, a linha cuja descrição contém "'.trim($pattern).'" já vem sugerida'.($destino !== null ? ' como '.$destino : '').'. Você ainda confirma na revisão.',
+        ];
+
+        $modelo = $despesa ? ExpenseRecord::class : IncomeRecord::class;
+        $existentes = $modelo::query()->whereRaw('LOWER(description) LIKE ?', ['%'.mb_strtolower($pattern).'%'])->count();
+
+        if ($existentes > 0) {
+            $linhas[] = ($existentes === 1 ? 'Já existe 1 lançamento' : 'Já existem '.$existentes.' lançamentos').' com esse trecho na descrição. Ao salvar, o Cerne pergunta se você quer recategorizá-'.($existentes === 1 ? 'lo' : 'los').': nada muda sozinho.';
+        }
+
+        return $linhas;
+    }
+
     /** @return Collection<int, ExpenseSubcategory> */
     public function getExpenseSubcategoriesProperty(): Collection
     {
@@ -438,6 +475,8 @@ class CategorizationRulesIndex extends Component
             'incomeCategories' => IncomeCategory::query()->available()->get(),
             'fixedBills' => FixedBill::query()->active()->orderBy('name')->get(),
             'recurringIncomes' => RecurringIncome::query()->active()->orderBy('name')->get(),
+            'expenseRuleConsequence' => $this->ruleConsequence('despesa'),
+            'incomeRuleConsequence' => $this->ruleConsequence('receita'),
         ]);
     }
 }

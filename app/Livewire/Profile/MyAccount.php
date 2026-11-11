@@ -302,6 +302,50 @@ class MyAccount extends Component
         $this->encerrandoVinculoId = null;
     }
 
+    /**
+     * O que "Convidar" faz: o e-mail com o link (que vale `cerne.invite.expires_in_days` dias), o convite pendente que deixa de valer e o que muda no
+     * perfil quando a pessoa aceita (`ClientOnboardingService::addPartner`: perfil de casal, e o cadastro sem login que já existe passa a ter login).
+     *
+     * @return list<string>
+     */
+    private function inviteConsequence(?PartnerInvite $pendente, ?ProfileMember $semLogin): array
+    {
+        if (! $this->showInviteForm || filter_var(trim($this->partnerEmail), FILTER_VALIDATE_EMAIL) === false) {
+            return [];
+        }
+
+        $linhas = ['Um e-mail com o link do convite vai para '.trim($this->partnerEmail).'. O link vale por '.config('cerne.invite.expires_in_days').' dias.'];
+
+        if ($pendente !== null) {
+            $linhas[] = 'O convite pendente para '.$pendente->partner_email.' deixa de valer: só o novo link funciona.';
+        }
+
+        $linhas[] = $semLogin !== null
+            ? 'Quando '.$semLogin->name.' aceitar, passa a entrar com login próprio e assume o cadastro que já existe, com todos os dados dele(a).'
+            : 'Quando a pessoa aceitar, o perfil passa a ser de casal e ela entra com login próprio. Cada um decide o que oculta do outro.';
+
+        return $linhas;
+    }
+
+    /**
+     * O que "Cadastrar" faz (`ClientOnboardingService::addPartnerWithoutLogin`): o perfil vira de casal e entra um segundo membro sem login.
+     *
+     * @return list<string>
+     */
+    private function partnerOnlyConsequence(): array
+    {
+        $nome = trim($this->partnerOnlyName);
+
+        if (! $this->showPartnerOnlyForm || $nome === '') {
+            return [];
+        }
+
+        return [
+            'O perfil passa a ser de casal e '.$nome.' entra como segundo membro, sem login.',
+            'Você pode convidá-lo(a) por e-mail depois: a pessoa assume este cadastro, com todos os dados já lançados em nome dela.',
+        ];
+    }
+
     public function render()
     {
         if ($this->isViewingOwnProfessionalAccount()) {
@@ -369,6 +413,9 @@ class MyAccount extends Component
             // a do cliente aberto).
             'ownMember' => $context->member(),
             'canManageMembers' => auth()->user()->can('manageMembers', $profile),
+            'inviteConsequence' => $this->inviteConsequence($pendingInvite, $partnerMember?->user === null ? $partnerMember : null),
+            'partnerOnlyConsequence' => $this->partnerOnlyConsequence(),
+            'birthdayNoticeDays' => (int) config('cerne.notifications.days_before_important_date'),
         ]);
     }
 
