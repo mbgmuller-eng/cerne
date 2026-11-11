@@ -159,9 +159,9 @@ class DebtService
      * Paga a parcela: cria a despesa (com a classificação do contrato, ou a informada), debita a conta quando houver e marca a
      * parcela como paga e ligada. O valor pago pode diferir do previsto (juros de mora, desconto).
      */
-    public function pay(DebtInstallment $parcela, CarbonInterface $dataPagamento, ?string $valor = null, ?string $contaId = null, ?string $userId = null): DebtInstallment
+    public function pay(DebtInstallment $parcela, CarbonInterface $dataPagamento, ?string $valor = null, ?string $contaId = null, ?string $userId = null, bool $semConta = false): DebtInstallment
     {
-        return DB::transaction(function () use ($parcela, $dataPagamento, $valor, $contaId, $userId): DebtInstallment {
+        return DB::transaction(function () use ($parcela, $dataPagamento, $valor, $contaId, $userId, $semConta): DebtInstallment {
             $parcela = DebtInstallment::query()->with('debt')->lockForUpdate()->findOrFail($parcela->id);
 
             if ($parcela->isPaid()) {
@@ -175,7 +175,9 @@ class DebtService
                 throw new InvalidArgumentException('Informe o valor pago.');
             }
 
-            $conta = ($contaId ?? $divida->bank_account_id) !== null ? BankAccount::query()->findOrFail($contaId ?? $divida->bank_account_id) : null;
+            // Sem conta informada vale a do contrato; `$semConta` é a pessoa dizendo "nenhuma": só a despesa, sem mexer em saldo.
+            $contaAlvo = $semConta ? null : ($contaId ?? $divida->bank_account_id);
+            $conta = $contaAlvo !== null ? BankAccount::query()->findOrFail($contaAlvo) : null;
 
             $despesa = ExpenseRecord::create([
                 'member_id' => $divida->member_id,

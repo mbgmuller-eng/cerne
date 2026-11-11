@@ -211,7 +211,7 @@ class DebtShow extends Component
         $parcela = DebtInstallment::query()->where('debt_id', $this->debt->id)->findOrFail($this->payId);
 
         try {
-            app(DebtService::class)->pay($parcela, CarbonImmutable::createFromFormat('Y-m-d', $dados['payDate'])->startOfDay(), $dados['payAmount'], $dados['payAccountId'] ?: null);
+            app(DebtService::class)->pay($parcela, CarbonImmutable::createFromFormat('Y-m-d', $dados['payDate'])->startOfDay(), $dados['payAmount'], $dados['payAccountId'] ?: null, semConta: ($dados['payAccountId'] ?? '') === '');
         } catch (InvalidArgumentException $e) {
             $this->addError('payAmount', $e->getMessage());
 
@@ -846,8 +846,8 @@ class DebtShow extends Component
     }
 
     /**
-     * O que "Registrar pagamento" faz com o que está digitado. A conta é a que `DebtService::pay` usa: a escolhida e, sem escolha,
-     * a do contrato (escolher "Nenhuma" não tira a conta do contrato).
+     * O que "Registrar pagamento" faz com o que está digitado. A conta é a escolhida; "Nenhuma" quer dizer nenhuma (a tela já
+     * vem com a conta do contrato marcada).
      *
      * @param  Collection<int, BankAccount>  $contas
      * @return list<string>
@@ -868,7 +868,7 @@ class DebtShow extends Component
             return [];
         }
 
-        $contaId = $this->payAccountId !== '' ? $this->payAccountId : (string) $this->debt->bank_account_id;
+        $contaId = $this->payAccountId;
 
         return FormConsequence::installmentPayment(
             $this->payAmount,

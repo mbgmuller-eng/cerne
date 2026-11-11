@@ -247,12 +247,12 @@
                 <div class="@sm:col-span-2">
                     <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Conta de onde saiu <span class="font-normal text-slate-400">(opcional)</span></label>
                     <select wire:model.live="payAccountId" class="select mt-1.5 w-full">
-                        <option value="">{{ $debt->bank_account_id ? 'A conta do contrato' : 'Nenhuma' }}</option>
+                        <option value="">Nenhuma</option>
                         @foreach ($contas as $c)
                             <option value="{{ $c->id }}">{{ $c->bank_name }}</option>
                         @endforeach
                     </select>
-                    <p class="mt-1 text-xs text-slate-400">Sem escolher outra, vale a conta do contrato, se ele tiver uma. Sem conta, só a despesa é criada.</p>
+                    <p class="mt-1 text-xs text-slate-400">Já vem a conta do contrato, se ele tiver uma. Com “Nenhuma”, só a despesa é criada e nenhum saldo muda.</p>
                 </div>
             </div>
             <x-form-consequence :lines="$consequenciaPagamento" />

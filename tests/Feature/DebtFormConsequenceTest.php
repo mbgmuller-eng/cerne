@@ -176,7 +176,7 @@ class DebtFormConsequenceTest extends TestCase
         ]);
     }
 
-    public function test_pagar_parcela_diz_a_despesa_que_nasce_e_a_conta_do_contrato_e_a_usada_mesmo_sem_escolher(): void
+    public function test_pagar_parcela_diz_a_despesa_que_nasce_e_ja_vem_com_a_conta_do_contrato(): void
     {
         $conta = BankAccount::factory()->for($this->perfil, 'profile')->for($this->membro, 'member')->create(['bank_name' => 'Banco Azul', 'current_balance' => '1000.00']);
         $divida = $this->emprestimo($conta);
@@ -188,13 +188,25 @@ class DebtFormConsequenceTest extends TestCase
             ->assertSee('A parcela prevê R$ 650,00.')
             ->assertSee('Será criada uma despesa de R$ 650,00 em 20/10/2026, na categoria '.$categoria.'.')
             ->assertSee('O saldo de Banco Azul cai R$ 650,00.')
-            // "Nenhuma" (vazio) não tira a conta do contrato: o aviso diz o que de fato acontece.
-            ->set('payAccountId', '')
-            ->assertSee('O saldo de Banco Azul cai R$ 650,00.')
             ->call('pay')->assertHasNoErrors();
 
         $this->assertSame('350.00', $conta->refresh()->current_balance);
         $this->assertSame('650.00', ExpenseRecord::withoutProfileScope()->sole()->amount);
+    }
+
+    public function test_escolher_nenhuma_nao_debita_nem_a_conta_do_contrato(): void
+    {
+        $conta = BankAccount::factory()->for($this->perfil, 'profile')->for($this->membro, 'member')->create(['bank_name' => 'Banco Azul', 'current_balance' => '1000.00']);
+        $divida = $this->emprestimo($conta);
+
+        Livewire::test(DebtShow::class, ['debt' => $divida])
+            ->call('openPay', $divida->installments[0]->id)
+            ->set('payAccountId', '')
+            ->assertSee('Nenhuma conta é debitada.')
+            ->call('pay')->assertHasNoErrors();
+
+        $this->assertSame('1000.00', $conta->refresh()->current_balance);
+        $this->assertNull(ExpenseRecord::withoutProfileScope()->sole()->bank_account_id);
     }
 
     public function test_pagar_sem_conta_nenhuma_diz_que_so_a_despesa_e_criada_e_valor_com_letra_e_recusado(): void
