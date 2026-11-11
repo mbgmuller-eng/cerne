@@ -139,7 +139,7 @@ class InvestmentEvents extends Component
         }
 
         return $this->validate($rules, [], [
-            'date' => 'data', 'gross' => 'valor bruto', 'tax' => 'imposto retido', 'from' => 'de', 'to' => 'para',
+            'date' => 'data', 'gross' => 'valor bruto', 'tax' => 'imposto retido', 'from' => 'quantidade antes', 'to' => 'quantidade depois',
         ]);
     }
 

@@ -55,8 +55,9 @@
 
                 <div>
                     <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Saldo atual</label>
-                    <input type="number" step="0.01" wire:model="accountBalance" class="input mt-1.5" placeholder="0,00">
+                    <input type="number" step="0.01" wire:model.live.blur="accountBalance" class="input mt-1.5" placeholder="0,00">
                     @error('accountBalance') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                    <p class="mt-1 text-xs text-slate-400">Saldo de hoje. Depois, lançamentos que usam esta conta somam ou subtraem dele.</p>
                 </div>
 
                 <div>
@@ -65,20 +66,20 @@
                 </div>
 
                 <div>
-                    <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Conta (opcional)</label>
+                    <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Número da conta (opcional)</label>
                     <input type="text" wire:model="accountNumber" class="input mt-1.5">
                 </div>
 
                 <div>
                     <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Membro</label>
-                    <select wire:model="accountMemberId" class="select mt-1.5 w-full">
+                    <select wire:model.live="accountMemberId" class="select mt-1.5 w-full">
                         <option value="">Selecione</option>
                         @foreach ($members as $membro)
                             <option value="{{ $membro->id }}">{{ $membro->name }}</option>
                         @endforeach
                     </select>
                     @error('accountMemberId') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
-                    <p class="mt-1 text-xs text-slate-400">Marcar "conjunta" abaixo não dispensa o dono — é só a flag de compartilhamento.</p>
+                    <p class="mt-1 text-xs text-slate-400">Conjunta ou não, toda conta precisa de um dono. Escolha quem a movimenta.</p>
                 </div>
 
                 <div>
@@ -87,21 +88,22 @@
                 </div>
 
                 <div class="flex items-center gap-2 pt-5">
-                    <input type="checkbox" wire:model="accountIsJoint" id="accountIsJoint" class="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500">
+                    <input type="checkbox" wire:model.live="accountIsJoint" id="accountIsJoint" class="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500">
                     <label for="accountIsJoint" class="text-sm text-slate-600 dark:text-slate-400">Conta conjunta</label>
                 </div>
 
                 @unless ($accountIsJoint)
                     <div class="flex items-center gap-2 pt-5">
-                        <input type="checkbox" wire:model="accountVisibleToPartner" id="accountVisibleToPartner" class="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500">
+                        <input type="checkbox" wire:model.live="accountVisibleToPartner" id="accountVisibleToPartner" class="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500">
                         <label for="accountVisibleToPartner" class="text-sm text-slate-600 dark:text-slate-400">Visível para o cônjuge</label>
                     </div>
 
                     @if ($accountVisibleToPartner)
                         <div class="flex items-center gap-2 pt-5">
-                            <input type="checkbox" wire:model="accountIncludedInConsolidated" id="accountIncludedInConsolidated" class="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500">
+                            <input type="checkbox" wire:model.live="accountIncludedInConsolidated" id="accountIncludedInConsolidated" class="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500">
                             <label for="accountIncludedInConsolidated" class="text-sm text-slate-600 dark:text-slate-400">Entra no consolidado</label>
                         </div>
+                        <p class="text-xs text-slate-400 @sm:col-span-2 @lg:col-span-3">Soma o saldo desta conta no total consolidado e no painel.</p>
                     @endif
                 @else
                     <p class="self-end pb-2 text-xs text-slate-400">Conjunta é sempre visível e entra no consolidado.</p>
@@ -112,6 +114,8 @@
                     <textarea wire:model="accountNotes" rows="2" class="input mt-1.5"></textarea>
                 </div>
             </div>
+
+            <x-form-consequence :lines="$accountConsequence" />
 
             <div class="flex justify-end">
                 <button type="submit" class="btn-primary px-4 py-2" wire:loading.attr="disabled">
@@ -156,18 +160,21 @@
                     <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Limite</label>
                     <input type="number" step="0.01" min="0.01" wire:model="cardLimit" class="input mt-1.5" placeholder="0,00">
                     @error('cardLimit') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                    <p class="mt-1 text-xs text-slate-400">Informativo. O Cerne não bloqueia compras acima do limite.</p>
                 </div>
 
                 <div>
                     <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Dia de fechamento</label>
-                    <input type="number" min="1" max="31" wire:model="cardClosingDay" class="input mt-1.5">
+                    <input type="number" min="1" max="31" wire:model.live.blur="cardClosingDay" class="input mt-1.5">
                     @error('cardClosingDay') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                    <p class="mt-1 text-xs text-slate-400">Compras até este dia entram na fatura do mês. Depois, na fatura seguinte.</p>
                 </div>
 
                 <div>
                     <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Dia de vencimento</label>
-                    <input type="number" min="1" max="31" wire:model="cardDueDay" class="input mt-1.5">
+                    <input type="number" min="1" max="31" wire:model.live.blur="cardDueDay" class="input mt-1.5">
                     @error('cardDueDay') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                    <p class="mt-1 text-xs text-slate-400">Se for igual ou menor que o fechamento, a fatura vence no mês seguinte.</p>
                 </div>
 
                 <div>
@@ -178,7 +185,7 @@
 
                 <div>
                     <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Membro</label>
-                    <select wire:model="cardMemberId" class="select mt-1.5 w-full">
+                    <select wire:model.live="cardMemberId" class="select mt-1.5 w-full">
                         <option value="">Selecione</option>
                         @foreach ($members as $membro)
                             <option value="{{ $membro->id }}">{{ $membro->name }}</option>
@@ -193,13 +200,13 @@
                 </div>
 
                 <div class="flex items-center gap-2 pt-5">
-                    <input type="checkbox" wire:model="cardIsJoint" id="cardIsJoint" class="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500">
+                    <input type="checkbox" wire:model.live="cardIsJoint" id="cardIsJoint" class="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500">
                     <label for="cardIsJoint" class="text-sm text-slate-600 dark:text-slate-400">Cartão conjunto</label>
                 </div>
 
                 @unless ($cardIsJoint)
                     <div class="flex items-center gap-2 pt-5">
-                        <input type="checkbox" wire:model="cardVisibleToPartner" id="cardVisibleToPartner" class="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500">
+                        <input type="checkbox" wire:model.live="cardVisibleToPartner" id="cardVisibleToPartner" class="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500">
                         <label for="cardVisibleToPartner" class="text-sm text-slate-600 dark:text-slate-400">Visível para o cônjuge</label>
                     </div>
 
@@ -213,6 +220,8 @@
                     <p class="self-end pb-2 text-xs text-slate-400">Conjunto é sempre visível e entra no consolidado.</p>
                 @endunless
             </div>
+
+            <x-form-consequence :lines="$cardConsequence" />
 
             <div class="flex justify-end">
                 <button type="submit" class="btn-primary px-4 py-2" wire:loading.attr="disabled">

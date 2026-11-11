@@ -11,6 +11,7 @@ use App\Models\BankAccount;
 use App\Models\CreditCard;
 use App\Models\CreditCardInvoice;
 use App\Models\ProfileMember;
+use App\Support\Forms\FormConsequence;
 use App\Support\Money;
 use App\Support\ProfileContext;
 use Illuminate\Database\Eloquent\Builder;
@@ -186,8 +187,11 @@ class AccountsIndex extends Component
         ], attributes: [
             'accountBankName' => 'banco',
             'accountType' => 'tipo',
+            'accountAgency' => 'agência',
+            'accountNumber' => 'número da conta',
             'accountBalance' => 'saldo',
             'accountMemberId' => 'membro',
+            'accountColor' => 'cor',
         ]);
 
         $memberId = $this->resolveMembro($data['accountMemberId'], 'accountMemberId');
@@ -241,7 +245,7 @@ class AccountsIndex extends Component
 
         if ($account->hasActivity()) {
             $account->update(['is_active' => false]);
-            session()->flash('status', 'Essa conta tem lançamentos — desativada em vez de excluída.');
+            session()->flash('status', 'Essa conta tem lançamentos, então foi desativada em vez de excluída.');
         } else {
             $account->delete();
             session()->flash('status', 'Conta excluída.');
@@ -326,6 +330,7 @@ class AccountsIndex extends Component
             'cardDueDay' => 'dia de vencimento',
             'cardLastFour' => 'últimos 4 dígitos',
             'cardMemberId' => 'membro',
+            'cardColor' => 'cor',
         ]);
 
         $memberId = $this->resolveMembro($data['cardMemberId'], 'cardMemberId');
@@ -374,7 +379,7 @@ class AccountsIndex extends Component
 
         if ($card->hasActivity()) {
             $card->update(['is_active' => false]);
-            session()->flash('status', 'Esse cartão tem lançamentos — desativado em vez de excluído.');
+            session()->flash('status', 'Esse cartão tem lançamentos, então foi desativado em vez de excluído.');
         } else {
             $card->delete();
             session()->flash('status', 'Cartão excluído.');
@@ -515,11 +520,98 @@ class AccountsIndex extends Component
         return Money::sum($this->currentInvoices->pluck('total_amount'));
     }
 
+    /**
+     * "O que vai acontecer ao salvar" da conta: o saldo substituído (na edição) e quem vai ver a conta e se ela entra no consolidado.
+     *
+     * @param  Collection<int, ProfileMember>  $membros
+     * @return list<string>
+     */
+    private function accountConsequence(Collection $membros): array
+    {
+        if (! $this->showAccountForm) {
+            return [];
+        }
+
+        $linhas = [];
+
+        if ($this->editingAccountId !== null) {
+            $conta = BankAccount::query()->find($this->editingAccountId);
+            $novo = Money::parse($this->accountBalance);
+
+            if ($conta !== null && bccomp($novo, (string) $conta->current_balance, 2) !== 0) {
+                $linhas[] = FormConsequence::balanceReplaced((string) $conta->current_balance, $novo);
+            }
+        }
+
+        if (! $this->accountIsJoint) {
+            $dono = $membros->firstWhere('id', $this->accountMemberId)?->name ?? 'o dono escolhido';
+
+            if (! $this->accountVisibleToPartner) {
+                // visible_to_partner = false força o consolidado em false (HasSharingFlags).
+                $linhas[] = 'Só '.$dono.' e o consultor verão esta conta, e ela fica fora do consolidado.';
+            } elseif (! $this->accountIncludedInConsolidated) {
+                $linhas[] = 'O saldo desta conta não entra no total consolidado nem no painel.';
+            }
+        }
+
+        return $linhas;
+    }
+
+    /**
+     * "O que vai acontecer ao salvar" do cartão: o ciclo da fatura (a mesma regra que classifica cada compra) e, ao editar, que as faturas já criadas guardam
+     * as datas que tinham.
+     *
+     * @param  Collection<int, ProfileMember>  $membros
+     * @return list<string>
+     */
+    private function cardConsequence(Collection $membros): array
+    {
+        if (! $this->showCardForm) {
+            return [];
+        }
+
+        $linhas = [];
+        $fechamento = $this->diaValido($this->cardClosingDay);
+        $vencimento = $this->diaValido($this->cardDueDay);
+
+        if ($fechamento !== null && $vencimento !== null) {
+            $linhas[] = FormConsequence::cardCycle((new CreditCard)->forceFill(['closing_day' => $fechamento, 'due_day' => $vencimento]));
+
+            if ($this->editingCardId !== null) {
+                $cartao = CreditCard::query()->find($this->editingCardId);
+
+                if ($cartao !== null && ((int) $cartao->closing_day !== $fechamento || (int) $cartao->due_day !== $vencimento)) {
+                    // ensureInvoice grava as datas só ao criar a fatura: mudar o cartão não reescreve as que já existem.
+                    $linhas[] = 'As faturas já criadas guardam as datas que tinham: a mudança vale para as faturas novas.';
+                }
+            }
+        }
+
+        if (! $this->cardIsJoint && ! $this->cardVisibleToPartner) {
+            $dono = $membros->firstWhere('id', $this->cardMemberId)?->name ?? 'o dono escolhido';
+            $linhas[] = 'Só '.$dono.' e o consultor verão este cartão e as faturas dele.';
+        }
+
+        return $linhas;
+    }
+
+    private function diaValido(string $valor): ?int
+    {
+        return ctype_digit($valor) && (int) $valor >= 1 && (int) $valor <= 31 ? (int) $valor : null;
+    }
+
     public function render()
     {
         $profileId = app(ProfileContext::class)->profileId();
+        $membros = ProfileMember::query()
+            ->where('profile_id', $profileId)
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get();
 
         return view('livewire.accounts.accounts-index', [
+            'accountConsequence' => $this->accountConsequence($membros),
+            'cardConsequence' => $this->cardConsequence($membros),
             'showPrivacyTabs' => $this->showPrivacyTabs,
             'privacyMembers' => $this->privacyMembers,
             'accounts' => $this->accounts,
@@ -529,11 +621,7 @@ class AccountsIndex extends Component
             'currentInvoices' => $this->currentInvoices,
             'totalBalance' => $this->totalBalance,
             'totalCardDebt' => $this->totalCardDebt,
-            'members' => ProfileMember::query()
-                ->where('profile_id', $profileId)
-                ->where('is_active', true)
-                ->orderBy('name')
-                ->get(),
+            'members' => $membros,
             'knownBanks' => Bank::names(),
         ]);
     }

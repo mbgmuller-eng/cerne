@@ -35,6 +35,7 @@
                             <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Valor bruto (R$)</label>
                             <input type="text" inputmode="decimal" wire:model.live.debounce.400ms="gross" class="input mt-1.5" autocomplete="off">
                             @error('gross') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                            <p class="mt-1 text-xs text-slate-400">Informe o valor antes do imposto. O líquido é o bruto menos o imposto retido.</p>
                         </div>
 
                         <div>
@@ -56,6 +57,7 @@
                                     <option value="{{ $conta->id }}">{{ $conta->displayName() }}</option>
                                 @endforeach
                             </select>
+                            <p class="mt-1 text-xs text-slate-400">Com conta, o líquido entra como receita e soma no saldo dela. Sem conta, fica só no histórico do ativo.</p>
                         </div>
                     @else
                         <div class="@sm:col-span-2">

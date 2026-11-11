@@ -233,25 +233,29 @@
             <div class="grid gap-4 @sm:grid-cols-2 *:min-w-0">
                 <div>
                     <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Data do pagamento</label>
-                    <input type="date" wire:model="payDate" class="input mt-1.5">
+                    <input type="date" wire:model.live="payDate" class="input mt-1.5">
                     @error('payDate') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
                 </div>
                 <div>
                     <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Valor pago</label>
-                    <input type="text" wire:model="payAmount" inputmode="decimal" class="input mt-1.5">
+                    <input type="text" wire:model.live.blur="payAmount" inputmode="decimal" class="input mt-1.5">
+                    @if ($previstoPagamento !== null)
+                        <p class="mt-1 text-xs text-slate-400">A parcela prevê {{ \App\Support\Money::format($previstoPagamento) }}. Informe o que foi pago de fato (com mora ou desconto).</p>
+                    @endif
                     @error('payAmount') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
                 </div>
                 <div class="@sm:col-span-2">
                     <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Conta de onde saiu <span class="font-normal text-slate-400">(opcional)</span></label>
-                    <select wire:model="payAccountId" class="select mt-1.5 w-full">
-                        <option value="">Nenhuma</option>
+                    <select wire:model.live="payAccountId" class="select mt-1.5 w-full">
+                        <option value="">{{ $debt->bank_account_id ? 'A conta do contrato' : 'Nenhuma' }}</option>
                         @foreach ($contas as $c)
                             <option value="{{ $c->id }}">{{ $c->bank_name }}</option>
                         @endforeach
                     </select>
+                    <p class="mt-1 text-xs text-slate-400">Sem escolher outra, vale a conta do contrato, se ele tiver uma. Sem conta, só a despesa é criada.</p>
                 </div>
             </div>
-            <p class="text-xs text-slate-400">Cria a despesa de {{ $debt->category?->name }}{{ $debt->subcategory ? ' › '.$debt->subcategory->name : '' }} e, com conta, debita o saldo dela. O valor pode ser diferente do previsto (juros de mora, desconto).</p>
+            <x-form-consequence :lines="$consequenciaPagamento" />
             <div class="flex justify-end"><button type="submit" class="btn-primary px-4 py-2 text-sm">Registrar pagamento</button></div>
         </form>
     </x-modal>

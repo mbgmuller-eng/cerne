@@ -18,6 +18,7 @@ use App\Models\ProfileMember;
 use App\Services\InsurancePolicyHistoryService;
 use App\Services\LeadService;
 use App\Enums\LeadQuoteStatus;
+use App\Support\Forms\FormConsequence;
 use App\Support\LifeCoverage;
 use Illuminate\Support\Facades\DB;
 use App\Models\User;
@@ -224,10 +225,14 @@ class InsuranceIndex extends Component
         ], attributes: [
             'policyInsuranceType' => 'tipo de seguro',
             'policyInsurerName' => 'seguradora',
-            'policyMonthlyPremium' => 'mensalidade',
+            'policyMonthlyPremium' => 'valor de cada parcela',
             'policyPaymentFrequency' => 'forma de pagamento',
             'policyStartDate' => 'início de vigência',
             'policyExpiryDate' => 'vencimento',
+            'policyInsuredPersonName' => 'nome da pessoa segurada',
+            'policyNumber' => 'número da apólice',
+            'policyCoverageAmount' => 'valor segurado',
+            'policyAnnualPremium' => 'prêmio anual',
         ]);
 
         // Nome novo vira sugestão pro admin aprovar; nunca bloqueia o cadastro, e
@@ -547,12 +552,67 @@ class InsuranceIndex extends Component
             : null;
     }
 
+    /**
+     * "O que vai acontecer ao salvar" da apólice: o custo mensal que entra no resumo (a mesma conta de InsurancePolicy::monthlyCostOf), o que a
+     * renovação automática desliga, quem vai ver a apólice e, ao editar, o histórico.
+     *
+     * @param  Collection<int, ProfileMember>  $membros
+     * @param  Collection<int, User>  $corretores
+     * @return list<string>
+     */
+    private function policyConsequence(Collection $membros, Collection $corretores): array
+    {
+        if (! $this->showPolicyForm) {
+            return [];
+        }
+
+        $linhas = [];
+        $frequencia = PaymentFrequency::tryFrom($this->policyPaymentFrequency);
+        $parcela = Money::parse($this->policyMonthlyPremium);
+        $anual = $this->policyAnnualPremium !== '' ? Money::parse($this->policyAnnualPremium) : null;
+
+        if ($frequencia !== null && (bccomp($parcela, '0', 2) > 0 || ($anual !== null && bccomp($anual, '0', 2) > 0))) {
+            $linhas[] = 'No resumo, esta apólice entra com '.Money::format(InsurancePolicy::monthlyCostOf($frequencia, $parcela, $anual)).' por mês.';
+        }
+
+        if ($this->policyAutoRenews) {
+            $linhas[] = 'Esta apólice não gerará aviso de vencimento nem lead de renovação.';
+        }
+
+        if ($this->policyIsPrivate) {
+            $dono = $membros->firstWhere('id', $this->policyMemberId)?->name;
+            // member_id nulo é "da família": o escopo de privacidade deixa visível aos dois (MemberPrivacyScope).
+            $linhas[] = $dono !== null
+                ? 'Só '.$dono.' e o consultor verão esta apólice.'
+                : 'Sem um membro escolhido, a apólice continua visível aos dois: “Ocultar do cônjuge” só vale com Membro preenchido.';
+        }
+
+        $corretor = $this->policyBrokerId !== '' ? $corretores->firstWhere('id', $this->policyBrokerId) : null;
+
+        if ($corretor !== null) {
+            $linhas[] = 'Só '.$corretor->name.' e o consultor verão esta apólice.';
+        }
+
+        if ($this->editingPolicyId !== null) {
+            $linhas[] = 'Mudanças em prêmio, valor segurado, forma de pagamento ou vencimento entram no histórico da apólice.';
+        }
+
+        return $linhas;
+    }
+
     public function render()
     {
         $context = app(ProfileContext::class);
         $profileId = $context->profileId();
+        $corretores = $this->availableBrokers;
+        $membros = ProfileMember::query()
+            ->where('profile_id', $profileId)
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get();
 
         return view('livewire.insurance.insurance-index', [
+            'policyConsequence' => $this->policyConsequence($membros, $corretores),
             'showPrivacyTabs' => $this->showPrivacyTabs,
             'privacyMembers' => $this->privacyMembers,
             'profile' => $context->profile(),
@@ -568,13 +628,9 @@ class InsuranceIndex extends Component
             'voltar' => $this->voltar($profileId),
             'knownInsurers' => Insurer::names(),
             'insurerColors' => Insurer::colorMap(),
-            'availableBrokers' => $this->availableBrokers,
+            'availableBrokers' => $corretores,
             'acceptedQuotes' => $this->editingPolicyId === null ? $this->acceptedQuotes : collect(),
-            'members' => ProfileMember::query()
-                ->where('profile_id', $profileId)
-                ->where('is_active', true)
-                ->orderBy('name')
-                ->get(),
+            'members' => $membros,
         ]);
     }
 }

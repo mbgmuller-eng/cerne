@@ -50,6 +50,13 @@
                         </label>
                         <input type="number" step="any" min="0" wire:model.live.debounce.400ms="price" class="input mt-1.5" autocomplete="off">
                         @error('price') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                        @if ($action === 'buy')
+                            <p class="mt-1 text-xs text-slate-400">O preço pago vira a cotação do ativo (se a data não for anterior à última cotação), e o valor atual passa a ser cotas × preço.</p>
+                        @elseif ($action === 'sell')
+                            <p class="mt-1 text-xs text-slate-400">O preço médio não muda. O valor atual passa a ser as cotas que restam × este preço (se a data não for anterior à última cotação).</p>
+                        @elseif ($action === 'quote')
+                            <p class="mt-1 text-xs text-slate-400">Cotação de hoje, ou mais nova que a última, passa a ser o valor do ativo. De uma data antiga, só corrige o mês dela.</p>
+                        @endif
                     </div>
 
                     <div>
@@ -58,6 +65,9 @@
                         </label>
                         <input type="date" wire:model="date" max="{{ now()->toDateString() }}" class="input mt-1.5">
                         @error('date') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                        @if (in_array($action, ['buy', 'sell'], true))
+                            <p class="mt-1 text-xs text-slate-400">Com data anterior a outras operações, o Cerne refaz a posição pela ordem das datas.</p>
+                        @endif
                     </div>
 
                     @if (in_array($action, ['buy', 'sell'], true))
@@ -65,6 +75,7 @@
                             <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Corretagem e taxas <span class="font-normal text-slate-400">(opcional)</span></label>
                             <input type="number" step="0.01" min="0" wire:model.live.debounce.400ms="fees" class="input mt-1.5" placeholder="0,00">
                             @error('fees') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                            <p class="mt-1 text-xs text-slate-400">Na compra, soma ao custo e entra no preço médio. Na venda, desconta do que você recebeu.</p>
                         </div>
                     @endif
                 </div>
@@ -83,7 +94,7 @@
 
                 <p class="text-xs text-slate-400">
                     @if ($action === 'quote')
-                        O valor do ativo passa a ser cotas × cotação, e o histórico do mês é atualizado.
+                        Se a data for a de hoje ou mais nova que a última cotação, o valor do ativo passa a ser cotas × cotação. De uma data antiga, só o histórico do mês dela é corrigido.
                     @else
                         Só o total do patrimônio muda: nenhum saldo de conta é alterado.
                     @endif

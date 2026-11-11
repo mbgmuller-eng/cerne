@@ -2,7 +2,10 @@
 
 namespace App\Support\Forms;
 
+use App\Enums\DebtAmortization;
+use App\Enums\DebtRateBasis;
 use App\Models\CreditCard;
+use App\Support\Debts\DebtScheduleCalculator;
 use App\Support\Money;
 use Carbon\CarbonImmutable;
 
@@ -113,6 +116,172 @@ final class FormConsequence
         $parseado = Money::parse($valor);
 
         return bccomp($parseado, '0', 2) > 0 ? 'de '.Money::format($parseado) : 'do valor da conta';
+    }
+
+    /** Editar o saldo de uma conta SUBSTITUI o valor: não cria lançamento nenhum. */
+    public static function balanceReplaced(string $anterior, string $novo): string
+    {
+        return 'Ao salvar, o saldo passa de '.Money::format(Money::parse($anterior)).' para '.Money::format(Money::parse($novo)).', sem criar lançamento.';
+    }
+
+    /**
+     * O ciclo da fatura de um cartão, na mesma regra de CreditCard::billingPeriodFor e dueDateFor: compras até o fechamento entram na fatura do mês,
+     * e o vencimento fica no próprio mês quando o dia dele é maior que o do fechamento (senão, no mês seguinte).
+     */
+    public static function cardCycle(CreditCard $cartao): string
+    {
+        $mes = $cartao->due_day > $cartao->closing_day ? 'do próprio mês' : 'do mês seguinte';
+
+        return 'Compras até o dia '.$cartao->closing_day.' entram na fatura do mês; as seguintes, na do mês seguinte. A fatura vence no dia '.$cartao->due_day.' '.$mes.'.';
+    }
+
+    /**
+     * Financiamento ou empréstimo: quantas parcelas nascem, de quando a quando, quanto valem (na mesma conta do cronograma que grava, `DebtScheduleCalculator`)
+     * e o que acontece com as que a pessoa diz já ter pago. Valor ainda não digitado ou taxa inválida: o aviso fica sem o valor, nunca com um chute.
+     *
+     * @return list<string>
+     */
+    public static function debtSchedule(
+        DebtAmortization $sistema,
+        int $prazo,
+        CarbonImmutable $primeira,
+        int $jaPagas,
+        ?string $parcela,
+        ?string $principal,
+        ?string $taxa,
+        ?DebtRateBasis $base,
+        string $taxas = '0',
+    ): array {
+        if ($prazo < 1 || $prazo > 480) {
+            return [];
+        }
+
+        $ultima = $primeira->addMonthsNoOverflow($prazo - 1);
+        $periodo = $prazo === 1 ? 'em '.$primeira->format('d/m/Y') : 'de '.$primeira->format('d/m/Y').' a '.$ultima->format('d/m/Y');
+        $linhas = [];
+
+        $valorFixo = $parcela !== null ? Money::parse($parcela) : '0.00';
+        $emprestado = $principal !== null ? Money::parse($principal) : '0.00';
+
+        if ($sistema === DebtAmortization::Fixed) {
+            $linhas[] = bccomp($valorFixo, '0', 2) > 0
+                ? 'Serão criadas '.$prazo.' parcelas de '.Money::format($valorFixo).', '.$periodo.'.'
+                : 'Serão criadas '.$prazo.' parcelas, '.$periodo.'.';
+        } elseif (bccomp($emprestado, '0', 2) > 0 && $taxa !== null && is_numeric($taxa) && $base !== null) {
+            $cronograma = DebtScheduleCalculator::schedule($sistema, $emprestado, DebtScheduleCalculator::monthlyRate($taxa, $base), $prazo, Money::parse($taxas));
+            $primeiraParcela = $cronograma[0]['amount'];
+            $ultimaParcela = $cronograma[$prazo - 1]['amount'];
+
+            $linhas[] = $primeiraParcela === $ultimaParcela
+                ? 'Serão criadas '.$prazo.' parcelas de cerca de '.Money::format($primeiraParcela).', '.$periodo.'.'
+                : 'Serão criadas '.$prazo.' parcelas, '.$periodo.', de '.Money::format($primeiraParcela).' (a 1ª) a '.Money::format($ultimaParcela).' (a última).';
+            $linhas[] = 'É uma estimativa pelo contrato: o banco pode cobrar um valor um pouco diferente. Você ajusta cada parcela depois.';
+        } else {
+            $linhas[] = 'Serão criadas '.$prazo.' parcelas, '.$periodo.'.';
+        }
+
+        return [...$linhas, ...self::alreadyPaid($prazo, $primeira, $jaPagas)];
+    }
+
+    /**
+     * Consórcio: as parcelas que nascem, o que as já pagas e as puladas fazem, o destino de cada parcela paga (investimento, não dívida)
+     * e quando o Cerne avisa do primeiro reajuste (a mesma data que fica em `next_adjustment_on`).
+     *
+     * @return list<string>
+     */
+    public static function consortium(int $prazo, CarbonImmutable $primeira, int $jaPagas, int $puladas, ?string $parcela, ?int $primeiroReajuste): array
+    {
+        if ($prazo < 1 || $prazo > 480) {
+            return [];
+        }
+
+        $valor = $parcela !== null ? Money::parse($parcela) : '0.00';
+        $ultima = $primeira->addMonthsNoOverflow($prazo - 1);
+        $periodo = $prazo === 1 ? 'em '.$primeira->format('d/m/Y') : 'de '.$primeira->format('d/m/Y').' a '.$ultima->format('d/m/Y');
+
+        $linhas = [bccomp($valor, '0', 2) > 0
+            ? 'Serão criadas '.$prazo.' parcelas de '.Money::format($valor).', '.$periodo.'.'
+            : 'Serão criadas '.$prazo.' parcelas, '.$periodo.'.'];
+
+        $vencidas = $jaPagas + $puladas;
+
+        if ($puladas > 0 && $vencidas <= $prazo) {
+            $linhas[] = ($puladas === 1 ? 'A parcela pulada fica' : 'As '.$puladas.' parcelas puladas ficam').' fora do que está em aberto e do que foi pago.';
+        }
+
+        if ($jaPagas > 0 && $vencidas <= $prazo) {
+            $linhas[] = ($jaPagas === 1 ? 'A parcela já paga entra' : 'As '.$jaPagas.' parcelas já pagas entram').($jaPagas === 1 ? ' como paga' : ' como pagas').', sem criar despesa nem mexer no saldo de conta.';
+        }
+
+        if ($vencidas < $prazo) {
+            $proxima = $vencidas + 1;
+            $linhas[] = 'A 1ª parcela em aberto é a '.$proxima.', com vencimento em '.$primeira->addMonthsNoOverflow($vencidas)->format('d/m/Y').'.';
+        }
+
+        $linhas[] = 'Antes da contemplação, cada parcela que você pagar vira despesa de investimento (Consórcio): não conta como dívida nem como patrimônio.';
+
+        if ($primeiroReajuste !== null && $primeiroReajuste >= 1) {
+            $linhas[] = 'O Cerne avisa do primeiro reajuste da carta em '.$primeira->addMonthsNoOverflow($primeiroReajuste)->format('d/m/Y').'.';
+        }
+
+        return $linhas;
+    }
+
+    /**
+     * Dívida em aberto: entra no total devedor pelo saldo informado e não gera parcela nem despesa até o acordo.
+     *
+     * @return list<string>
+     */
+    public static function openDebt(?string $saldo, CarbonImmutable $data): array
+    {
+        $valor = $saldo !== null ? Money::parse($saldo) : '0.00';
+
+        $linhas = [bccomp($valor, '0', 2) > 0
+            ? 'Entra no total devedor com saldo de '.Money::format($valor).', informado em '.$data->format('d/m/Y').'.'
+            : 'Entra no total devedor pelo saldo informado.'];
+
+        $linhas[] = 'Não gera parcelas nem despesas até você registrar um acordo.';
+
+        return $linhas;
+    }
+
+    /**
+     * Pagar uma parcela de dívida: a despesa que nasce (valor, data, categoria) e o que acontece com a conta. `$conta` é a conta que de fato será usada
+     * (a escolhida, ou a do contrato quando nenhuma é escolhida), no mesmo critério de `DebtService::pay`.
+     *
+     * @return list<string>
+     */
+    public static function installmentPayment(string $valor, CarbonImmutable $data, ?string $conta, string $categoria): array
+    {
+        $pago = Money::parse($valor);
+
+        if (bccomp($pago, '0', 2) <= 0) {
+            return [];
+        }
+
+        return [
+            'Será criada uma despesa de '.Money::format($pago).' em '.$data->format('d/m/Y').', na categoria '.$categoria.'.',
+            $conta !== null
+                ? 'O saldo de '.$conta.' cai '.Money::format($pago).'.'
+                : 'Nenhuma conta é debitada.',
+        ];
+    }
+
+    /** Parcelas que a pessoa diz já ter pago ao cadastrar: nascem pagas, sem despesa e sem mexer em conta. @return list<string> */
+    private static function alreadyPaid(int $prazo, CarbonImmutable $primeira, int $jaPagas): array
+    {
+        if ($jaPagas < 1 || $jaPagas > $prazo) {
+            return [];
+        }
+
+        if ($jaPagas === $prazo) {
+            return ['As '.$prazo.' parcelas entram como pagas, sem criar despesa nem mexer no saldo de conta.'];
+        }
+
+        return [
+            ($jaPagas === 1 ? 'A 1ª parcela entra como paga' : 'As '.$jaPagas.' primeiras parcelas entram como pagas').', sem criar despesa nem mexer no saldo de conta.',
+            'A 1ª em aberto é a '.($jaPagas + 1).', com vencimento em '.$primeira->addMonthsNoOverflow($jaPagas)->format('d/m/Y').'.',
+        ];
     }
 
     /** Lançamento de outro mês que o exibido na tela: não vai aparecer onde a pessoa está olhando. */

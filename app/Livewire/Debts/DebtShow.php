@@ -21,6 +21,7 @@ use App\Support\Debts\DebtAgreementSimulator;
 use App\Support\Debts\DebtClassification;
 use App\Support\Debts\DebtScheduleCalculator;
 use App\Support\Debts\DebtSimulator;
+use App\Support\Forms\FormConsequence;
 use App\Support\Money;
 use App\Support\ProfileContext;
 use Carbon\CarbonImmutable;
@@ -203,9 +204,9 @@ class DebtShow extends Component
     {
         $dados = $this->validate([
             'payDate' => ['required', 'date_format:Y-m-d'],
-            'payAmount' => ['required', 'string', 'max:20'],
+            'payAmount' => ['required', 'string', 'max:20', 'regex:/^\s*(R\$)?\s*[\d.,\s]+$/'],
             'payAccountId' => ['nullable', 'string'],
-        ], [], ['payDate' => 'data do pagamento', 'payAmount' => 'valor pago']);
+        ], ['payAmount.regex' => 'Informe só números, como 1250,00.'], ['payDate' => 'data do pagamento', 'payAmount' => 'valor pago']);
 
         $parcela = DebtInstallment::query()->where('debt_id', $this->debt->id)->findOrFail($this->payId);
 
@@ -844,6 +845,39 @@ class DebtShow extends Component
             ->get();
     }
 
+    /**
+     * O que "Registrar pagamento" faz com o que está digitado. A conta é a que `DebtService::pay` usa: a escolhida e, sem escolha,
+     * a do contrato (escolher "Nenhuma" não tira a conta do contrato).
+     *
+     * @param  Collection<int, BankAccount>  $contas
+     * @return list<string>
+     */
+    private function paymentConsequence(Collection $contas): array
+    {
+        if (! $this->showPay || $this->payAmount === '' || preg_match('/^\d{4}-\d{2}-\d{2}$/', $this->payDate) !== 1) {
+            return [];
+        }
+
+        try {
+            $data = CarbonImmutable::createFromFormat('!Y-m-d', $this->payDate) ?: null;
+        } catch (\Throwable) {
+            $data = null;
+        }
+
+        if ($data === null) {
+            return [];
+        }
+
+        $contaId = $this->payAccountId !== '' ? $this->payAccountId : (string) $this->debt->bank_account_id;
+
+        return FormConsequence::installmentPayment(
+            $this->payAmount,
+            $data,
+            $contaId !== '' ? $contas->firstWhere('id', $contaId)?->bank_name : null,
+            (string) $this->debt->category?->name,
+        );
+    }
+
     public function render()
     {
         // O projeto desliga o carregamento preguiçoso fora de produção: a categoria que a tela mostra vem carregada aqui.
@@ -862,7 +896,9 @@ class DebtShow extends Component
             // Custo da dívida: tudo o que vai além do valor financiado (só quando o contrato separa os juros).
             'custoJuros' => $this->debt->amortization === DebtAmortization::Fixed ? null : bcadd(Money::sum($parcelas->pluck('interest_amount')), Money::sum($parcelas->pluck('fees_amount')), 2),
             'categorias' => ExpenseCategory::available()->whereNull('necessity')->with(['subcategories' => fn ($q) => $q->where('is_active', true)->orderBy('sort_order')->orderBy('name')])->get(),
-            'contas' => BankAccount::query()->where('is_active', true)->orderBy('bank_name')->get(),
+            'contas' => $contas = BankAccount::query()->where('is_active', true)->orderBy('bank_name')->get(),
+            'consequenciaPagamento' => $this->paymentConsequence($contas),
+            'previstoPagamento' => $this->showPay ? $parcelas->firstWhere('id', $this->payId)?->amount : null,
             'membros' => $this->membros(),
             'candidatas' => $this->candidatas(),
             'semCategoria' => $this->semCategoria(),

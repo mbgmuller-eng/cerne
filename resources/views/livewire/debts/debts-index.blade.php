@@ -223,28 +223,29 @@
                     </div>
                     <div>
                         <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Valor da parcela hoje</label>
-                        <input type="text" wire:model="installmentAmount" inputmode="decimal" class="input mt-1.5" placeholder="Ex.: 1180,00">
+                        <input type="text" wire:model.live.blur="installmentAmount" inputmode="decimal" class="input mt-1.5" placeholder="Ex.: 1180,00">
                         @error('installmentAmount') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
                     </div>
                     <div>
                         <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Prazo (parcelas)</label>
-                        <input type="number" wire:model="term" min="1" max="480" class="input mt-1.5">
+                        <input type="number" wire:model.live.blur="term" min="1" max="480" class="input mt-1.5">
                         @error('term') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
                     </div>
                     <div>
                         <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Vencimento da 1ª parcela</label>
-                        <input type="date" wire:model="firstDueDate" class="input mt-1.5">
+                        <input type="date" wire:model.live="firstDueDate" class="input mt-1.5">
                         @error('firstDueDate') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
                     </div>
                     <div>
                         <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Parcelas já pagas</label>
-                        <input type="number" wire:model="paidBefore" min="0" class="input mt-1.5">
+                        <input type="number" wire:model.live.blur="paidBefore" min="0" class="input mt-1.5">
                         <p class="mt-1 text-xs text-slate-400">Sem contar as puladas.</p>
                         @error('paidBefore') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
                     </div>
                     <div>
                         <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Parcelas puladas <span class="font-normal text-slate-400">(opcional)</span></label>
-                        <input type="text" wire:model="skippedInstallments" class="input mt-1.5" placeholder="Ex.: 3, 12">
+                        <input type="text" wire:model.live.blur="skippedInstallments" class="input mt-1.5" placeholder="Ex.: 3, 12">
+                        <p class="mt-1 text-xs text-slate-400">Os números das parcelas vencidas que o extrato mostra como diluídas nas seguintes.</p>
                         @error('skippedInstallments') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
                     </div>
                     <div class="@sm:col-span-2">
@@ -275,7 +276,7 @@
                         </div>
                         <div class="@sm:col-span-2">
                             <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Primeiro reajuste depois de (meses, a contar da 1ª parcela)</label>
-                            <input type="number" wire:model="adjustmentFirstAfter" min="1" max="120" class="input mt-1.5">
+                            <input type="number" wire:model.live.blur="adjustmentFirstAfter" min="1" max="120" class="input mt-1.5">
                             @error('adjustmentFirstAfter') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
                         </div>
                     @endif
@@ -334,16 +335,19 @@
                     </div>
                     <div>
                         <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Valor original <span class="font-normal text-slate-400">(opcional)</span></label>
-                        <input type="text" wire:model="principal" inputmode="decimal" class="input mt-1.5" placeholder="Ex.: 2900,00">
+                        <input type="text" wire:model.live.blur="principal" inputmode="decimal" class="input mt-1.5" placeholder="Ex.: 2900,00">
+                        <p class="mt-1 text-xs text-slate-400">Só para comparar com o saldo. O que entra no total devedor é o saldo atual.</p>
+                        @error('principal') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
                     </div>
                     <div>
                         <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Saldo atual</label>
-                        <input type="text" wire:model="currentBalance" inputmode="decimal" class="input mt-1.5" placeholder="Ex.: 4250,00">
+                        <input type="text" wire:model.live.blur="currentBalance" inputmode="decimal" class="input mt-1.5" placeholder="Ex.: 4250,00">
+                        <p class="mt-1 text-xs text-slate-400">Entra no total devedor. Atualize depois, na tela da dívida, quando o valor mudar.</p>
                         @error('currentBalance') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
                     </div>
                     <div class="@sm:col-span-2">
                         <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Saldo informado em</label>
-                        <input type="date" wire:model="balanceDate" class="input mt-1.5">
+                        <input type="date" wire:model.live="balanceDate" class="input mt-1.5">
                         @error('balanceDate') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
                     </div>
                     </div>
@@ -377,6 +381,7 @@
                     <div>
                         <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Data da contratação <span class="font-normal text-slate-400">(opcional)</span></label>
                         <input type="date" wire:model="contractedOn" class="input mt-1.5">
+                        <p class="mt-1 text-xs text-slate-400">Sem a data, o relatório de imposto de renda estima um mês antes do 1º vencimento.</p>
                         @error('contractedOn') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
                     </div>
                     <div>
@@ -391,17 +396,18 @@
                     @if ($amortization !== 'fixed')
                         <div>
                             <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Valor financiado</label>
-                            <input type="text" wire:model="principal" inputmode="decimal" class="input mt-1.5" placeholder="Ex.: 360000,00">
+                            <input type="text" wire:model.live.blur="principal" inputmode="decimal" class="input mt-1.5" placeholder="Ex.: 360000,00">
+                            <p class="mt-1 text-xs text-slate-400">O valor que o banco emprestou, sem os juros.</p>
                             @error('principal') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
                         </div>
                         <div>
                             <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Taxa de juros (%)</label>
-                            <input type="text" wire:model="rate" inputmode="decimal" class="input mt-1.5" placeholder="Ex.: 10,5">
+                            <input type="text" wire:model.live.blur="rate" inputmode="decimal" class="input mt-1.5" placeholder="Ex.: 10,5">
                             @error('rate') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
                         </div>
                         <div class="@sm:col-span-2">
                             <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">A taxa é</label>
-                            <select wire:model="rateBasis" class="select mt-1.5 w-full">
+                            <select wire:model.live="rateBasis" class="select mt-1.5 w-full">
                                 @foreach ($bases as $valor => $rotulo)
                                     <option value="{{ $valor }}">{{ $rotulo }}</option>
                                 @endforeach
@@ -409,33 +415,38 @@
                         </div>
                         <div class="@sm:col-span-2">
                             <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Seguro e taxas fixas por parcela <span class="font-normal text-slate-400">(opcional)</span></label>
-                            <input type="text" wire:model="monthlyFees" inputmode="decimal" class="input mt-1.5" placeholder="Ex.: 85,00">
+                            <input type="text" wire:model.live.blur="monthlyFees" inputmode="decimal" class="input mt-1.5" placeholder="Ex.: 85,00">
+                            <p class="mt-1 text-xs text-slate-400">Somado ao valor de cada parcela.</p>
+                            @error('monthlyFees') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
                         </div>
                     @else
                         <div>
                             <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Valor da parcela</label>
-                            <input type="text" wire:model="installmentAmount" inputmode="decimal" class="input mt-1.5" placeholder="Ex.: 650,00">
+                            <input type="text" wire:model.live.blur="installmentAmount" inputmode="decimal" class="input mt-1.5" placeholder="Ex.: 650,00">
                             @error('installmentAmount') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
                         </div>
                         <div>
                             <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Valor tomado <span class="font-normal text-slate-400">(opcional)</span></label>
-                            <input type="text" wire:model="principal" inputmode="decimal" class="input mt-1.5" placeholder="Ex.: 12000,00">
+                            <input type="text" wire:model.live.blur="principal" inputmode="decimal" class="input mt-1.5" placeholder="Ex.: 12000,00">
+                            <p class="mt-1 text-xs text-slate-400">Com ele o Cerne calcula a taxa que você paga de fato, para comparar com outras dívidas.</p>
+                            @error('principal') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
                         </div>
                     @endif
 
                     <div>
                         <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Quantidade de parcelas</label>
-                        <input type="number" wire:model="term" min="1" max="480" class="input mt-1.5">
+                        <input type="number" wire:model.live.blur="term" min="1" max="480" class="input mt-1.5">
                         @error('term') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
                     </div>
                     <div>
                         <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Vencimento da 1ª parcela</label>
-                        <input type="date" wire:model="firstDueDate" class="input mt-1.5">
+                        <input type="date" wire:model.live="firstDueDate" class="input mt-1.5">
                         @error('firstDueDate') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
                     </div>
                     <div class="@sm:col-span-2">
                         <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Parcelas já pagas antes de usar o Cerne</label>
-                        <input type="number" wire:model="paidBefore" min="0" class="input mt-1.5">
+                        <input type="number" wire:model.live.blur="paidBefore" min="0" class="input mt-1.5">
+                        <p class="mt-1 text-xs text-slate-400">Entram como pagas, sem criar despesa nem mexer no saldo de nenhuma conta.</p>
                         @error('paidBefore') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
                     </div>
 
@@ -447,6 +458,7 @@
                                 <option value="{{ $cat->id }}">{{ $cat->name }}</option>
                             @endforeach
                         </select>
+                        <p class="mt-1 text-xs text-slate-400">Cada parcela que você pagar vira uma despesa nesta categoria. Mudar depois vale só para as próximas.</p>
                         @error('categoryId') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
                     </div>
                     <div>
@@ -466,6 +478,7 @@
                                 <option value="{{ $c->id }}">{{ $c->bank_name }}</option>
                             @endforeach
                         </select>
+                        <p class="mt-1 text-xs text-slate-400">Ao pagar uma parcela, o valor sai do saldo desta conta. Sem conta, só a despesa é criada.</p>
                     </div>
                     </div>
                 @endif
@@ -479,9 +492,16 @@
                                 <option value="{{ $m->id }}">{{ $m->name }}</option>
                             @endforeach
                         </select>
+                        <p class="mt-1 text-xs text-slate-400">“Do casal” aparece para os dois. Escolhendo uma pessoa, a dívida fica no nome dela.</p>
                     </div>
                 @endif
             </div>
+
+            @error('form')
+                <p data-form-error class="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-400">{{ $message }}</p>
+            @enderror
+
+            <x-form-consequence :lines="$consequencia" />
 
             @if ($kind === 'consortium')
                 <p class="text-xs text-slate-400">Antes de ser contemplado, cada parcela paga entra no fluxo de caixa como investimento (Consórcio). O consórcio não conta como dívida nem como patrimônio: o que vale é a carta. Quando for contemplado, você informa o novo valor da parcela e ele passa a ser uma dívida.</p>

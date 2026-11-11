@@ -18,8 +18,10 @@ use App\Models\ProfileMember;
 use App\Services\DebtService;
 use App\Services\DebtStrategyService;
 use App\Support\Debts\DebtClassification;
+use App\Support\Forms\FormConsequence;
 use App\Support\Money;
 use App\Support\ProfileContext;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
 use InvalidArgumentException;
 use Livewire\Attributes\Layout;
@@ -114,6 +116,9 @@ class DebtsIndex extends Component
 
     public string $openStatus = 'open';
 
+    /** Valor em dinheiro: só dígitos, ponto e vírgula (Money::parse ignora letra e devolveria 0,00 sem avisar). */
+    private const MONEY = 'regex:/^\s*(R\$)?\s*[\d.,\s]+$/';
+
     public function mount(): void
     {
         // Mesmo bloqueio das demais telas financeiras: corretor só entra em Seguros.
@@ -200,13 +205,13 @@ class DebtsIndex extends Component
             'creditorDocument' => ['nullable', 'string', 'max:20'],
             'contractedOn' => ['nullable', 'date_format:Y-m-d'],
             'amortization' => ['required', DebtAmortization::rule()],
-            'principal' => [$emCalculo ? 'required' : 'nullable', 'string', 'max:20'],
+            'principal' => [$emCalculo ? 'required' : 'nullable', 'string', 'max:20', self::MONEY],
             'rate' => [$emCalculo ? 'required' : 'nullable', 'numeric', 'min:0', 'max:1000'],
             'rateBasis' => [$emCalculo ? 'required' : 'nullable', DebtRateBasis::rule()],
             'term' => ['required', 'integer', 'min:1', 'max:480'],
             'firstDueDate' => ['required', 'date_format:Y-m-d'],
-            'installmentAmount' => [$emCalculo ? 'nullable' : 'required', 'string', 'max:20'],
-            'monthlyFees' => ['nullable', 'string', 'max:20'],
+            'installmentAmount' => [$emCalculo ? 'nullable' : 'required', 'string', 'max:20', self::MONEY],
+            'monthlyFees' => ['nullable', 'string', 'max:20', self::MONEY],
             'paidBefore' => ['required', 'integer', 'min:0', 'lte:term'],
             'necessity' => ['required', 'in:'.Necessity::Essential->value.','.Necessity::Discretionary->value],
             'categoryId' => ['required', 'string'],
@@ -214,9 +219,7 @@ class DebtsIndex extends Component
             'bankAccountId' => ['nullable', 'string'],
             'memberId' => ['nullable', 'string'],
             'notes' => ['nullable', 'string', 'max:2000'],
-        ], [
-            'paidBefore.lte' => 'As parcelas já pagas não podem passar do prazo.',
-        ], $this->attributeNames());
+        ], $this->messages(['paidBefore.lte' => 'As parcelas já pagas não podem passar do prazo.']), $this->attributeNames());
 
         $this->persist(fn () => app(DebtService::class)->create([
             'kind' => $dados['kind'], 'name' => $dados['name'], 'creditor' => $dados['creditor'] ?: null,
@@ -241,8 +244,8 @@ class DebtsIndex extends Component
             'name' => ['nullable', 'string', 'max:120'],
             'creditor' => ['nullable', 'string', 'max:120'],
             'consortiumGroup' => ['nullable', 'string', 'max:40'],
-            'creditAmount' => ['required', 'string', 'max:20'],
-            'installmentAmount' => ['required', 'string', 'max:20'],
+            'creditAmount' => ['required', 'string', 'max:20', self::MONEY],
+            'installmentAmount' => ['required', 'string', 'max:20', self::MONEY],
             'term' => ['required', 'integer', 'min:1', 'max:480'],
             'firstDueDate' => ['required', 'date_format:Y-m-d'],
             'paidBefore' => ['required', 'integer', 'min:0', 'lte:term'],
@@ -255,7 +258,7 @@ class DebtsIndex extends Component
             'goalName' => [$this->goalChoice === 'new' ? 'required' : 'nullable', 'string', 'max:120'],
             'bankAccountId' => ['nullable', 'string'],
             'notes' => ['nullable', 'string', 'max:2000'],
-        ], ['paidBefore.lte' => 'As parcelas já pagas não podem passar do prazo.', 'skippedInstallments.regex' => 'Informe só os números das parcelas, separados por vírgula (ex.: 3, 12).'], $this->attributeNames());
+        ], $this->messages(['paidBefore.lte' => 'As parcelas já pagas não podem passar do prazo.', 'skippedInstallments.regex' => 'Informe só os números das parcelas, separados por vírgula (ex.: 3, 12).']), $this->attributeNames());
 
         $puladas = collect(preg_split('/[,;\s]+/', $dados['skippedInstallments'] ?? '', -1, PREG_SPLIT_NO_EMPTY))->map(fn ($n) => (int) $n)->all();
 
@@ -280,12 +283,12 @@ class DebtsIndex extends Component
             'name' => ['required', 'string', 'max:120'],
             'creditor' => ['nullable', 'string', 'max:120'],
             'creditorDocument' => ['nullable', 'string', 'max:20'],
-            'principal' => ['nullable', 'string', 'max:20'],
-            'currentBalance' => ['required', 'string', 'max:20'],
+            'principal' => ['nullable', 'string', 'max:20', self::MONEY],
+            'currentBalance' => ['required', 'string', 'max:20', self::MONEY],
             'balanceDate' => ['required', 'date_format:Y-m-d'],
             'openStatus' => ['required', 'in:open,negotiating'],
             'notes' => ['nullable', 'string', 'max:2000'],
-        ], [], $this->attributeNames());
+        ], $this->messages(), $this->attributeNames());
 
         $this->persist(fn () => app(DebtService::class)->createOpenDebt([
             'name' => $dados['name'], 'creditor' => $dados['creditor'] ?: null, 'creditor_document' => $dados['creditorDocument'] ?: null, 'principal' => $dados['principal'] ?: null,
@@ -300,7 +303,7 @@ class DebtsIndex extends Component
         try {
             $divida = $criar();
         } catch (InvalidArgumentException $e) {
-            $this->addError('name', $e->getMessage());
+            $this->addError('form', $e->getMessage());
 
             return;
         }
@@ -315,16 +318,86 @@ class DebtsIndex extends Component
         return $this->memberId !== '' && $this->membros()->contains('id', $this->memberId) ? $this->memberId : null;
     }
 
+    /**
+     * Mensagens próprias: o "regex" cru dos campos de dinheiro sairia como "formato inválido".
+     *
+     * @param  array<string, string>  $extra
+     * @return array<string, string>
+     */
+    private function messages(array $extra = []): array
+    {
+        $dinheiro = [];
+
+        foreach (['principal', 'installmentAmount', 'monthlyFees', 'creditAmount', 'currentBalance'] as $campo) {
+            $dinheiro[$campo.'.regex'] = 'Informe só números, como 1250,00.';
+        }
+
+        return [...$dinheiro, ...$extra];
+    }
+
     /** @return array<string, string> */
     private function attributeNames(): array
     {
         return [
+            'monthlyFees' => 'seguro e taxas fixas', 'notes' => 'observações', 'subcategoryId' => 'subcategoria', 'memberId' => 'de quem é',
             'name' => 'nome', 'creditor' => 'credor', 'principal' => 'valor', 'rate' => 'taxa', 'rateBasis' => 'base da taxa',
             'term' => 'prazo', 'firstDueDate' => 'primeiro vencimento', 'installmentAmount' => 'valor da parcela', 'paidBefore' => 'parcelas já pagas',
             'categoryId' => 'categoria', 'creditAmount' => 'valor da carta', 'creditorDocument' => 'CPF ou CNPJ do credor', 'contractedOn' => 'data da contratação', 'flexPercent' => 'flex da parcela', 'skippedInstallments' => 'parcelas puladas', 'consortiumType' => 'tipo do consórcio',
             'adjustmentEvery' => 'periodicidade do reajuste', 'adjustmentFirstAfter' => 'prazo do primeiro reajuste', 'goalName' => 'nome do objetivo',
             'currentBalance' => 'saldo atual', 'balanceDate' => 'data do saldo', 'openStatus' => 'situação',
         ];
+    }
+
+    /**
+     * O que acontece ao cadastrar, com o que a pessoa já digitou. A conta é a de DebtScheduleCalculator e de FormConsequence (a mesma que grava).
+     *
+     * @return list<string>
+     */
+    private function debtConsequence(): array
+    {
+        if (! $this->showForm) {
+            return [];
+        }
+
+        $primeira = $this->parsedDate($this->firstDueDate);
+        $prazo = (int) $this->term;
+        $jaPagas = max(0, (int) $this->paidBefore);
+
+        return match ($this->kind) {
+            'debt' => FormConsequence::openDebt($this->currentBalance !== '' ? $this->currentBalance : null, $this->parsedDate($this->balanceDate) ?? CarbonImmutable::today()),
+            'consortium' => $primeira === null ? [] : FormConsequence::consortium(
+                $prazo,
+                $primeira,
+                $jaPagas,
+                count(preg_split('/[,;\s]+/', $this->skippedInstallments, -1, PREG_SPLIT_NO_EMPTY) ?: []),
+                $this->installmentAmount !== '' ? $this->installmentAmount : null,
+                $this->adjustmentIndex !== '' ? (int) $this->adjustmentFirstAfter : null,
+            ),
+            default => $primeira === null ? [] : FormConsequence::debtSchedule(
+                DebtAmortization::tryFrom($this->amortization) ?? DebtAmortization::Fixed,
+                $prazo,
+                $primeira,
+                $jaPagas,
+                $this->installmentAmount !== '' ? $this->installmentAmount : null,
+                $this->principal !== '' ? $this->principal : null,
+                str_replace(',', '.', trim($this->rate)) !== '' ? str_replace(',', '.', trim($this->rate)) : null,
+                DebtRateBasis::tryFrom($this->rateBasis),
+                $this->monthlyFees !== '' ? $this->monthlyFees : '0',
+            ),
+        };
+    }
+
+    private function parsedDate(string $texto): ?CarbonImmutable
+    {
+        if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $texto) !== 1) {
+            return null;
+        }
+
+        try {
+            return CarbonImmutable::createFromFormat('!Y-m-d', $texto) ?: null;
+        } catch (\Throwable) {
+            return null;
+        }
     }
 
     /** @return Collection<int, ProfileMember> */
@@ -371,6 +444,7 @@ class DebtsIndex extends Component
             'bases' => DebtRateBasis::options(),
             'tiposConsorcio' => ConsortiumType::options(),
             'indices' => AdjustmentIndex::options(),
+            'consequencia' => $this->debtConsequence(),
         ]);
     }
 }

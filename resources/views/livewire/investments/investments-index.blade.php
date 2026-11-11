@@ -134,6 +134,7 @@
                             @endforeach
                         </select>
                         @error('investmentAssetClass') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                        <p class="mt-1 text-xs text-slate-400">Ações, FIIs, ETFs, fundos e cripto pedem quantidade e preço. As demais, só valores.</p>
                     </div>
 
                     <div>
@@ -155,14 +156,15 @@
                     @endif
 
                     <div>
-                        <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Conta para reserva</label>
-                        <select wire:model="investmentReserveType" class="select mt-1.5 w-full">
+                        <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Conta como reserva</label>
+                        <select wire:model.live="investmentReserveType" class="select mt-1.5 w-full">
                             <option value="">Nenhuma</option>
                             @foreach (ReserveType::options() as $valor => $rotulo)
                                 <option value="{{ $valor }}">{{ $rotulo }}</option>
                             @endforeach
                         </select>
                         @error('investmentReserveType') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                        <p class="mt-1 text-xs text-slate-400">Soma o valor à reserva escolhida e tira o ativo da alocação recomendada.</p>
                     </div>
 
                     <div>
@@ -173,23 +175,25 @@
                     <div>
                         <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Ticker</label>
                         <input type="text" wire:model="investmentTicker" class="input mt-1.5" placeholder="Ex.: PETR4">
+                        <p class="mt-1 text-xs text-slate-400">Só identifica o ativo na lista. Não busca cotação automática.</p>
                     </div>
 
                     <div>
                         <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Data da compra</label>
                         <input type="date" wire:model="investmentPurchaseDate" class="input mt-1.5">
+                        <p class="mt-1 text-xs text-slate-400">Em ativo com cotas, é a data da primeira compra. Sem data, vale hoje.</p>
                     </div>
 
                     @if ($comCotas)
                         <div wire:key="investment-field-quantity">
                             <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Quantidade</label>
-                            <input type="number" step="0.000001" min="0.000001" wire:model="investmentQuantity" class="input mt-1.5">
+                            <input type="number" step="0.000001" min="0.000001" wire:model.live.blur="investmentQuantity" class="input mt-1.5">
                             @error('investmentQuantity') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
                         </div>
 
                         <div wire:key="investment-field-unit-price">
                             <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Preço unitário de compra</label>
-                            <input type="number" step="0.01" min="0.01" wire:model="investmentUnitPrice" class="input mt-1.5" placeholder="0,00">
+                            <input type="number" step="0.01" min="0.01" wire:model.live.blur="investmentUnitPrice" class="input mt-1.5" placeholder="0,00">
                             @error('investmentUnitPrice') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
                         </div>
 
@@ -227,8 +231,8 @@
                         @if ($editingInvestmentId)
                             <div wire:key="investment-field-value-date">
                                 <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Data deste valor</label>
-                                <input type="date" wire:model="investmentValueDate" class="input mt-1.5" max="{{ now()->toDateString() }}">
-                                <p class="mt-1 text-xs text-slate-400">O dia em que você conferiu esse valor — atualiza o histórico do mês.</p>
+                                <input type="date" wire:model.live="investmentValueDate" class="input mt-1.5" max="{{ now()->toDateString() }}">
+                                <p class="mt-1 text-xs text-slate-400">O dia em que você conferiu esse valor. Ele atualiza o histórico do mês.</p>
                                 @error('investmentValueDate') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
                             </div>
                         @endif
@@ -242,15 +246,19 @@
                             <div wire:key="investment-field-invested-amount">
                                 <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Valor investido (aporte)</label>
                                 <input type="number" step="0.01" min="0" wire:model="investmentInvestedAmount" class="input mt-1.5" placeholder="Se vazio, usa o valor atual">
+                                <p class="mt-1 text-xs text-slate-400">Base do cálculo do ganho. Se vazio, o ganho começa em zero.</p>
                             </div>
                         @endif
 
                         <div wire:key="investment-field-return-rate">
                             <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Taxa contratada</label>
                             <input type="text" wire:model="investmentReturnRate" class="input mt-1.5" placeholder="Ex.: CDI 108%">
+                            <p class="mt-1 text-xs text-slate-400">Texto livre exibido na lista. Não entra em nenhum cálculo.</p>
                         </div>
                     @endif
                 </div>
+
+                <x-form-consequence :lines="$investmentConsequence" />
 
                 <div class="flex justify-end">
                     <button type="submit" class="btn-primary px-4 py-2" wire:loading.attr="disabled">
@@ -677,7 +685,7 @@
                                 :width="640"
                             />
                         @else
-                            <p class="py-8 text-center text-xs text-slate-400">Nenhum grupo selecionado — clique em um grupo abaixo para mostrar de novo.</p>
+                            <p class="py-8 text-center text-xs text-slate-400">Nenhum grupo selecionado. Clique em um grupo abaixo para mostrar de novo.</p>
                         @endif
                         <div class="mt-3 flex flex-wrap gap-x-4 gap-y-2">
                             @foreach ($evolutionChart['porGrupo'] as $grupoEvolucao)

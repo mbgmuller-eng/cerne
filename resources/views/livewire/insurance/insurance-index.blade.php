@@ -94,6 +94,7 @@
                         @endforeach
                     </datalist>
                     @error('policyInsurerName') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                    <p class="mt-1 text-xs text-slate-400">Nome novo é aceito e vira sugestão para o administrador aprovar.</p>
                 </div>
 
                 <div>
@@ -103,7 +104,7 @@
 
                 <div>
                     <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Membro</label>
-                    <select wire:model="policyMemberId" class="select mt-1.5 w-full">
+                    <select wire:model.live="policyMemberId" class="select mt-1.5 w-full">
                         <option value="">Seguro familiar / outra pessoa</option>
                         @foreach ($members as $membro)
                             <option value="{{ $membro->id }}">{{ $membro->name }}</option>
@@ -121,21 +122,21 @@
                 @if (! auth()->user()->isBroker() && $availableBrokers->isNotEmpty())
                     <div>
                         <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Compartilhar com corretor</label>
-                        <select wire:model="policyBrokerId" class="select mt-1.5 w-full">
+                        <select wire:model.live="policyBrokerId" class="select mt-1.5 w-full">
                             <option value="">Nenhum</option>
                             @foreach ($availableBrokers as $corretor)
                                 <option value="{{ $corretor->id }}">{{ $corretor->name }}</option>
                             @endforeach
                         </select>
                         @error('policyBrokerId') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
-                        <p class="mt-1 text-xs text-slate-400">Só esse corretor enxerga esta apólice — o consultor sempre vê tudo.</p>
+                        <p class="mt-1 text-xs text-slate-400">Só esse corretor enxerga esta apólice. O consultor sempre vê tudo.</p>
                     </div>
                 @endif
 
                 <div>
                     <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Item segurado (opcional)</label>
                     <input type="text" wire:model="policyInsuredItem" class="input mt-1.5" placeholder="Ex.: Honda Civic 2022, iPhone 15">
-                    <p class="mt-1 text-xs text-slate-400">Para carro, eletrônico ou imóvel — ajuda a separar quando há mais de um.</p>
+                    <p class="mt-1 text-xs text-slate-400">Para carro, eletrônico ou imóvel: ajuda a separar quando há mais de um.</p>
                 </div>
 
                 <div>
@@ -147,24 +148,26 @@
 
                 <div>
                     <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Forma de pagamento</label>
-                    <select wire:model="policyPaymentFrequency" class="select mt-1.5 w-full">
+                    <select wire:model.live="policyPaymentFrequency" class="select mt-1.5 w-full">
                         @foreach (PaymentFrequency::options() as $valor => $rotulo)
                             <option value="{{ $valor }}">{{ $rotulo }}</option>
                         @endforeach
                     </select>
+                    <p class="mt-1 text-xs text-slate-400">Define como o valor informado vira custo mensal no resumo.</p>
                 </div>
 
                 <div>
-                    <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Mensalidade</label>
-                    <input type="number" step="0.01" wire:model="policyMonthlyPremium" class="input mt-1.5" placeholder="0,00">
+                    <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Valor de cada parcela</label>
+                    <input type="number" step="0.01" wire:model.live.blur="policyMonthlyPremium" class="input mt-1.5" placeholder="0,00">
                     @error('policyMonthlyPremium') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
-                    <p class="mt-1 text-xs text-slate-400">Para apólice anual, deixe 0 e preencha o prêmio anual ao lado.</p>
+                    <p class="mt-1 text-xs text-slate-400">Valor de cada cobrança, conforme a forma de pagamento. Se a apólice é anual, use o prêmio anual.</p>
                 </div>
 
                 <div>
                     <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Prêmio anual (opcional)</label>
-                    <input type="number" step="0.01" wire:model="policyAnnualPremium" class="input mt-1.5" placeholder="0,00">
+                    <input type="number" step="0.01" wire:model.live.blur="policyAnnualPremium" class="input mt-1.5" placeholder="0,00">
                     @error('policyAnnualPremium') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                    <p class="mt-1 text-xs text-slate-400">Só entra no custo mensal quando a forma de pagamento não é mensal.</p>
                 </div>
 
                 <div>
@@ -177,16 +180,23 @@
                     <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Vencimento (opcional)</label>
                     <input type="date" wire:model="policyExpiryDate" class="input mt-1.5">
                     @error('policyExpiryDate') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                    <p class="mt-1 text-xs text-slate-400">Sem esta data, o Cerne não avisa o vencimento da apólice.</p>
                 </div>
 
-                <div class="flex items-center gap-2 pt-5">
-                    <input type="checkbox" wire:model="policyAutoRenews" id="policyAutoRenews" class="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500">
-                    <label for="policyAutoRenews" class="text-sm text-slate-600 dark:text-slate-400">Renova automaticamente</label>
+                <div class="pt-5">
+                    <div class="flex items-center gap-2">
+                        <input type="checkbox" wire:model.live="policyAutoRenews" id="policyAutoRenews" class="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500">
+                        <label for="policyAutoRenews" class="text-sm text-slate-600 dark:text-slate-400">Renova automaticamente</label>
+                    </div>
+                    <p class="mt-1 text-xs text-slate-400">Se marcada, o Cerne não avisa o vencimento nem cria lead de renovação.</p>
                 </div>
 
-                <div class="flex items-center gap-2 pt-5">
-                    <input type="checkbox" wire:model="policyIsPrivate" id="policyIsPrivate" class="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500">
-                    <label for="policyIsPrivate" class="text-sm text-slate-600 dark:text-slate-400">Ocultar do cônjuge</label>
+                <div class="pt-5">
+                    <div class="flex items-center gap-2">
+                        <input type="checkbox" wire:model.live="policyIsPrivate" id="policyIsPrivate" class="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500">
+                        <label for="policyIsPrivate" class="text-sm text-slate-600 dark:text-slate-400">Ocultar do cônjuge</label>
+                    </div>
+                    <p class="mt-1 text-xs text-slate-400">Só vale com Membro preenchido. Sem membro, a apólice continua visível aos dois.</p>
                 </div>
 
                 <div class="@sm:col-span-2 @lg:col-span-3">
@@ -194,6 +204,8 @@
                     <textarea wire:model="policyNotes" rows="2" class="input mt-1.5"></textarea>
                 </div>
             </div>
+
+            <x-form-consequence :lines="$policyConsequence" />
 
             <div class="flex justify-end gap-2 border-t border-slate-100 pt-4 dark:border-white/10">
                 <button type="submit" class="btn-primary" wire:loading.attr="disabled">{{ $editingPolicyId ? 'Salvar' : 'Cadastrar' }}</button>

@@ -25,6 +25,7 @@ use App\Models\RecommendedAllocation;
 use App\Services\CurrencyRateService;
 use App\Services\InvestmentPerformanceService;
 use App\Services\InvestmentTransactionService;
+use App\Support\Forms\FormConsequence;
 use App\Support\Money;
 use App\Support\ProfileContext;
 use Carbon\CarbonImmutable;
@@ -634,6 +635,12 @@ class InvestmentsIndex extends Component
             'investmentNativeAmount' => 'quantidade',
             'investmentInvestedNative' => 'base',
             'investmentValueDate' => 'data deste valor',
+            'investmentInvestedAmount' => 'valor investido',
+            'investmentPurchaseDate' => 'data da compra',
+            'investmentReturnRate' => 'taxa contratada',
+            'investmentReserveType' => 'conta como reserva',
+            'investmentTicker' => 'ticker',
+            'investmentInstitution' => 'instituição',
         ]);
 
         $membroId = $this->resolveMembro($this->investmentMemberId);
@@ -1092,9 +1099,55 @@ class InvestmentsIndex extends Component
         $query->where('member_id', $this->viewAs === '' ? null : $this->viewAs);
     }
 
+    /**
+     * "O que vai acontecer ao salvar" do investimento (ver FormConsequence): a compra que um ativo com cotas registra (sem mexer em conta nenhuma), a
+     * data do valor que vai para o histórico do mês e a reserva a que o ativo passa a pertencer.
+     *
+     * @return list<string>
+     */
+    private function investmentConsequence(): array
+    {
+        if (! $this->showInvestmentForm) {
+            return [];
+        }
+
+        $linhas = [];
+        $classe = AssetClass::tryFrom($this->investmentAssetClass);
+        $editando = $this->editingInvestmentId !== null;
+
+        if (! $editando && $classe?->hasQuantity()) {
+            $quantidade = $this->investmentQuantity;
+            $preco = Money::parse($this->investmentUnitPrice);
+
+            if (is_numeric($quantidade) && bccomp($quantidade, '0', 6) > 0 && bccomp($preco, '0', 2) > 0) {
+                $custo = bcmul($quantidade, $preco, 2);
+                $linhas[] = 'Será registrada uma compra de '.str_replace('.', ',', rtrim(rtrim(bcadd($quantidade, '0', 6), '0'), '.')).' cotas a '.Money::format($preco)
+                    .', com custo de '.Money::format($custo).'. Nenhuma conta é debitada.';
+            }
+        }
+
+        if ($editando && $this->investmentValueDate !== '' && ! $this->investmentHasPosition && ! ($classe?->isForeignCurrency() ?? false)) {
+            try {
+                $data = CarbonImmutable::parse($this->investmentValueDate);
+                $linhas[] = 'O valor de '.$data->format('d/m/Y').' será gravado no histórico de '.FormConsequence::monthYear($data->year, $data->month).'.';
+            } catch (\Throwable) {
+                // Data ainda incompleta: sem aviso.
+            }
+        }
+
+        $reserva = ReserveType::tryFrom($this->investmentReserveType);
+
+        if ($reserva !== null) {
+            $linhas[] = 'Este ativo passa a compor a '.mb_strtolower($reserva->label()).' e sai da comparação com a alocação recomendada.';
+        }
+
+        return $linhas;
+    }
+
     public function render()
     {
         return view('livewire.investments.investments-index', [
+            'investmentConsequence' => $this->investmentConsequence(),
             'members' => ProfileMember::query()
                 ->where('profile_id', app(ProfileContext::class)->profileId())
                 ->where('is_active', true)
