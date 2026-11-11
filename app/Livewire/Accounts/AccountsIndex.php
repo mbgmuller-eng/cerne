@@ -102,8 +102,6 @@ class AccountsIndex extends Component
 
     public bool $cardVisibleToPartner = true;
 
-    public bool $cardIncludedInConsolidated = true;
-
     public string $cardColor = '#B45309';
 
     public ?string $confirmingDeleteCardId = null;
@@ -303,7 +301,6 @@ class AccountsIndex extends Component
         $this->cardMemberId = (string) $card->member_id;
         $this->cardIsJoint = $card->is_joint;
         $this->cardVisibleToPartner = $card->visible_to_partner;
-        $this->cardIncludedInConsolidated = $card->included_in_consolidated;
         $this->cardColor = $card->color_hex ?? '#B45309';
         $this->showCardForm = true;
         $this->showAccountForm = false;
@@ -347,7 +344,6 @@ class AccountsIndex extends Component
             'member_id' => $memberId,
             'is_joint' => $this->cardIsJoint,
             'visible_to_partner' => $this->cardVisibleToPartner,
-            'included_in_consolidated' => $this->cardIncludedInConsolidated,
             'color_hex' => $data['cardColor'],
         ];
 
@@ -402,7 +398,6 @@ class AccountsIndex extends Component
         );
         $this->cardBrand = 'visa';
         $this->cardVisibleToPartner = true;
-        $this->cardIncludedInConsolidated = true;
         $this->cardColor = '#B45309';
         $this->resetErrorBag();
     }

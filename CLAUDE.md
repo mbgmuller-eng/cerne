@@ -50,7 +50,7 @@ na privacidade.
 
 - **Lançamento GERADO a partir de algo oculto herda o `is_private` do pai**: pagar conta fixa (`FixedBillService::pay`), receber receita recorrente (`RecurringIncomeService::receive`), pagar parcela de dívida e
   vender ou receber provento de investimento criam despesa ou receita, e ela nasce com a mesma marca do que a originou. Quem cria lançamento novo a partir de outro registro copia `is_private`
-  (`GeneratedRecordsPrivacyTest`). **A importação de extrato (`DocumentCommitService`) ainda não copia a privacidade da conta**: decisão pendente do dono do projeto.
+  (`GeneratedRecordsPrivacyTest`). **A importação de extrato e de fatura (`DocumentCommitService`) também herda**: o que vem de conta ou cartão que não é conjunto e não é visível ao cônjuge nasce oculto (`hiddenFromPartner`), e o que casa com conta fixa ou receita recorrente oculta (e a parcela de dívida oculta) segue a marca do pai (`ImportedRecordsPrivacyTest`).
 
 Ao mexer em qualquer listagem, pergunte: *isso vaza por agregado?* Um total
 consolidado pode revelar um gasto privado por subtração. Por isso o cache do

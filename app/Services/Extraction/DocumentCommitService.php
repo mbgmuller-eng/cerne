@@ -159,6 +159,7 @@ class DocumentCommitService
 
                 IncomeRecord::create([
                     'member_id' => $documento->member_id,
+                    'is_private' => $this->hiddenFromPartner($documento->member_id, $conta, null) || ($ocorrencia?->loadMissing('recurringIncome')->recurringIncome?->is_private ?? false),
                     'category_id' => $this->overrideOr($overrides, 'categoria', $i, fn () => $this->incomeCategory($item['categoria_sugerida'] ?? null)),
                     'description' => $item['descricao'] ?? 'Importado',
                     'amount' => $valor,
@@ -221,6 +222,7 @@ class DocumentCommitService
 
                 ExpenseRecord::create([
                     'member_id' => $documento->member_id,
+                    'is_private' => $this->hiddenFromPartner($documento->member_id, $conta, null) || ($pagamento?->loadMissing('fixedBill')->fixedBill?->is_private ?? false),
                     'description' => $item['descricao'] ?? 'Importado',
                     // Sem regra que bateu, necessidade é julgamento humano,
                     // não da IA: o padrão é essencial e o usuário
@@ -367,6 +369,7 @@ class DocumentCommitService
 
             ExpenseRecord::create([
                 'member_id' => $documento->member_id,
+                'is_private' => $this->hiddenFromPartner($documento->member_id, null, $cartao),
                 'description' => $item['descricao'] ?? 'Importado',
                 'necessity' => $estorno ? null : (isset($overrides['necessidade'][$i]) && $overrides['necessidade'][$i] !== ''
                     ? Necessity::from($overrides['necessidade'][$i])
@@ -395,6 +398,25 @@ class DocumentCommitService
 
     /** Busca de novo em vez de confiar no que a revisão viu — status pode ter mudado nesse meio-tempo. */
     /** A parcela escolhida na revisão, só se ainda estiver em aberto: dado de revisão velho não baixa parcela já paga. */
+    /**
+     * O lançamento importado herda a privacidade da conta ou do cartão: conta que não é conjunta e não é visível ao cônjuge esconde o que vem dela
+     * (regra 2: lançamento gerado a partir de algo oculto nasce oculto). Sem dono (`member_id` nulo) não há de quem esconder.
+     */
+    private function hiddenFromPartner(?string $memberId, ?BankAccount $conta, ?CreditCard $cartao): bool
+    {
+        if ($memberId === null) {
+            return false;
+        }
+
+        foreach ([$conta, $cartao] as $origem) {
+            if ($origem !== null && ! $origem->is_joint && ! $origem->visible_to_partner) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     private function debtInstallmentFor(?string $id): ?DebtInstallment
     {
         if (blank($id)) {
@@ -419,6 +441,8 @@ class DocumentCommitService
 
         $despesa = ExpenseRecord::create([
             'member_id' => $documento->member_id,
+            // Oculta se a dívida é oculta ou se a conta de onde saiu é (mesma regra de DebtService::pay para a dívida).
+            'is_private' => $divida->is_private || $this->hiddenFromPartner($documento->member_id, $conta, null),
             'description' => $item['descricao'] ?? 'Importado',
             'necessity' => $divida->necessity,
             'category_id' => $divida->category_id,

@@ -209,15 +209,8 @@
                         <input type="checkbox" wire:model.live="cardVisibleToPartner" id="cardVisibleToPartner" class="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500">
                         <label for="cardVisibleToPartner" class="text-sm text-slate-600 dark:text-slate-400">Visível para o cônjuge</label>
                     </div>
-
-                    @if ($cardVisibleToPartner)
-                        <div class="flex items-center gap-2 pt-5">
-                            <input type="checkbox" wire:model="cardIncludedInConsolidated" id="cardIncludedInConsolidated" class="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500">
-                            <label for="cardIncludedInConsolidated" class="text-sm text-slate-600 dark:text-slate-400">Entra no consolidado</label>
-                        </div>
-                    @endif
                 @else
-                    <p class="self-end pb-2 text-xs text-slate-400">Conjunto é sempre visível e entra no consolidado.</p>
+                    <p class="self-end pb-2 text-xs text-slate-400">Conjunto é sempre visível para os dois.</p>
                 @endunless
             </div>
 
