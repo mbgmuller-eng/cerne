@@ -177,6 +177,8 @@ class RecurringIncomeService
                     'received_date' => $receivedAt,
                     'bank_account_id' => $receita->bank_account_id,
                     'is_recurring' => true,
+                    // A receita gerada herda a privacidade da receita recorrente (ver FixedBillService::pay).
+                    'is_private' => $receita->is_private,
                     'created_by_user_id' => $userId ?? $receita->profile->owner_user_id,
                 ]);
 

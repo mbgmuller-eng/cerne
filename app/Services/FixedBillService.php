@@ -210,6 +210,8 @@ class FixedBillService
                     'amount' => $valor,
                     'expense_date' => $paidAt,
                     'bank_account_id' => $bill->bank_account_id,
+                    // A despesa gerada herda a privacidade da conta fixa: sem isto, quem marcou "Ocultar do meu cônjuge" via a despesa aparecer no fluxo dele ao pagar.
+                    'is_private' => $bill->is_private,
                     'created_by_user_id' => $userId ?? $bill->profile->owner_user_id,
                 ]);
 
