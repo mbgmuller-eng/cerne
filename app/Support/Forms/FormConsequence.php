@@ -125,6 +125,43 @@ final class FormConsequence
     }
 
     /**
+     * Editar um lançamento que mexe no saldo: o Cerne DESFAZ o efeito antigo na conta de antes e aplica o novo na conta de agora (mesma ordem de
+     * `CashFlowIndex::updateExpense/updateIncome`). `$efeitoAntes` e `$efeitoDepois` são o que o lançamento faz no saldo (despesa tira, receita e
+     * estorno põem), com sinal. Cada conta vem como `['id' =>, 'nome' =>, 'saldo' =>]`, ou nulo quando não há conta.
+     *
+     * @param  array{id: string, nome: string, saldo: string}|null  $antes
+     * @param  array{id: string, nome: string, saldo: string}|null  $depois
+     * @return list<string>
+     */
+    public static function editedBalance(?array $antes, string $efeitoAntes, ?array $depois, string $efeitoDepois): array
+    {
+        $efeitoAntes = Money::parse($efeitoAntes);
+        $efeitoDepois = Money::parse($efeitoDepois);
+
+        if ($antes !== null && $depois !== null && $antes['id'] === $depois['id']) {
+            $atual = Money::parse($antes['saldo']);
+
+            return ['O saldo de '.$antes['nome'].' passa de '.Money::format($atual).' para '.Money::format(bcadd(bcsub($atual, $efeitoAntes, 2), $efeitoDepois, 2)).' ao salvar.'];
+        }
+
+        $linhas = [];
+
+        if ($antes !== null) {
+            $atual = Money::parse($antes['saldo']);
+            $linhas[] = 'O lançamento deixa '.$antes['nome'].': o saldo passa de '.Money::format($atual).' para '.Money::format(bcsub($atual, $efeitoAntes, 2)).'.';
+        }
+
+        if ($depois !== null) {
+            $atual = Money::parse($depois['saldo']);
+            $linhas[] = 'E passa para '.$depois['nome'].': o saldo vai de '.Money::format($atual).' para '.Money::format(bcadd($atual, $efeitoDepois, 2)).'.';
+        } elseif ($antes !== null) {
+            $linhas[] = 'Sem conta, o lançamento deixa de mexer em saldo.';
+        }
+
+        return $linhas;
+    }
+
+    /**
      * O ciclo da fatura de um cartão, na mesma regra de CreditCard::billingPeriodFor e dueDateFor: compras até o fechamento entram na fatura do mês,
      * e o vencimento fica no próprio mês quando o dia dele é maior que o do fechamento (senão, no mês seguinte).
      */
@@ -282,6 +319,60 @@ final class FormConsequence
             ($jaPagas === 1 ? 'A 1ª parcela entra como paga' : 'As '.$jaPagas.' primeiras parcelas entram como pagas').', sem criar despesa nem mexer no saldo de conta.',
             'A 1ª em aberto é a '.($jaPagas + 1).', com vencimento em '.$primeira->addMonthsNoOverflow($jaPagas)->format('d/m/Y').'.',
         ];
+    }
+
+    /**
+     * Revisão de extrato ou fatura: o que "Importar selecionados" vai criar, por destino. `$contagens` conta as linhas prontas pelo caminho que o
+     * `DocumentCommitService` seguirá (mesmas escolhas da tela de revisão). Ao confirmar, o serviço ainda confere se a conta fixa, a receita ou a
+     * parcela casada continua em aberto; se mudou nesse meio-tempo, a linha segue como lançamento comum.
+     *
+     * @param  array<string, int>  $contagens  despesa, estorno, receita, contaFixa, receitaRecorrente, parcela, fatura, transferencia
+     * @return list<string>
+     */
+    public static function importReview(array $contagens, bool $fatura, ?string $origem, bool $mexeNoSaldo, bool $oculta): array
+    {
+        $partes = [];
+
+        foreach ([
+            'despesa' => ['despesa nova', 'despesas novas'],
+            'estorno' => ['estorno', 'estornos'],
+            'receita' => ['receita nova', 'receitas novas'],
+            'contaFixa' => ['baixa de conta fixa', 'baixas de conta fixa'],
+            'receitaRecorrente' => ['baixa de receita recorrente', 'baixas de receita recorrente'],
+            'parcela' => ['pagamento de parcela de dívida', 'pagamentos de parcela de dívida'],
+            'fatura' => ['pagamento de fatura de cartão', 'pagamentos de fatura de cartão'],
+            'transferencia' => ['transferência entre contas', 'transferências entre contas'],
+        ] as $chave => [$singular, $plural]) {
+            $n = $contagens[$chave] ?? 0;
+
+            if ($n > 0) {
+                $partes[] = $n.' '.($n === 1 ? $singular : $plural);
+            }
+        }
+
+        if ($partes === []) {
+            return [];
+        }
+
+        $linhas = ['Ao importar: '.implode(', ', $partes).'.'];
+
+        if (($contagens['transferencia'] ?? 0) > 0) {
+            $linhas[] = 'Transferência entre contas só mexe nos saldos: não vira receita nem despesa.';
+        }
+
+        if ($fatura) {
+            $linhas[] = 'As compras entram na fatura do cartão'.($origem !== null ? ' '.$origem : '').' pela data de cada uma. Nenhuma conta é debitada agora: o dinheiro só sai quando a fatura é paga.';
+        } else {
+            $linhas[] = $mexeNoSaldo
+                ? 'O saldo'.($origem !== null ? ' de '.$origem : '').' é atualizado pelas linhas importadas.'
+                : 'Este envio não altera o saldo de nenhuma conta.';
+        }
+
+        if ($oculta) {
+            $linhas[] = 'O que for criado fica oculto do seu cônjuge, porque '.($fatura ? 'o cartão' : 'a conta').' não é visível a ele.';
+        }
+
+        return $linhas;
     }
 
     /** Lançamento de outro mês que o exibido na tela: não vai aparecer onde a pessoa está olhando. */

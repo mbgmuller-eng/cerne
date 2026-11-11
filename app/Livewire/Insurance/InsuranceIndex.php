@@ -567,6 +567,12 @@ class InsuranceIndex extends Component
         }
 
         $linhas = [];
+
+        if ($this->editingPolicyId !== null) {
+            // InsurancePolicyHistoryService::apply: o que mudar entre os dados acompanhados vira uma versão na linha do tempo, valendo desde hoje.
+            $linhas[] = 'Se algum dado acompanhado da apólice mudar (prêmio, vigência, cobertura...), a alteração entra na linha do tempo dela, valendo a partir de hoje.';
+        }
+
         $frequencia = PaymentFrequency::tryFrom($this->policyPaymentFrequency);
         $parcela = Money::parse($this->policyMonthlyPremium);
         $anual = $this->policyAnnualPremium !== '' ? Money::parse($this->policyAnnualPremium) : null;

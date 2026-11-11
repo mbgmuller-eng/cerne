@@ -402,7 +402,7 @@ class DocumentCommitService
      * O lançamento importado herda a privacidade da conta ou do cartão: conta que não é conjunta e não é visível ao cônjuge esconde o que vem dela
      * (regra 2: lançamento gerado a partir de algo oculto nasce oculto). Sem dono (`member_id` nulo) não há de quem esconder.
      */
-    private function hiddenFromPartner(?string $memberId, ?BankAccount $conta, ?CreditCard $cartao): bool
+    public static function hiddenFromPartner(?string $memberId, ?BankAccount $conta, ?CreditCard $cartao): bool
     {
         if ($memberId === null) {
             return false;

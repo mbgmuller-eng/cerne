@@ -139,6 +139,15 @@ class DebtService
         return DB::transaction(function () use ($divida, $d, $reclassificarPagas): Debt {
             $divida->update(collect($d)->only(['name', 'creditor', 'creditor_document', 'contracted_on', 'necessity', 'category_id', 'subcategory_id', 'bank_account_id', 'notes', 'member_id', 'is_private'])->all());
 
+            // Dono e privacidade acompanham a dívida inteira: as parcelas e as despesas dos pagamentos já feitos nasceram com a marca
+            // de quando a dívida foi criada (regra 2). Sem isto, ocultar a dívida depois deixaria parcelas e pagamentos à vista do cônjuge.
+            if ($divida->wasChanged(['member_id', 'is_private'])) {
+                $marca = ['member_id' => $divida->member_id, 'is_private' => $divida->is_private];
+
+                DebtInstallment::withoutProfileScope()->where('debt_id', $divida->id)->update($marca);
+                ExpenseRecord::withoutProfileScope()->whereIn('id', DebtInstallment::withoutProfileScope()->where('debt_id', $divida->id)->whereNotNull('expense_id')->select('expense_id'))->update($marca);
+            }
+
             if ($reclassificarPagas) {
                 $this->reclassifyLinkedExpenses($divida);
             }

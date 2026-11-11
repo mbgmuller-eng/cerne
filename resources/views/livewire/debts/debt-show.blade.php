@@ -776,7 +776,7 @@
                 </div>
                 <div>
                     <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Subcategoria</label>
-                    <select wire:model="editSubcategoryId" class="select mt-1.5 w-full">
+                    <select wire:model.live="editSubcategoryId" class="select mt-1.5 w-full">
                         <option value="">Nenhuma</option>
                         @foreach ($categorias->firstWhere('id', $editCategoryId)?->subcategories ?? [] as $sub)
                             <option value="{{ $sub->id }}">{{ $sub->name }}</option>
@@ -786,7 +786,7 @@
                 @endunless
                 <div>
                     <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Conta de pagamento</label>
-                    <select wire:model="editAccountId" class="select mt-1.5 w-full">
+                    <select wire:model.live="editAccountId" class="select mt-1.5 w-full">
                         <option value="">Nenhuma</option>
                         @foreach ($contas as $c)
                             <option value="{{ $c->id }}">{{ $c->bank_name }}</option>
@@ -796,7 +796,7 @@
                 @if ($membros->count() > 1)
                     <div>
                         <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">De quem é</label>
-                        <select wire:model="editMemberId" class="select mt-1.5 w-full">
+                        <select wire:model.live="editMemberId" class="select mt-1.5 w-full">
                             <option value="">Do casal</option>
                             @foreach ($membros as $m)
                                 <option value="{{ $m->id }}">{{ $m->name }}</option>
@@ -810,9 +810,10 @@
                 </div>
             </div>
             <label class="inline-flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
-                <input type="checkbox" wire:model="editReclassify" class="rounded border-slate-300">
+                <input type="checkbox" wire:model.live="editReclassify" class="rounded border-slate-300">
                 Aplicar a nova categoria também às parcelas já pagas (por padrão, só valem as próximas)
             </label>
+            <x-form-consequence :lines="$consequenciaEdicao" />
             <div class="flex flex-wrap items-center justify-between gap-3">
                 <button type="button" wire:click="deleteDebt" wire:confirm="Apagar este contrato e o cronograma? As despesas já lançadas continuam no fluxo de caixa." class="btn-ghost px-3 py-1.5 text-xs text-red-700 dark:text-red-400">Apagar contrato</button>
                 <button type="submit" class="btn-primary px-4 py-2 text-sm">Salvar</button>

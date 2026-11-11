@@ -166,7 +166,7 @@
                     @if ($privacyMembers->count() >= 2 && $billMemberId !== '')
                         <div class="pt-5">
                             <div class="flex items-center gap-2">
-                                <input type="checkbox" wire:model="billIsPrivate" id="billIsPrivate" class="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500">
+                                <input type="checkbox" wire:model.live="billIsPrivate" id="billIsPrivate" class="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500">
                                 <label for="billIsPrivate" class="text-sm text-slate-600 dark:text-slate-400">Ocultar do meu cônjuge</label>
                             </div>
                             <p class="mt-1 text-xs text-slate-400">Só {{ $members->firstWhere('id', $billMemberId)?->name ?? 'o membro escolhido' }} e o consultor verão esta conta e a despesa criada ao pagar.</p>
@@ -398,7 +398,7 @@
                     @if ($privacyMembers->count() >= 2 && $incomeMemberId !== '')
                         <div class="pt-5">
                             <div class="flex items-center gap-2">
-                                <input type="checkbox" wire:model="incomeIsPrivate" id="incomeIsPrivate" class="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500">
+                                <input type="checkbox" wire:model.live="incomeIsPrivate" id="incomeIsPrivate" class="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500">
                                 <label for="incomeIsPrivate" class="text-sm text-slate-600 dark:text-slate-400">Ocultar do meu cônjuge</label>
                             </div>
                             <p class="mt-1 text-xs text-slate-400">Só {{ $members->firstWhere('id', $incomeMemberId)?->name ?? 'o membro escolhido' }} e o consultor verão esta receita e o lançamento criado ao receber.</p>

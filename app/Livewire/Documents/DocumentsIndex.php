@@ -23,6 +23,7 @@ use App\Services\Extraction\ExternalReportReview;
 use App\Services\Extraction\DebtInstallmentMatcher;
 use App\Services\Extraction\InvoicePaymentMatcher;
 use App\Services\Extraction\OwnTransferMatcher;
+use App\Support\Forms\FormConsequence;
 use App\Support\Money;
 use App\Support\ProfileContext;
 use Carbon\CarbonImmutable;
@@ -1211,11 +1212,68 @@ class DocumentsIndex extends Component
             : DocumentUpload::find($this->revisandoId);
     }
 
+    /**
+     * O que "Importar selecionados" cria, contado pelo caminho de cada linha pronta (mesma ordem de decisão do DocumentCommitService::bankStatement).
+     * Só extrato e fatura: os outros tipos têm revisão própria.
+     *
+     * @return list<string>
+     */
+    private function importConsequence(?DocumentUpload $documento): array
+    {
+        if ($documento === null || ! in_array($documento->document_type, [DocumentType::BankStatement, DocumentType::CreditCardInvoice], true)) {
+            return [];
+        }
+
+        $itens = $documento->extractedItems();
+        $fatura = $documento->document_type === DocumentType::CreditCardInvoice;
+        $c = array_fill_keys(['despesa', 'estorno', 'receita', 'contaFixa', 'receitaRecorrente', 'parcela', 'fatura', 'transferencia'], 0);
+
+        foreach ($this->aceitos as $i) {
+            $item = $itens[$i] ?? null;
+
+            if ($item === null || ($this->itensFaltandoCategoria[$i] ?? false)) {
+                continue;
+            }
+
+            $estorno = ($this->estornoPorItem[$i] ?? false) === true;
+
+            if ($fatura) {
+                $c[$estorno ? 'estorno' : 'despesa']++;
+
+                continue;
+            }
+
+            $chave = match (true) {
+                ($this->transferenciaPorItem[$i] ?? false) === true && ! $estorno => 'transferencia',
+                ($item['tipo'] ?? null) === 'receita' => ($this->recurringIncomeOccurrencePorItem[$i] ?? '') !== '' ? 'receitaRecorrente' : 'receita',
+                ! $estorno && ($this->faturaPorItem[$i] ?? '') !== '' => 'fatura',
+                ! $estorno && ($this->parcelaDividaPorItem[$i] ?? '') !== '' => 'parcela',
+                ! $estorno && ($this->fixedBillPaymentPorItem[$i] ?? '') !== '' => 'contaFixa',
+                $estorno => 'estorno',
+                default => 'despesa',
+            };
+            $c[$chave]++;
+        }
+
+        $conta = $documento->loadMissing('bankAccount')->bankAccount;
+        $cartao = $documento->credit_card_id !== null ? CreditCard::query()->find($documento->credit_card_id) : null;
+        $origem = $fatura ? $cartao?->displayName() : $conta?->displayName();
+
+        return FormConsequence::importReview(
+            $c,
+            $fatura,
+            $origem,
+            (bool) $documento->applies_to_balance,
+            DocumentCommitService::hiddenFromPartner($documento->member_id, $fatura ? null : $conta, $fatura ? $cartao : null),
+        );
+    }
+
     public function render()
     {
         return view('livewire.documents.documents-index', [
             'documents' => $this->documents,
             'revisando' => $this->revisando,
+            'importConsequence' => $this->importConsequence($this->revisando),
             'tipos' => $this->tiposDisponiveis(),
             'iaConfigurada' => filled(config('cerne.ai.api_key')),
             'bankAccounts' => BankAccount::query()->active()->orderBy('bank_name')->get(),

@@ -175,7 +175,7 @@
                     @else
                         <div>
                             <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Conta (opcional)</label>
-                            <select wire:model="expenseBankAccountId" class="select mt-1.5 w-full">
+                            <select wire:model.live="expenseBankAccountId" class="select mt-1.5 w-full">
                                 <option value="">Sem débito em conta</option>
                                 @foreach ($bankAccounts as $conta)
                                     <option value="{{ $conta->id }}">{{ $conta->displayName() }}</option>

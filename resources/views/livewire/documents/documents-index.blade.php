@@ -529,6 +529,7 @@
                                 {{ count($duplicataPorItem) }} {{ count($duplicataPorItem) === 1 ? 'possível duplicata foi desmarcada' : 'possíveis duplicatas foram desmarcadas' }} automaticamente — confira antes de marcar de volta.
                             </p>
                         @endif
+                        <x-form-consequence :lines="$importConsequence" />
                     </div>
                     <div class="flex gap-2">
                         <button wire:click="descartar('{{ $revisando->id }}')" class="btn-secondary px-3 py-1.5 hover:text-red-700 dark:hover:text-red-400">

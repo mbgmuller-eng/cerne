@@ -1293,8 +1293,12 @@ class CashFlowIndex extends Component
      */
     private function expenseConsequence(Collection $contas, Collection $cartoes): array
     {
-        if (! $this->showExpenseForm || $this->editingExpenseId !== null) {
+        if (! $this->showExpenseForm) {
             return [];
+        }
+
+        if ($this->editingExpenseId !== null) {
+            return $this->editedExpenseConsequence($contas);
         }
 
         $valor = Money::parse($this->expenseAmount);
@@ -1351,8 +1355,12 @@ class CashFlowIndex extends Component
      */
     private function incomeConsequence(Collection $contas): array
     {
-        if (! $this->showIncomeForm || $this->editingIncomeId !== null) {
+        if (! $this->showIncomeForm) {
             return [];
+        }
+
+        if ($this->editingIncomeId !== null) {
+            return $this->editedIncomeConsequence($contas);
         }
 
         $valor = Money::parse($this->incomeAmount);
@@ -1378,6 +1386,116 @@ class CashFlowIndex extends Component
         }
 
         return $linhas;
+    }
+
+    /**
+     * Edição de despesa: a fatura em que a compra fica (a data não a muda de fatura), o que acontece com o saldo (desfaz o efeito antigo e aplica o novo)
+     * e o mês em que ela passa a aparecer. Despesa em fatura paga nem abre a edição (`editExpense`), por isso não há caso para ela aqui.
+     *
+     * @param  Collection<int, BankAccount>  $contas
+     * @return list<string>
+     */
+    private function editedExpenseConsequence(Collection $contas): array
+    {
+        $despesa = ExpenseRecord::query()->with('invoice')->find($this->editingExpenseId);
+
+        if ($despesa === null) {
+            return [];
+        }
+
+        $linhas = [];
+        $data = $this->dateOrNull($this->expenseDate);
+        $outroMes = $data !== null && $this->year !== null && $this->month !== null ? FormConsequence::otherMonth($data, $this->year, $this->month) : null;
+
+        if ($outroMes !== null) {
+            $linhas[] = $outroMes;
+        }
+
+        if ($despesa->credit_card_id !== null) {
+            if ($despesa->invoice !== null) {
+                $linhas[] = 'Esta compra continua na fatura de '.FormConsequence::monthYear($despesa->invoice->year, $despesa->invoice->month).', mesmo que você mude a data. O total da fatura é recalculado.';
+            }
+
+            return $linhas;
+        }
+
+        if (! $despesa->affects_balance) {
+            $linhas[] = 'Esta despesa não mexe no saldo de nenhuma conta, então editar não muda nenhum saldo.';
+
+            return $linhas;
+        }
+
+        $valor = Money::parse($this->expenseAmount);
+
+        if (bccomp($valor, '0', 2) <= 0) {
+            return $linhas;
+        }
+
+        return [...$linhas, ...FormConsequence::editedBalance(
+            $this->accountRef($despesa->bank_account_id),
+            bcmul((string) $despesa->amount, '-1', 2),
+            $this->accountRef($this->expenseBankAccountId !== '' ? $this->expenseBankAccountId : null, $contas),
+            $this->expenseIsRefund ? $valor : bcmul($valor, '-1', 2),
+        )];
+    }
+
+    /**
+     * Edição de receita: o saldo (desfaz o crédito antigo e aplica o novo) e o mês em que ela passa a aparecer.
+     *
+     * @param  Collection<int, BankAccount>  $contas
+     * @return list<string>
+     */
+    private function editedIncomeConsequence(Collection $contas): array
+    {
+        $receita = IncomeRecord::query()->find($this->editingIncomeId);
+
+        if ($receita === null) {
+            return [];
+        }
+
+        $linhas = [];
+        $data = $this->dateOrNull($this->incomeDate);
+        $outroMes = $data !== null && $this->year !== null && $this->month !== null ? FormConsequence::otherMonth($data, $this->year, $this->month) : null;
+
+        if ($outroMes !== null) {
+            $linhas[] = $outroMes;
+        }
+
+        if (! $receita->affects_balance) {
+            $linhas[] = 'Esta receita não mexe no saldo de nenhuma conta, então editar não muda nenhum saldo.';
+
+            return $linhas;
+        }
+
+        $valor = Money::parse($this->incomeAmount);
+
+        if (bccomp($valor, '0', 2) <= 0) {
+            return $linhas;
+        }
+
+        return [...$linhas, ...FormConsequence::editedBalance(
+            $this->accountRef($receita->bank_account_id),
+            (string) $receita->amount,
+            $this->accountRef($this->incomeBankAccountId !== '' ? $this->incomeBankAccountId : null, $contas),
+            $valor,
+        )];
+    }
+
+    /**
+     * A conta (id, nome e saldo de hoje) para o aviso de saldo. Conta inativa não está na lista da tela, por isso a busca cai no banco.
+     *
+     * @param  Collection<int, BankAccount>|null  $contas
+     * @return array{id: string, nome: string, saldo: string}|null
+     */
+    private function accountRef(?string $id, ?Collection $contas = null): ?array
+    {
+        if ($id === null) {
+            return null;
+        }
+
+        $conta = $contas?->firstWhere('id', $id) ?? BankAccount::query()->find($id);
+
+        return $conta === null ? null : ['id' => $conta->id, 'nome' => $conta->displayName(), 'saldo' => (string) $conta->current_balance];
     }
 
     private function dateOrNull(?string $valor): ?CarbonImmutable

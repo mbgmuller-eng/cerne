@@ -732,7 +732,14 @@ class FixedBillsIndex extends Component
         }
 
         if ($this->editingBillId !== null) {
-            return ['Valor, categoria e conta valem a partir do próximo pagamento. O dia do vencimento vale só para meses ainda não gerados.'];
+            $linhas = ['Valor, categoria e conta valem a partir do próximo pagamento. O dia do vencimento vale só para meses ainda não gerados.'];
+
+            // A marca de oculto vale na hora para os vencimentos (eles seguem a conta fixa), mas as despesas que um pagamento já criou não mudam.
+            if ($this->billIsPrivate !== (bool) FixedBill::query()->whereKey($this->editingBillId)->value('is_private')) {
+                $linhas[] = 'Ocultar ou mostrar vale já para os vencimentos. As despesas que pagamentos anteriores criaram no fluxo de caixa ficam como estão.';
+            }
+
+            return $linhas;
         }
 
         $linhas = [];
@@ -762,7 +769,13 @@ class FixedBillsIndex extends Component
         }
 
         if ($this->editingIncomeId !== null) {
-            return ['Valor, categoria e conta valem a partir do próximo recebimento. O dia do recebimento vale só para meses ainda não gerados.'];
+            $linhas = ['Valor, categoria e conta valem a partir do próximo recebimento. O dia do recebimento vale só para meses ainda não gerados.'];
+
+            if ($this->incomeIsPrivate !== (bool) RecurringIncome::query()->whereKey($this->editingIncomeId)->value('is_private')) {
+                $linhas[] = 'Ocultar ou mostrar vale já para os recebimentos previstos. As receitas que recebimentos anteriores criaram no fluxo de caixa ficam como estão.';
+            }
+
+            return $linhas;
         }
 
         $linhas = [];

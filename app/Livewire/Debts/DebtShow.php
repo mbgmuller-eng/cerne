@@ -878,6 +878,41 @@ class DebtShow extends Component
         );
     }
 
+    /**
+     * O que "Salvar" faz na edição do contrato: a conta e a categoria valem a partir do próximo pagamento (a menos que se peça para refazer as já pagas), e
+     * o dono vale para a dívida inteira (`DebtService::update`). Só diz o que mudou em relação ao que está gravado.
+     *
+     * @param  Collection<int, ProfileMember>  $membros
+     * @return list<string>
+     */
+    private function editConsequence(Collection $membros, int $pagamentos): array
+    {
+        if (! $this->showEdit) {
+            return [];
+        }
+
+        $linhas = [];
+
+        if ($this->editMemberId !== (string) $this->debt->member_id) {
+            $nome = $this->editMemberId !== '' ? ($membros->firstWhere('id', $this->editMemberId)?->name ?? 'a pessoa escolhida') : 'o casal';
+            $linhas[] = 'Mudar de quem é vale para a dívida inteira: as parcelas e as despesas dos pagamentos já feitos passam para '.$nome.'.';
+        }
+
+        if ($this->editAccountId !== (string) $this->debt->bank_account_id) {
+            $linhas[] = 'A nova conta de pagamento vale a partir do próximo pagamento. Os já feitos não mudam de conta nem de saldo.';
+        }
+
+        if (! $this->semCategoria() && ($this->editCategoryId !== (string) $this->debt->category_id || $this->editSubcategoryId !== (string) $this->debt->subcategory_id || $this->editNecessity !== $this->debt->necessity->value)) {
+            $linhas[] = $this->editReclassify
+                ? ($pagamentos === 0
+                    ? 'A nova classificação vale para os próximos pagamentos (ainda não há parcela paga).'
+                    : 'A nova classificação vale para os próximos pagamentos e também para '.($pagamentos === 1 ? 'a despesa da parcela já paga' : 'as '.$pagamentos.' despesas de parcelas já pagas').'.')
+                : 'A nova classificação vale a partir do próximo pagamento.'.($pagamentos === 0 ? '' : ($pagamentos === 1 ? ' A despesa da parcela já paga fica como está.' : ' As '.$pagamentos.' despesas de parcelas já pagas ficam como estão.'));
+        }
+
+        return $linhas;
+    }
+
     public function render()
     {
         // O projeto desliga o carregamento preguiçoso fora de produção: a categoria que a tela mostra vem carregada aqui.
@@ -898,8 +933,9 @@ class DebtShow extends Component
             'categorias' => ExpenseCategory::available()->whereNull('necessity')->with(['subcategories' => fn ($q) => $q->where('is_active', true)->orderBy('sort_order')->orderBy('name')])->get(),
             'contas' => $contas = BankAccount::query()->where('is_active', true)->orderBy('bank_name')->get(),
             'consequenciaPagamento' => $this->paymentConsequence($contas),
+            'consequenciaEdicao' => $this->editConsequence($membros = $this->membros(), $this->showEdit ? $parcelas->whereNotNull('expense_id')->count() : 0),
             'previstoPagamento' => $this->showPay ? $parcelas->firstWhere('id', $this->payId)?->amount : null,
-            'membros' => $this->membros(),
+            'membros' => $membros,
             'candidatas' => $this->candidatas(),
             'semCategoria' => $this->semCategoria(),
             'emCarta' => $this->debt->isSavingForCredit(),
