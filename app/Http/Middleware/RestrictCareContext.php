@@ -18,7 +18,7 @@ use Symfony\Component\HttpFoundation\Response;
 class RestrictCareContext
 {
     /** Abertas mesmo com a assinatura do dono fora de vigor. */
-    private const ALLOWED_ALWAYS = ['care.*', 'legal.*', 'logout', 'theme.update', 'push.subscribe', 'privacy.export.download'];
+    private const ALLOWED_ALWAYS = ['care.*', 'legal.*', 'logout', 'theme.update', 'push.subscribe', 'privacy.export.download', 'admin.impersonate.stop'];
 
     /** Nomes de rota (ou prefixo com *) que continuam abertos dentro do perfil de uma pessoa acompanhada. */
     private const ALLOWED = [
@@ -26,7 +26,7 @@ class RestrictCareContext
         'health.card.index', 'health.qrcode.show', 'health.appointments.index', 'health.care.index', 'health.appointments.ics', 'health.care.ics',
         'documents.vault.index', 'documents.vault.file',
         'health.consent', 'health.consent.store', 'health.consent.revoke',
-        'legal.*', 'logout', 'theme.update', 'push.subscribe', 'privacy.export.download',
+        'legal.*', 'logout', 'theme.update', 'push.subscribe', 'privacy.export.download', 'admin.impersonate.stop',
     ];
 
     /** As telas de leitura das finanças da família: só para quem tem acesso às finanças. */

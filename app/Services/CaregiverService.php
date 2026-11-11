@@ -8,6 +8,7 @@ use App\Enums\CaregiverStatus;
 use App\Enums\UserRole;
 use App\Mail\CaregiverInviteMail;
 use App\Models\FinancialProfile;
+use App\Notifications\ConsultantAccessRequested;
 use App\Models\ProfileCaregiver;
 use App\Models\ProfileMember;
 use App\Models\User;
@@ -90,13 +91,19 @@ class CaregiverService
      * isso sozinho. Fica registrado quem, quando e com que base (a pessoa autorizou, ou o consultor a representa legalmente), cada pessoa com login é
      * avisada na hora e pode encerrar o acesso quando quiser. Um e-mail só vai ao familiar, e um aceite ativa todos os acessos do mesmo lote.
      *
+     * O consultor NUNCA recebe o link nem dispara o e-mail: o pedido fica guardado, o dono do perfil é avisado e só depois que ele aprova
+     * (`approveAssistedGrant`) o e-mail vai ao familiar. Sem essa trava o consultor liberava saúde e documentos a um e-mail que ele controla.
+     *
      * @param  list<string>  $memberIds  as pessoas do perfil cujos dados o familiar passa a acompanhar
-     * @return string o link do convite
      */
-    public function assistedGrant(FinancialProfile $profile, User $consultant, array $memberIds, string $name, string $email, bool $health, CaregiverAccess $access, bool $finance, CaregiverGrantBasis $basis): string
+    public function assistedGrant(FinancialProfile $profile, User $consultant, array $memberIds, string $name, string $email, bool $health, CaregiverAccess $access, bool $finance, CaregiverGrantBasis $basis): void
     {
         if ($profile->isCare() || ! (new \App\Policies\FinancialProfilePolicy)->manageFamilyAccess($consultant, $profile)) {
             throw new RuntimeException('Só o consultor vinculado ao cliente monta o acesso da família.');
+        }
+
+        if ($profile->owner->password_pending) {
+            throw new RuntimeException('O cliente ainda não ativou o acesso à conta. Envie o convite de acesso primeiro: é ele quem aprova o acesso da família.');
         }
 
         if ($basis === CaregiverGrantBasis::Self) {
@@ -121,27 +128,100 @@ class CaregiverService
             throw new RuntimeException('Essa pessoa já divide o perfil e já vê o que a outra cadastra.');
         }
 
-        $link = DB::transaction(function () use ($profile, $consultant, $membros, $name, $email, $access, $health, $finance, $basis): string {
-            $primeiroToken = null;
-
+        DB::transaction(function () use ($profile, $consultant, $membros, $name, $email, $access, $health, $finance, $basis): void {
             foreach ($membros as $membro) {
-                ['token' => $token] = ProfileCaregiver::issue($profile, $membro, $consultant, $name, $email, $access, $health, $finance, $basis, $consultant);
-                $primeiroToken ??= $token;
+                // approved = false: o token daqui nunca sai; o aceite só existe depois que o dono aprova (novo token).
+                ProfileCaregiver::issue($profile, $membro, $consultant, $name, $email, $access, $health, $finance, $basis, $consultant, false);
             }
-
-            return route('caregiver-invite.accept', ['token' => $primeiroToken]);
         });
 
-        $nomes = $membros->pluck('name')->sort()->join(', ', ' e ');
-        Mail::to($email)->queue(new CaregiverInviteMail($consultant, $nomes, $name, $access, $link, false, $health, $finance, true));
+        $escopo = collect([$health ? 'a saúde' : null, $finance ? 'as finanças (só para ver)' : null])->filter()->join(' e ');
+        $profile->owner->notify(new ConsultantAccessRequested($consultant->name, $name, 'o acesso de familiar a '.$escopo.' de '.$membros->pluck('name')->sort()->join(', ', ' e ')));
+    }
+
+    /**
+     * Pedidos de acesso de familiar montados pelo consultor que esperam a aprovação do dono, agrupados por lote (mesmo e-mail e mesmo consultor).
+     *
+     * @return \Illuminate\Support\Collection<int, \Illuminate\Support\Collection<int, ProfileCaregiver>>
+     */
+    public function pendingAssistedGrants(User $owner): \Illuminate\Support\Collection
+    {
+        return ProfileCaregiver::query()
+            ->whereIn('profile_id', FinancialProfile::withCareProfiles()->where('owner_user_id', $owner->id)->select('id'))
+            ->whereNotNull('granted_by_user_id')
+            ->whereNull('owner_approved_at')
+            ->where('status', CaregiverStatus::Invited->value)
+            ->where('invite_expires_at', '>', now())
+            ->with(['member', 'grantedBy'])
+            ->get()
+            ->groupBy(fn (ProfileCaregiver $c) => $c->profile_id.'|'.$c->invited_email.'|'.$c->granted_by_user_id)
+            ->values();
+    }
+
+    /** O dono aprova o lote: troca o token de cada linha (o original nunca saiu), e só agora o e-mail vai ao familiar e as pessoas são avisadas. */
+    public function approveAssistedGrant(ProfileCaregiver $caregiver, User $owner): string
+    {
+        $lote = $this->assistedBatch($caregiver, $owner);
+
+        $primeiroToken = null;
+
+        DB::transaction(function () use ($lote, &$primeiroToken): void {
+            foreach ($lote as $linha) {
+                $token = \Illuminate\Support\Str::random(48);
+                $linha->forceFill([
+                    'invite_token' => hash('sha256', $token),
+                    'invite_expires_at' => now()->addDays((int) config('cerne.invite.expires_in_days')),
+                    'owner_approved_at' => now(),
+                ])->save();
+                $primeiroToken ??= $token;
+            }
+        });
+
+        $primeira = $lote->first();
+        $link = route('caregiver-invite.accept', ['token' => $primeiroToken]);
+        $nomes = $lote->map(fn (ProfileCaregiver $l) => $l->member->name)->sort()->join(', ', ' e ');
+        $consultor = $primeira->grantedBy;
+        $medico = (bool) $primeira->can_view_health;
+        $financas = (bool) $primeira->can_view_finance;
+
+        Mail::to($primeira->invited_email)->queue(new CaregiverInviteMail($consultor, $nomes, $primeira->invited_name, $primeira->access_level, $link, false, $medico, $financas, true));
 
         // Cada pessoa com login sabe, na hora, quem passou a acompanhá-la e com que base.
-        $escopo = collect([$health ? 'a saúde' : null, $finance ? 'as finanças (só para ver)' : null])->filter()->join(' e ');
-        foreach ($membros->filter(fn (ProfileMember $m) => $m->user !== null) as $membro) {
-            Notification::send($membro->user, new FamilyAccessGranted($consultant->name, $name, $escopo, mb_strtolower($basis->label())));
+        $escopo = collect([$medico ? 'a saúde' : null, $financas ? 'as finanças (só para ver)' : null])->filter()->join(' e ');
+        foreach ($lote->filter(fn (ProfileCaregiver $l) => $l->member?->user !== null) as $linha) {
+            Notification::send($linha->member->user, new FamilyAccessGranted($consultor->name, $primeira->invited_name, $escopo, mb_strtolower($primeira->grant_basis->label())));
         }
 
         return $link;
+    }
+
+    public function rejectAssistedGrant(ProfileCaregiver $caregiver, User $owner): void
+    {
+        foreach ($this->assistedBatch($caregiver, $owner) as $linha) {
+            $linha->update(['status' => CaregiverStatus::Revoked, 'revoked_at' => now(), 'invite_token' => null, 'invite_expires_at' => null]);
+        }
+    }
+
+    /** O lote do pedido (todas as pessoas do mesmo familiar e consultor) e a conferência de que quem decide é o dono do perfil. */
+    private function assistedBatch(ProfileCaregiver $caregiver, User $owner): \Illuminate\Support\Collection
+    {
+        $perfil = FinancialProfile::withCareProfiles()->findOrFail($caregiver->profile_id);
+
+        if ($perfil->owner_user_id !== $owner->id) {
+            throw new RuntimeException('Só o dono do perfil aprova este pedido.');
+        }
+
+        $lote = ProfileCaregiver::query()
+            ->where('profile_id', $caregiver->profile_id)->where('invited_email', $caregiver->invited_email)
+            ->where('granted_by_user_id', $caregiver->granted_by_user_id)
+            ->whereNull('owner_approved_at')->where('status', CaregiverStatus::Invited->value)
+            ->with(['member.user', 'grantedBy'])->get();
+
+        if ($lote->isEmpty() || $caregiver->granted_by_user_id === null) {
+            throw new RuntimeException('Este pedido já foi tratado ou expirou. Peça um novo ao consultor.');
+        }
+
+        return $lote;
     }
 
     /** Muda o que o familiar enxerga (saúde, finanças ou as duas). Sempre fica pelo menos uma. */

@@ -102,6 +102,15 @@ class InvestorProfile extends Model
      * aos dois) não cobre. Base da reserva individual dele (ver
      * peaceReserveTarget()).
      */
+    /**
+     * A média que a TELA mostra: só dos gastos essenciais que quem está olhando enxerga. A média da casa (essentialMonthlyAverage) soma também o
+     * essencial que o cônjuge marcou como oculto, e mostrá-la entregaria esse gasto por subtração.
+     */
+    public function essentialMonthlyAverageVisibleToMe(): string
+    {
+        return $this->averageOf($this->closedMonthsEssentialTotals(comoQuemOlha: true));
+    }
+
     private function ownEssentialMonthlyAverage(): string
     {
         return $this->averageOf($this->closedMonthsEssentialTotals(memberId: $this->member_id, onlyPrivate: true));
@@ -121,11 +130,13 @@ class InvestorProfile extends Model
      *
      * @return Collection<int, string>
      */
-    private function closedMonthsEssentialTotals(bool $onlyVisible = false, ?string $memberId = null, bool $onlyPrivate = false): Collection
+    private function closedMonthsEssentialTotals(bool $onlyVisible = false, ?string $memberId = null, bool $onlyPrivate = false, bool $comoQuemOlha = false): Collection
     {
         $hoje = CarbonImmutable::now();
 
-        $query = ExpenseRecord::withoutPrivacyScope()
+        // `$comoQuemOlha`: só o que a pessoa que está olhando enxerga (com a privacidade do casal ligada). É o que se MOSTRA na tela; o cálculo da meta
+        // usa a casa inteira e fica oculto de quem não pode ver o total (ReservePrivacyScope).
+        $query = ($comoQuemOlha ? ExpenseRecord::query() : ExpenseRecord::withoutPrivacyScope())
             ->ofNecessity(Necessity::Essential)
             ->where(function ($query) use ($hoje) {
                 $query->where('year', '<', $hoje->year)

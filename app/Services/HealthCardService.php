@@ -117,7 +117,12 @@ class HealthCardService
             return null;
         }
 
-        $membro = ProfileMember::withoutGlobalScopes()->findOrFail($card->member_id);
+        $membro = ProfileMember::withoutGlobalScopes()->with('user')->findOrFail($card->member_id);
+
+        // A pessoa que revogou o consentimento de saúde não pode continuar exposta por um QR já impresso.
+        if ($membro->user !== null && ! $membro->user->hasCurrentHealthConsent()) {
+            return null;
+        }
 
         return [
             'member' => $membro,

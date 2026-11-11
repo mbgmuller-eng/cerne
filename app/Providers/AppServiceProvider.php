@@ -18,6 +18,8 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        \Livewire\Livewire::componentHook(\App\Livewire\Hooks\BindToActiveProfile::class);
+
         // Falha alto em desenvolvimento: acessar um atributo que não foi
         // carregado, ou atribuir em massa um campo não declarado, vira erro
         // em vez de virar bug silencioso em relatório financeiro.

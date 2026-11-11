@@ -29,6 +29,9 @@ class InvoiceShow extends Component
 
     public function mount(CreditCardInvoice $invoice): void
     {
+        // Corretor só entra em Seguros — nenhuma tela financeira (mesmo bloqueio das demais).
+        abort_if(auth()->user()?->isBroker(), 403);
+
         $this->invoice = $invoice->load('creditCard', 'paidFromAccount');
         $this->payAmount = $this->invoice->total_amount;
     }

@@ -85,9 +85,20 @@ trait Auditable
         ]);
     }
 
+    /**
+     * Campos que NUNCA entram na trilha, além de $auditExclude: conteúdo extraído de extrato ou fatura (CPF, endereço, todas as linhas). O model
+     * sobrescreve este método. A trilha é append-only e sobrevive à retenção dos arquivos.
+     *
+     * @return list<string>
+     */
+    protected function auditNever(): array
+    {
+        return [];
+    }
+
     /** @return array<string, mixed> */
     protected function auditableAttributes(array $attributes): array
     {
-        return array_diff_key($attributes, array_flip($this->auditExclude));
+        return array_diff_key($attributes, array_flip([...$this->auditExclude, ...$this->auditNever()]));
     }
 }

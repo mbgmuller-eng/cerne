@@ -100,7 +100,8 @@ class PortfolioInsurance extends Component
             return;
         }
 
-        $this->lastInviteLink = $links->inviteOrRequest(auth()->user(), $this->inviteName, $this->inviteEmail, $invites);
+        // O link nunca é mostrado ao corretor: quem tem o link define a senha. Só o e-mail leva até a pessoa.
+        $links->inviteOrRequest(auth()->user(), $this->inviteName, $this->inviteEmail, $invites);
         $this->reset('inviteName', 'inviteEmail');
         session()->flash('status', 'Convite enviado.');
     }
@@ -112,7 +113,7 @@ class PortfolioInsurance extends Component
             ->where('status', InviteStatus::Pending)
             ->findOrFail($id);
 
-        $this->lastInviteLink = $invites->resend($convite);
+        $invites->resend($convite);
         session()->flash('status', 'Convite reenviado.');
     }
 

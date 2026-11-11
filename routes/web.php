@@ -114,7 +114,7 @@ Route::post('/convite-pessoa/{token}', [\App\Http\Controllers\Auth\AcceptCarePer
 // QR Code de emergência: pública de propósito (quem escaneia é um
 // socorrista ou familiar sem conta) — token opaco no lugar de login, ver
 // HealthCardService::emergencyPayload().
-Route::get('/saude/emergencia/{token}', [HealthEmergencyController::class, 'show'])->name('health.emergency.show');
+Route::get('/saude/emergencia/{token}', [HealthEmergencyController::class, 'show'])->middleware('throttle:30,1')->name('health.emergency.show');
 
 // Webhook da Asaas: pública de propósito (é a Asaas chamando, não uma
 // pessoa logada) — autenticação é o header asaas-access-token, conferido

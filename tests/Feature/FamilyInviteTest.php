@@ -170,9 +170,25 @@ class FamilyInviteTest extends TestCase
         Notification::fake();
         $this->comoConsultor();
 
-        $link = app(CaregiverService::class)->assistedGrant(
+        app(CaregiverService::class)->assistedGrant(
             $this->perfil, $this->consultor, [$this->membroPai->id, $this->membroMae->id], 'Filha B', 'filha@exemplo.com', true, CaregiverAccess::Read, true, CaregiverGrantBasis::Authorized,
         );
+
+        // O consultor só monta o pedido: nenhum e-mail sai e ninguém é avisado de "acesso liberado" antes de o dono aprovar.
+        Mail::assertNothingQueued();
+        Notification::assertNotSentTo($this->mae, FamilyAccessGranted::class);
+        Notification::assertSentTo($this->perfil->owner, \App\Notifications\ConsultantAccessRequested::class);
+
+        // Só o dono do perfil aprova.
+        $pedido = ProfileCaregiver::query()->orderBy('member_id')->first();
+        try {
+            app(CaregiverService::class)->approveAssistedGrant($pedido, $this->consultor);
+            $this->fail('o consultor não pode aprovar o próprio pedido');
+        } catch (RuntimeException $e) {
+            $this->assertStringContainsString('Só o dono', $e->getMessage());
+        }
+
+        $link = app(CaregiverService::class)->approveAssistedGrant($pedido, $this->perfil->owner);
 
         $acessos = ProfileCaregiver::query()->orderBy('member_id')->get();
         $this->assertCount(2, $acessos);

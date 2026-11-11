@@ -73,7 +73,7 @@ class FamilyAccessAssist extends Component
         ], ['name' => 'nome', 'email' => 'e-mail']);
 
         try {
-            $this->lastLink = $service->assistedGrant(
+            $service->assistedGrant(
                 $perfil, auth()->user(), $dados['memberIds'], trim($dados['name']), $dados['email'], $this->health, CaregiverAccess::from($dados['access']),
                 $this->finance, CaregiverGrantBasis::from($dados['basis']),
             );
@@ -84,7 +84,7 @@ class FamilyAccessAssist extends Component
         }
 
         $this->reset('name', 'email', 'basis', 'declared');
-        session()->flash('status', 'Acesso liberado. O familiar recebeu o convite por e-mail e as pessoas foram avisadas.');
+        session()->flash('status', 'Pedido enviado ao cliente. O familiar só recebe o convite depois que o cliente aprovar em Minha conta.');
     }
 
     public function revoke(string $caregiverId, CaregiverService $service): void

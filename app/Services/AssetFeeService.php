@@ -86,6 +86,13 @@ class AssetFeeService
      */
     public function preview(AssetFeeAgreement $contrato, ?Collection $regras = null): array
     {
+        // Vínculo encerrado: não se lê mais o patrimônio do cliente. O contrato continua na lista, sem o valor de hoje.
+        $profissional = User::query()->find($contrato->professional_id);
+
+        if ($profissional === null || ! \App\Models\ConsultantClient::activeProfileIds($profissional)->contains($contrato->profile_id)) {
+            return ['base' => '0.00', 'annual' => '0.00', 'per_charge' => '0.00'];
+        }
+
         $regras ??= CommissionRule::query()->where('professional_id', $contrato->professional_id)->where('kind', CommissionRule::KIND_INVESTMENT)->get();
         $r = $this->calculator->annualFee($contrato, $this->calculator->holdings($contrato->profile_id), $this->calculator->indexRules($regras));
 

@@ -140,7 +140,7 @@ class PortfolioOverviewInviteTest extends TestCase
     {
         Mail::fake();
         $consultor = User::factory()->consultant()->create();
-        $rubens = User::factory()->create(['name' => 'Rubens Anjos', 'email' => 'rubens@exemplo.com']);
+        $rubens = User::factory()->create(['name' => 'Rubens Anjos', 'email' => 'rubens@exemplo.com', 'password_pending' => true]);
         ConsultantClient::factory()->create([
             'consultant_id' => $consultor->id,
             'client_id' => $rubens->id,

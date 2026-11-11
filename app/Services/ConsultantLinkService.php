@@ -110,10 +110,10 @@ class ConsultantLinkService
             return $invites->send($professional, $name, $email);
         }
 
+        // Resposta igual em todos os casos: quem digita um e-mail nunca descobre se ele tem conta, de que tipo, nem se já é cliente de alguém.
+        // Conta que não é de cliente, vínculo já ativo ou pedido já pendente: nada é feito, e a tela diz a mesma coisa.
         if (! $existente->isClient()) {
-            throw ValidationException::withMessages([
-                'inviteEmail' => 'Esse e-mail já pertence a uma conta que não é de cliente.',
-            ]);
+            return '';
         }
 
         $vinculo = ConsultantClient::query()
@@ -121,16 +121,8 @@ class ConsultantLinkService
             ->where('client_id', $existente->id)
             ->first();
 
-        if ($vinculo?->status === ConsultantClientStatus::Active) {
-            throw ValidationException::withMessages([
-                'inviteEmail' => 'Esse e-mail já é seu cliente.',
-            ]);
-        }
-
-        if ($vinculo?->status === ConsultantClientStatus::Pending) {
-            throw ValidationException::withMessages([
-                'inviteEmail' => 'Já existe uma autorização pendente para esse e-mail.',
-            ]);
+        if (in_array($vinculo?->status, [ConsultantClientStatus::Active, ConsultantClientStatus::Pending], true)) {
+            return '';
         }
 
         return $this->request($professional, $existente);

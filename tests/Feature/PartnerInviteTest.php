@@ -189,9 +189,16 @@ class PartnerInviteTest extends TestCase
 
         $link = app(PartnerInviteService::class)->send($profile, $consultor, 'Helen Müller', 'helen@exemplo.com');
 
-        self::assertNotEmpty($link);
+        // O consultor nunca recebe link e nenhum e-mail sai até o dono aprovar.
+        self::assertNull($link);
+        Mail::assertNothingQueued();
         $invite = PartnerInvite::query()->where('profile_id', $profile->id)->sole();
         self::assertSame($consultor->id, $invite->invited_by_user_id);
+        self::assertNull($invite->owner_approved_at);
+
+        $linkAprovado = app(PartnerInviteService::class)->approve($invite, $titular);
+        self::assertNotEmpty($linkAprovado);
+        Mail::assertQueued(\App\Mail\PartnerInviteMail::class);
     }
 
     public function test_consultor_sem_vinculo_nao_pode_convidar(): void

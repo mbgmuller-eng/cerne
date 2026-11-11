@@ -58,6 +58,15 @@ class AdminUsers extends Component
 
     public string $motivoAcesso = '';
 
+    /**
+     * Conferido em TODA ação, não só ao abrir a tela: uma aba que ficou aberta depois de o administrador perder o papel, ou durante uma
+     * personificação (quando quem está logado é a conta personificada), nunca age como administrador.
+     */
+    private function guard(): void
+    {
+        abort_unless(auth()->user()?->isPlatformAdmin() && session('impersonator_id') === null, 403);
+    }
+
     public function mount(): void
     {
         abort_unless(auth()->user()?->isPlatformAdmin(), 403);
@@ -77,6 +86,8 @@ class AdminUsers extends Component
 
     public function invite(ClientInviteService $invites): void
     {
+        $this->guard();
+
         $this->validate([
             'inviteName' => ['required', 'string', 'max:255'],
             'inviteEmail' => ['required', 'email', 'max:255'],
@@ -119,6 +130,8 @@ class AdminUsers extends Component
      */
     public function inviteProfessional(ProfessionalInviteService $invites): void
     {
+        $this->guard();
+
         $data = $this->validate([
             'professionalName' => ['required', 'string', 'max:255'],
             'professionalEmail' => ['required', 'email', 'max:255'],
@@ -148,6 +161,8 @@ class AdminUsers extends Component
 
     public function reenviarConviteProfissional(string $id, ProfessionalInviteService $invites): void
     {
+        $this->guard();
+
         $convite = ProfessionalInvite::query()
             ->where('status', InviteStatus::Pending)
             ->findOrFail($id);
@@ -169,6 +184,8 @@ class AdminUsers extends Component
 
     public function pedirExclusao(string $userId): void
     {
+        $this->guard();
+
         $this->excluindoUserId = $userId;
         $this->confirmacaoExclusao = '';
         $this->showInviteForm = false;
@@ -196,6 +213,8 @@ class AdminUsers extends Component
      */
     public function excluirConta(): void
     {
+        $this->guard();
+
         $alvo = User::findOrFail($this->excluindoUserId);
 
         if ($alvo->id === auth()->id()) {
@@ -288,6 +307,8 @@ class AdminUsers extends Component
      */
     public function pedirEntrada(string $userId): void
     {
+        $this->guard();
+
         $this->entrandoUserId = User::findOrFail($userId)->id;
         $this->motivoAcesso = '';
         $this->resetErrorBag();
@@ -307,6 +328,8 @@ class AdminUsers extends Component
      */
     public function entrarComo(string $userId): void
     {
+        $this->guard();
+
         $alvo = User::findOrFail($userId);
 
         if ($alvo->isPlatformAdmin()) {
@@ -331,9 +354,10 @@ class AdminUsers extends Component
             'ip_address' => request()->ip(), 'user_agent' => mb_substr((string) request()->userAgent(), 0, 255),
         ]);
 
-        session(['impersonator_id' => $adminId, 'impersonation_log_id' => $registro->id]);
+        session(['impersonator_id' => $adminId, 'impersonation_log_id' => $registro->id, 'impersonation_expires_at' => now()->addMinutes(\App\Http\Controllers\Admin\ImpersonationController::MAX_MINUTES)->timestamp]);
 
         Auth::login($alvo);
+        session()->regenerate();
 
         $this->redirect(route('dashboard'), navigate: false);
     }

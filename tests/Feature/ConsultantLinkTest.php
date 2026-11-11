@@ -59,7 +59,8 @@ class ConsultantLinkTest extends TestCase
             ->set('inviteName', 'Nome Qualquer')
             ->set('inviteEmail', 'outro-consultor@exemplo.com')
             ->call('invite')
-            ->assertHasErrors(['inviteEmail']);
+            // Resposta única: o profissional não descobre se o e-mail tem conta, de que tipo, nem se já é cliente.
+            ->assertHasNoErrors();
 
         self::assertSame(0, ConsultantClient::query()->count());
     }
@@ -81,7 +82,8 @@ class ConsultantLinkTest extends TestCase
             ->set('inviteName', 'Nome Qualquer')
             ->set('inviteEmail', 'ativo@exemplo.com')
             ->call('invite')
-            ->assertHasErrors(['inviteEmail']);
+            // Resposta única: o profissional não descobre se o e-mail tem conta, de que tipo, nem se já é cliente.
+            ->assertHasNoErrors();
 
         self::assertSame(1, ConsultantClient::query()->count());
     }
@@ -103,7 +105,8 @@ class ConsultantLinkTest extends TestCase
             ->set('inviteName', 'Nome Qualquer')
             ->set('inviteEmail', 'pendente@exemplo.com')
             ->call('invite')
-            ->assertHasErrors(['inviteEmail']);
+            // Resposta única: o profissional não descobre se o e-mail tem conta, de que tipo, nem se já é cliente.
+            ->assertHasNoErrors();
 
         self::assertSame(1, ConsultantClient::query()->count());
         Mail::assertNothingQueued();

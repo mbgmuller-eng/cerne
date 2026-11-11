@@ -44,6 +44,7 @@ class User extends Authenticatable implements MustVerifyEmail
             'birthdate' => 'date',
             'last_login_at' => 'datetime',
             'password' => 'hashed',
+            'password_pending' => 'boolean',
             'role' => UserRole::class,
             'is_active' => 'boolean',
             'is_platform_admin' => 'boolean',
@@ -138,6 +139,11 @@ class User extends Authenticatable implements MustVerifyEmail
     public function revokeHealthConsent(): void
     {
         $this->forceFill(['health_consent_at' => null, 'health_consent_version' => null])->save();
+
+        // Revogar fecha também o QR de emergência já impresso: o token antigo deixa de existir (ao voltar a consentir, nasce outro).
+        \App\Models\HealthCard::withoutGlobalScopes()
+            ->whereIn('member_id', \App\Models\ProfileMember::withoutGlobalScopes()->where('user_id', $this->id)->select('id'))
+            ->update(['emergency_token' => null]);
     }
 
     public function isPlatformAdmin(): bool

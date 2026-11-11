@@ -222,6 +222,8 @@
         </x-modal>
     </section>
 
+    <livewire:profile.access-approvals />
+
     @include('livewire.profile.partials.notifications')
 
     <livewire:tutorial.reset-tutorials />

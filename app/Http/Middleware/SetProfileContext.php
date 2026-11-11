@@ -36,6 +36,16 @@ class SetProfileContext
             return $next($request);
         }
 
+        // Personificação ("Entrar como") tem prazo: passou dele, a sessão volta sozinha para o administrador.
+        $expira = $request->session()->get('impersonation_expires_at');
+
+        if ($expira !== null && now()->timestamp > (int) $expira && $request->session()->has('impersonator_id')) {
+            \App\Http\Controllers\Admin\ImpersonationController::end();
+            $request->session()->flash('status', 'A personificação passou do prazo e foi encerrada.');
+
+            return redirect()->route('admin.users');
+        }
+
         $profile = $this->resolveProfile($request, $user);
 
         if ($profile === null) {

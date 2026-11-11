@@ -54,7 +54,15 @@ class ClientOnboardingService
                     ]);
                 }
 
-                $existente->forceFill(['password' => $password])->save();
+                // Conta que a pessoa já ativou NUNCA tem a senha trocada por convite: quem tem o link (inclusive o consultor que o emitiu) tomaria a conta.
+                // Só a conta criada por profissional, com senha aleatória que ninguém conhece, pode ser ativada por aqui.
+                if (! $existente->password_pending) {
+                    throw ValidationException::withMessages([
+                        'password' => 'Esse e-mail já tem uma conta ativa. Entre com a sua senha: o vínculo com o consultor é pedido por lá.',
+                    ]);
+                }
+
+                $existente->forceFill(['password' => $password, 'password_pending' => false, 'email_verified_at' => $existente->email_verified_at ?? now()])->save();
 
                 $invite->update([
                     'status' => InviteStatus::Accepted,
@@ -135,6 +143,9 @@ class ClientOnboardingService
                 'role' => UserRole::Client,
                 'is_active' => true,
             ]);
+
+            // Senha aleatória que ninguém conhece: a pessoa define a dela pelo convite de acesso (única hora em que o convite troca senha).
+            $user->forceFill(['password_pending' => true])->save();
 
             $perfil = FinancialProfile::create([
                 'owner_user_id' => $user->id,

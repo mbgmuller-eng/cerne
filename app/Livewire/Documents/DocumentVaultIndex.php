@@ -97,13 +97,21 @@ class DocumentVaultIndex extends Component
         return [
             'category' => ['required', DocumentCategory::rule()],
             'title' => ['required', 'string', 'max:120'],
-            'memberId' => ['nullable', 'string'],
+            'memberId' => ['nullable', 'string', function (string $atributo, mixed $valor, \Closure $falhar): void {
+                if ($valor !== '' && $valor !== null && ! \App\Models\ProfileMember::query()->where('profile_id', app(\App\Support\ProfileContext::class)->profileId())->whereKey($valor)->exists()) {
+                    $falhar('A pessoa escolhida não faz parte deste perfil.');
+                }
+            }],
             'folderId' => ['nullable', 'string', function (string $atributo, mixed $valor, \Closure $falhar): void {
                 if ($valor !== '' && $valor !== null && ! DocumentFolder::query()->whereKey($valor)->exists()) {
                     $falhar('A pasta escolhida não existe mais.');
                 }
             }],
-            'insurancePolicyId' => ['required_if:category,'.DocumentCategory::InsurancePolicy->value],
+            'insurancePolicyId' => ['required_if:category,'.DocumentCategory::InsurancePolicy->value, function (string $atributo, mixed $valor, \Closure $falhar): void {
+                if ($valor !== '' && $valor !== null && ! \App\Models\InsurancePolicy::query()->whereKey($valor)->exists()) {
+                    $falhar('A apólice escolhida não existe neste perfil.');
+                }
+            }],
             'expiresOn' => ['nullable', 'date'],
             'arquivo' => [
                 // Só obrigatório ao criar — editar é só metadado, ver DocumentService::update().

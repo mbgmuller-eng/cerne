@@ -78,7 +78,8 @@ class AcceptInviteTest extends TestCase
     public function test_convite_para_email_que_ja_tem_conta_so_define_a_senha(): void
     {
         $consultor = User::factory()->consultant()->create();
-        $existente = User::factory()->create(['name' => 'Mariana Marino', 'email' => 'mariana@exemplo.com']);
+        // Conta criada pelo profissional (senha aleatória que ninguém conhece): a única que o convite pode ativar.
+        $existente = User::factory()->create(['name' => 'Mariana Marino', 'email' => 'mariana@exemplo.com', 'password_pending' => true]);
         $perfil = FinancialProfile::factory()->create(['owner_user_id' => $existente->id]);
         ConsultantClient::factory()->create([
             'consultant_id' => $consultor->id,

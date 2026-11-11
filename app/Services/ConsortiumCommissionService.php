@@ -164,7 +164,10 @@ class ConsortiumCommissionService
     /** @return Collection<int, array<string, mixed>> uma linha por consórcio com comissão, com a regra e o total previsto */
     public function linkRows(User $professional): Collection
     {
-        $vinculos = DebtCommission::query()->where('professional_id', $professional->id)->with('debt')->get()->filter(fn (DebtCommission $v) => $v->debt !== null);
+        // Só o consórcio de cliente com vínculo ativo: o do cliente que saiu da carteira não mostra mais nome, carta nem status.
+        $ativos = \App\Models\ConsultantClient::activeProfileIds($professional);
+        $vinculos = DebtCommission::query()->where('professional_id', $professional->id)->with('debt')->get()
+            ->filter(fn (DebtCommission $v) => $v->debt !== null && $ativos->contains($v->debt->profile_id));
         $nomes = $this->clientNames($vinculos->pluck('debt.profile_id')->unique()->all());
         $regras = $this->indexedRules($professional);
 

@@ -50,7 +50,12 @@ class ProcessDocumentJob implements ShouldQueue
 
         $context->set($documento->profile);
 
-        $extractor->extract($documento);
+        try {
+            $extractor->extract($documento);
+        } finally {
+            // O contexto é um singleton: num worker que não pára a cada rodada ele vazaria para o próximo job.
+            $context->clear();
+        }
     }
 
     public function failed(\Throwable $e): void

@@ -397,7 +397,8 @@ class ConsultantPortfolioService
 
             $exibicao = ($profileId && $profile !== null)
                 ? $this->resumoDeExibicao($profile)
-                : ['name' => $link->client->name, 'tipo_perfil' => null, 'parceiro' => null, 'acessos' => null, 'vida_financeira' => null];
+                // Enquanto a pessoa não autorizou, o profissional vê só o e-mail que ele mesmo digitou, nunca o nome cadastrado na conta dela.
+                : ['name' => $ativo ? $link->client->name : $link->client->email, 'tipo_perfil' => null, 'parceiro' => null, 'acessos' => null, 'vida_financeira' => null];
 
             return [
                 'name' => $exibicao['name'],

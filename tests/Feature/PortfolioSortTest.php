@@ -64,14 +64,15 @@ class PortfolioSortTest extends TestCase
 
     public function test_quem_nao_tem_o_dado_fica_no_fim_nos_dois_sentidos(): void
     {
-        $pendente = User::factory()->create(['name' => 'Davi Pendente']);
+        $pendente = User::factory()->create(['name' => 'Davi Pendente', 'email' => 'davi.pendente@exemplo.com']);
         ConsultantClient::factory()->pending()->create(['consultant_id' => $this->consultor->id, 'client_id' => $pendente->id]);
 
         foreach (['asc', 'desc'] as $sentido) {
             Livewire::test(PortfolioOverview::class)
                 ->set('ordenarClientes', 'patrimonio')
                 ->set('sentidoClientes', $sentido)
-                ->tap(fn ($c) => self::assertSame('Davi Pendente', last($this->nomes($c))));
+                // Enquanto a pessoa não autorizou o vínculo, a lista mostra o e-mail digitado, nunca o nome cadastrado na conta dela.
+                ->tap(fn ($c) => self::assertSame('davi.pendente@exemplo.com', last($this->nomes($c))));
         }
     }
 

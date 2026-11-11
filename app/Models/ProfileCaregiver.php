@@ -24,7 +24,7 @@ use Illuminate\Support\Str;
 #[Fillable([
     'profile_id', 'member_id', 'user_id', 'invited_by_user_id', 'invited_email', 'invited_name', 'access_level', 'status', 'invite_token', 'invite_expires_at',
     'accepted_at', 'revoked_at', 'notify_reminders', 'notify_care_items',
-    'can_view_health', 'can_view_finance', 'notify_finance', 'notify_weekly', 'notify_alerts', 'grant_basis', 'granted_by_user_id', 'granted_declared_at',
+    'can_view_health', 'can_view_finance', 'notify_finance', 'notify_weekly', 'notify_alerts', 'grant_basis', 'granted_by_user_id', 'granted_declared_at', 'owner_approved_at',
 ])]
 class ProfileCaregiver extends Model
 {
@@ -47,6 +47,7 @@ class ProfileCaregiver extends Model
             'notify_alerts' => 'boolean',
             'grant_basis' => CaregiverGrantBasis::class,
             'granted_declared_at' => 'datetime',
+            'owner_approved_at' => 'datetime',
         ];
     }
 
@@ -87,7 +88,7 @@ class ProfileCaregiver extends Model
      *
      * @return array{caregiver: self, token: string}
      */
-    public static function issue(FinancialProfile $profile, ProfileMember $member, User $issuer, string $name, string $email, CaregiverAccess $access, bool $health = true, bool $finance = false, ?CaregiverGrantBasis $basis = null, ?User $grantedBy = null): array
+    public static function issue(FinancialProfile $profile, ProfileMember $member, User $issuer, string $name, string $email, CaregiverAccess $access, bool $health = true, bool $finance = false, ?CaregiverGrantBasis $basis = null, ?User $grantedBy = null, bool $approved = true): array
     {
         $token = Str::random(48);
         $email = mb_strtolower(trim($email));
@@ -108,6 +109,8 @@ class ProfileCaregiver extends Model
             'invite_token' => hash('sha256', $token),
             'invite_expires_at' => now()->addDays((int) config('cerne.invite.expires_in_days')),
             'revoked_at' => null,
+            // O que o consultor monta em nome do cliente só vale depois que o dono do perfil aprova (CaregiverService::approveAssistedGrant).
+            'owner_approved_at' => $approved ? now() : null,
         ]);
 
         // Quem já aceitou continua ativo; os demais voltam a "convidado".
@@ -123,7 +126,7 @@ class ProfileCaregiver extends Model
 
     public static function findValidByToken(string $plainToken): ?self
     {
-        $caregiver = self::query()->where('invite_token', hash('sha256', $plainToken))->where('status', CaregiverStatus::Invited->value)->first();
+        $caregiver = self::query()->where('invite_token', hash('sha256', $plainToken))->where('status', CaregiverStatus::Invited->value)->whereNotNull('owner_approved_at')->first();
 
         return $caregiver !== null && $caregiver->invite_expires_at?->isFuture() ? $caregiver : null;
     }

@@ -13,6 +13,19 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 #[Fillable(['consultant_id', 'client_id', 'status', 'invited_at', 'accepted_at', 'ended_at', 'plan_delivery', 'notes'])]
 class ConsultantClient extends Model
 {
+    /**
+     * Os perfis dos clientes com vínculo ATIVO deste profissional. É o único critério para ler dado vivo do cliente: vínculo encerrado, pendente ou
+     * revogado corta a leitura na hora (tela de comissões e de contratos incluídas), mesmo que o profissional ainda tenha o registro financeiro dele.
+     *
+     * @return \Illuminate\Support\Collection<int, string>
+     */
+    public static function activeProfileIds(User $professional): \Illuminate\Support\Collection
+    {
+        $clientes = self::query()->where('consultant_id', $professional->id)->where('status', ConsultantClientStatus::Active)->pluck('client_id');
+
+        return FinancialProfile::query()->whereIn('owner_user_id', $clientes)->pluck('id');
+    }
+
     use HasFactory, HasUuids;
 
     protected static function booted(): void

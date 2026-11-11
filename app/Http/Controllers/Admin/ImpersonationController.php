@@ -18,11 +18,22 @@ use Illuminate\Support\Facades\Auth;
  */
 class ImpersonationController extends Controller
 {
+    /** Máximo que uma personificação dura sem ser renovada: depois disso a sessão volta sozinha para o administrador. */
+    public const MAX_MINUTES = 60;
+
     public function stop(): RedirectResponse
+    {
+        static::end();
+
+        return redirect()->route('admin.users');
+    }
+
+    /** Encerra a personificação em curso: fecha o registro do acesso e devolve a sessão ao administrador, com sessão nova. */
+    public static function end(): void
     {
         $adminId = session('impersonator_id');
         $registroId = session('impersonation_log_id');
-        session()->forget(['impersonator_id', 'impersonation_log_id']);
+        session()->forget(['impersonator_id', 'impersonation_log_id', 'impersonation_expires_at']);
 
         // Fecha o registro do acesso (se a sessão acabar sem passar por aqui, ele fica aberto e a tela de acessos mostra "em andamento").
         if ($registroId !== null) {
@@ -31,8 +42,7 @@ class ImpersonationController extends Controller
 
         if ($adminId !== null && ($admin = User::find($adminId)) !== null) {
             Auth::login($admin);
+            session()->regenerate();
         }
-
-        return redirect()->route('admin.users');
     }
 }

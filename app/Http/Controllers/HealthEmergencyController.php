@@ -3,7 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Services\HealthCardService;
-use Illuminate\Contracts\View\View;
+use Illuminate\Http\Response;
 
 /**
  * Página pública do QR Code de emergência — SEM login (quem escaneia é
@@ -16,12 +16,16 @@ use Illuminate\Contracts\View\View;
  */
 class HealthEmergencyController extends Controller
 {
-    public function show(string $token, HealthCardService $service): View
+    public function show(string $token, HealthCardService $service): Response
     {
         $dados = $service->emergencyPayload($token);
 
         abort_if($dados === null, 404);
 
-        return view('health.emergency', $dados);
+        // Página com dado de saúde, aberta a quem tem o token: nunca indexada nem guardada em cache de navegador ou de intermediário.
+        return response()->view('health.emergency', $dados)->withHeaders([
+            'X-Robots-Tag' => 'noindex, nofollow, noarchive',
+            'Cache-Control' => 'no-store, private',
+        ]);
     }
 }

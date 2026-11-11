@@ -175,8 +175,11 @@ class InsuranceCommissionService
     /** @return Collection<int, array<string, mixed>> uma linha por apólice com comissão, já com a regra que vale para ela */
     public function policyRows(User $professional): Collection
     {
+        // A apólice que o profissional vendeu (broker_id) é o registro da venda dele e fica; a de cliente que ele só acompanha (incluída à mão)
+        // exige vínculo ATIVO: quem saiu da carteira não mostra mais nome, seguradora, número nem prêmio.
+        $ativos = \App\Models\ConsultantClient::activeProfileIds($professional);
         $vinculos = PolicyCommission::query()->where('professional_id', $professional->id)->with('policy')->get()
-            ->filter(fn (PolicyCommission $v) => $v->policy !== null);
+            ->filter(fn (PolicyCommission $v) => $v->policy !== null && ($v->policy->broker_id === $professional->id || $ativos->contains($v->policy->profile_id)));
 
         $nomes = $this->clientNames($vinculos->pluck('policy.profile_id')->unique()->all());
         $regras = $this->indexedRules($professional);

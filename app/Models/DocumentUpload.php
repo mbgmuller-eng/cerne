@@ -89,6 +89,12 @@ class DocumentUpload extends Model
      *
      * @return array<int, array<string, mixed>>
      */
+    /** O conteúdo lido do PDF (linhas do extrato, CPF, endereço) não vai para a trilha de auditoria: ela é append-only e sobrevive à retenção. */
+    protected function auditNever(): array
+    {
+        return ['extraction_summary'];
+    }
+
     public function extractedItems(): array
     {
         return $this->extraction_summary['itens'] ?? [];

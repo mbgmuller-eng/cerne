@@ -84,7 +84,7 @@ class BrokerLinkRequestTest extends TestCase
             ->set('inviteName', 'Nome Qualquer')
             ->set('inviteEmail', 'ativo@exemplo.com')
             ->call('invite')
-            ->assertHasErrors(['inviteEmail']);
+            ->assertHasNoErrors();
 
         self::assertSame(1, ConsultantClient::query()->count());
     }

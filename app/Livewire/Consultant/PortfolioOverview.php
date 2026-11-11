@@ -255,39 +255,26 @@ class PortfolioOverview extends Component
         $existente = User::where('email', $this->inviteEmail)->first();
 
         if ($existente === null) {
-            $this->lastInviteLink = $invites->send($consultor, $this->inviteName, $this->inviteEmail);
+            // O link nunca é mostrado ao consultor: quem tem o link define a senha. Só o e-mail leva até a pessoa.
+            $invites->send($consultor, $this->inviteName, $this->inviteEmail);
             $this->reset('inviteName', 'inviteEmail');
-            session()->flash('status', 'Convite enviado.');
+            session()->flash('status', 'Se este e-mail puder ser vinculado, a pessoa recebe o convite ou o pedido de autorização. Acompanhe pela lista.');
 
             return;
         }
 
-        if (! $existente->isClient()) {
-            $this->addError('inviteEmail', 'Esse e-mail já pertence a uma conta que não é de cliente.');
+        // Mensagem única em todos os casos (conta de outro tipo, já é cliente, pedido pendente ou pedido novo): o profissional nunca descobre
+        // se um e-mail tem conta no Cerne.
+        $vinculo = $existente->isClient()
+            ? ConsultantClient::query()->where('consultant_id', $consultor->id)->where('client_id', $existente->id)->first()
+            : null;
 
-            return;
+        if ($existente->isClient() && ! in_array($vinculo?->status, [ConsultantClientStatus::Active, ConsultantClientStatus::Pending], true)) {
+            $links->request($consultor, $existente);
         }
 
-        $vinculo = ConsultantClient::query()
-            ->where('consultant_id', $consultor->id)
-            ->where('client_id', $existente->id)
-            ->first();
-
-        if ($vinculo?->status === ConsultantClientStatus::Active) {
-            $this->addError('inviteEmail', 'Esse e-mail já é seu cliente.');
-
-            return;
-        }
-
-        if ($vinculo?->status === ConsultantClientStatus::Pending) {
-            $this->addError('inviteEmail', 'Já existe uma autorização pendente para esse e-mail.');
-
-            return;
-        }
-
-        $this->lastInviteLink = $links->request($consultor, $existente);
         $this->reset('inviteName', 'inviteEmail');
-        session()->flash('status', 'Esse e-mail já tem conta no Cerne — enviamos um pedido de autorização de vínculo.');
+        session()->flash('status', 'Se este e-mail puder ser vinculado, a pessoa recebe o convite ou o pedido de autorização. Acompanhe pela lista.');
     }
 
     /**
@@ -315,7 +302,13 @@ class PortfolioOverview extends Component
             'partnerEmail' => 'e-mail',
         ]);
 
-        $this->lastPartnerInviteLink = $service->send($profile, auth()->user(), $data['partnerName'], $data['partnerEmail']);
+        try {
+            $service->send($profile, auth()->user(), $data['partnerName'], $data['partnerEmail']);
+        } catch (\RuntimeException $e) {
+            $this->addError('partnerEmail', $e->getMessage());
+
+            return;
+        }
 
         $this->reset('partnerName', 'partnerEmail');
         session()->flash('status', 'Convite enviado.');
@@ -334,7 +327,7 @@ class PortfolioOverview extends Component
             ->where('status', InviteStatus::Pending)
             ->findOrFail($id);
 
-        $this->lastInviteLink = $invites->resend($convite);
+        $invites->resend($convite);
         session()->flash('status', 'Convite reenviado.');
     }
 
@@ -360,8 +353,11 @@ class PortfolioOverview extends Component
             ->where('status', ConsultantClientStatus::Active)
             ->firstOrFail();
 
-        $this->lastAccessInviteProfileId = $profileId;
-        $this->lastAccessInviteLink = $invites->send(auth()->user(), $profile->owner->name, $profile->owner->email);
+        // Convite de acesso é para a conta que ainda não foi ativada (criada pelo profissional, senha aleatória). Cliente que já definiu a senha
+        // nunca recebe convite que troque a senha dele.
+        abort_unless($profile->owner->password_pending, 403);
+
+        $invites->send(auth()->user(), $profile->owner->name, $profile->owner->email);
 
         session()->flash('status', "Convite de acesso enviado para {$profile->owner->email}.");
     }

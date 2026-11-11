@@ -380,7 +380,7 @@
                                                     <input type="radio" wire:model.live="essentialSourceInput" value="auto" class="mt-1">
                                                     <span>
                                                         {{ EssentialSource::Auto->label() }}
-                                                        @php $media = $perfil?->essentialMonthlyAverage() ?? '0.00'; @endphp
+                                                        @php $media = $perfil?->essentialMonthlyAverageVisibleToMe() ?? '0.00'; @endphp
                                                         <span class="block text-xs text-slate-400">
                                                             @if (bccomp($media, '0', 2) > 0)
                                                                 Média dos meses fechados: {{ Money::format($media) }} por mês.

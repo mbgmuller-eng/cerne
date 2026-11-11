@@ -21,7 +21,7 @@ use Illuminate\Support\Str;
  * profile_id explicitamente no ponto de uso, mesmo raciocínio de
  * ConsultantInvite (ver TenancyCoverageTest).
  */
-#[Fillable(['profile_id', 'invited_by_user_id', 'partner_name', 'partner_email', 'token', 'expires_at', 'status', 'accepted_at'])]
+#[Fillable(['profile_id', 'invited_by_user_id', 'partner_name', 'partner_email', 'token', 'expires_at', 'status', 'accepted_at', 'owner_approved_at'])]
 class PartnerInvite extends Model
 {
     use HasFactory, HasUuids;
@@ -32,6 +32,7 @@ class PartnerInvite extends Model
             'status' => InviteStatus::class,
             'expires_at' => 'datetime',
             'accepted_at' => 'datetime',
+            'owner_approved_at' => 'datetime',
         ];
     }
 
@@ -49,9 +50,12 @@ class PartnerInvite extends Model
      * Cria o convite e devolve o token em claro junto — é a única vez que
      * ele existe fora do hash. O chamador monta o link com ele.
      *
+     * `$approved` é falso quando quem emite NÃO é o dono do perfil (o consultor): o convite nasce guardado e só vale depois que o dono aprova
+     * (`PartnerInviteService::approve`, que troca o token). O token daqui nunca é enviado.
+     *
      * @return array{invite: self, token: string}
      */
-    public static function issue(FinancialProfile $profile, User $issuer, string $name, string $email): array
+    public static function issue(FinancialProfile $profile, User $issuer, string $name, string $email, bool $approved = true): array
     {
         $plainToken = Str::random(48);
 
@@ -63,6 +67,7 @@ class PartnerInvite extends Model
             'token' => hash('sha256', $plainToken),
             'expires_at' => Carbon::now()->addDays(config('cerne.invite.expires_in_days')),
             'status' => InviteStatus::Pending,
+            'owner_approved_at' => $approved ? Carbon::now() : null,
         ]);
 
         return ['invite' => $invite, 'token' => $plainToken];
@@ -74,6 +79,7 @@ class PartnerInvite extends Model
         $invite = self::query()
             ->where('token', hash('sha256', $plainToken))
             ->where('status', InviteStatus::Pending)
+            ->whereNotNull('owner_approved_at')
             ->first();
 
         return $invite?->isExpired() ? null : $invite;

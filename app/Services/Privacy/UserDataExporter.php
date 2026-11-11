@@ -161,7 +161,17 @@ class UserDataExporter
         /** @var Model $modelo */
         $modelo = new $classe;
 
+        // A trilha de auditoria guarda o valor completo (inclusive o que o cônjuge marcou como privado) e o IP de quem alterou: não sai na cópia.
+        if ($classe === \App\Models\AuditLog::class) {
+            return;
+        }
+
         $consulta = $classe::query()->where($modelo->qualifyColumn('profile_id'), $perfil->id)->orderBy($modelo->getQualifiedKeyName());
+
+        // O perfil de investidor guarda o gasto essencial que a pessoa digitou: é só dela. A linha do cônjuge não sai.
+        if ($classe === \App\Models\InvestorProfile::class) {
+            $consulta->where($modelo->qualifyColumn('member_id'), app(\App\Support\ProfileContext::class)->memberId());
+        }
 
         if (! $consulta->clone()->exists()) {
             return;

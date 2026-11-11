@@ -40,8 +40,10 @@ class PortfolioOverviewPartnerInviteTest extends TestCase
             ->call('sendPartnerInvite')
             ->assertHasNoErrors();
 
+        // O pedido fica guardado: nada sai por e-mail e o consultor não vê link. Só depois que o dono aprova o convite é enviado.
         self::assertTrue(PartnerInvite::query()->where('profile_id', $profile->id)->exists());
-        Mail::assertQueued(PartnerInviteMail::class);
+        self::assertNull(PartnerInvite::query()->where('profile_id', $profile->id)->value('owner_approved_at'));
+        Mail::assertNotQueued(PartnerInviteMail::class);
     }
 
     public function test_consultor_nao_convida_conjuge_de_cliente_sem_vinculo(): void
