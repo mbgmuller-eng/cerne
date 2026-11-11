@@ -417,21 +417,29 @@
                         <p class="truncate text-sm font-medium text-white">{{ $user->name }}</p>
                         <p class="truncate text-xs text-white/50">{{ $user->email }}</p>
                     </div>
+                </div>
+
+                {{-- Segunda linha do rodapé: Sair à esquerda e as ferramentas (tutorial, notificações) à direita. Tudo numa linha só com o nome
+                     espremia o nome e o e-mail até virarem "M…". --}}
+                <div class="mt-1 flex items-center justify-between px-1">
                     <form method="POST" action="{{ route('logout') }}">
                         @csrf
                         <button type="submit" class="btn-ghost !text-white/60 px-2" title="Sair">
                             <x-nav-icon name="logout" class="h-4 w-4" />
+                            <span class="ml-1.5 text-xs">Sair</span>
                         </button>
                     </form>
-                    {{-- O botão do sino é do componente compartilhado
-                         (usado no cabeçalho também, com fundo claro) — o
-                         seletor aqui força a cor certa só nesta instância,
-                         sem mexer no componente em si. --}}
-                    @if ($temTutorial)
-                        <x-help-button class="!text-white/60" />
-                    @endif
-                    <div class="[&>div>button]:!text-white/60">
-                        <livewire:notifications.notification-center direction="up" />
+                    <div class="flex items-center gap-1">
+                        @if ($temTutorial)
+                            <x-help-button class="!text-white/60" />
+                        @endif
+                        {{-- O botão do sino é do componente compartilhado
+                             (usado no cabeçalho também, com fundo claro) — o
+                             seletor aqui força a cor certa só nesta instância,
+                             sem mexer no componente em si. --}}
+                        <div class="[&>div>button]:!text-white/60">
+                            <livewire:notifications.notification-center direction="up" />
+                        </div>
                     </div>
                 </div>
 
@@ -496,16 +504,22 @@
                         <p class="truncate text-sm font-medium text-slate-800 dark:text-slate-100">{{ $user->name }}</p>
                         <p class="truncate text-xs text-slate-500 dark:text-slate-400">{{ $user->email }}</p>
                     </div>
+                </div>
+
+                <div class="mt-1 flex items-center justify-between px-1">
                     <form method="POST" action="{{ route('logout') }}">
                         @csrf
                         <button type="submit" class="btn-ghost px-2" title="Sair">
                             <x-nav-icon name="logout" class="h-4 w-4" />
+                            <span class="ml-1.5 text-xs">Sair</span>
                         </button>
                     </form>
-                    @if ($temTutorial)
-                        <x-help-button />
-                    @endif
-                    <livewire:notifications.notification-center direction="up" />
+                    <div class="flex items-center gap-1">
+                        @if ($temTutorial)
+                            <x-help-button />
+                        @endif
+                        <livewire:notifications.notification-center direction="up" />
+                    </div>
                 </div>
 
                 <div class="mt-2 flex justify-center">
@@ -585,16 +599,22 @@
                         <p class="truncate text-sm font-medium text-slate-800 dark:text-slate-100">{{ $user->name }}</p>
                         <p class="truncate text-xs text-slate-500 dark:text-slate-400">{{ $user->email }}</p>
                     </div>
+                </div>
+
+                <div class="mt-1 flex items-center justify-between px-1">
                     <form method="POST" action="{{ route('logout') }}">
                         @csrf
                         <button type="submit" class="btn-ghost px-2" title="Sair">
                             <x-nav-icon name="logout" class="h-4 w-4" />
+                            <span class="ml-1.5 text-xs">Sair</span>
                         </button>
                     </form>
-                    @if ($temTutorial)
-                        <x-help-button />
-                    @endif
-                    <livewire:notifications.notification-center direction="up" />
+                    <div class="flex items-center gap-1">
+                        @if ($temTutorial)
+                            <x-help-button />
+                        @endif
+                        <livewire:notifications.notification-center direction="up" />
+                    </div>
                 </div>
 
                 <div class="mt-2 flex justify-center">
