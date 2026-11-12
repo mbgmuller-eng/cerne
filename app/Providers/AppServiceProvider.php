@@ -23,6 +23,18 @@ class AppServiceProvider extends ServiceProvider
     {
         \Livewire\Livewire::componentHook(\App\Livewire\Hooks\BindToActiveProfile::class);
 
+        // As regras de acesso das rotas valem também para as AÇÕES das telas (`/livewire/update`). Sem isto, só a abertura da página era
+        // conferida: quem perdeu o acesso com a tela já aberta (consentimento de saúde revogado, termos novos, plano vencido, segundo passo
+        // desligado, acesso de cuidador encerrado) seguia agindo até recarregar. O Livewire reaplica estas regras contra a rota ORIGINAL
+        // da tela e, se uma delas redireciona, devolve o redirecionamento. Ver LivewirePersistentMiddlewareTest.
+        \Livewire\Livewire::addPersistentMiddleware([
+            \App\Http\Middleware\RequiresCurrentTerms::class,
+            \App\Http\Middleware\RequiresTwoFactor::class,
+            \App\Http\Middleware\RequiresActiveSubscription::class,
+            \App\Http\Middleware\RequiresHealthConsent::class,
+            \App\Http\Middleware\RestrictCareContext::class,
+        ]);
+
         $this->configureRateLimiting();
 
         // Regra única de senha (cadastro, compra, convites, redefinição, troca). Em produção também recusa senha que já
