@@ -174,15 +174,40 @@
                     @endif
 
                     <div>
-                        <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Conta para debitar (opcional)</label>
-                        <select wire:model.live="billBankAccountId" class="select mt-1.5 w-full">
-                            <option value="">Nenhuma (só lembrete)</option>
-                            @foreach ($bankAccounts as $conta)
-                                <option value="{{ $conta->id }}">{{ $conta->displayName() }}</option>
-                            @endforeach
+                        <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Forma de pagamento</label>
+                        <select wire:model.live="billPaymentMethod" class="select mt-1.5 w-full" data-bill-payment-method>
+                            <option value="conta">Conta bancária</option>
+                            <option value="cartao">Cartão de crédito</option>
                         </select>
-                        <p class="mt-1 text-xs text-slate-400">Sem conta, “Pagar” só marca como paga: nenhuma despesa é criada.</p>
+                        <p class="mt-1 text-xs text-slate-400">No cartão, o valor entra sozinho na fatura a cada vencimento.</p>
                     </div>
+
+                    @if ($billPaymentMethod === 'cartao')
+                        <div>
+                            <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Cartão</label>
+                            <select wire:model.live="billCreditCardId" class="select mt-1.5 w-full" data-bill-credit-card>
+                                <option value="">Escolha o cartão</option>
+                                @foreach ($creditCards as $cartao)
+                                    <option value="{{ $cartao->id }}">{{ $cartao->displayName() }}</option>
+                                @endforeach
+                            </select>
+                            @error('billCreditCardId') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                            @if ($creditCards->isEmpty())
+                                <p class="mt-1 text-xs text-slate-400">Nenhum cartão ativo. Cadastre um em Contas &amp; Cartões.</p>
+                            @endif
+                        </div>
+                    @else
+                        <div>
+                            <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Conta para debitar (opcional)</label>
+                            <select wire:model.live="billBankAccountId" class="select mt-1.5 w-full">
+                                <option value="">Nenhuma (só lembrete)</option>
+                                @foreach ($bankAccounts as $conta)
+                                    <option value="{{ $conta->id }}">{{ $conta->displayName() }}</option>
+                                @endforeach
+                            </select>
+                            <p class="mt-1 text-xs text-slate-400">Sem conta, “Pagar” só marca como paga: nenhuma despesa é criada.</p>
+                        </div>
+                    @endif
 
                     <div class="flex items-center gap-2 pt-5">
                         <input type="checkbox" wire:model.live="billIsVariable" id="billIsVariable" class="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500">
@@ -236,6 +261,7 @@
                                 @if ($conta->member) · {{ $conta->member->name }} @endif
                                 @if ($conta->recurrence !== RecurrenceType::Monthly) · {{ $conta->recurrence->label() }} @endif
                                 @if ($conta->is_variable) · valor variável @endif
+                                @if ($conta->creditCard) · no cartão {{ $conta->creditCard->displayName() }} @endif
                             </p>
                         </div>
 

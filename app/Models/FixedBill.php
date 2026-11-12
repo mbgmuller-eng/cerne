@@ -40,6 +40,11 @@ class FixedBill extends Model
         ];
     }
 
+    public function creditCard(): BelongsTo
+    {
+        return $this->belongsTo(CreditCard::class, 'credit_card_id');
+    }
+
     public function member(): BelongsTo
     {
         return $this->belongsTo(ProfileMember::class, 'member_id');

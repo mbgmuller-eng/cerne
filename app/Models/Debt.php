@@ -240,6 +240,11 @@ class Debt extends Model
         return $this->isConsortium() && ! $this->isContemplated();
     }
 
+    public function simulations(): HasMany
+    {
+        return $this->hasMany(DebtSimulation::class)->orderByDesc('created_at');
+    }
+
     public function adjustments(): HasMany
     {
         return $this->hasMany(DebtAdjustment::class)->orderByDesc('applied_on');

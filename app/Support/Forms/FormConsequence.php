@@ -98,6 +98,76 @@ final class FormConsequence
         return 'Ao pagar, será criada uma despesa '.$quanto.' em '.$categoria.', com a data do pagamento, e '.$conta.' será debitada.';
     }
 
+    /**
+     * Conta fixa NO CARTÃO: no vencimento o Cerne lança a compra sozinho na fatura (ver FixedBillService::postDueCardCharges). O período da fatura sai
+     * de CreditCard::billingPeriodFor e o vencimento dela de dueDateFor, a MESMA conta que grava.
+     *
+     * @return list<string>
+     */
+    public static function payBillOnCard(?CreditCard $cartao, string $valor, bool $variavel, string $categoria, ?CarbonImmutable $proximoVencimento): array
+    {
+        if ($cartao === null) {
+            return ['Escolha o cartão: a conta fixa será lançada na fatura dele a cada vencimento.'];
+        }
+
+        $linhas = [];
+        // Antes de escolher a categoria a tela passa "a categoria escolhida": "em a categoria" não existe em português.
+        $em = $categoria === 'a categoria escolhida' ? 'na categoria escolhida' : 'em '.$categoria;
+
+        if ($variavel) {
+            $linhas[] = 'Valor variável: ao pagar, informe o valor. Ele entra na fatura do cartão '.$cartao->displayName().' '.$em.'. Nenhuma conta bancária é debitada.';
+        } else {
+            $linhas[] = 'No dia de cada vencimento o Cerne lança sozinho uma compra '.self::valorDaConta($valor).' '.$em.' na fatura do cartão '.$cartao->displayName().' e marca a conta como paga. Nenhuma conta bancária é debitada agora: o dinheiro sai quando você pagar a fatura.';
+        }
+
+        if ($proximoVencimento !== null) {
+            [$ano, $mes] = $cartao->billingPeriodFor($proximoVencimento);
+            $linhas[] = 'O vencimento de '.$proximoVencimento->format('d/m').' cai na fatura de '.str_pad((string) $mes, 2, '0', STR_PAD_LEFT).'/'.$ano.', que vence em '.$cartao->dueDateFor($ano, $mes)->format('d/m/Y').'.';
+
+            if (! $variavel && $proximoVencimento->lessThanOrEqualTo(CarbonImmutable::now())) {
+                $linhas[] = 'O vencimento deste mês já passou: a compra será lançada ao salvar.';
+            }
+        }
+
+        return $linhas;
+    }
+
+    /**
+     * O que "Registrar acordo" faz: as parcelas que nascem (a entrada, quando há, é a 1ª) e o desconto sobre o saldo de hoje. O cronograma sai de
+     * DebtService::agreementSchedule, a MESMA conta que grava.
+     *
+     * @return list<string>
+     */
+    public static function agreement(string $saldo, string $total, int $parcelas, string $entrada, ?CarbonImmutable $primeiroVencimento): array
+    {
+        $total = Money::parse($total);
+        $entrada = Money::parse($entrada);
+
+        if ($primeiroVencimento === null || bccomp($total, '0', 2) <= 0 || $parcelas < 1 || $parcelas > 480 || bccomp($entrada, '0', 2) < 0 || bccomp($entrada, $total, 2) >= 0) {
+            return [];
+        }
+
+        $cronograma = \App\Services\DebtService::agreementSchedule($total, $parcelas, $entrada, $primeiroVencimento);
+        $regulares = array_values(array_filter($cronograma, fn (array $l) => ! $l['is_down']));
+        $ultima = $regulares[count($regulares) - 1]['due']->format('d/m/Y');
+
+        if (bccomp($entrada, '0', 2) > 0) {
+            $primeiraRegular = $regulares[0];
+            $linhas = ['Serão criadas '.count($cronograma).' parcelas: a entrada de '.Money::format($entrada).' em '.$primeiroVencimento->format('d/m/Y').' e '.$parcelas.' '.($parcelas === 1 ? 'parcela' : 'parcelas').' de '.Money::format($primeiraRegular['amount']).', de '.$primeiraRegular['due']->format('d/m/Y').' a '.$ultima.'.'];
+        } else {
+            $linhas = ['Serão criadas '.$parcelas.' '.($parcelas === 1 ? 'parcela' : 'parcelas').' de '.Money::format($cronograma[0]['amount']).', de '.$primeiroVencimento->format('d/m/Y').' a '.$ultima.', e a dívida passa a ter parcelas no mês.'];
+        }
+
+        $desconto = bcsub(Money::parse($saldo), $total, 2);
+        $linhas[] = match (bccomp($desconto, '0', 2)) {
+            1 => 'Desconto de '.Money::format($desconto).' sobre o saldo de hoje.',
+            0 => 'Sem desconto: você paga o saldo de hoje.',
+            default => 'Você paga '.Money::format(bcsub('0', $desconto, 2)).' a mais que o saldo de hoje.',
+        };
+
+        return $linhas;
+    }
+
     /** O que "Receber" faz numa receita recorrente (espelho de payBill). */
     public static function receiveIncome(?string $conta, string $valor, bool $variavel, string $categoria): string
     {

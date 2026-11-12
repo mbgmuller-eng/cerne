@@ -162,15 +162,19 @@ class DebtAgreementSimTest extends TestCase
             ->call('simulateAgreement')->assertHasErrors(['agSimRows.0.total', 'agSimRows.1.installments']);
     }
 
-    public function test_adiciona_e_remove_propostas_ate_quatro(): void
+    public function test_adiciona_e_remove_propostas_ate_dez(): void
     {
         $divida = $this->cartao();
 
-        $teste = Livewire::test(DebtShow::class, ['debt' => $divida])->call('openAgreementSim')
-            ->call('addAgreementSimRow')->call('addAgreementSimRow')->call('addAgreementSimRow');
-        self::assertCount(4, $teste->get('agSimRows'));
+        $teste = Livewire::test(DebtShow::class, ['debt' => $divida])->call('openAgreementSim');
+        for ($i = 0; $i < 12; $i++) {
+            $teste->call('addAgreementSimRow');
+        }
+        self::assertCount(DebtShow::MAX_SIM_PROPOSALS, $teste->get('agSimRows'), 'o teto é de 10 propostas (era 4)');
 
-        $teste->call('removeAgreementSimRow', 0)->call('removeAgreementSimRow', 0)->call('removeAgreementSimRow', 0)->call('removeAgreementSimRow', 0);
+        for ($i = 0; $i < 12; $i++) {
+            $teste->call('removeAgreementSimRow', 0);
+        }
         self::assertCount(1, $teste->get('agSimRows'), 'sempre fica uma proposta');
     }
 

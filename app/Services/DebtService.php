@@ -149,6 +149,7 @@ class DebtService
                 $marca = ['member_id' => $divida->member_id, 'is_private' => $divida->is_private];
 
                 DebtInstallment::withoutProfileScope()->where('debt_id', $divida->id)->update($marca);
+                \App\Models\DebtSimulation::withoutProfileScope()->where('debt_id', $divida->id)->update($marca);
                 ExpenseRecord::withoutProfileScope()->whereIn('id', DebtInstallment::withoutProfileScope()->where('debt_id', $divida->id)->whereNotNull('expense_id')->select('expense_id'))->update($marca);
             }
 
@@ -826,7 +827,9 @@ class DebtService
      * Registra o acordo: o valor negociado em N parcelas. A dívida passa a ter cronograma (e a ter parcelas no mês), e ficam
      * guardados o valor original, o saldo na hora do acordo e o desconto obtido.
      *
-     * @param  array{total: string, installments: int|string, first_due_date: string, category_id: string, subcategory_id?: ?string, bank_account_id?: ?string}  $d
+     * Com `down_payment` (entrada), a 1ª parcela é a entrada, no primeiro vencimento, e as `installments` seguintes vencem mês a mês depois dela.
+     *
+     * @param  array{total: string, installments: int|string, first_due_date: string, category_id: string, subcategory_id?: ?string, bank_account_id?: ?string, down_payment?: ?string}  $d
      */
     public function registerAgreement(Debt $divida, array $d): Debt
     {
@@ -834,6 +837,7 @@ class DebtService
 
         $total = Money::parse($d['total'] ?? 0);
         $n = (int) $d['installments'];
+        $entrada = Money::parse($d['down_payment'] ?? 0);
 
         if (bccomp($total, '0', 2) <= 0) {
             throw new InvalidArgumentException('Informe o valor negociado.');
@@ -843,31 +847,32 @@ class DebtService
             throw new InvalidArgumentException('Informe de 1 a 480 parcelas.');
         }
 
+        if (bccomp($entrada, '0', 2) < 0 || bccomp($entrada, $total, 2) >= 0) {
+            throw new InvalidArgumentException('A entrada precisa ser menor que o valor negociado.');
+        }
+
         $this->validateClassification($d['category_id'] ?? null, $d['subcategory_id'] ?? null);
 
         $primeira = CarbonImmutable::parse($d['first_due_date'])->startOfDay();
         $desconto = bcsub((string) $divida->current_balance, $total, 2);
+        $cronograma = self::agreementSchedule($total, $n, $entrada, $primeira);
 
-        return DB::transaction(function () use ($divida, $d, $total, $n, $primeira, $desconto): Debt {
-            $base = bcdiv($total, (string) $n, 2);
-            $resto = bcsub($total, bcmul($base, (string) $n, 2), 2);
-
-            for ($i = 0; $i < $n; $i++) {
-                $valor = $i === $n - 1 ? bcadd($base, $resto, 2) : $base;
-
+        return DB::transaction(function () use ($divida, $d, $total, $n, $primeira, $desconto, $cronograma, $entrada): Debt {
+            foreach ($cronograma as $i => $linha) {
                 DebtInstallment::create([
                     'debt_id' => $divida->id, 'member_id' => $divida->member_id, 'is_private' => $divida->is_private,
-                    'number' => $i + 1, 'due_date' => $primeira->addMonthsNoOverflow($i),
-                    'principal_amount' => $valor, 'interest_amount' => '0.00', 'fees_amount' => '0.00', 'amount' => $valor,
+                    'number' => $i + 1, 'due_date' => $linha['due'],
+                    'principal_amount' => $linha['amount'], 'interest_amount' => '0.00', 'fees_amount' => '0.00', 'amount' => $linha['amount'],
                     'status' => DebtInstallmentStatus::Open,
                 ]);
             }
 
             $divida->update([
                 'status' => DebtStatus::Active,
-                'term' => $n,
+                'term' => count($cronograma),
                 'first_due_date' => $primeira,
-                'installment_amount' => bcdiv($total, (string) $n, 2),
+                // A parcela "regular": a de depois da entrada (sem entrada, a própria 1ª).
+                'installment_amount' => $cronograma[bccomp($entrada, '0', 2) > 0 ? 1 : 0]['amount'],
                 'agreement_on' => now()->toDateString(),
                 'agreement_total' => $total,
                 'agreement_discount' => bccomp($desconto, '0', 2) > 0 ? $desconto : '0.00',
@@ -879,6 +884,36 @@ class DebtService
 
             return $divida->refresh();
         });
+    }
+
+    /**
+     * O cronograma de um acordo: sem entrada, N parcelas iguais a partir do 1º vencimento; com entrada, ela é a 1ª parcela (no 1º vencimento) e as N
+     * seguintes vencem mês a mês depois. A última absorve a sobra de centavos. É a MESMA conta que o aviso do formulário mostra
+     * (FormConsequence::agreement) e que o simulador usa para a parcela.
+     *
+     * @return list<array{due: CarbonImmutable, amount: string, is_down: bool}>
+     */
+    public static function agreementSchedule(string $total, int $n, string $entrada, CarbonImmutable $primeira): array
+    {
+        $temEntrada = bccomp($entrada, '0', 2) > 0;
+        $restante = $temEntrada ? bcsub($total, $entrada, 2) : $total;
+        $base = bcdiv($restante, (string) $n, 2);
+        $resto = bcsub($restante, bcmul($base, (string) $n, 2), 2);
+        $linhas = [];
+
+        if ($temEntrada) {
+            $linhas[] = ['due' => $primeira, 'amount' => $entrada, 'is_down' => true];
+        }
+
+        for ($i = 0; $i < $n; $i++) {
+            $linhas[] = [
+                'due' => $primeira->addMonthsNoOverflow($i + ($temEntrada ? 1 : 0)),
+                'amount' => $i === $n - 1 ? bcadd($base, $resto, 2) : $base,
+                'is_down' => false,
+            ];
+        }
+
+        return $linhas;
     }
 
     /** Dá a dívida (sem acordo) como quitada: pagou por fora, foi perdoada ou prescreveu. */

@@ -500,13 +500,13 @@
             </div>
 
             <p class="text-sm text-slate-600 dark:text-slate-300">
-                Compare o que o credor propôs. O saldo hoje é <strong class="font-medium">{{ Money::format($debt->current_balance) }}</strong>. Em cada proposta, informe o valor total que você vai pagar e em quantas parcelas.
+                Compare o que o credor propôs. O saldo hoje é <strong class="font-medium">{{ Money::format($debt->current_balance) }}</strong>. Em cada proposta, informe o valor total que você vai pagar (somando a entrada, se houver) e em quantas parcelas. Dá para comparar até {{ \App\Livewire\Debts\DebtShow::MAX_SIM_PROPOSALS }} propostas.
             </p>
 
             <form wire:submit="simulateAgreement" class="space-y-4">
                 <div class="space-y-3">
                     @foreach ($agSimRows as $i => $linha)
-                        <div class="grid gap-3 @sm:grid-cols-[1fr_1fr_7rem_auto] *:min-w-0" wire:key="ag-linha-{{ $i }}">
+                        <div class="grid gap-3 @sm:grid-cols-[1fr_1fr_1fr_7rem_auto] *:min-w-0" wire:key="ag-linha-{{ $i }}">
                             <div>
                                 <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Proposta</label>
                                 <input type="text" wire:model="agSimRows.{{ $i }}.label" maxlength="40" class="input mt-1.5">
@@ -518,8 +518,14 @@
                                 @error('agSimRows.'.$i.'.total') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
                             </div>
                             <div>
+                                <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Entrada <span class="font-normal text-slate-400">(opcional)</span></label>
+                                <input type="text" wire:model="agSimRows.{{ $i }}.down" inputmode="decimal" class="input mt-1.5" placeholder="Ex.: 600,00" data-sim-down>
+                                @error('agSimRows.'.$i.'.down') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                            </div>
+                            <div>
                                 <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Parcelas</label>
                                 <input type="number" wire:model="agSimRows.{{ $i }}.installments" min="1" max="480" class="input mt-1.5">
+                                <p class="mt-1 text-xs text-slate-400">Depois da entrada.</p>
                                 @error('agSimRows.'.$i.'.installments') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
                             </div>
                             <div class="flex items-end">
@@ -541,13 +547,14 @@
                 </div>
 
                 <div class="flex flex-wrap items-center justify-between gap-3">
-                    @if (count($agSimRows) < 4)
+                    @if (count($agSimRows) < \App\Livewire\Debts\DebtShow::MAX_SIM_PROPOSALS)
                         <button type="button" wire:click="addAgreementSimRow" class="btn-ghost px-3 py-1.5 text-xs">Adicionar proposta</button>
                     @else
                         <span></span>
                     @endif
                     <button type="submit" class="btn-primary px-4 py-2 text-sm">Comparar</button>
                 </div>
+                @error('agSimRows') <p class="text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
             </form>
 
             @if ($agSimResult !== [])
@@ -564,8 +571,13 @@
                                     <button type="button" wire:click="useAgreementProposal({{ $i }})" class="btn-secondary px-2.5 py-1 text-xs">Usar esta proposta</button>
                                 </div>
                                 <p class="text-sm tabular-nums text-slate-700 dark:text-slate-300">
-                                    {{ Money::format($p['total']) }} em {{ $p['installments'] }} {{ $p['installments'] === 1 ? 'vez' : 'vezes' }}
-                                    @if ($p['installments'] > 1) · {{ Money::format($p['monthly']) }} por mês @endif
+                                    {{ Money::format($p['total']) }}
+                                    @if (bccomp($p['down'], '0', 2) > 0)
+                                        : entrada de {{ Money::format($p['down']) }} + {{ $p['installments'] }} {{ $p['installments'] === 1 ? 'parcela' : 'parcelas' }} de {{ Money::format($p['monthly']) }}
+                                    @else
+                                        em {{ $p['installments'] }} {{ $p['installments'] === 1 ? 'vez' : 'vezes' }}
+                                        @if ($p['installments'] > 1) · {{ Money::format($p['monthly']) }} por mês @endif
+                                    @endif
                                 </p>
                                 <p class="text-xs {{ bccomp($p['discount'], '0', 2) > 0 ? 'text-accent-700 dark:text-accent-400' : 'text-red-700 dark:text-red-400' }}">
                                     @if (bccomp($p['discount'], '0', 2) > 0)
@@ -588,6 +600,92 @@
                         </p>
                     @endif
                     <p class="text-xs text-slate-400">É uma comparação das propostas que você informou, sem considerar o que o dinheiro renderia em outro lugar. Confira tudo no contrato do acordo.</p>
+
+                    <div class="space-y-2 border-t border-slate-100 pt-3 dark:border-white/10" data-save-simulation>
+                        <p class="text-xs font-medium text-slate-600 dark:text-slate-300">Guardar esta simulação para comparar com uma proposta nova no futuro</p>
+                        <form wire:submit="saveAgreementSimulation" class="flex flex-wrap items-start gap-2">
+                            <div class="min-w-0 grow sm:max-w-xs">
+                                <input type="text" wire:model="agSimName" maxlength="80" class="input" placeholder="Ex.: Propostas do Banco X em nov/2026" aria-label="Nome da simulação">
+                                @error('agSimName') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                            </div>
+                            <button type="submit" class="btn-secondary px-3 py-2 text-xs">Guardar simulação</button>
+                        </form>
+                        <p class="text-xs text-slate-400">Guarda as propostas digitadas e o saldo de hoje ({{ Money::format($agSimResult['balance']) }}). O resultado é recalculado com esse saldo.</p>
+                    </div>
+                </div>
+            @endif
+
+            @if ($comparacaoComSalva)
+                @php $c = $comparacaoComSalva; @endphp
+                <div class="space-y-3 rounded-xl border border-brand-200 bg-brand-50/40 p-4 dark:border-brand-500/30 dark:bg-brand-500/5" data-simulation-comparison>
+                    <div class="flex flex-wrap items-baseline justify-between gap-2">
+                        <p class="text-sm font-semibold text-slate-900 dark:text-white">Comparação com «{{ $c['name'] }}» ({{ $c['date']->format('d/m/Y') }})</p>
+                        <button type="button" wire:click="clearComparison" class="text-xs text-slate-500 underline dark:text-slate-400">Parar de comparar</button>
+                    </div>
+                    <div class="grid gap-3 text-sm tabular-nums @sm:grid-cols-2 *:min-w-0">
+                        <div>
+                            <p class="text-xs font-medium text-slate-500 dark:text-slate-400">Menor custo naquela simulação</p>
+                            <p class="text-slate-800 dark:text-slate-200">{{ $c['saved_best']['label'] }}: {{ Money::format($c['saved_best']['total']) }}</p>
+                            <p class="text-xs text-slate-500 dark:text-slate-400">
+                                @if (bccomp($c['saved_best']['down'], '0', 2) > 0) entrada de {{ Money::format($c['saved_best']['down']) }} + @endif
+                                {{ $c['saved_best']['installments'] }} × {{ Money::format($c['saved_best']['monthly']) }} · saldo na época {{ Money::format($c['saved_balance']) }}
+                            </p>
+                        </div>
+                        <div>
+                            <p class="text-xs font-medium text-slate-500 dark:text-slate-400">Menor custo agora</p>
+                            <p class="text-slate-800 dark:text-slate-200">{{ $c['current_best']['label'] }}: {{ Money::format($c['current_best']['total']) }}</p>
+                            <p class="text-xs text-slate-500 dark:text-slate-400">
+                                @if (bccomp($c['current_best']['down'], '0', 2) > 0) entrada de {{ Money::format($c['current_best']['down']) }} + @endif
+                                {{ $c['current_best']['installments'] }} × {{ Money::format($c['current_best']['monthly']) }} · saldo hoje {{ Money::format($c['current_balance']) }}
+                            </p>
+                        </div>
+                    </div>
+                    <p class="text-sm {{ bccomp($c['total_diff'], '0', 2) < 0 ? 'text-accent-700 dark:text-accent-400' : (bccomp($c['total_diff'], '0', 2) > 0 ? 'text-red-700 dark:text-red-400' : 'text-slate-600 dark:text-slate-300') }}" data-comparison-verdict>
+                        @if (bccomp($c['total_diff'], '0', 2) < 0)
+                            A melhor proposta de agora custa {{ Money::format(bcsub('0', $c['total_diff'], 2)) }} a menos no total que a melhor daquela simulação.
+                        @elseif (bccomp($c['total_diff'], '0', 2) > 0)
+                            A melhor proposta de agora custa {{ Money::format($c['total_diff']) }} a mais no total que a melhor daquela simulação.
+                        @else
+                            O custo total da melhor proposta é o mesmo daquela simulação.
+                        @endif
+                        @if (bccomp($c['monthly_diff'], '0', 2) !== 0)
+                            A parcela é {{ Money::format(ltrim($c['monthly_diff'], '-')) }} {{ bccomp($c['monthly_diff'], '0', 2) < 0 ? 'menor' : 'maior' }}.
+                        @endif
+                    </p>
+                    @if (bccomp($c['balance_diff'], '0', 2) !== 0)
+                        <p class="text-xs text-slate-500 dark:text-slate-400">O saldo da dívida {{ bccomp($c['balance_diff'], '0', 2) > 0 ? 'subiu' : 'caiu' }} {{ Money::format(ltrim($c['balance_diff'], '-')) }} desde aquela simulação.</p>
+                    @endif
+                </div>
+            @endif
+
+            @if (session('sim_status'))
+                <p class="rounded-xl bg-brand-50 px-3 py-2 text-xs text-brand-900 ring-1 ring-brand-200 dark:bg-brand-500/10 dark:text-brand-200 dark:ring-brand-500/20">{{ session('sim_status') }}</p>
+            @endif
+
+            @if ($simulacoesSalvas->isNotEmpty())
+                <div class="space-y-2 rounded-xl border border-slate-200 p-4 dark:border-white/10" data-saved-simulations>
+                    <p class="text-sm font-semibold text-slate-900 dark:text-white">Simulações guardadas</p>
+                    <ul class="divide-y divide-slate-100 dark:divide-white/10">
+                        @foreach ($simulacoesSalvas as $sim)
+                            <li class="flex flex-col gap-2 py-3 first:pt-0 last:pb-0 sm:flex-row sm:items-center sm:justify-between" wire:key="sim-salva-{{ $sim['id'] }}">
+                                <div class="min-w-0">
+                                    <p class="truncate text-sm font-medium text-slate-800 dark:text-slate-200">{{ $sim['name'] }}</p>
+                                    <p class="text-xs text-slate-500 dark:text-slate-400">
+                                        {{ $sim['date']->format('d/m/Y') }} · saldo {{ Money::format($sim['balance']) }} · {{ $sim['count'] }} {{ $sim['count'] === 1 ? 'proposta' : 'propostas' }}
+                                        @if ($sim['best']) · menor custo {{ Money::format($sim['best']['total']) }} ({{ $sim['best']['label'] }}) @endif
+                                    </p>
+                                </div>
+                                <div class="flex shrink-0 flex-wrap gap-2">
+                                    @if ($agSimResult !== [])
+                                        <button type="button" wire:click="compareWithSaved('{{ $sim['id'] }}')" class="btn-secondary px-2.5 py-1 text-xs @if ($agCompareId === $sim['id']) ring-2 ring-brand-500 @endif">Comparar com a atual</button>
+                                    @endif
+                                    <button type="button" wire:click="openSavedSimulation('{{ $sim['id'] }}')" class="btn-ghost px-2.5 py-1 text-xs">Abrir</button>
+                                    <button type="button" wire:click="deleteSavedSimulation('{{ $sim['id'] }}')" wire:confirm="Excluir esta simulação guardada?" class="btn-ghost px-2.5 py-1 text-xs text-red-700 dark:text-red-400">Excluir</button>
+                                </div>
+                            </li>
+                        @endforeach
+                    </ul>
+                    <p class="text-xs text-slate-400">Para comparar com uma proposta nova: clique em Abrir, acrescente a proposta nova (ou troque os valores), clique em Comparar e depois em Comparar com a atual.</p>
                 </div>
             @endif
         </div>
@@ -602,17 +700,23 @@
             <div class="grid gap-4 @sm:grid-cols-2 *:min-w-0">
                 <div>
                     <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Valor negociado (total a pagar)</label>
-                    <input type="text" wire:model="agreementTotal" inputmode="decimal" class="input mt-1.5">
+                    <input type="text" wire:model.live.blur="agreementTotal" inputmode="decimal" class="input mt-1.5">
                     @error('agreementTotal') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
                 </div>
                 <div>
                     <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Em quantas parcelas</label>
-                    <input type="number" wire:model="agreementInstallments" min="1" max="480" class="input mt-1.5">
+                    <input type="number" wire:model.live.blur="agreementInstallments" min="1" max="480" class="input mt-1.5">
                     @error('agreementInstallments') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
                 </div>
                 <div>
+                    <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Entrada <span class="font-normal text-slate-400">(opcional)</span></label>
+                    <input type="text" wire:model.live.blur="agreementDown" inputmode="decimal" class="input mt-1.5" placeholder="Ex.: 600,00" data-agreement-down>
+                    <p class="mt-1 text-xs text-slate-400">Vence no 1º vencimento e conta como a 1ª parcela. As demais vêm mês a mês depois.</p>
+                    @error('agreementDown') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                </div>
+                <div>
                     <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Vencimento da 1ª parcela</label>
-                    <input type="date" wire:model="agreementFirstDue" class="input mt-1.5">
+                    <input type="date" wire:model.live="agreementFirstDue" class="input mt-1.5">
                     @error('agreementFirstDue') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
                 </div>
                 <div>
@@ -645,6 +749,7 @@
                 </div>
             </div>
             <p class="text-xs text-slate-400">O saldo de hoje ({{ Money::format($debt->current_balance) }}) fica guardado e a diferença para o valor negociado é registrada como desconto obtido. As parcelas passam a contar no mês.</p>
+            <x-form-consequence :lines="$consequenciaAcordo" />
             <div class="flex justify-end"><button type="submit" class="btn-primary px-4 py-2 text-sm">Registrar acordo</button></div>
         </form>
     </x-modal>

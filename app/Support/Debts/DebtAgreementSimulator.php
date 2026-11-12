@@ -13,7 +13,8 @@ final class DebtAgreementSimulator
 {
     /**
      * @param  string  $balance  o saldo da dívida hoje
-     * @param  list<array{label: string, total: string, installments: int}>  $proposals  total é o que se paga no fim, somando as parcelas
+     * @param  list<array{label: string, total: string, installments: int, down?: string}>  $proposals  total é o que se paga no fim, somando a entrada e as parcelas;
+     *                                                                                                  `down` é a entrada (opcional) e `installments` são as parcelas DEPOIS dela
      * @return array{proposals: list<array<string, mixed>>, best_total: ?int, lightest_month: ?int}
      */
     public static function compare(string $balance, array $proposals): array
@@ -23,14 +24,18 @@ final class DebtAgreementSimulator
         foreach ($proposals as $i => $p) {
             $n = max(1, (int) $p['installments']);
             $total = bcadd($p['total'], '0', 2);
+            // Entrada maior ou igual ao total não existe: o que passa do total não conta (a validação da tela já barra, isto protege a conta).
+            $entrada = bccomp($p['down'] ?? '0', $total, 2) < 0 ? bcadd($p['down'] ?? '0', '0', 2) : '0.00';
             $desconto = bcsub($balance, $total, 2);
 
             $linhas[$i] = [
                 'label' => $p['label'],
                 'total' => $total,
+                'down' => $entrada,
                 'installments' => $n,
-                // A última parcela absorve a sobra de centavos, como no acordo registrado (DebtService::registerAgreement).
-                'monthly' => bcdiv($total, (string) $n, 2),
+                // A última parcela absorve a sobra de centavos, como no acordo registrado (DebtService::registerAgreement). Com entrada, a parcela é
+                // o que sobra do total dividido em N.
+                'monthly' => bcdiv(bcsub($total, $entrada, 2), (string) $n, 2),
                 'discount' => $desconto,
                 'discount_percent' => bccomp($balance, '0', 2) > 0 ? round((float) $desconto / (float) $balance * 100, 2) : 0.0,
                 'implicit_rate' => null,
@@ -49,7 +54,8 @@ final class DebtAgreementSimulator
         if ($referencia !== null) {
             foreach ($linhas as $i => $l) {
                 if ($l['installments'] > $linhas[$referencia]['installments']) {
-                    $linhas[$i]['implicit_rate'] = self::implicitRate($linhas[$referencia]['total'], $l['total'], $l['installments']);
+                    // Com entrada: o que sobra do pagamento à vista, depois de pagar a entrada hoje, é o que as parcelas precisam valer.
+                    $linhas[$i]['implicit_rate'] = self::implicitRate(bcsub($linhas[$referencia]['total'], $l['down'], 2), bcsub($l['total'], $l['down'], 2), $l['installments']);
                     $linhas[$i]['reference'] = $linhas[$referencia]['label'];
                 }
             }
@@ -84,6 +90,10 @@ final class DebtAgreementSimulator
     /** A taxa mensal que faz as parcelas de `$total` valerem o `$avista`, com a 1ª parcela daqui a um mês; em %, com 2 casas. */
     private static function implicitRate(string $avista, string $total, int $parcelas): ?float
     {
+        if (bccomp($avista, '0', 2) <= 0 || bccomp($total, '0', 2) <= 0) {
+            return null;
+        }
+
         $base = bcdiv($total, (string) $parcelas, 2);
         $resto = bcsub($total, bcmul($base, (string) $parcelas, 2), 2);
         $parcelasValor = array_fill(0, $parcelas, $base);

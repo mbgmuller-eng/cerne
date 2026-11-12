@@ -12,6 +12,7 @@ use App\Enums\Necessity;
 use App\Models\BankAccount;
 use App\Models\Debt;
 use App\Models\DebtInstallment;
+use App\Models\DebtSimulation;
 use App\Models\ExpenseCategory;
 use App\Models\ExpenseRecord;
 use App\Models\Goal;
@@ -138,6 +139,8 @@ class DebtShow extends Component
 
     public string $agreementInstallments = '1';
 
+    public string $agreementDown = '';
+
     public string $agreementFirstDue = '';
 
     public string $agreementCategoryId = '';
@@ -171,8 +174,19 @@ class DebtShow extends Component
     // Simulador de acordo (dívida em aberto): compara propostas antes de registrar o acordo
     public bool $showAgreementSim = false;
 
-    /** @var list<array{label: string, total: string, installments: string}> */
+    /** Teto de propostas numa simulação e de simulações guardadas por dívida. */
+    public const MAX_SIM_PROPOSALS = 10;
+
+    public const MAX_SAVED_SIMULATIONS = 30;
+
+    /** @var list<array{label: string, total: string, down: string, installments: string}> */
     public array $agSimRows = [];
+
+    /** Nome com que a simulação é guardada. */
+    public string $agSimName = '';
+
+    /** Simulação guardada contra a qual a atual está sendo comparada (vazio = nenhuma). */
+    public string $agCompareId = '';
 
     public string $agSimGrowth = '';
 
@@ -611,17 +625,19 @@ class DebtShow extends Component
         $this->resetValidation();
         $this->agSimResult = [];
         $this->agSimGrowth = '';
+        $this->agSimName = '';
+        $this->agCompareId = '';
         $this->agSimRows = [
-            ['label' => 'À vista', 'total' => '', 'installments' => '1'],
-            ['label' => 'Parcelado', 'total' => '', 'installments' => '12'],
+            ['label' => 'À vista', 'total' => '', 'down' => '', 'installments' => '1'],
+            ['label' => 'Parcelado', 'total' => '', 'down' => '', 'installments' => '12'],
         ];
         $this->showAgreementSim = true;
     }
 
     public function addAgreementSimRow(): void
     {
-        if (count($this->agSimRows) < 4) {
-            $this->agSimRows[] = ['label' => 'Proposta '.(count($this->agSimRows) + 1), 'total' => '', 'installments' => '12'];
+        if (count($this->agSimRows) < self::MAX_SIM_PROPOSALS) {
+            $this->agSimRows[] = ['label' => 'Proposta '.(count($this->agSimRows) + 1), 'total' => '', 'down' => '', 'installments' => '12'];
         }
     }
 
@@ -634,30 +650,66 @@ class DebtShow extends Component
         }
     }
 
-    public function simulateAgreement(): void
+    /**
+     * Valida as propostas digitadas e devolve o saldo de hoje e as propostas já em dinheiro (bcmath), ou nulo quando algo está errado (o erro já foi
+     * posto na tela). Compartilhado por "Comparar" e "Salvar simulação": o que se guarda é exatamente o que foi validado.
+     *
+     * @return array{0: string, 1: list<array{label: string, total: string, down: string, installments: int}>}|null
+     */
+    private function validatedSimulation(): ?array
     {
-        abort_unless($this->debt->status->isUnscheduled(), 404);
-
         $this->validate([
-            'agSimRows' => ['required', 'array', 'min:1', 'max:4'],
+            'agSimRows' => ['required', 'array', 'min:1', 'max:'.self::MAX_SIM_PROPOSALS],
             'agSimRows.*.label' => ['required', 'string', 'max:40'],
             'agSimRows.*.total' => ['required', 'string', 'max:20', 'regex:/^[0-9.,\s]+$/'],
+            'agSimRows.*.down' => ['nullable', 'string', 'max:20', 'regex:/^[0-9.,\s]*$/'],
             'agSimRows.*.installments' => ['required', 'integer', 'min:1', 'max:480'],
             'agSimGrowth' => ['nullable', 'string', 'max:8', 'regex:/^[0-9.,\s]*$/'],
         ], [
+            'agSimRows.max' => 'No máximo '.self::MAX_SIM_PROPOSALS.' propostas por simulação.',
             'agSimRows.*.total.required' => 'Informe o valor total da proposta.',
             'agSimRows.*.total.regex' => 'Informe o valor só com números (ex.: 3000,00).',
+            'agSimRows.*.down.regex' => 'Informe a entrada só com números (ex.: 600,00).',
             'agSimRows.*.installments.required' => 'Informe em quantas parcelas.',
         ], ['agSimRows.*.label' => 'nome da proposta', 'agSimRows.*.installments' => 'parcelas', 'agSimGrowth' => 'juros por mês']);
 
         $saldo = Money::parse($this->debt->current_balance);
-        $propostas = array_map(fn (array $r) => ['label' => $r['label'], 'total' => Money::parse($r['total']), 'installments' => (int) $r['installments']], $this->agSimRows);
 
         if (bccomp($saldo, '0', 2) <= 0) {
             $this->addError('agSimRows', 'A dívida não tem saldo para simular.');
 
+            return null;
+        }
+
+        $propostas = [];
+
+        foreach ($this->agSimRows as $i => $r) {
+            $total = Money::parse($r['total']);
+            $entrada = Money::parse($r['down'] ?? 0);
+
+            if (bccomp($entrada, $total, 2) >= 0) {
+                $this->addError('agSimRows.'.$i.'.down', 'A entrada precisa ser menor que o total.');
+
+                return null;
+            }
+
+            $propostas[] = ['label' => $r['label'], 'total' => $total, 'down' => $entrada, 'installments' => (int) $r['installments']];
+        }
+
+        return [$saldo, $propostas];
+    }
+
+    public function simulateAgreement(): void
+    {
+        abort_unless($this->debt->status->isUnscheduled(), 404);
+
+        $validada = $this->validatedSimulation();
+
+        if ($validada === null) {
             return;
         }
+
+        [$saldo, $propostas] = $validada;
 
         $this->agSimResult = DebtAgreementSimulator::compare($saldo, $propostas) + [
             'balance' => $saldo,
@@ -678,6 +730,7 @@ class DebtShow extends Component
         $this->openAgreement();
         $this->agreementTotal = $p['total'];
         $this->agreementInstallments = (string) $p['installments'];
+        $this->agreementDown = bccomp($p['down'], '0', 2) > 0 ? $p['down'] : '';
     }
 
     public function openAgreement(): void
@@ -687,6 +740,7 @@ class DebtShow extends Component
         $this->resetValidation();
         $this->agreementTotal = (string) $this->debt->current_balance;
         $this->agreementInstallments = '1';
+        $this->agreementDown = '';
         $this->agreementFirstDue = now()->addMonth()->toDateString();
         $this->agreementCategoryId = (string) $sugestao['category_id'];
         $this->agreementSubcategoryId = (string) $sugestao['subcategory_id'];
@@ -704,23 +758,25 @@ class DebtShow extends Component
         $dados = $this->validate([
             'agreementTotal' => ['required', 'string', 'max:20'],
             'agreementInstallments' => ['required', 'integer', 'min:1', 'max:480'],
+            'agreementDown' => ['nullable', 'string', 'max:20', 'regex:/^[0-9.,\s]*$/'],
             'agreementFirstDue' => ['required', 'date_format:Y-m-d'],
             'agreementCategoryId' => ['required', 'string'],
             'agreementSubcategoryId' => ['nullable', 'string'],
             'agreementAccountId' => ['nullable', 'string'],
-        ], [], [
-            'agreementTotal' => 'valor negociado', 'agreementInstallments' => 'parcelas',
+        ], ['agreementDown.regex' => 'Informe a entrada só com números (ex.: 600,00).'], [
+            'agreementTotal' => 'valor negociado', 'agreementInstallments' => 'parcelas', 'agreementDown' => 'entrada',
             'agreementFirstDue' => 'primeiro vencimento', 'agreementCategoryId' => 'categoria',
         ]);
 
         try {
             app(DebtService::class)->registerAgreement($this->debt, [
                 'total' => $dados['agreementTotal'], 'installments' => $dados['agreementInstallments'], 'first_due_date' => $dados['agreementFirstDue'],
+                'down_payment' => $dados['agreementDown'] ?: null,
                 'category_id' => $dados['agreementCategoryId'], 'subcategory_id' => $dados['agreementSubcategoryId'] ?: null,
                 'bank_account_id' => $dados['agreementAccountId'] ?: null,
             ]);
         } catch (InvalidArgumentException $e) {
-            $this->addError('agreementTotal', $e->getMessage());
+            $this->addError(str_contains($e->getMessage(), 'entrada') ? 'agreementDown' : 'agreementTotal', $e->getMessage());
 
             return;
         }
@@ -944,6 +1000,9 @@ class DebtShow extends Component
             'previaReajuste' => $this->showAdjustment ? app(DebtService::class)->previewAdjustment($this->debt, $this->adjustmentPercent) : null,
             'previaLance' => $this->bidPreview(),
             'podeSimularAcordo' => $this->debt->status->isUnscheduled(),
+            'simulacoesSalvas' => $this->showAgreementSim ? $this->savedSimulations() : collect(),
+            'comparacaoComSalva' => $this->showAgreementSim ? $this->comparisonWithSaved() : null,
+            'consequenciaAcordo' => $this->agreementConsequence(),
             'basesTaxa' => DebtRateBasis::options(),
             'ultimaPaga' => (int) $parcelas->where('status', DebtInstallmentStatus::Paid)->max('number'),
             'quantidadePuladas' => $parcelas->where('status', DebtInstallmentStatus::Diluted)->count(),
@@ -951,5 +1010,153 @@ class DebtShow extends Component
             'objetivo' => Goal::query()->where('linked_debt_id', $this->debt->id)->first(),
             'modosContemplacao' => ContemplationMode::options(),
         ]);
+    }
+
+    // ------------------------------------------------------------------ simulações guardadas
+
+    /** Guarda a simulação como está na tela (propostas e o saldo de hoje) para comparar depois com uma proposta nova. */
+    public function saveAgreementSimulation(): void
+    {
+        abort_unless($this->debt->status->isUnscheduled(), 404);
+
+        $this->validate(['agSimName' => ['required', 'string', 'max:80']], [], ['agSimName' => 'nome da simulação']);
+
+        $validada = $this->validatedSimulation();
+
+        if ($validada === null) {
+            return;
+        }
+
+        if (DebtSimulation::query()->where('debt_id', $this->debt->id)->count() >= self::MAX_SAVED_SIMULATIONS) {
+            $this->addError('agSimName', 'Esta dívida já tem '.self::MAX_SAVED_SIMULATIONS.' simulações guardadas. Exclua alguma para guardar outra.');
+
+            return;
+        }
+
+        [$saldo, $propostas] = $validada;
+
+        DebtSimulation::create([
+            'profile_id' => $this->debt->profile_id,
+            'debt_id' => $this->debt->id,
+            // Dono e privacidade da dívida, como nas parcelas e nos reajustes.
+            'member_id' => $this->debt->member_id,
+            'is_private' => $this->debt->is_private,
+            'name' => $this->agSimName,
+            'balance' => $saldo,
+            'growth_percent' => $this->agSimGrowth !== '' ? str_replace(',', '.', trim($this->agSimGrowth)) : null,
+            'proposals' => $propostas,
+            'created_by_user_id' => auth()->id(),
+        ]);
+
+        $this->agSimName = '';
+        session()->flash('sim_status', 'Simulação guardada. Ela fica nesta lista para você comparar com uma proposta nova.');
+    }
+
+    /** Põe as propostas de uma simulação guardada no formulário, para editar ou acrescentar a proposta nova. */
+    public function openSavedSimulation(string $id): void
+    {
+        $sim = DebtSimulation::query()->where('debt_id', $this->debt->id)->findOrFail($id);
+
+        $this->resetValidation();
+        $this->agSimRows = array_map(fn (array $p) => [
+            'label' => (string) $p['label'], 'total' => (string) $p['total'], 'down' => bccomp((string) ($p['down'] ?? '0'), '0', 2) > 0 ? (string) $p['down'] : '', 'installments' => (string) $p['installments'],
+        ], $sim->proposals ?? []);
+        $this->agSimGrowth = (string) ($sim->growth_percent ?? '');
+        $this->agSimResult = [];
+        $this->agCompareId = $sim->id;
+    }
+
+    /** Escolhe contra qual simulação guardada o resultado atual é comparado. */
+    public function compareWithSaved(string $id): void
+    {
+        $this->agCompareId = DebtSimulation::query()->where('debt_id', $this->debt->id)->findOrFail($id)->id;
+    }
+
+    public function clearComparison(): void
+    {
+        $this->agCompareId = '';
+    }
+
+    public function deleteSavedSimulation(string $id): void
+    {
+        DebtSimulation::query()->where('debt_id', $this->debt->id)->findOrFail($id)->delete();
+
+        if ($this->agCompareId === $id) {
+            $this->agCompareId = '';
+        }
+    }
+
+    /**
+     * As simulações guardadas, cada uma recalculada com o saldo DA ÉPOCA (a mesma conta do simulador).
+     *
+     * @return Collection<int, array<string, mixed>>
+     */
+    private function savedSimulations(): Collection
+    {
+        return $this->debt->simulations()->get()->map(function (DebtSimulation $sim): array {
+            $propostas = array_map(fn (array $p) => [
+                'label' => (string) $p['label'], 'total' => (string) $p['total'], 'down' => (string) ($p['down'] ?? '0'), 'installments' => (int) $p['installments'],
+            ], $sim->proposals ?? []);
+            $resultado = $propostas === [] ? ['proposals' => [], 'best_total' => null, 'lightest_month' => null] : DebtAgreementSimulator::compare((string) $sim->balance, $propostas);
+
+            return [
+                'id' => $sim->id,
+                'name' => $sim->name,
+                'date' => $sim->created_at,
+                'balance' => (string) $sim->balance,
+                'count' => count($propostas),
+                'proposals' => $resultado['proposals'],
+                'best' => $resultado['best_total'] !== null ? $resultado['proposals'][$resultado['best_total']] : null,
+            ];
+        });
+    }
+
+    /**
+     * Compara o resultado de agora com uma simulação guardada: a melhor proposta (menor custo total) de cada uma, a diferença no total e na parcela,
+     * e quanto o saldo da dívida mudou desde então. Diferença negativa = hoje está mais barato.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function comparisonWithSaved(): ?array
+    {
+        if ($this->agCompareId === '' || $this->agSimResult === [] || $this->agSimResult['best_total'] === null) {
+            return null;
+        }
+
+        $salva = $this->savedSimulations()->firstWhere('id', $this->agCompareId);
+
+        if ($salva === null || $salva['best'] === null) {
+            return null;
+        }
+
+        $atual = $this->agSimResult['proposals'][$this->agSimResult['best_total']];
+
+        return [
+            'name' => $salva['name'],
+            'date' => $salva['date'],
+            'saved_balance' => $salva['balance'],
+            'current_balance' => $this->agSimResult['balance'],
+            'saved_best' => $salva['best'],
+            'current_best' => $atual,
+            'total_diff' => bcsub($atual['total'], $salva['best']['total'], 2),
+            'monthly_diff' => bcsub($atual['monthly'], $salva['best']['monthly'], 2),
+            'balance_diff' => bcsub($this->agSimResult['balance'], $salva['balance'], 2),
+        ];
+    }
+
+    /** "Ao registrar" o acordo (ver FormConsequence::agreement): as parcelas que vão nascer, pela mesma conta que grava. */
+    private function agreementConsequence(): array
+    {
+        if (! $this->showAgreement) {
+            return [];
+        }
+
+        try {
+            $primeira = CarbonImmutable::createFromFormat('Y-m-d', $this->agreementFirstDue);
+        } catch (\Throwable) {
+            return [];
+        }
+
+        return FormConsequence::agreement((string) $this->debt->current_balance, $this->agreementTotal, (int) $this->agreementInstallments, $this->agreementDown, $primeira ?: null);
     }
 }

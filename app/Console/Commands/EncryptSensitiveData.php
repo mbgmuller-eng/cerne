@@ -43,6 +43,7 @@ class EncryptSensitiveData extends Command
         'consultant_clients' => ['notes'],
         'leads' => ['phone', 'notes'],
         'document_uploads' => ['extraction_summary'],
+        'debt_simulations' => ['proposals'],
         'lead_attachments' => ['extraction_summary'],
     ];
 

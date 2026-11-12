@@ -9,6 +9,7 @@ use App\Enums\RecurringIncomeStatus;
 use App\Livewire\Concerns\HasPrivacyTabs;
 use App\Livewire\Concerns\RequiresActiveProfile;
 use App\Models\BankAccount;
+use App\Models\CreditCard;
 use App\Models\ExpenseCategory;
 use App\Models\ExpenseSubcategory;
 use App\Models\FixedBill;
@@ -100,6 +101,11 @@ class FixedBillsIndex extends Component
     public bool $billIsPrivate = false;
 
     public string $billBankAccountId = '';
+
+    /** 'conta' (debita de uma conta bancária) ou 'cartao' (vai para a fatura do cartão no vencimento). */
+    public string $billPaymentMethod = 'conta';
+
+    public string $billCreditCardId = '';
 
     public bool $billIsVariable = false;
 
@@ -282,6 +288,8 @@ class FixedBillsIndex extends Component
         $this->billMemberId = $conta->member_id ?? '';
         $this->billIsPrivate = $conta->is_private;
         $this->billBankAccountId = $conta->bank_account_id ?? '';
+        $this->billCreditCardId = $conta->credit_card_id ?? '';
+        $this->billPaymentMethod = $conta->credit_card_id !== null ? 'cartao' : 'conta';
         $this->billIsVariable = $conta->is_variable;
         $this->billNotes = $conta->notes ?? '';
         $this->showBillForm = true;
@@ -326,8 +334,11 @@ class FixedBillsIndex extends Component
             'billNewSubcategory' => ['nullable', 'string', 'max:255'],
             'billMemberId' => ['nullable'],
             'billBankAccountId' => ['nullable'],
+            'billPaymentMethod' => ['required', Rule::in(['conta', 'cartao'])],
+            'billCreditCardId' => ['required_if:billPaymentMethod,cartao', 'nullable'],
             'billNotes' => ['nullable', 'string'],
         ], messages: [
+            'billCreditCardId.required_if' => 'Escolha o cartão.',
             // O required_if cru diria "quando recorrência for monthly": o valor do enum sai em inglês.
             'billDueDay.required_if' => 'Informe o dia do vencimento.',
             'billDueWeekday.required_if' => 'Escolha o dia da semana.',
@@ -349,7 +360,10 @@ class FixedBillsIndex extends Component
         $categoria = ExpenseCategory::query()->findOrFail($data['billCategoryId']);
         $subcategoriaId = $this->resolveSubcategoryId($categoria);
         $memberId = $this->validarMembro($this->billMemberId);
-        $conta = $this->billBankAccountId !== ''
+        // Conta bancária e cartão são excludentes: a conta fixa vai para UM dos dois. O id vem do navegador, então passa por findOrFail sob escopo.
+        $noCartao = $this->billPaymentMethod === 'cartao';
+        $cartao = $noCartao ? CreditCard::query()->where('is_active', true)->findOrFail($this->billCreditCardId) : null;
+        $conta = ! $noCartao && $this->billBankAccountId !== ''
             ? BankAccount::query()->findOrFail($this->billBankAccountId)
             : null;
 
@@ -365,6 +379,7 @@ class FixedBillsIndex extends Component
             'subcategory_id' => $subcategoriaId,
             'member_id' => $memberId,
             'bank_account_id' => $conta?->id,
+            'credit_card_id' => $cartao?->id,
             'is_variable' => $this->billIsVariable,
             'notes' => $this->billNotes !== '' ? $this->billNotes : null,
             'is_private' => $memberId !== null && $this->billIsPrivate,
@@ -420,9 +435,10 @@ class FixedBillsIndex extends Component
         $this->reset(
             'billName', 'billAmount', 'billDueDay', 'billDueWeekday', 'billDueMonth', 'billNecessity',
             'billCategoryId', 'billSubcategoryId', 'billNewSubcategory',
-            'billMemberId', 'billIsPrivate', 'billBankAccountId', 'billIsVariable', 'billNotes', 'editingBillId',
+            'billMemberId', 'billIsPrivate', 'billBankAccountId', 'billCreditCardId', 'billIsVariable', 'billNotes', 'editingBillId',
         );
         $this->billRecurrence = 'monthly';
+        $this->billPaymentMethod = 'conta';
         $this->resetErrorBag();
     }
 
@@ -431,7 +447,7 @@ class FixedBillsIndex extends Component
     {
         $query = FixedBillPayment::query()
             ->forPeriod($this->year, $this->month)
-            ->with('fixedBill.category', 'fixedBill.member');
+            ->with('fixedBill.category', 'fixedBill.member', 'fixedBill.creditCard');
 
         $this->applyPrivacyTabFilter($query, 'fixedBill');
 
@@ -725,14 +741,23 @@ class FixedBillsIndex extends Component
      * @param  Collection<int, BankAccount>  $contas
      * @return list<string>
      */
-    private function billConsequence(Collection $contas): array
+    private function billConsequence(Collection $contas, Collection $cartoes): array
     {
         if (! $this->showBillForm) {
             return [];
         }
 
         if ($this->editingBillId !== null) {
-            $linhas = ['Valor, categoria e conta valem a partir do próximo pagamento. O dia do vencimento vale só para meses ainda não gerados.'];
+            $linhas = ['Valor, categoria e conta (ou cartão) valem a partir do próximo pagamento. O dia do vencimento vale só para meses ainda não gerados.'];
+
+            $antes = FixedBill::query()->whereKey($this->editingBillId)->first(['credit_card_id', 'bank_account_id']);
+            $passouAoCartao = $this->billPaymentMethod === 'cartao' && $this->billCreditCardId !== '' && $antes?->credit_card_id !== $this->billCreditCardId;
+
+            if ($passouAoCartao) {
+                $linhas[] = 'Conta no cartão: o que já venceu e está em aberto neste mês entra na fatura ao salvar, e os próximos vencimentos entram sozinhos. O que já foi pago ou debitado fica como está.';
+            } elseif ($this->billPaymentMethod === 'conta' && $antes?->credit_card_id !== null) {
+                $linhas[] = 'Os próximos vencimentos deixam de ir para a fatura do cartão. O que já foi lançado na fatura fica como está.';
+            }
 
             // A marca de oculto vale na hora para os vencimentos (eles seguem a conta fixa), mas as despesas que um pagamento já criou não mudam.
             if ($this->billIsPrivate !== (bool) FixedBill::query()->whereKey($this->editingBillId)->value('is_private')) {
@@ -749,8 +774,16 @@ class FixedBillsIndex extends Component
             $linhas[] = $criacao;
         }
 
-        $conta = $contas->firstWhere('id', $this->billBankAccountId);
         $categoria = $this->billFormCategories->firstWhere('id', $this->billCategoryId)?->name ?? 'a categoria escolhida';
+
+        if ($this->billPaymentMethod === 'cartao') {
+            $cartao = $cartoes->firstWhere('id', $this->billCreditCardId);
+            $datas = $this->datasDoMes(new FixedBill, $this->billRecurrence, $this->billDueDay, $this->billDueWeekday, $this->billDueMonth);
+
+            return [...$linhas, ...FormConsequence::payBillOnCard($cartao, $this->billAmount, $this->billIsVariable, $categoria, $datas[0] ?? null)];
+        }
+
+        $conta = $contas->firstWhere('id', $this->billBankAccountId);
         $linhas[] = FormConsequence::payBill($conta?->displayName(), $this->billAmount, $this->billIsVariable, $categoria);
 
         return $linhas;
@@ -799,9 +832,11 @@ class FixedBillsIndex extends Component
     {
         $profileId = app(ProfileContext::class)->profileId();
         $bankAccounts = BankAccount::query()->active()->orderBy('bank_name')->get();
+        $creditCards = CreditCard::query()->where('is_active', true)->orderBy('card_name')->get();
 
         return view('livewire.fixed-bills.fixed-bills-index', [
-            'billConsequence' => $this->billConsequence($bankAccounts),
+            'creditCards' => $creditCards,
+            'billConsequence' => $this->billConsequence($bankAccounts, $creditCards),
             'incomeConsequence' => $this->incomeConsequence($bankAccounts),
             'showPrivacyTabs' => $this->showPrivacyTabs,
             'privacyMembers' => $this->privacyMembers,
