@@ -9,6 +9,7 @@ use App\Enums\GoalStatus;
 use App\Livewire\Concerns\RequiresActiveProfile;
 use App\Models\Debt;
 use App\Models\Goal;
+use App\Models\GoalContribution;
 use App\Models\InvestmentRecord;
 use App\Models\ProfileMember;
 use App\Support\Money;
@@ -202,7 +203,13 @@ class GoalsIndex extends Component
         ];
 
         if ($this->editingId !== null) {
-            $this->editable($this->editingId)->update($campos);
+            $objetivo = $this->editable($this->editingId);
+            $objetivo->update($campos);
+
+            // Dono e privacidade acompanham o objetivo inteiro: os aportes registrados nasceram com a marca de antes (regra 2).
+            if ($objetivo->wasChanged(['member_id', 'is_private'])) {
+                GoalContribution::withoutProfileScope()->where('goal_id', $objetivo->id)->update(['member_id' => $objetivo->member_id, 'is_private' => $objetivo->is_private]);
+            }
         } else {
             Goal::create($campos + ['created_by_user_id' => auth()->id()]);
         }
@@ -358,6 +365,7 @@ class GoalsIndex extends Component
         return Goal::query()
             ->active()
             ->byPriority()
+            ->withContributionTotal()
             ->with('member', 'linkedInvestment', 'linkedDebt')
             ->get();
     }
@@ -367,6 +375,7 @@ class GoalsIndex extends Component
     {
         return Goal::query()
             ->where('status', GoalStatus::Achieved)
+            ->withContributionTotal()
             ->with('member')
             ->get();
     }
@@ -388,6 +397,10 @@ class GoalsIndex extends Component
             $this->goals->map(fn (Goal $g) => $g->monthlyNeeded())->filter()
         );
     }
+
+    /** O histórico de aportes (outro componente) gravou ou excluiu: os totais e a previsão precisam ler de novo. */
+    #[\Livewire\Attributes\On('goals-changed')]
+    public function refreshList(): void {}
 
     public function render()
     {

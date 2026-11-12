@@ -42,7 +42,7 @@ class FamilyFinanceAccessTest extends TestCase
     /** Os únicos models que quem acompanha as finanças enxerga. Mudar esta lista é uma decisão de privacidade: revise antes. */
     private const FAMILY_VISIBLE = [
         'BankAccount', 'CreditCard', 'CreditCardInvoice', 'Debt', 'DebtInstallment', 'ExpenseCategory', 'ExpenseRecord', 'ExpenseSubcategory', 'FixedBill',
-        'FixedBillPayment', 'Goal', 'IncomeCategory', 'IncomeRecord', 'InsurancePolicy', 'InvestmentRecord', 'RecurringIncome',
+        'FixedBillPayment', 'Goal', 'GoalContribution', 'IncomeCategory', 'IncomeRecord', 'InsurancePolicy', 'InvestmentRecord', 'RecurringIncome',
     ];
 
     private User $pai;

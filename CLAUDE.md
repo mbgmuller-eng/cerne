@@ -513,6 +513,16 @@ Auditoria dos 6 formulários mais usados (lançamento, conta fixa, conta e cart�
 - **Sem previsão** (`forecast()` nulo) quando não há aporte informado, o objetivo já foi alcançado ou é ligado a consórcio (aí o avanço é pelas parcelas pagas, não por dinheiro).
 - Mudar o dono de uma dívida (ou o "oculto") **pede confirmação antes de gravar** quando há o que ela leva junto (`DebtShow::ownerChangeImpact`: parcelas, despesas dos pagamentos já feitos e simulações guardadas): o 1º "Salvar" só mostra a contagem (`editAwaitingOwnerConfirm`), o 2º ("Confirmar e salvar") grava; mexer no dono depois do pedido desfaz o pedido. Sem nada para levar junto, ou sem mudança de dono, grava direto (`DebtOwnerChangeConfirmTest`).
 
+### Objetivos: histórico de aportes
+
+`GoalContribution` (`goal_contributions`), `Goal::accumulated`, `GoalHistory` (janela aberta por "Aportes" na lista; evento `open-goal-history`). Regras:
+
+- **O que o objetivo tem (sem ligação a investimento ou consórcio) = saldo inicial (`goals.current_amount`) + a SOMA dos lançamentos**, nunca abaixo de zero. Duas fontes separadas, nenhum número à mão para divergir: o formulário do objetivo continua editando só o saldo inicial. Objetivo ligado a investimento ou consórcio NÃO tem histórico (`Goal::acceptsContributions`): o avanço vem do saldo do investimento ou das parcelas pagas.
+- **Aporte é valor positivo, retirada é negativo** (o tipo escolhido na tela decide o sinal). Retirada que deixaria o objetivo abaixo de zero é recusada, e na edição a conta ignora o próprio lançamento. Data não pode ser futura. Registrar, editar ou excluir muda o progresso, o quanto falta e a previsão (`forecast` usa `accumulated`).
+- **Soma sempre em SQL, uma consulta para todos**: quem percorre vários objetivos usa `Goal::withContributionTotal()` (`withSum`, atributo `contributions_total`): lista, painel (`DashboardService::goalsSummary`) e tela da família já usam. Objetivo lido sem o escopo cai numa consulta por objetivo (funciona, mas não percorra uma lista assim). A linha do tempo agrupa por mês em SQL; o acumulado parte do saldo inicial.
+- **Ritmo real** = média dos 3 últimos meses (contando o de hoje; mês sem lançamento vale zero) contra o planejado (`installment_amount`). É a base do aviso de objetivo atrasado, que vem na próxima entrega.
+- **Privacidade e dono do objetivo valem para os lançamentos** (`member_id`/`is_private` copiados na criação e propagados em `GoalsIndex::save`, como parcelas e simulações de dívida). `GoalContribution` está na lista de permitidos da família (`VisibleToFamily`, travada em `FamilyFinanceAccessTest`) porque o progresso que o familiar já vê é essa soma. A observação (`note`) é cifrada (`Sensitive`, em `EncryptSensitiveData::COLUMNS`). O lançamento é sempre buscado DENTRO do objetivo aberto (`entry`): id de outro objetivo ou inventado dá 404. Teste: `GoalHistoryTest`.
+
 ### Calendário (Saúde e agenda do profissional)
 
 Um módulo só desenha o calendário: `<x-calendar>` (mês, semana e dia, no estilo de uma agenda) alimentado por `CalendarBuilder` e

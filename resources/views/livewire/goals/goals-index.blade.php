@@ -97,12 +97,17 @@
                         @if (! $objetivo->isAchieved())
                             <button type="button" wire:click="markAchieved('{{ $objetivo->id }}')" wire:confirm="Marcar este objetivo como conquistado?" class="btn-ghost px-2 py-1 text-xs">Marcar como conquistado</button>
                         @endif
+                        @if ($objetivo->acceptsContributions())
+                            <button type="button" wire:click="$dispatch('open-goal-history', { id: '{{ $objetivo->id }}' })" class="btn-secondary px-2 py-1 text-xs" data-open-goal-history>Aportes</button>
+                        @endif
                         <button type="button" wire:click="edit('{{ $objetivo->id }}')" class="btn-ghost px-2 py-1 text-xs">Editar</button>
                     </div>
                 </li>
             @endforeach
         </ul>
     @endif
+
+    <livewire:goals.goal-history />
 
     @if ($achieved->isNotEmpty())
         <section>

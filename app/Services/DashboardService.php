@@ -250,7 +250,7 @@ class DashboardService
 
     public function goalsSummary(): array
     {
-        $objetivos = Goal::query()->active()->byPriority()->with('linkedInvestment', 'linkedDebt')->get();
+        $objetivos = Goal::query()->active()->byPriority()->withContributionTotal()->with('linkedInvestment', 'linkedDebt')->get();
         $proximo = $objetivos->first();
 
         return [

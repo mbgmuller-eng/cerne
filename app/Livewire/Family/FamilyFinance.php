@@ -183,6 +183,6 @@ class FamilyFinance extends Component
     /** @return array<string, mixed> */
     private function metas(): array
     {
-        return ['metas' => Goal::query()->active()->byPriority()->with('linkedInvestment', 'linkedDebt')->get()];
+        return ['metas' => Goal::query()->active()->byPriority()->withContributionTotal()->with('linkedInvestment', 'linkedDebt')->get()];
     }
 }

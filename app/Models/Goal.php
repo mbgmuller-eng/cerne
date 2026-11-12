@@ -16,6 +16,7 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 #[Fillable([
     'profile_id', 'member_id', 'name', 'priority', 'estimated_value', 'target_date',
@@ -56,6 +57,27 @@ class Goal extends Model
         return $this->belongsTo(Debt::class, 'linked_debt_id');
     }
 
+    /** Aportes e retiradas registrados (só valem para o objetivo sem ligação a investimento ou consórcio). */
+    public function contributions(): HasMany
+    {
+        return $this->hasMany(GoalContribution::class)->orderByDesc('contributed_on')->orderByDesc('created_at');
+    }
+
+    /**
+     * Traz a soma dos aportes numa só consulta (`contributions_total`): a lista, o painel e a tela da família percorrem vários objetivos, e uma
+     * soma por objetivo seria uma consulta a mais para cada um.
+     */
+    public function scopeWithContributionTotal(Builder $query): Builder
+    {
+        return $query->withSum('contributions as contributions_total', 'amount');
+    }
+
+    /** Este objetivo guarda histórico de aportes? Não quando o avanço vem de investimento ou de consórcio. */
+    public function acceptsContributions(): bool
+    {
+        return $this->linked_investment_id === null && $this->linked_debt_id === null;
+    }
+
     public function usesInstallments(): bool
     {
         return $this->linked_debt_id !== null && $this->linkedDebt !== null && $this->linkedDebt->term > 0;
@@ -91,7 +113,15 @@ class Goal extends Model
             return $p['total'] > 0 ? Money::parse(bcdiv(bcmul($this->estimated_value, (string) $p['paid'], 4), (string) $p['total'], 4)) : '0.00';
         }
 
-        return $this->linkedInvestment?->current_amount ?? $this->current_amount;
+        if ($this->linkedInvestment !== null) {
+            return $this->linkedInvestment->current_amount;
+        }
+
+        // Sem ligação: o saldo inicial (`current_amount`) mais os aportes registrados, nunca abaixo de zero.
+        $aportes = $this->getAttribute('contributions_total') ?? ($this->exists ? $this->contributions()->sum('amount') : 0);
+        $total = bcadd((string) $this->current_amount, Money::parse((string) $aportes), 2);
+
+        return bccomp($total, '0', 2) > 0 ? $total : '0.00';
     }
 
     public function progressPercentage(): float
