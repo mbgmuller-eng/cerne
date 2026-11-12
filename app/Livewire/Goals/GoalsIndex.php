@@ -10,6 +10,7 @@ use App\Livewire\Concerns\RequiresActiveProfile;
 use App\Models\Debt;
 use App\Models\Goal;
 use App\Models\GoalContribution;
+use App\Services\GoalPaceService;
 use App\Models\InvestmentRecord;
 use App\Models\ProfileMember;
 use App\Support\Money;
@@ -415,6 +416,9 @@ class GoalsIndex extends Component
             'consorcios' => $this->showForm ? $this->consorcios() : collect(),
             'metodos' => FundingMethod::options(),
             'goalConsequence' => $this->goalConsequence(),
+            // Ritmo real x planejado, medido em uma consulta para a lista toda (GoalPaceService::forGoals); só os atrasados trazem a faixa.
+            'ritmos' => app(GoalPaceService::class)->forGoals($this->goals),
+            'paceService' => app(GoalPaceService::class),
         ]);
     }
 }

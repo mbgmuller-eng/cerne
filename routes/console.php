@@ -288,6 +288,14 @@ Schedule::call(function (): void {
     logger()->info('Roteiros do acompanhamento', ['itens_alterados' => $mudaram]);
 })->dailyAt('06:30')->name('acompanhamento-roteiro')->withoutOverlapping();
 
+// Objetivos: avisa (no máximo uma vez por mês por objetivo) quem guardou menos de 70% do planejado nos últimos meses fechados. Idempotente pelo livro
+// de lembretes (engagement_reminders: usuário + objetivo + tipo com o mês). Objetivo privado só avisa o dono.
+Schedule::call(function (): void {
+    $enviados = app(AppServicesGoalPaceService::class)->notifyBehind();
+
+    logger()->info('Objetivos abaixo do planejado', ['avisados' => $enviados]);
+})->dailyAt('08:15')->name('objetivos-atrasados')->withoutOverlapping();
+
 // Dívidas: aviso de parcela de financiamento ou empréstimo a vencer (mesma antecedência das contas fixas). Idempotente pelo livro de
 // lembretes (engagement_reminders: usuário + parcela + tipo).
 Schedule::call(function (): void {

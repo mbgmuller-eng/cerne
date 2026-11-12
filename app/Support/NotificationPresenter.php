@@ -94,6 +94,11 @@ final class NotificationPresenter
                 'message' => $d['message'] ?? $titulo,
                 'url' => isset($d['debt_id']) ? route('debts.show', $d['debt_id']) : route('consultant.portfolio.debts'),
             ],
+            'goal_behind_pace' => [
+                'heading' => 'Objetivo abaixo do planejado',
+                'message' => ($titulo !== '' ? $titulo.': ' : '').($d['message'] ?? ''),
+                'url' => route('goals.index'),
+            ],
             'gym_plan_review_due' => [
                 'heading' => $titulo !== '' ? $titulo : 'Hora de renovar o treino',
                 'message' => $d['message'] ?? null,
@@ -142,7 +147,7 @@ final class NotificationPresenter
         $d = $notificacao->data;
 
         // O aviso do Acompanhamento já grava o perfil: o clique abre o perfil do cliente antes de ir para a tela.
-        if (in_array($d['kind'] ?? null, ['engagement_notice', 'debt_installment_due_soon', 'debt_adjustment_due', 'debt_installment_overdue', 'debt_installment_overdue_consultant', 'gym_plan_review_due'], true)) {
+        if (in_array($d['kind'] ?? null, ['engagement_notice', 'debt_installment_due_soon', 'debt_adjustment_due', 'debt_installment_overdue', 'debt_installment_overdue_consultant', 'gym_plan_review_due', 'goal_behind_pace'], true)) {
             return $d['profile_id'] ?? null;
         }
 

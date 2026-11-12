@@ -93,6 +93,12 @@
                         <p @class(['mt-2 text-xs', 'text-slate-500 dark:text-slate-400' => $objetivo->forecast()['on_track'] !== false, 'text-amber-700 dark:text-amber-400' => $objetivo->forecast()['on_track'] === false]) data-goal-forecast>{{ $previsao }}</p>
                     @endif
 
+                    @if (($ritmos[$objetivo->id]['late'] ?? false) === true)
+                        <p class="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800 ring-1 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-300 dark:ring-amber-500/20" data-goal-behind-pace>
+                            <strong class="font-medium">Abaixo do planejado.</strong> {{ $paceService->line($objetivo, $ritmos[$objetivo->id]) }}
+                        </p>
+                    @endif
+
                     <div class="mt-3 flex flex-wrap justify-end gap-1">
                         @if (! $objetivo->isAchieved())
                             <button type="button" wire:click="markAchieved('{{ $objetivo->id }}')" wire:confirm="Marcar este objetivo como conquistado?" class="btn-ghost px-2 py-1 text-xs">Marcar como conquistado</button>
