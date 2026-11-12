@@ -4,6 +4,7 @@ namespace App\Notifications;
 
 use Carbon\CarbonImmutable;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
@@ -14,7 +15,7 @@ use NotificationChannels\WebPush\WebPushMessage;
  * Chegou a data do reajuste da carta do consórcio: a pessoa informa o percentual do índice (o Cerne não busca o índice sozinho).
  * Carrega dado já resolvido, não o model (o worker da fila não tem perfil ativo).
  */
-class DebtAdjustmentDue extends Notification implements ShouldQueue
+class DebtAdjustmentDue extends Notification implements ShouldBeEncrypted, ShouldQueue
 {
     use Queueable;
 

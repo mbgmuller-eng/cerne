@@ -7,6 +7,7 @@ use App\Models\DataExport;
 use App\Models\FinancialProfile;
 use App\Models\ProfileMember;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\RateLimiter;
 use Livewire\Component;
 
 /**
@@ -69,11 +70,23 @@ class PrivacyCenter extends Component
             'deleteEmail' => ['required', 'string'],
         ], [], ['deletePassword' => 'senha', 'deleteEmail' => 'e-mail']);
 
+        // Quem está com a sessão aberta (computador emprestado, sessão roubada) não pode testar senhas aqui sem limite.
+        $chave = 'delete-account:'.$usuario->id;
+
+        if (RateLimiter::tooManyAttempts($chave, 5)) {
+            $this->addError('deletePassword', 'Muitas tentativas. Tente novamente em '.ceil(RateLimiter::availableIn($chave) / 60).' minuto(s).');
+
+            return;
+        }
+
         if (! Hash::check($this->deletePassword, $usuario->password)) {
+            RateLimiter::hit($chave, 900);
             $this->addError('deletePassword', 'A senha não confere.');
 
             return;
         }
+
+        RateLimiter::clear($chave);
 
         if (mb_strtolower(trim($this->deleteEmail)) !== mb_strtolower($usuario->email)) {
             $this->addError('deleteEmail', 'Digite o e-mail da conta exatamente como ele está cadastrado.');

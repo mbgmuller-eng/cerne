@@ -36,7 +36,7 @@ class SelfRegistrationController extends Controller
             'email' => ['required', 'email', 'max:255', 'unique:users,email'],
             'papel' => ['required_if:tipo_conta,profissional', Rule::in(['consultant', 'broker'])],
             'nascimento' => ['required', 'date', 'before:today', 'after:1900-01-01'],
-            'password' => ['required', 'confirmed', Password::min(8)->letters()->numbers()],
+            'password' => ['required', 'confirmed', Password::defaults()],
             'termos' => ['accepted'],
         ], attributes: [
             'nome' => 'nome',

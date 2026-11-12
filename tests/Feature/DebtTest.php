@@ -223,6 +223,22 @@ class DebtTest extends TestCase
         self::assertSame(['category_id' => null, 'subcategory_id' => null], DebtClassification::suggest(DebtKind::Financing, DebtClassification::OTHER));
     }
 
+    // ------------------------------------------------------------------ conta bancária vinda do formulário
+
+    public function test_a_conta_da_divida_precisa_ser_do_perfil_ativo(): void
+    {
+        $outroPerfil = FinancialProfile::factory()->create();
+        $contaAlheia = BankAccount::factory()->create(['profile_id' => $outroPerfil->id]);
+
+        $this->expectException(\Illuminate\Database\Eloquent\ModelNotFoundException::class);
+
+        try {
+            $this->financiamento(['bank_account_id' => $contaAlheia->id]);
+        } finally {
+            self::assertSame(0, Debt::query()->count(), 'nada é gravado com a conta de outro perfil');
+        }
+    }
+
     // ------------------------------------------------------------------ pagar e ligar à despesa
 
     public function test_pagar_cria_a_despesa_na_categoria_do_contrato_e_debita_a_conta(): void

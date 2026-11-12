@@ -23,7 +23,7 @@ use NotificationChannels\WebPush\HasPushSubscriptions;
     'name', 'email', 'password', 'role', 'phone', 'birthdate', 'cpf_cnpj', 'asaas_customer_id', 'avatar_url', 'is_active', 'is_platform_admin', 'theme',
     'agenda_layout', 'calendar_view', 'portfolio_prefs', 'notify_email_enabled', 'notify_push_enabled', 'gym_keep_awake', 'gym_vibrate', 'gym_sound', 'terms_accepted_at', 'terms_version', 'health_consent_at', 'health_consent_version', 'deletion_requested_at', 'deletion_due_at', 'renewal_lead_types', 'renewal_lead_days',
 ])]
-#[Hidden(['password', 'remember_token'])]
+#[Hidden(['password', 'remember_token', 'two_factor_secret', 'two_factor_recovery_codes'])]
 class User extends Authenticatable implements MustVerifyEmail
 {
     /** @use HasFactory<UserFactory> */
@@ -35,6 +35,7 @@ class User extends Authenticatable implements MustVerifyEmail
     protected function casts(): array
     {
         return [
+            'phone' => Sensitive::class,
             'email_verified_at' => 'datetime',
             'terms_accepted_at' => 'datetime',
             'health_consent_at' => 'datetime',
@@ -45,6 +46,9 @@ class User extends Authenticatable implements MustVerifyEmail
             'last_login_at' => 'datetime',
             'password' => 'hashed',
             'password_pending' => 'boolean',
+            'two_factor_secret' => 'encrypted',
+            'two_factor_recovery_codes' => 'encrypted:array',
+            'two_factor_confirmed_at' => 'datetime',
             'role' => UserRole::class,
             'is_active' => 'boolean',
             'is_platform_admin' => 'boolean',
@@ -69,6 +73,18 @@ class User extends Authenticatable implements MustVerifyEmail
     public function sendEmailVerificationNotification(): void
     {
         $this->notify(new VerifyEmailAddress);
+    }
+
+    /** As notificações do sino passam pelo model que cifra os textos de `data` (ver App\Models\DatabaseNotification). */
+    public function notifications()
+    {
+        return $this->morphMany(\App\Models\DatabaseNotification::class, 'notifiable')->latest();
+    }
+
+    /** E-mail de redefinição de senha com a cara do Cerne (o do framework seria em inglês e levaria o e-mail na URL). */
+    public function sendPasswordResetNotification($token): void
+    {
+        $this->notify(new \App\Notifications\ResetPasswordLink((string) $token));
     }
 
     // ---------------------------------------------------------------------
@@ -149,6 +165,18 @@ class User extends Authenticatable implements MustVerifyEmail
     public function isPlatformAdmin(): bool
     {
         return (bool) $this->is_platform_admin;
+    }
+
+    /** Segundo passo já configurado e confirmado (só então o login passa a exigir o código). */
+    public function hasTwoFactor(): bool
+    {
+        return $this->two_factor_confirmed_at !== null && $this->two_factor_secret !== null;
+    }
+
+    /** Quem vê dado de outras pessoas (administrador, consultor, corretor) precisa do segundo passo quando a exigência está ligada. */
+    public function mustUseTwoFactor(): bool
+    {
+        return $this->isPlatformAdmin() || $this->isAdmin() || $this->isConsultant() || $this->isBroker();
     }
 
     // ---------------------------------------------------------------------

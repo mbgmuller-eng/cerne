@@ -7,6 +7,7 @@ use App\Models\HealthAppointment;
 use App\Support\CareLinks;
 use Carbon\CarbonImmutable;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
@@ -19,7 +20,7 @@ use NotificationChannels\WebPush\WebPushMessage;
  *
  * Carrega o texto pronto: o worker da fila não tem perfil ativo e a consulta pode já ter mudado (ou sumido) quando o aviso sair.
  */
-class HealthAppointmentChanged extends Notification implements ShouldQueue
+class HealthAppointmentChanged extends Notification implements ShouldBeEncrypted, ShouldQueue
 {
     use Queueable;
 

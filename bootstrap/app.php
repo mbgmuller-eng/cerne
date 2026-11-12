@@ -30,14 +30,22 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->web(
             remove: [SubstituteBindings::class],
             append: [
+                // Trocar ou redefinir a senha derruba as outras sessões e o "manter conectado": a sessão guarda o hash da senha
+                // com que foi aberta e deixa de valer quando ele muda.
+                \Illuminate\Session\Middleware\AuthenticateSession::class,
                 SetProfileContext::class,
                 SubstituteBindings::class,
             ],
         );
 
+        // Só responde pelo domínio do APP_URL (e subdomínios): um Host forjado não chega nem a gerar link. Fora de produção o
+        // Laravel não aplica (desenvolvimento e testes usam localhost).
+        $middleware->trustHosts();
+
         $middleware->alias([
             'assinatura' => RequiresActiveSubscription::class,
             'termos' => \App\Http\Middleware\RequiresCurrentTerms::class,
+            'dois-passos' => \App\Http\Middleware\RequiresTwoFactor::class,
             'consentimento-saude' => \App\Http\Middleware\RequiresHealthConsent::class,
             'cuidado' => \App\Http\Middleware\RestrictCareContext::class,
         ]);
@@ -50,7 +58,7 @@ return Application::configure(basePath: dirname(__DIR__))
         // Webhook da Asaas não carrega token CSRF (não é um formulário do
         // Cerne) — a autenticação dele é outra (header asaas-access-token,
         // conferido no controller), não o CSRF do Laravel.
-        $middleware->validateCsrfTokens(except: ['webhooks/asaas']);
+        $middleware->validateCsrfTokens(except: ['webhooks/asaas', 'csp-report']);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         // Todo erro que o Laravel reporta (tela, ação do Livewire, fila, rotina agendada) é anotado e entra no relatório diário. Sem

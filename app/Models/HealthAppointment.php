@@ -27,6 +27,11 @@ class HealthAppointment extends Model
     protected function casts(): array
     {
         return [
+            'location' => Sensitive::class,
+            'address' => Sensitive::class,
+            'phone' => Sensitive::class,
+            'booked_by_name' => Sensitive::class,
+            'booked_with_name' => Sensitive::class,
             'kind' => HealthAppointmentKind::class,
             'status' => \App\Enums\HealthAppointmentStatus::class,
             'status_at' => 'datetime',

@@ -6,6 +6,7 @@ use App\Models\HealthAppointment;
 use App\Support\MapLinks;
 use Carbon\CarbonImmutable;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
@@ -17,7 +18,7 @@ use NotificationChannels\WebPush\WebPushMessage;
  * FixedBillDueSoon: o worker da fila reconstitui a notificação sem
  * ProfileContext ativo, e HealthAppointment falha fechado sem ele.
  */
-class HealthAppointmentUpcoming extends Notification implements ShouldQueue
+class HealthAppointmentUpcoming extends Notification implements ShouldBeEncrypted, ShouldQueue
 {
     use Queueable;
 

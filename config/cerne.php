@@ -92,6 +92,18 @@ return [
     | não compensa — deixe ligado salvo decisão explícita em contrário.
     */
 
+    /*
+    |---------------------------------------------------------------------------
+    | Segurança de acesso
+    |---------------------------------------------------------------------------
+    | `two_factor_required`: administrador, consultor e corretor só usam o app depois de ligar a verificação em dois
+    | passos (ver RequiresTwoFactor). Desligado por padrão: a ligação em produção obriga cada profissional a configurar
+    | o aplicativo autenticador no próximo acesso, e é decisão do dono do projeto (CERNE_TWO_FACTOR_REQUIRED=true).
+    */
+    'security' => [
+        'two_factor_required' => (bool) env('CERNE_TWO_FACTOR_REQUIRED', false),
+    ],
+
     'ai' => [
         'api_key' => env('ANTHROPIC_API_KEY'),
 
@@ -126,6 +138,9 @@ return [
 
         // Idem para a simulação em PDF de um lead (ver LeadQuoteExtractionService), por profissional.
         'lead_quote_reads_per_day' => (int) env('CERNE_LEAD_QUOTE_READS_PER_DAY', 20),
+
+        // Teto geral de envios na tela Importar (extrato, fatura, relatório) por perfil e por dia.
+        'document_imports_per_day' => (int) env('CERNE_DOCUMENT_IMPORTS_PER_DAY', 40),
 
         // Idem para relatório de outro aplicativo (ver DocumentsIndex::enviar).
         'external_imports_per_day' => (int) env('CERNE_EXTERNAL_IMPORTS_PER_DAY', 10),

@@ -3,6 +3,7 @@
 namespace App\Notifications;
 
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
@@ -14,7 +15,7 @@ use NotificationChannels\WebPush\WebPushMessage;
  * pronto e só o id do perfil (o worker da fila não tem contexto de perfil); o link entra pelo `care.goto`, que escolhe o perfil de quem se acompanha
  * antes de abrir a tela de leitura.
  */
-class FamilyFinanceNotice extends Notification implements ShouldQueue
+class FamilyFinanceNotice extends Notification implements ShouldBeEncrypted, ShouldQueue
 {
     use Queueable;
 

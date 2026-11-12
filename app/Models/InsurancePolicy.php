@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Casts\Sensitive;
 use App\Enums\InsuranceType;
 use App\Enums\PaymentFrequency;
 use App\Models\Concerns\Auditable;
@@ -33,6 +34,8 @@ class InsurancePolicy extends Model
     protected function casts(): array
     {
         return [
+            'insured_person_name' => Sensitive::class,
+            'notes' => Sensitive::class,
             'insurance_type' => InsuranceType::class,
             'payment_frequency' => PaymentFrequency::class,
             'coverage_amount' => 'decimal:2',

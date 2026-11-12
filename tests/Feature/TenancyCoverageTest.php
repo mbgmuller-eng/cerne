@@ -85,6 +85,9 @@ class TenancyCoverageTest extends TestCase
         DebtCommission::class => 'liga o consultor a um consórcio de cliente em que ele tem comissão (professional_id) — sigiloso; o consórcio em si segue isolado por perfil',
         FeeAgreement::class => 'honorário que o profissional combinou com um cliente (professional_id) — mesmo sigilo de IncomeEntry; o profile_id aponta o cliente, não isola o dado',
 
+        // Notificação do sino: é da PESSOA (notifiable), não de um perfil; os textos de `data` ficam cifrados.
+        \App\Models\DatabaseNotification::class => 'notificação do sino de uma pessoa (notifiable_id), não de um perfil; o acesso é sempre pelo usuário logado (User::notifications)',
+
         // Privacidade (LGPD): registros da plataforma sobre a conta do usuário, sem perfil.
         DataExport::class => 'cópia dos dados pedida pelo próprio usuário (user_id) — pertence à conta, não a um perfil; o download confere o dono',
         ImpersonationLog::class => 'registro de quando um administrador entrou em uma conta (admin_id, target_user_id) — só o administrador lê e sobrevive à conta, por isso não tem perfil',

@@ -31,6 +31,8 @@ class ConsultantLinkService
      */
     public function request(User $consultant, User $client): string
     {
+        \App\Support\MailThrottle::guard($consultant->id, $client->email);
+
         // updateOrCreate porque a restrição única é (consultant_id,
         // client_id): um vínculo já revogado (Inactive) precisa reabrir a
         // MESMA linha, não criar outra.

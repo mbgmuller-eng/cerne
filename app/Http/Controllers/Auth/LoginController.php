@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
+use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -38,6 +39,22 @@ class LoginController extends Controller
         ]);
 
         $this->ensureIsNotRateLimited($request);
+
+        // Conta com segundo passo: confere a senha SEM abrir a sessão e manda para a tela do código. A sessão só nasce
+        // depois que o código confere (TwoFactorChallengeController), então senha certa sozinha não entra.
+        $candidato = User::query()->where('email', $credentials['email'])->first();
+
+        if ($candidato !== null && $candidato->is_active && $candidato->hasTwoFactor() && Auth::validate([...$credentials, 'is_active' => true])) {
+            RateLimiter::clear($this->throttleKey($request));
+            $request->session()->regenerate();
+            $request->session()->put(TwoFactorChallengeController::SESSION_KEY, [
+                'id' => $candidato->id,
+                'remember' => $request->boolean('remember'),
+                'expires_at' => now()->addMinutes(10)->timestamp,
+            ]);
+
+            return redirect()->route('two-factor.challenge');
+        }
 
         $entrou = Auth::attempt(
             [...$credentials, 'is_active' => true],

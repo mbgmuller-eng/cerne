@@ -38,6 +38,8 @@ class CaregiverService
         // A pessoa acompanhada tem um membro só: o acesso é a ele.
         $membro = ProfileMember::query()->where('profile_id', $profile->id)->orderBy('created_at')->firstOrFail();
 
+        \App\Support\MailThrottle::guard($owner->id, $email);
+
         ['token' => $token] = ProfileCaregiver::issue($profile, $membro, $owner, $name, $email, $access);
 
         $link = route('caregiver-invite.accept', ['token' => $token]);
@@ -76,6 +78,8 @@ class CaregiverService
         if (ProfileMember::query()->where('profile_id', $member->profile_id)->where('is_active', true)->whereHas('user', fn ($q) => $q->whereRaw('lower(email) = ?', [mb_strtolower(trim($email))]))->exists()) {
             throw new RuntimeException('Essa pessoa já divide o perfil com você e já vê o que você cadastra.');
         }
+
+        \App\Support\MailThrottle::guard($inviter->id, $email);
 
         ['token' => $token] = ProfileCaregiver::issue($perfil, $member, $inviter, $name, $email, $access, $health, $finance, CaregiverGrantBasis::Self);
 
@@ -183,6 +187,8 @@ class CaregiverService
         $consultor = $primeira->grantedBy;
         $medico = (bool) $primeira->can_view_health;
         $financas = (bool) $primeira->can_view_finance;
+
+        \App\Support\MailThrottle::guard($consultor?->id, $primeira->invited_email);
 
         Mail::to($primeira->invited_email)->queue(new CaregiverInviteMail($consultor, $nomes, $primeira->invited_name, $primeira->access_level, $link, false, $medico, $financas, true));
 

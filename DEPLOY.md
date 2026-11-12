@@ -139,9 +139,23 @@ APP_URL=https://cerne.app.br
 QUEUE_CONNECTION=database
 SESSION_DRIVER=database
 CACHE_STORE=database
+SESSION_ENCRYPT=true
+LOG_STACK=daily
+LOG_LEVEL=warning
+LOG_DAILY_DAYS=14
+CERNE_TWO_FACTOR_REQUIRED=true
 ```
 
 `ANTHROPIC_API_KEY` também vive só aqui.
+
+O que cada linha de segurança faz (o `cerne:check` avisa enquanto faltar):
+
+- `SESSION_ENCRYPT=true`: a tabela `sessions` guarda a sessão cifrada. Ligar desconecta todo mundo uma vez.
+- `LOG_STACK=daily`, `LOG_LEVEL=warning`, `LOG_DAILY_DAYS=14`: o log gira por dia e não guarda detalhe de consulta; o filtro `ScrubLogs` já tira e-mail, CPF e valores.
+- `CERNE_TWO_FACTOR_REQUIRED=true`: administrador, consultor e corretor só usam o app depois de configurar o aplicativo autenticador. Ligar obriga cada um a configurar no próximo acesso.
+
+Depois de uma leva que cifra mais colunas, rode `php artisan cerne:encrypt-sensitive --dry-run` e, conferido, `php artisan cerne:encrypt-sensitive`
+(faça o backup do banco antes; a `APP_KEY` precisa estar no cofre: sem ela os campos cifrados não abrem).
 
 ### 6. Cache de produção
 
@@ -158,14 +172,33 @@ php artisan config:cache && php artisan route:cache && php artisan view:cache
 
 ### 7. Backup
 
-```bash
-0 3 * * * mysqldump -u USER -pSENHA BANCO | gzip > /home/uXXXXXXX/backups/cerne-$(date +\%F).sql.gz
+**Nunca ponha a senha do banco na linha do cron** (`-pSENHA` aparece na lista de processos do servidor para qualquer usuário e fica no
+histórico). Guarde as credenciais em `~/.my.cnf` (`chmod 600`) e chame o `mysqldump` sem senha:
+
+```ini
+# ~/.my.cnf  (chmod 600)
+[client]
+user=USUARIO_DO_BANCO
+password=SENHA_DO_BANCO
 ```
+
+O banco, cifrado, e os arquivos privados (o banco não os contém):
+
+```bash
+# banco: dump comprimido e CIFRADO (a frase fica em ~/.backup-pass, chmod 600, e também no cofre de senhas)
+0 3 * * * mysqldump --single-transaction BANCO | gzip | openssl enc -aes-256-cbc -pbkdf2 -salt -pass file:/home/uXXXXXXX/.backup-pass -out /home/uXXXXXXX/backups/cerne-$(date +\%F).sql.gz.enc
+# arquivos privados (PDF de extrato, documentos, fotos): o banco não os contém
+15 3 * * * tar -C /home/uXXXXXXX/cerne/storage/app -czf - private | openssl enc -aes-256-cbc -pbkdf2 -salt -pass file:/home/uXXXXXXX/.backup-pass -out /home/uXXXXXXX/backups/cerne-arquivos-$(date +\%F).tar.gz.enc
+```
+
+Para abrir um backup: `openssl enc -d -aes-256-cbc -pbkdf2 -pass file:CAMINHO_DA_FRASE -in ARQUIVO.enc | gunzip > restaurado.sql`.
+Backup que mora só no mesmo servidor não é backup: copie periodicamente para fora (outro provedor ou o seu computador), sempre cifrado.
+A `APP_KEY` e a frase do backup ficam no cofre de senhas, **fora** do servidor e fora de pasta sincronizada (OneDrive, Drive, Dropbox).
 
 Com rotação de 7 dias:
 
 ```bash
-30 3 * * * find /home/uXXXXXXX/backups -name 'cerne-*.sql.gz' -mtime +7 -delete
+30 3 * * * find /home/uXXXXXXX/backups -name 'cerne-*' -mtime +7 -delete
 ```
 
 ---
@@ -234,10 +267,10 @@ O service worker (`public/sw.js`) **cacheia apenas arquivos estáticos** — bui
 Cerne Saúde › Academia aceita um histórico já estruturado (JSON revisado pela própria pessoa). É comando de servidor porque o arquivo tem dado de saúde — não há tela de upload. Formato em `database/examples/gym-history.example.json`.
 
 ```bash
-scp -P 65002 -i ~/.ssh/cerne_hostinger historico_treinos.json u165451165@89.117.7.59:~/historico_treinos.json
-ssh -p 65002 -i ~/.ssh/cerne_hostinger u165451165@89.117.7.59 "cd ~/cerne && php artisan cerne:gym-import ~/historico_treinos.json --email=CONTA_DA_PESSOA --dry-run"
+scp -P PORTA -i ~/.ssh/cerne_hostinger historico_treinos.json USUARIO@SERVIDOR:~/historico_treinos.json
+ssh -p PORTA -i ~/.ssh/cerne_hostinger USUARIO@SERVIDOR "cd ~/cerne && php artisan cerne:gym-import ~/historico_treinos.json --email=CONTA_DA_PESSOA --dry-run"
 # conferiu o relatório? repita sem --dry-run:
-ssh -p 65002 -i ~/.ssh/cerne_hostinger u165451165@89.117.7.59 "cd ~/cerne && php artisan cerne:gym-import ~/historico_treinos.json --email=CONTA_DA_PESSOA && rm ~/historico_treinos.json"
+ssh -p PORTA -i ~/.ssh/cerne_hostinger USUARIO@SERVIDOR "cd ~/cerne && php artisan cerne:gym-import ~/historico_treinos.json --email=CONTA_DA_PESSOA && rm ~/historico_treinos.json"
 ```
 
 A conta precisa ter perfil próprio com membro (treino é pessoal). Validação acusa o arquivo inteiro antes de gravar; rodar de novo não duplica (sessão = treino + data). Apague o JSON do servidor depois.
@@ -247,11 +280,11 @@ A conta precisa ter perfil próprio com membro (treino é pessoal). Validação 
 Para o consultor que recebe os certificados dos clientes (hoje Icatu): `cerne:import-policies` acha o cliente na carteira do consultor, cria ou atualiza a apólice e guarda o PDF em **Documentos**, ligado à apólice (a tela Seguros mostra "Ver apólice (PDF)"). O JSON sai da leitura dos PDFs e carrega CPF: é arquivo de servidor, apague depois. Formato do JSON: comentário em `App\Console\Commands\ImportPolicyCertificates`.
 
 ```bash
-scp -P 65002 -i ~/.ssh/cerne_hostinger -r pasta_com_pdfs u165451165@89.117.7.59:~/certificados
-scp -P 65002 -i ~/.ssh/cerne_hostinger apolices.json u165451165@89.117.7.59:~/apolices.json
-ssh -p 65002 -i ~/.ssh/cerne_hostinger u165451165@89.117.7.59 "cd ~/cerne && php artisan cerne:import-policies ~/apolices.json --consultant=EMAIL_DO_CONSULTOR --pdf-dir=../certificados"
+scp -P PORTA -i ~/.ssh/cerne_hostinger -r pasta_com_pdfs USUARIO@SERVIDOR:~/certificados
+scp -P PORTA -i ~/.ssh/cerne_hostinger apolices.json USUARIO@SERVIDOR:~/apolices.json
+ssh -p PORTA -i ~/.ssh/cerne_hostinger USUARIO@SERVIDOR "cd ~/cerne && php artisan cerne:import-policies ~/apolices.json --consultant=EMAIL_DO_CONSULTOR --pdf-dir=../certificados"
 # conferiu o relatório (simulação, nada gravado)? repita com --apply, depois apague os arquivos:
-ssh -p 65002 -i ~/.ssh/cerne_hostinger u165451165@89.117.7.59 "cd ~/cerne && php artisan cerne:import-policies ~/apolices.json --consultant=EMAIL_DO_CONSULTOR --pdf-dir=../certificados --apply && rm -rf ~/certificados ~/apolices.json"
+ssh -p PORTA -i ~/.ssh/cerne_hostinger USUARIO@SERVIDOR "cd ~/cerne && php artisan cerne:import-policies ~/apolices.json --consultant=EMAIL_DO_CONSULTOR --pdf-dir=../certificados --apply && rm -rf ~/certificados ~/apolices.json"
 ```
 
 Serve também para a **Azos** (e outra seguradora que se acrescente): o leitor do PDF acrescenta ao item do JSON as chaves opcionais `seguradora`, `seguradora_curta`, `notas`, `vencimento`, `capital_principal`, `padronizar_coberturas`, `email_pdf` e a `franquia` de cada cobertura (descritas em `PolicyCertificateImporter`). A apólice-casca que a carga em planilha deixou (mesma seguradora, sem número) é preenchida em vez de criar outra. Quando a apólice-casca não tem custo, capital nem proteções, o histórico não grava uma linha "Valores anteriores" vazia.
@@ -263,10 +296,10 @@ Só age em clientes **ativos** do consultor. Casamento por CPF, ou por nome (e n
 `cerne:import-investments` grava, no perfil de quem o e-mail indica, os ativos (ações, FIIs, Tesouro, fundo), as compras das notas de corretagem, os proventos, desdobramentos e amortizações do extrato de preço médio, e a carteira mês a mês do relatório de performance. O JSON ("pacote") sai da leitura desses três documentos e é conferido contra a posição que a própria corretora declara: toda diferença aparece no relatório da simulação. Formato do JSON: comentário em `App\Services\Investments\BrokerPackageImporter`. Ativo já cadastrado à mão com o mesmo ticker não é tocado (vira `conflito`). Rodar de novo não duplica (chave única por lançamento).
 
 ```bash
-scp -P 65002 -i ~/.ssh/cerne_hostinger pacote-btg.json u165451165@89.117.7.59:~/pacote-btg.json
-ssh -p 65002 -i ~/.ssh/cerne_hostinger u165451165@89.117.7.59 "cd ~/cerne && php artisan cerne:import-investments ~/pacote-btg.json --email=EMAIL_DO_DONO [--member=NOME]"
+scp -P PORTA -i ~/.ssh/cerne_hostinger pacote-btg.json USUARIO@SERVIDOR:~/pacote-btg.json
+ssh -p PORTA -i ~/.ssh/cerne_hostinger USUARIO@SERVIDOR "cd ~/cerne && php artisan cerne:import-investments ~/pacote-btg.json --email=EMAIL_DO_DONO [--member=NOME]"
 # conferiu a simulação (nada gravado)? repita com --apply e apague o arquivo:
-ssh -p 65002 -i ~/.ssh/cerne_hostinger u165451165@89.117.7.59 "cd ~/cerne && php artisan cerne:import-investments ~/pacote-btg.json --email=EMAIL_DO_DONO --apply && rm ~/pacote-btg.json"
+ssh -p PORTA -i ~/.ssh/cerne_hostinger USUARIO@SERVIDOR "cd ~/cerne && php artisan cerne:import-investments ~/pacote-btg.json --email=EMAIL_DO_DONO --apply && rm ~/pacote-btg.json"
 ```
 
 O pacote também usa a B3 (proventos recebidos e movimentação): a data do provento é a do **pagamento**, não a de aprovação do extrato de preço médio (o imposto de renda conta pelo recebimento). Provento aprovado e ainda não pago vai em `pendentes` e só gera aviso. Título do Tesouro vendido por inteiro vem com `encerrado`, `lotes` e `vendas` e fica inativo; venda parcial ainda não é aceita.
@@ -279,9 +312,9 @@ Quando duas pessoas foram cadastradas como clientes separados (perfis individuai
 
 ```bash
 # simulação (padrão): confere tudo e mostra o que mudaria, sem gravar nada
-ssh -p 65002 -i ~/.ssh/cerne_hostinger u165451165@89.117.7.59 "cd ~/cerne && php artisan cerne:merge-couple EMAIL_DA_PRINCIPAL EMAIL_DA_CONJUGE"
+ssh -p PORTA -i ~/.ssh/cerne_hostinger USUARIO@SERVIDOR "cd ~/cerne && php artisan cerne:merge-couple EMAIL_DA_PRINCIPAL EMAIL_DA_CONJUGE"
 # conferiu? aplique, guardando a cópia para desfazer à mão se for preciso:
-ssh -p 65002 -i ~/.ssh/cerne_hostinger u165451165@89.117.7.59 "cd ~/cerne && php artisan cerne:merge-couple EMAIL_DA_PRINCIPAL EMAIL_DA_CONJUGE --apply --backup=\$HOME/unificacao_NOME.json"
+ssh -p PORTA -i ~/.ssh/cerne_hostinger USUARIO@SERVIDOR "cd ~/cerne && php artisan cerne:merge-couple EMAIL_DA_PRINCIPAL EMAIL_DA_CONJUGE --apply --backup=\$HOME/unificacao_NOME.json"
 ```
 
 O registro de membro da cônjuge é **movido**, não recriado: tudo que é dela continua dela (lançamentos, apólices, documentos, saúde, privacidade por lançamento). A operação recusa, sem alterar nada, quando: um dos perfis já é de casal ou tem outro membro; a cônjuge tem assinatura própria; ela é cliente de um consultor que não acompanha a principal (ou o vínculo da principal não está ativo); há categoria própria de mesmo nome nos dois perfis; ou há a mesma reserva do casal nos dois. Regras de categorização com o mesmo texto ficam com a da principal. As chaves de perfil e de membro apagam em cascata: por isso o perfil antigo só é excluído depois de conferido que nada sobrou nele.
@@ -292,17 +325,17 @@ Referência genérica (nome, grupo muscular, foto) que qualquer cliente vê ao m
 
 **Dados do catálogo** (nome/grupo/tipo/observação, sem foto) — roda como qualquer seeder, não é automático no deploy:
 ```bash
-ssh -p 65002 -i ~/.ssh/cerne_hostinger u165451165@89.117.7.59 "cd ~/cerne && php artisan db:seed --class=GymExerciseCatalogSeeder"
+ssh -p PORTA -i ~/.ssh/cerne_hostinger USUARIO@SERVIDOR "cd ~/cerne && php artisan db:seed --class=GymExerciseCatalogSeeder"
 ```
 Idempotente (`updateOrCreate` por nome) — rodar de novo atualiza texto sem tocar na foto já vinculada.
 
 **Fotos do catálogo** — mesmo esquema do `cerne:gym-link-images` pessoal, mas sem `--email` (o catálogo não tem dono):
 ```bash
-scp -P 65002 -i ~/.ssh/cerne_hostinger -r pasta_com_fotos u165451165@89.117.7.59:~/gym-catalog-images
-scp -P 65002 -i ~/.ssh/cerne_hostinger mapping.json u165451165@89.117.7.59:~/mapping.json
-ssh -p 65002 -i ~/.ssh/cerne_hostinger u165451165@89.117.7.59 "cd ~/cerne && php artisan cerne:gym-catalog-link-images ~/mapping.json --dry-run"
+scp -P PORTA -i ~/.ssh/cerne_hostinger -r pasta_com_fotos USUARIO@SERVIDOR:~/gym-catalog-images
+scp -P PORTA -i ~/.ssh/cerne_hostinger mapping.json USUARIO@SERVIDOR:~/mapping.json
+ssh -p PORTA -i ~/.ssh/cerne_hostinger USUARIO@SERVIDOR "cd ~/cerne && php artisan cerne:gym-catalog-link-images ~/mapping.json --dry-run"
 # conferiu? repita sem --dry-run, depois apague os arquivos do servidor
-ssh -p 65002 -i ~/.ssh/cerne_hostinger u165451165@89.117.7.59 "cd ~/cerne && php artisan cerne:gym-catalog-link-images ~/mapping.json && rm -rf ~/gym-catalog-images ~/mapping.json"
+ssh -p PORTA -i ~/.ssh/cerne_hostinger USUARIO@SERVIDOR "cd ~/cerne && php artisan cerne:gym-catalog-link-images ~/mapping.json && rm -rf ~/gym-catalog-images ~/mapping.json"
 ```
 
 ## Privacidade e LGPD (primeira publicação)

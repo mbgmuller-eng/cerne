@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Casts\Sensitive;
 use App\Enums\LeadKind;
 use App\Enums\LeadLostReason;
 use App\Enums\LeadSource;
@@ -35,6 +36,8 @@ class Lead extends Model
     protected function casts(): array
     {
         return [
+            'phone' => Sensitive::class,
+            'notes' => Sensitive::class,
             'kind' => LeadKind::class,
             'stage' => LeadStage::class,
             'source' => LeadSource::class,

@@ -6,6 +6,7 @@ use App\Models\CreditCardInvoice;
 use App\Support\Money;
 use Carbon\CarbonImmutable;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
@@ -17,7 +18,7 @@ use NotificationChannels\WebPush\WebPushMessage;
  * model — CreditCardInvoice/CreditCard usam BelongsToProfile, que falha
  * fechado sem ProfileContext ativo (a situação de um worker de fila real).
  */
-class CreditCardInvoiceDueSoon extends Notification implements ShouldQueue
+class CreditCardInvoiceDueSoon extends Notification implements ShouldBeEncrypted, ShouldQueue
 {
     use Queueable;
 

@@ -4,6 +4,7 @@ namespace App\Notifications;
 
 use App\Models\ProfileMember;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
@@ -19,7 +20,7 @@ use NotificationChannels\WebPush\WebPushMessage;
  * Carrega dado já resolvido, não o Eloquent model — mesmo motivo de
  * FixedBillDueSoon: o worker da fila não tem ProfileContext ativo.
  */
-class ClientBirthdayUpcoming extends Notification implements ShouldQueue
+class ClientBirthdayUpcoming extends Notification implements ShouldBeEncrypted, ShouldQueue
 {
     use Queueable;
 

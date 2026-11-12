@@ -3,6 +3,7 @@
 namespace App\Notifications;
 
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
@@ -11,7 +12,7 @@ use Illuminate\Notifications\Notification;
  * Cartão recusado na cobrança da assinatura. Sempre por e-mail, sem checar
  * notify_email_enabled: é aviso de cobrança, não notificação opcional.
  */
-class SubscriptionPaymentFailed extends Notification implements ShouldQueue
+class SubscriptionPaymentFailed extends Notification implements ShouldBeEncrypted, ShouldQueue
 {
     use Queueable;
 

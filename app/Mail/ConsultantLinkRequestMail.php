@@ -4,12 +4,13 @@ namespace App\Mail;
 
 use App\Models\User;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Queue\SerializesModels;
 
-class ConsultantLinkRequestMail extends Mailable
+class ConsultantLinkRequestMail extends Mailable implements ShouldBeEncrypted
 {
     use Queueable, SerializesModels;
 

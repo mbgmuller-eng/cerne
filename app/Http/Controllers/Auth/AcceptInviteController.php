@@ -30,7 +30,7 @@ class AcceptInviteController extends Controller
     public function store(Request $request, string $token, ClientOnboardingService $onboarding): RedirectResponse
     {
         $data = $request->validate([
-            'password' => ['required', 'confirmed', Password::min(8)->letters()->numbers()],
+            'password' => ['required', 'confirmed', Password::defaults()],
         ], attributes: [
             'password' => 'senha',
         ]);

@@ -5,6 +5,7 @@ namespace App\Notifications;
 use App\Models\HealthCareItem;
 use Carbon\CarbonImmutable;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
@@ -16,7 +17,7 @@ use NotificationChannels\WebPush\WebPushMessage;
  * notificação sem ProfileContext ativo, e HealthCareItem falha fechado sem ele (mesmo
  * motivo de HealthAppointmentUpcoming).
  */
-class HealthCareItemDue extends Notification implements ShouldQueue
+class HealthCareItemDue extends Notification implements ShouldBeEncrypted, ShouldQueue
 {
     use Queueable;
 

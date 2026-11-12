@@ -83,7 +83,9 @@ class DataRetentionService
             ->each(function (DocumentUpload $upload) use (&$apagados): void {
                 $upload->deleteFile();
                 // `storage_path` é NOT NULL: vazio quer dizer "arquivo já removido".
-                $upload->forceFill(['storage_path' => ''])->saveQuietly();
+                // O resumo extraído (descrição, valor e data de cada linha do extrato, CPF e endereço do titular) vai junto com o arquivo:
+                // depois de confirmado, descartado ou falho ele só é cópia do que já virou lançamento, e ficava para sempre no banco.
+                $upload->forceFill(['storage_path' => '', 'extraction_summary' => null])->saveQuietly();
                 $apagados++;
             });
 

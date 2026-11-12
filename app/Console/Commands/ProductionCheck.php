@@ -46,6 +46,16 @@ class ProductionCheck extends Command
             'Impede que script no navegador leia o cookie.');
         $this->item('SameSite definido', in_array(config('session.same_site'), ['lax', 'strict'], true),
             'Protege contra requisições forjadas de outros sites.');
+        $this->item('Sessão cifrada no banco', (bool) config('session.encrypt'),
+            'Com SESSION_ENCRYPT desligado, a tabela sessions guarda o conteúdo da sessão em texto puro (quem lê o banco lê a sessão). Ligar desconecta todo mundo uma vez.', aviso: true);
+
+        $this->secao('Segurança de acesso');
+        $this->item('Segundo passo obrigatório para profissionais e administradores', (bool) config('cerne.security.two_factor_required'),
+            'Com CERNE_TWO_FACTOR_REQUIRED desligado, a senha sozinha abre a conta de quem vê dado de outras pessoas. Ligar obriga cada profissional a configurar o aplicativo autenticador no próximo acesso.', aviso: true);
+        $this->item('Log com nível de aviso ou acima', ! in_array(config('logging.channels.daily.level'), ['debug', 'info'], true),
+            'LOG_LEVEL=debug grava muito detalhe (consultas, ids) em arquivo de texto. Use warning em produção.', aviso: true);
+        $this->item('Log com rotação diária', in_array('daily', (array) config('logging.channels.stack.channels'), true),
+            'LOG_STACK=single cria um arquivo único que cresce sem fim e guarda dado antigo para sempre. Use daily (LOG_DAILY_DAYS=14).', aviso: true);
 
         $this->secao('Banco de dados');
         $this->item('Conexão com o banco', $this->bancoResponde(),

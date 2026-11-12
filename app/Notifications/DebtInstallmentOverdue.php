@@ -6,6 +6,7 @@ use App\Models\DebtInstallment;
 use App\Support\Money;
 use Carbon\CarbonImmutable;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
@@ -16,7 +17,7 @@ use NotificationChannels\WebPush\WebPushMessage;
  * Parcela de dívida em atraso: um aviso para quem deve (no primeiro dia e de novo uma semana depois) e outro para o consultor
  * do cliente, depois de uma semana. Carrega dado já resolvido, não o model: o worker da fila não tem perfil ativo.
  */
-class DebtInstallmentOverdue extends Notification implements ShouldQueue
+class DebtInstallmentOverdue extends Notification implements ShouldBeEncrypted, ShouldQueue
 {
     use Queueable;
 

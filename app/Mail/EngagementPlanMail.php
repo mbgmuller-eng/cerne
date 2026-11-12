@@ -4,6 +4,7 @@ namespace App\Mail;
 
 use App\Services\EngagementPlanReport;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Attachment;
 use Illuminate\Mail\Mailables\Content;
@@ -14,7 +15,7 @@ use Illuminate\Queue\SerializesModels;
  * Plano de acompanhamento em PDF, enviado ao cliente quando o consultor encerra o vínculo e decide entregá-lo. Guarda só ids e
  * nomes: o PDF é gerado no momento do envio, direto pelo perfil e pelo consultor (a fila não tem usuário logado).
  */
-class EngagementPlanMail extends Mailable
+class EngagementPlanMail extends Mailable implements ShouldBeEncrypted
 {
     use Queueable, SerializesModels;
 

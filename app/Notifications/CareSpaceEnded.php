@@ -3,6 +3,7 @@
 namespace App\Notifications;
 
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
@@ -11,7 +12,7 @@ use Illuminate\Notifications\Notification;
  * A própria pessoa acompanhada encerrou o espaço dela (direito de eliminação). Avisa o dono: os dados foram apagados e a cobrança dela sai
  * a partir da próxima cobrança. Carrega o texto pronto: o worker da fila não tem perfil ativo.
  */
-class CareSpaceEnded extends Notification implements ShouldQueue
+class CareSpaceEnded extends Notification implements ShouldBeEncrypted, ShouldQueue
 {
     use Queueable;
 

@@ -5,6 +5,7 @@ namespace App\Notifications;
 use App\Enums\ProcessingStatus;
 use App\Models\DocumentUpload;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
@@ -19,7 +20,7 @@ use NotificationChannels\WebPush\WebPushMessage;
  * situação normal de um worker de fila real (QUEUE_CONNECTION=database em
  * produção). Guardar o model faria o worker reidratar tudo como null.
  */
-class DocumentProcessed extends Notification implements ShouldQueue
+class DocumentProcessed extends Notification implements ShouldBeEncrypted, ShouldQueue
 {
     use Queueable;
 

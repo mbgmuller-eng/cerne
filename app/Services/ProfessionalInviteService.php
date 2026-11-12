@@ -19,6 +19,8 @@ class ProfessionalInviteService
 {
     public function send(?User $admin, string $name, string $email, UserRole $role): string
     {
+        \App\Support\MailThrottle::guard($admin?->id, $email);
+
         ['invite' => $invite, 'token' => $token] = ProfessionalInvite::issue($admin, $name, $email, $role);
 
         $link = route('professional-invite.accept', ['token' => $token]);

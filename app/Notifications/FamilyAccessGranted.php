@@ -3,6 +3,7 @@
 namespace App\Notifications;
 
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
@@ -11,7 +12,7 @@ use Illuminate\Notifications\Notification;
  * Aviso à PESSOA quando o consultor, em nome dela (convite assistido), libera o acesso de um familiar à saúde e/ou às finanças dela. Ela sempre sabe
  * quem enxerga o quê, e encerra o acesso quando quiser (Pessoas e acessos).
  */
-class FamilyAccessGranted extends Notification implements ShouldQueue
+class FamilyAccessGranted extends Notification implements ShouldBeEncrypted, ShouldQueue
 {
     use Queueable;
 

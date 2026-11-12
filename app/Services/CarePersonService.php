@@ -47,6 +47,8 @@ class CarePersonService
             throw new RuntimeException('Use o e-mail da própria pessoa, não o seu.');
         }
 
+        \App\Support\MailThrottle::guard($owner->id, $email);
+
         ['token' => $token] = CarePersonInvite::issue($profile, $membro, $owner, $email);
 
         $link = route('care-person-invite.accept', ['token' => $token]);

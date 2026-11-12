@@ -3,13 +3,14 @@
 namespace App\Mail;
 
 use App\Models\DataExport;
+use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Support\Facades\URL;
 
 /** Avisa que a cópia dos dados está pronta. O link é assinado, expira com o arquivo e só abre para quem está logado como o dono. */
-class DataExportReadyMail extends Mailable
+class DataExportReadyMail extends Mailable implements ShouldBeEncrypted
 {
     public function __construct(public DataExport $export) {}
 

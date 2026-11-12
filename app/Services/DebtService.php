@@ -92,7 +92,7 @@ class DebtService
                 'necessity' => Necessity::from($d['necessity'] ?? Necessity::Essential->value),
                 'category_id' => $d['category_id'],
                 'subcategory_id' => $d['subcategory_id'] ?? null,
-                'bank_account_id' => $d['bank_account_id'] ?? null,
+                'bank_account_id' => $this->ownAccountId($d['bank_account_id'] ?? null),
                 'notes' => $d['notes'] ?? null,
                 'created_by_user_id' => $userId ?? auth()->id(),
             ]);
@@ -134,6 +134,10 @@ class DebtService
     {
         if (array_key_exists('category_id', $d)) {
             $this->validateClassification($d['category_id'], $d['subcategory_id'] ?? null);
+        }
+
+        if (! empty($d['bank_account_id'])) {
+            $this->ownAccountId($d['bank_account_id']);
         }
 
         return DB::transaction(function () use ($divida, $d, $reclassificarPagas): Debt {
@@ -378,7 +382,7 @@ class DebtService
                 'necessity' => Necessity::Investment,
                 'category_id' => $classificacao['category_id'],
                 'subcategory_id' => null,
-                'bank_account_id' => $d['bank_account_id'] ?? null,
+                'bank_account_id' => $this->ownAccountId($d['bank_account_id'] ?? null),
                 'notes' => $d['notes'] ?? null,
                 'created_by_user_id' => $userId ?? auth()->id(),
             ]);
@@ -693,7 +697,7 @@ class DebtService
                     'necessity' => Necessity::Investment,
                     'category_id' => $classificacao['category_id'],
                     'subcategory_id' => $classificacao['subcategory_id'],
-                    'bank_account_id' => $d['bank_account_id'] ?? null,
+                    'bank_account_id' => $this->ownAccountId($d['bank_account_id'] ?? null),
                     'created_by_user_id' => $userId ?? auth()->id(),
                 ]);
             } else {
@@ -870,7 +874,7 @@ class DebtService
                 'necessity' => Necessity::Essential,
                 'category_id' => $d['category_id'],
                 'subcategory_id' => $d['subcategory_id'] ?? null,
-                'bank_account_id' => $d['bank_account_id'] ?? null,
+                'bank_account_id' => $this->ownAccountId($d['bank_account_id'] ?? null),
             ]);
 
             return $divida->refresh();
@@ -1049,5 +1053,18 @@ class DebtService
     {
         $abertas = DebtInstallment::query()->where('debt_id', $divida->id)->where('status', DebtInstallmentStatus::Open)->exists();
         $divida->update(['status' => $abertas ? DebtStatus::Active : DebtStatus::PaidOff]);
+    }
+
+    /**
+     * A conta do formulário precisa ser do perfil ativo. O id vem do navegador: sem esta conferência, um id de OUTRO perfil seria gravado na dívida
+     * (a leitura continua isolada pelo escopo, mas o vínculo errado ficaria no banco). O escopo global faz o `findOrFail` dar 404 para conta alheia.
+     */
+    private function ownAccountId(?string $id): ?string
+    {
+        if ($id === null || $id === '') {
+            return null;
+        }
+
+        return BankAccount::query()->findOrFail($id)->id;
     }
 }

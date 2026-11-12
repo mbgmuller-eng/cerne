@@ -12,6 +12,7 @@ use App\Notifications\SubscriptionPaymentFailed;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -47,10 +48,20 @@ class SubscriptionWebhookService
             return;
         }
 
-        if (! $this->registrarSeNovo($eventId, $tipo)) {
-            return; // já processado antes — reentrega da Asaas, ignora.
-        }
+        // O registro do evento e o tratamento andam na mesma transação: se o tratamento falhar, o registro desfaz e a
+        // reentrega da Asaas tenta de novo. Antes, o evento ficava marcado como processado mesmo sem ter sido.
+        DB::transaction(function () use ($eventId, $tipo, $payload): void {
+            if (! $this->registrarSeNovo($eventId, $tipo)) {
+                return; // já processado antes — reentrega da Asaas, ignora.
+            }
 
+            $this->tratar($tipo, $payload);
+        });
+    }
+
+    /** @param  array<string, mixed>  $payload */
+    private function tratar(string $tipo, array $payload): void
+    {
         if (str_starts_with($tipo, 'INVOICE_')) {
             $this->tratarNotaFiscal($tipo, $payload);
 

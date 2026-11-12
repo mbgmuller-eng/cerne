@@ -78,7 +78,7 @@ class AcceptCaregiverInviteController extends Controller
         }
 
         $dados = $request->validate([
-            'password' => ['required', 'confirmed', Password::min(8)->letters()->numbers()],
+            'password' => ['required', 'confirmed', Password::defaults()],
             'terms' => ['accepted'],
         ], ['terms.accepted' => 'Para continuar, aceite os Termos de Uso e a Política de Privacidade.'], ['password' => 'senha']);
 

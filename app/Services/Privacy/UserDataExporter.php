@@ -106,7 +106,9 @@ class UserDataExporter
             'usuario' => $user->attributesToArray(),
             'assinaturas' => Subscription::query()->where('user_id', $user->id)->get()->map->attributesToArray()->all(),
             'dados_de_cobranca' => $user->billingDetail?->attributesToArray(),
-            'notificacoes' => DB::table('notifications')->where('notifiable_id', $user->id)->orderByDesc('created_at')->limit(1000)->get(['type', 'data', 'read_at', 'created_at'])->all(),
+            // Pelo model: os textos saem decifrados (a cópia é da própria pessoa); a tabela guarda os campos de texto cifrados.
+            'notificacoes' => \App\Models\DatabaseNotification::query()->where('notifiable_id', $user->id)->orderByDesc('created_at')->limit(1000)->get()
+                ->map(fn ($n) => ['type' => $n->type, 'data' => $n->data, 'read_at' => $n->read_at, 'created_at' => $n->created_at])->all(),
             // Quem tem acesso à minha saúde (e desde quando): é a pessoa que decide, e tem o direito de saber a lista inteira.
             'quem_me_acompanha' => \App\Models\ProfileCaregiver::query()->whereIn('member_id', ProfileMember::query()->where('user_id', $user->id)->select('id'))
                 ->orderBy('created_at')->get(['invited_name', 'invited_email', 'access_level', 'can_view_health', 'can_view_finance', 'grant_basis', 'granted_declared_at', 'status', 'accepted_at', 'revoked_at', 'created_at'])->map->attributesToArray()->all(),

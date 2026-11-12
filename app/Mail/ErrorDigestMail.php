@@ -2,12 +2,13 @@
 
 namespace App\Mail;
 
+use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
 
 /** Relatório diário de erros da plataforma (ver ErrorDigest). Sem dado de cliente: a mensagem já vem limpa do registro. */
-class ErrorDigestMail extends Mailable
+class ErrorDigestMail extends Mailable implements ShouldBeEncrypted
 {
     /** @param  array<string, mixed>  $dados */
     public function __construct(public array $dados) {}

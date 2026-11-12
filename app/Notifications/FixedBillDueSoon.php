@@ -6,6 +6,7 @@ use App\Models\FixedBillPayment;
 use App\Support\Money;
 use Carbon\CarbonImmutable;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
@@ -19,7 +20,7 @@ use NotificationChannels\WebPush\WebPushMessage;
  * falha FECHADO sem perfil ativo (ver ProfileScope). Guardar o model aqui
  * faria o worker reidratar `payment` como null e quebrar na entrega.
  */
-class FixedBillDueSoon extends Notification implements ShouldQueue
+class FixedBillDueSoon extends Notification implements ShouldBeEncrypted, ShouldQueue
 {
     use Queueable;
 

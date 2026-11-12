@@ -128,7 +128,8 @@ class EngagementPhase3Test extends TestCase
 
         self::assertSame(['2026-10-22', '2026-10-29', '2026-11-05', '2026-11-12'], $reunioes->map(fn ($m) => $m->scheduled_at->format('Y-m-d'))->all());
         self::assertCount(1, $reunioes->pluck('series_id')->unique());
-        self::assertSame(4, EngagementMeeting::query()->where('agenda', 'Revisão')->where('location', 'meet.example.com')->count());
+        // Pauta e local são cifrados no banco: o filtro é em PHP, não em SQL.
+        self::assertSame(4, EngagementMeeting::query()->get()->filter(fn ($m) => $m->agenda === 'Revisão' && $m->location === 'meet.example.com')->count());
         Notification::assertSentToTimes($this->cliente, EngagementNotice::class, 1);
         Notification::assertSentTo($this->cliente, EngagementNotice::class, fn (EngagementNotice $n) => $n->kind === 'meeting_series' && str_contains($n->message, '4 reuniões'));
     }

@@ -6,6 +6,7 @@ use App\Enums\HealthCareItemEvent;
 use App\Models\HealthCareItem;
 use App\Support\CareLinks;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
@@ -16,7 +17,7 @@ use NotificationChannels\WebPush\WebPushMessage;
  * Aviso a quem acompanha a pessoa quando um item de cuidado muda: cadastrado, alterado, troca registrada, pausado, retomado ou removido.
  * Quem fez a mudança não recebe o próprio aviso. Carrega o texto pronto: o worker da fila não tem perfil ativo e o item pode já ter mudado.
  */
-class HealthCareItemChanged extends Notification implements ShouldQueue
+class HealthCareItemChanged extends Notification implements ShouldBeEncrypted, ShouldQueue
 {
     use Queueable;
 

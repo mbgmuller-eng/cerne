@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Casts\Sensitive;
 use App\Enums\HealthCareCategory;
 use App\Enums\HealthCareIntervalUnit;
 use App\Models\Concerns\BelongsToProfile;
@@ -26,6 +27,9 @@ class HealthCareItem extends Model
     protected function casts(): array
     {
         return [
+            'name' => Sensitive::class,
+            'device_name' => Sensitive::class,
+            'notes' => Sensitive::class,
             'category' => HealthCareCategory::class,
             'interval_unit' => HealthCareIntervalUnit::class,
             'interval_value' => 'integer',

@@ -46,7 +46,7 @@ class CreateConsultant extends Command
 
         // Mesma política de senha do aceite de convite de cliente
         // (AcceptInviteController) — um consultor não é menos sensível.
-        $regraSenha = Password::min(8)->letters()->numbers();
+        $regraSenha = Password::defaults();
 
         $senha = password(
             'Senha do consultor (mín. 8 caracteres, com letra e número)',

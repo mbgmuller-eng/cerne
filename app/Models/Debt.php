@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Casts\Sensitive;
 use App\Enums\AdjustmentIndex;
 use App\Enums\ConsortiumType;
 use App\Enums\ContemplationMode;
@@ -46,6 +47,8 @@ class Debt extends Model
     protected function casts(): array
     {
         return [
+            'creditor_document' => Sensitive::class,
+            'notes' => Sensitive::class,
             'kind' => DebtKind::class,
             'status' => DebtStatus::class,
             'amortization' => DebtAmortization::class,

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Casts\SensitiveArray;
 use App\Enums\DocumentType;
 use App\Enums\ProcessingStatus;
 use App\Models\Concerns\Auditable;
@@ -39,7 +40,7 @@ class DocumentUpload extends Model
         return [
             'document_type' => DocumentType::class,
             'processing_status' => ProcessingStatus::class,
-            'extraction_summary' => 'array',
+            'extraction_summary' => SensitiveArray::class,
             'imported_item_indices' => 'array',
             'excluded_item_indices' => 'array',
             'card_payment_log' => 'array',

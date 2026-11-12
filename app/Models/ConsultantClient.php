@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Casts\Sensitive;
 use App\Enums\ConsultantClientStatus;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
@@ -37,6 +38,7 @@ class ConsultantClient extends Model
     protected function casts(): array
     {
         return [
+            'notes' => Sensitive::class,
             'status' => ConsultantClientStatus::class,
             'invited_at' => 'datetime',
             'accepted_at' => 'datetime',

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Casts\Sensitive;
 use App\Models\Concerns\BelongsToProfile;
 use App\Models\Scopes\EngagementScope;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -38,5 +39,13 @@ class EngagementRequestComment extends Model
     public function author(): BelongsTo
     {
         return $this->belongsTo(User::class, 'author_user_id');
+    }
+
+    /** @return array<string, string> */
+    protected function casts(): array
+    {
+        return [
+            'body' => Sensitive::class,
+        ];
     }
 }

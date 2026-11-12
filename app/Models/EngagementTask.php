@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Casts\Sensitive;
 use App\Enums\EngagementTaskOwner;
 use App\Enums\EngagementTaskStatus;
 use App\Models\Concerns\BelongsToProfile;
@@ -33,6 +34,7 @@ class EngagementTask extends Model
     protected function casts(): array
     {
         return [
+            'description' => Sensitive::class,
             'due_date' => 'date',
             'completed_at' => 'datetime',
             'owner' => EngagementTaskOwner::class,

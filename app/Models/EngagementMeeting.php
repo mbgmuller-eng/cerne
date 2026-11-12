@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Casts\Sensitive;
 use App\Enums\EngagementMeetingFormat;
 use App\Enums\EngagementMeetingStatus;
 use App\Models\Concerns\BelongsToProfile;
@@ -30,6 +31,10 @@ class EngagementMeeting extends Model
     protected function casts(): array
     {
         return [
+            'location' => Sensitive::class,
+            'agenda' => Sensitive::class,
+            'prep_notes' => Sensitive::class,
+            'summary' => Sensitive::class,
             'scheduled_at' => 'datetime',
             'duration_minutes' => 'integer',
             'format' => EngagementMeetingFormat::class,

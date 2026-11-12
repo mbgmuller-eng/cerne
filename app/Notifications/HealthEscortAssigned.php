@@ -4,6 +4,7 @@ namespace App\Notifications;
 
 use Carbon\CarbonImmutable;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
@@ -12,7 +13,7 @@ use Illuminate\Notifications\Notification;
  * "Fulano pediu que você leve Maria à consulta": avisa quem foi escolhido para levar a pessoa, na hora, sem esperar o lembrete do dia anterior.
  * Carrega o texto pronto: o worker da fila não tem perfil ativo. O link passa por `care.goto`, que escolhe a pessoa antes de abrir a agenda.
  */
-class HealthEscortAssigned extends Notification implements ShouldQueue
+class HealthEscortAssigned extends Notification implements ShouldBeEncrypted, ShouldQueue
 {
     use Queueable;
 

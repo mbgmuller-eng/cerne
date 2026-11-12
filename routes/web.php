@@ -82,39 +82,67 @@ Route::view('/profissionais', 'professionals')->name('professionals');
 */
 Route::middleware('guest')->group(function (): void {
     Route::get('/entrar', [LoginController::class, 'show'])->name('login');
-    Route::post('/entrar', [LoginController::class, 'store'])->name('login.store');
+    Route::post('/entrar', [LoginController::class, 'store'])->middleware('throttle:login-ip')->name('login.store');
+
+    // Segunda etapa do login (verificação em dois passos): a sessão só abre depois do código.
+    Route::get('/entrar/verificacao', [\App\Http\Controllers\Auth\TwoFactorChallengeController::class, 'show'])->name('two-factor.challenge');
+    Route::post('/entrar/verificacao', [\App\Http\Controllers\Auth\TwoFactorChallengeController::class, 'store'])->middleware('throttle:login-ip')->name('two-factor.store');
+
+    // Redefinição de senha: o pedido e a troca têm teto por IP e por e-mail (ver AppServiceProvider::configureRateLimiting).
+    Route::get('/esqueci-a-senha', [\App\Http\Controllers\Auth\PasswordResetController::class, 'showRequest'])->name('password.request');
+    Route::post('/esqueci-a-senha', [\App\Http\Controllers\Auth\PasswordResetController::class, 'sendLink'])->middleware('throttle:password-reset')->name('password.email');
+    Route::get('/redefinir-senha/{token}', [\App\Http\Controllers\Auth\PasswordResetController::class, 'showReset'])->middleware('throttle:invite-token')->name('password.reset');
+    Route::post('/redefinir-senha', [\App\Http\Controllers\Auth\PasswordResetController::class, 'reset'])->middleware('throttle:password-reset')->name('password.update');
 
     // Compra: resumo do pedido + criação de conta. A rota fixa de profissional
     // vem antes de /comprar/{pacote} pra "profissional" não ser lido como pacote.
     Route::get('/comprar/profissional', [CheckoutController::class, 'showProfessional'])->name('checkout.professional');
     Route::get('/comprar/{pacote}', [CheckoutController::class, 'show'])->name('checkout.show');
-    Route::post('/comprar', [CheckoutController::class, 'store'])->name('checkout.store');
+    Route::post('/comprar', [CheckoutController::class, 'store'])->middleware('throttle:registration')->name('checkout.store');
 
     Route::get('/cadastro', [SelfRegistrationController::class, 'show'])->name('register');
-    Route::post('/cadastro', [SelfRegistrationController::class, 'store'])->name('register.store');
+    Route::post('/cadastro', [SelfRegistrationController::class, 'store'])->middleware('throttle:registration')->name('register.store');
 
-    Route::get('/convite/{token}', [AcceptInviteController::class, 'show'])->name('invite.accept');
-    Route::post('/convite/{token}', [AcceptInviteController::class, 'store'])->name('invite.store');
+    Route::get('/convite/{token}', [AcceptInviteController::class, 'show'])->middleware('throttle:invite-token')->name('invite.accept');
+    Route::post('/convite/{token}', [AcceptInviteController::class, 'store'])->middleware('throttle:invite-token')->name('invite.store');
 
-    Route::get('/convite-conjuge/{token}', [AcceptPartnerInviteController::class, 'show'])->name('partner-invite.accept');
-    Route::post('/convite-conjuge/{token}', [AcceptPartnerInviteController::class, 'store'])->name('partner-invite.store');
+    Route::get('/convite-conjuge/{token}', [AcceptPartnerInviteController::class, 'show'])->middleware('throttle:invite-token')->name('partner-invite.accept');
+    Route::post('/convite-conjuge/{token}', [AcceptPartnerInviteController::class, 'store'])->middleware('throttle:invite-token')->name('partner-invite.store');
 
-    Route::get('/convite-profissional/{token}', [AcceptProfessionalInviteController::class, 'show'])->name('professional-invite.accept');
-    Route::post('/convite-profissional/{token}', [AcceptProfessionalInviteController::class, 'store'])->name('professional-invite.store');
+    Route::get('/convite-profissional/{token}', [AcceptProfessionalInviteController::class, 'show'])->middleware('throttle:invite-token')->name('professional-invite.accept');
+    Route::post('/convite-profissional/{token}', [AcceptProfessionalInviteController::class, 'store'])->middleware('throttle:invite-token')->name('professional-invite.store');
 });
 
 // Convite para acompanhar uma pessoa: fora do grupo de visitantes de propósito. Quem já tem conta pode estar logado ao abrir o link, e o
 // controlador decide o que mostrar conforme o e-mail convidado.
-Route::get('/convite-cuidador/{token}', [\App\Http\Controllers\Auth\AcceptCaregiverInviteController::class, 'show'])->name('caregiver-invite.accept');
-Route::post('/convite-cuidador/{token}', [\App\Http\Controllers\Auth\AcceptCaregiverInviteController::class, 'store'])->name('caregiver-invite.store');
+Route::get('/convite-cuidador/{token}', [\App\Http\Controllers\Auth\AcceptCaregiverInviteController::class, 'show'])->middleware('throttle:invite-token')->name('caregiver-invite.accept');
+Route::post('/convite-cuidador/{token}', [\App\Http\Controllers\Auth\AcceptCaregiverInviteController::class, 'store'])->middleware('throttle:invite-token')->name('caregiver-invite.store');
 // Convite para a PRÓPRIA pessoa acompanhada ter login e ver o espaço dela.
-Route::get('/convite-pessoa/{token}', [\App\Http\Controllers\Auth\AcceptCarePersonInviteController::class, 'show'])->name('care-person-invite.accept');
-Route::post('/convite-pessoa/{token}', [\App\Http\Controllers\Auth\AcceptCarePersonInviteController::class, 'store'])->name('care-person-invite.store');
+Route::get('/convite-pessoa/{token}', [\App\Http\Controllers\Auth\AcceptCarePersonInviteController::class, 'show'])->middleware('throttle:invite-token')->name('care-person-invite.accept');
+Route::post('/convite-pessoa/{token}', [\App\Http\Controllers\Auth\AcceptCarePersonInviteController::class, 'store'])->middleware('throttle:invite-token')->name('care-person-invite.store');
 
 // QR Code de emergência: pública de propósito (quem escaneia é um
 // socorrista ou familiar sem conta) — token opaco no lugar de login, ver
 // HealthCardService::emergencyPayload().
 Route::get('/saude/emergencia/{token}', [HealthEmergencyController::class, 'show'])->middleware('throttle:30,1')->name('health.emergency.show');
+
+// Relato do navegador sobre a política de conteúdo em observação (ver SecurityHeaders): o navegador chama sem login nem CSRF.
+Route::post('/csp-report', [\App\Http\Controllers\CspReportController::class, 'store'])->middleware('throttle:60,1')->name('csp.report');
+
+// Contato para quem achar uma falha (RFC 9116). Sai do e-mail do encarregado configurado; sem ele, a rota não existe.
+Route::get('/.well-known/security.txt', function () {
+    $contato = config('cerne.legal.dpo_email');
+    abort_if(blank($contato), 404);
+
+    $linhas = [
+        'Contact: mailto:'.$contato,
+        'Expires: '.now()->addYear()->startOfDay()->toIso8601ZuluString(),
+        'Preferred-Languages: pt, en',
+        'Canonical: '.url('/.well-known/security.txt'),
+    ];
+
+    return response(implode("\n", $linhas)."\n", 200, ['Content-Type' => 'text/plain; charset=utf-8']);
+})->name('security.txt');
 
 // Webhook da Asaas: pública de propósito (é a Asaas chamando, não uma
 // pessoa logada) — autenticação é o header asaas-access-token, conferido
@@ -144,6 +172,9 @@ Route::middleware('auth')->group(function (): void {
     // nem deslogar (o "verified" do grupo abaixo bloquearia isto também).
     Route::post('/sair', [LoginController::class, 'destroy'])->name('logout');
 
+    // Configuração obrigatória do segundo passo (ver RequiresTwoFactor): fora do grupo que exige a configuração, senão vira loop.
+    Route::view('/seguranca/dois-passos', 'auth.two-factor-setup')->name('two-factor.setup');
+
     // Aceite da versão atual dos Termos e da Política (ver RequiresCurrentTerms) e consentimento específico de saúde (RequiresHealthConsent).
     Route::get('/aceite-dos-termos', [\App\Http\Controllers\LegalAcceptanceController::class, 'showTerms'])->name('legal.accept');
     Route::post('/aceite-dos-termos', [\App\Http\Controllers\LegalAcceptanceController::class, 'storeTerms'])->name('legal.accept.store');
@@ -160,7 +191,7 @@ Route::middleware('auth')->group(function (): void {
 | carimbado (ClientOnboardingService/ProfessionalOnboardingService), não
 | muda de comportamento pra ela.
 */
-Route::middleware(['auth', 'verified', 'termos', 'cuidado'])->group(function (): void {
+Route::middleware(['auth', 'verified', 'termos', 'dois-passos', 'cuidado'])->group(function (): void {
     // Fora do bloqueio por assinatura: o necessário para pagar e para sair
     // (ver RequiresActiveSubscription).
     Route::get('/minha-conta', MyAccount::class)->name('my-account');

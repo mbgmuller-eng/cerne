@@ -125,7 +125,7 @@ class DebtTaxReport extends Component
             fwrite($saida, "\xEF\xBB\xBF"); // o Excel em português só lê acento com a marca de UTF-8
 
             foreach ($linhas as $linha) {
-                fputcsv($saida, $linha, ';');
+                fputcsv($saida, \App\Support\CsvSafe::row($linha), ';');
             }
 
             fclose($saida);

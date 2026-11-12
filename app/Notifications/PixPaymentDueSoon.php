@@ -3,6 +3,7 @@
 namespace App\Notifications;
 
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
@@ -12,7 +13,7 @@ use Illuminate\Notifications\Notification;
  * pagar até o acesso já estar bloqueado. Sempre por e-mail, sem checar
  * notify_email_enabled: é aviso de cobrança, não notificação opcional.
  */
-class PixPaymentDueSoon extends Notification implements ShouldQueue
+class PixPaymentDueSoon extends Notification implements ShouldBeEncrypted, ShouldQueue
 {
     use Queueable;
 

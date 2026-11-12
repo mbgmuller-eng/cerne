@@ -3,6 +3,7 @@
 namespace App\Notifications;
 
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
@@ -11,7 +12,7 @@ use Illuminate\Notifications\Notification;
  * Aviso ao DONO do perfil quando o consultor monta, em nome dele, um convite de cônjuge ou o acesso de um familiar. Nada vale (nem sai e-mail ao
  * convidado) até o dono aprovar em Minha conta: sem isso o consultor convidaria um e-mail que ele mesmo controla e ganharia um login dentro do perfil.
  */
-class ConsultantAccessRequested extends Notification implements ShouldQueue
+class ConsultantAccessRequested extends Notification implements ShouldBeEncrypted, ShouldQueue
 {
     use Queueable;
 

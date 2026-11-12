@@ -3,6 +3,7 @@
 namespace App\Notifications;
 
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
@@ -13,7 +14,7 @@ use NotificationChannels\WebPush\WebPushMessage;
  * Aviso do Acompanhamento (reunião, tarefa, demanda, lembrete). Carrega só texto já pronto e o perfil, sem model: o worker da
  * fila não tem contexto de perfil, e o clique no sino abre o perfil certo antes de ir para a tela.
  */
-class EngagementNotice extends Notification implements ShouldQueue
+class EngagementNotice extends Notification implements ShouldBeEncrypted, ShouldQueue
 {
     use Queueable;
 

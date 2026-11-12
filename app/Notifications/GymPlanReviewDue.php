@@ -3,6 +3,7 @@
 namespace App\Notifications;
 
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
@@ -13,7 +14,7 @@ use NotificationChannels\WebPush\WebPushMessage;
  * "Hora de renovar o treino": a fase de treino passou do ponto de troca (tempo para o objetivo ou exercícios parados). Um aviso por
  * fase, só para o dono (dado de saúde pessoal). Carrega o texto já pronto: o worker da fila não tem perfil ativo.
  */
-class GymPlanReviewDue extends Notification implements ShouldQueue
+class GymPlanReviewDue extends Notification implements ShouldBeEncrypted, ShouldQueue
 {
     use Queueable;
 

@@ -69,7 +69,7 @@ class CheckoutController extends Controller
             'nome' => ['required', 'string', 'max:100'],
             'email' => ['required', 'email', 'max:255', 'unique:users,email'],
             'nascimento' => ['required', 'date', 'before:today', 'after:1900-01-01'],
-            'password' => ['required', 'confirmed', Password::min(8)->letters()->numbers()],
+            'password' => ['required', 'confirmed', Password::defaults()],
             'termos' => ['accepted'],
         ], attributes: [
             'nome' => 'nome',

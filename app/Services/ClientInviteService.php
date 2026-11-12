@@ -19,6 +19,8 @@ class ClientInviteService
      */
     public function send(User $consultant, string $name, string $email): string
     {
+        \App\Support\MailThrottle::guard($consultant->id, $email);
+
         ['invite' => $invite, 'token' => $token] = ConsultantInvite::issue($consultant, $name, $email);
 
         $link = route('invite.accept', ['token' => $token]);
@@ -36,6 +38,8 @@ class ClientInviteService
      */
     public function sendStandalone(string $name, string $email): string
     {
+        \App\Support\MailThrottle::guard(null, $email);
+
         ['invite' => $invite, 'token' => $token] = ConsultantInvite::issue(null, $name, $email);
 
         $link = route('invite.accept', ['token' => $token]);

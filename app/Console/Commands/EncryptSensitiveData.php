@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Casts\Sensitive;
+use App\Casts\SensitiveNotificationData;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
@@ -20,13 +21,29 @@ class EncryptSensitiveData extends Command
 
     /** @var array<string, list<string>> */
     public const COLUMNS = [
-        'users' => ['cpf_cnpj'],
+        'users' => ['cpf_cnpj', 'phone'],
         'billing_details' => ['document'],
         'health_allergies' => ['description'],
         'health_conditions' => ['description'],
         'health_medications' => ['name', 'dose', 'schedule', 'reason', 'prescriber'],
-        'health_appointments' => ['title', 'professional_name', 'specialty', 'notes'],
+        'health_appointments' => ['title', 'professional_name', 'specialty', 'notes', 'location', 'address', 'phone', 'booked_by_name', 'booked_with_name'],
         'health_medication_changes' => ['old_value', 'new_value', 'note'],
+
+        // Segunda leva (revisão de segurança 2026-11): telefone, conta bancária, notas, textos do acompanhamento e as listas lidas por IA
+        // (JSON guardado como texto cifrado, ver SensitiveArray). Mantenha igual a database/migrations/*widen_more_sensitive_columns*.
+        'health_care_items' => ['name', 'device_name', 'notes'],
+        'bank_accounts' => ['agency', 'account_number', 'notes'],
+        'debts' => ['creditor_document', 'notes'],
+        'insurance_policies' => ['insured_person_name', 'notes'],
+        'engagement_notes' => ['body'],
+        'engagement_meetings' => ['location', 'agenda', 'prep_notes', 'summary'],
+        'engagement_tasks' => ['description'],
+        'engagement_requests' => ['body'],
+        'engagement_request_comments' => ['body'],
+        'consultant_clients' => ['notes'],
+        'leads' => ['phone', 'notes'],
+        'document_uploads' => ['extraction_summary'],
+        'lead_attachments' => ['extraction_summary'],
     ];
 
     /** Quantas linhas ainda têm algum campo sensível em texto puro (o cerne:check avisa enquanto for maior que zero). */
@@ -47,6 +64,15 @@ class EncryptSensitiveData extends Command
                 }
             });
         }
+
+        // Textos das notificações do sino (título, mensagem, nome da pessoa): cifrados campo a campo, ver SensitiveNotificationData.
+        DB::table('notifications')->orderBy('id')->chunkById(500, function ($linhas) use (&$total): void {
+            foreach ($linhas as $linha) {
+                if (SensitiveNotificationData::rowHasPlaintext((string) $linha->data)) {
+                    $total++;
+                }
+            }
+        });
 
         return $total;
     }
@@ -84,6 +110,26 @@ class EncryptSensitiveData extends Command
             $this->line("  {$tabela}: {$feitos} ".($simular ? 'a cifrar' : 'cifrados'));
             $total += $feitos;
         }
+
+        $notificacoes = 0;
+
+        DB::table('notifications')->orderBy('id')->chunkById(200, function ($linhas) use ($simular, &$notificacoes): void {
+            foreach ($linhas as $linha) {
+                if (! SensitiveNotificationData::rowHasPlaintext((string) $linha->data)) {
+                    continue;
+                }
+
+                $notificacoes++;
+
+                if (! $simular) {
+                    $dados = SensitiveNotificationData::encryptFields((array) json_decode((string) $linha->data, true));
+                    DB::table('notifications')->where('id', $linha->id)->update(['data' => json_encode($dados, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)]);
+                }
+            }
+        });
+
+        $this->line("  notifications: {$notificacoes} ".($simular ? 'a cifrar' : 'cifradas'));
+        $total += $notificacoes;
 
         $this->components->info(($simular ? '[SIMULAÇÃO] ' : '')."Linhas com campo sensível em texto puro: {$total}.");
 

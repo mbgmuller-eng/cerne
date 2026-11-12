@@ -6,6 +6,7 @@ use App\Models\DebtInstallment;
 use App\Support\Money;
 use Carbon\CarbonImmutable;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
@@ -16,7 +17,7 @@ use NotificationChannels\WebPush\WebPushMessage;
  * Parcela de financiamento ou empréstimo a vencer. Carrega dado já resolvido, não o model: o worker da fila não tem perfil
  * ativo e o model falharia fechado (mesmo motivo de FixedBillDueSoon).
  */
-class DebtInstallmentDueSoon extends Notification implements ShouldQueue
+class DebtInstallmentDueSoon extends Notification implements ShouldBeEncrypted, ShouldQueue
 {
     use Queueable;
 

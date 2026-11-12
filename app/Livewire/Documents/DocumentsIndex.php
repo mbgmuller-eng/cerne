@@ -199,6 +199,14 @@ class DocumentsIndex extends Component
             return;
         }
 
+        // Teto geral por perfil e por dia, para todo tipo de leitura (extrato e fatura não tinham): cada envio é uma chamada
+        // paga à API, e um laço de envios repetidos viraria conta alta em minutos.
+        if ($this->totalDiarioAtingido()) {
+            $this->addError('arquivo', 'Limite de '.config('cerne.ai.document_imports_per_day').' documentos enviados por dia atingido neste perfil. Tente amanhã.');
+
+            return;
+        }
+
         $context = app(ProfileContext::class);
 
         // Disco privado: extrato bancário não pode ficar em pasta pública.
@@ -1195,6 +1203,13 @@ class DocumentsIndex extends Component
             ->orderByDesc('created_at')
             ->limit(30)
             ->get();
+    }
+
+    private function totalDiarioAtingido(): bool
+    {
+        return DocumentUpload::query()
+            ->where('created_at', '>=', now()->startOfDay())
+            ->count() >= config('cerne.ai.document_imports_per_day');
     }
 
     private function limiteDiarioAtingido(): bool

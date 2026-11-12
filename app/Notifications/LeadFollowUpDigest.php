@@ -3,6 +3,7 @@
 namespace App\Notifications;
 
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
@@ -13,7 +14,7 @@ use NotificationChannels\WebPush\WebPushMessage;
  * Resumo diário do que pede atenção nos leads do profissional: cotações vencendo, contatos sem retorno e próximos
  * passos atrasados. Carrega só números, sem model: o worker da fila não tem contexto de perfil.
  */
-class LeadFollowUpDigest extends Notification implements ShouldQueue
+class LeadFollowUpDigest extends Notification implements ShouldBeEncrypted, ShouldQueue
 {
     use Queueable;
 

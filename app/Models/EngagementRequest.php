@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Casts\Sensitive;
 use App\Enums\EngagementRequestStatus;
 use App\Models\Concerns\BelongsToProfile;
 use App\Models\Scopes\EngagementScope;
@@ -29,6 +30,7 @@ class EngagementRequest extends Model
     protected function casts(): array
     {
         return [
+            'body' => Sensitive::class,
             'resolved_at' => 'datetime',
             'status' => EngagementRequestStatus::class,
         ];

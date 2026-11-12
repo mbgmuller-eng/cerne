@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Casts\SensitiveArray;
 use App\Enums\ProcessingStatus;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
@@ -25,7 +26,7 @@ class LeadAttachment extends Model
         return [
             'extraction_status' => ProcessingStatus::class,
             'extraction_requested_at' => 'datetime',
-            'extraction_summary' => 'array',
+            'extraction_summary' => SensitiveArray::class,
             'extraction_applied_at' => 'datetime',
         ];
     }

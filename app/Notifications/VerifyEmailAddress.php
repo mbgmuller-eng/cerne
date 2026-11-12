@@ -3,6 +3,7 @@
 namespace App\Notifications;
 
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
@@ -13,7 +14,7 @@ use Illuminate\Support\Facades\URL;
  * link assinado por baixo (URL::temporarySignedRoute), só troca o
  * template genérico pelo nosso. Ver User::sendEmailVerificationNotification().
  */
-class VerifyEmailAddress extends Notification implements ShouldQueue
+class VerifyEmailAddress extends Notification implements ShouldBeEncrypted, ShouldQueue
 {
     use Queueable;
 

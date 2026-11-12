@@ -224,6 +224,10 @@
 
     <livewire:profile.access-approvals />
 
+    <livewire:profile.change-password />
+
+    <livewire:profile.two-factor-settings />
+
     @include('livewire.profile.partials.notifications')
 
     <livewire:tutorial.reset-tutorials />

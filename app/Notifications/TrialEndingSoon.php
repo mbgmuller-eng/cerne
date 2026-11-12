@@ -3,6 +3,7 @@
 namespace App\Notifications;
 
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
@@ -13,7 +14,7 @@ use Illuminate\Support\Carbon;
  * sino do Cerne, sempre, sem checar notify_email_enabled: é aviso de cobrança,
  * não notificação opcional, e depois do último dia o acesso trava.
  */
-class TrialEndingSoon extends Notification implements ShouldQueue
+class TrialEndingSoon extends Notification implements ShouldBeEncrypted, ShouldQueue
 {
     use Queueable;
 

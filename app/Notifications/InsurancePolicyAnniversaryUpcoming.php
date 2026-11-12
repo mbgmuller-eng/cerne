@@ -5,6 +5,7 @@ namespace App\Notifications;
 use App\Models\InsurancePolicy;
 use App\Support\Money;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
@@ -17,7 +18,7 @@ use NotificationChannels\WebPush\WebPushMessage;
  * consultor e pro corretor DAQUELA apólice específica (broker_id), nunca
  * corretor de outro produto do mesmo cliente.
  */
-class InsurancePolicyAnniversaryUpcoming extends Notification implements ShouldQueue
+class InsurancePolicyAnniversaryUpcoming extends Notification implements ShouldBeEncrypted, ShouldQueue
 {
     use Queueable;
 

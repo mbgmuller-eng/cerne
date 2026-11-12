@@ -5,6 +5,7 @@ namespace App\Notifications;
 use App\Models\InsurancePolicy;
 use App\Support\Money;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
@@ -18,7 +19,7 @@ use NotificationChannels\WebPush\WebPushMessage;
  * um fim de vigência de verdade, sem continuidade automática. Mesmo
  * alcance: consultor + corretor daquela apólice (broker_id).
  */
-class InsurancePolicyExpiringUpcoming extends Notification implements ShouldQueue
+class InsurancePolicyExpiringUpcoming extends Notification implements ShouldBeEncrypted, ShouldQueue
 {
     use Queueable;
 

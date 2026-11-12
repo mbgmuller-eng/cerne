@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Casts\Sensitive;
 use App\Models\Concerns\BelongsToProfile;
 use App\Models\Scopes\EngagementScope;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -28,6 +29,7 @@ class EngagementNote extends Model
     protected function casts(): array
     {
         return [
+            'body' => Sensitive::class,
             'is_private' => 'boolean',
         ];
     }

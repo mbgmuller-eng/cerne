@@ -5,6 +5,7 @@ namespace App\Notifications;
 use App\Models\InvestmentRecord;
 use App\Support\Money;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
@@ -18,7 +19,7 @@ use NotificationChannels\WebPush\WebPushMessage;
  * (mesma régua de PortfolioInvestments/InvestmentsIndex), então nunca é
  * despachada pra ele.
  */
-class InvestmentMaturityUpcoming extends Notification implements ShouldQueue
+class InvestmentMaturityUpcoming extends Notification implements ShouldBeEncrypted, ShouldQueue
 {
     use Queueable;
 

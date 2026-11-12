@@ -36,6 +36,10 @@ class PartnerInviteService
             throw new RuntimeException('O cliente ainda não ativou o acesso à conta. Envie o convite de acesso primeiro: é ele quem aprova a entrada do cônjuge.');
         }
 
+        if ($doDono) {
+            \App\Support\MailThrottle::guard($issuer->id, $email);
+        }
+
         // Reenviar substitui o convite anterior em vez de empilhar —
         // a pessoa pode ter perdido o e-mail/link original.
         PartnerInvite::query()
@@ -70,6 +74,8 @@ class PartnerInviteService
         if ($this->alreadyHasPartnerComLogin($invite->profile)) {
             throw new RuntimeException('Este perfil já tem um cônjuge cadastrado.');
         }
+
+        \App\Support\MailThrottle::guard($owner->id, $invite->partner_email);
 
         $token = \Illuminate\Support\Str::random(48);
 

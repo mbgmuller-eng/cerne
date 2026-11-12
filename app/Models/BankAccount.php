@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Casts\Sensitive;
 use App\Enums\AccountType;
 use App\Models\Concerns\Auditable;
 use App\Models\Concerns\BelongsToProfile;
@@ -28,6 +29,9 @@ class BankAccount extends Model
     protected function casts(): array
     {
         return [
+            'agency' => Sensitive::class,
+            'account_number' => Sensitive::class,
+            'notes' => Sensitive::class,
             'account_type' => AccountType::class,
             'current_balance' => 'decimal:2',
             'is_joint' => 'boolean',
