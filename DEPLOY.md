@@ -182,7 +182,9 @@ user=USUARIO_DO_BANCO
 password=SENHA_DO_BANCO
 ```
 
-O banco, cifrado, e os arquivos privados (o banco não os contém):
+**Já existe um script pronto: `scripts/backup-cerne.sh`** (banco e `storage/app/private`, cifrados, conferidos ao final, com rotação de 7 dias).
+No servidor: crie `~/.my.cnf` e `~/.backup-pass` (modelo acima) e agende no cron da hospedagem (hPanel, Avançado, Cron Jobs):
+`bash /home/USUARIO/cerne/scripts/backup-cerne.sh >> /home/USUARIO/backups/backup.log 2>&1`, todo dia às 02:30. As linhas abaixo mostram o que ele faz, para quem preferir montar à mão:
 
 ```bash
 # banco: dump comprimido e CIFRADO (a frase fica em ~/.backup-pass, chmod 600, e também no cofre de senhas)
