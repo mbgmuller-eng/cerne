@@ -116,6 +116,7 @@
             </div>
 
             <x-form-consequence :lines="$accountConsequence" />
+            <x-form-errors />
 
             <div class="flex justify-end">
                 <button type="submit" class="btn-primary px-4 py-2" wire:loading.attr="disabled">
@@ -215,6 +216,7 @@
             </div>
 
             <x-form-consequence :lines="$cardConsequence" />
+            <x-form-errors />
 
             <div class="flex justify-end">
                 <button type="submit" class="btn-primary px-4 py-2" wire:loading.attr="disabled">

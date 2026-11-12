@@ -279,9 +279,11 @@ class FixedBillsIndex extends Component
         $this->billName = $conta->name;
         $this->billAmount = $conta->amount;
         $this->billRecurrence = $conta->recurrence->value;
-        $this->billDueDay = (string) ($conta->due_day ?? '');
-        $this->billDueWeekday = (string) ($conta->due_weekday ?? '');
-        $this->billDueMonth = (string) ($conta->due_month ?? '');
+        // Só o que a recorrência usa: um 0 antigo em campo que a conta não usa (dia da semana de conta mensal, mês de conta que não é anual) voltava
+        // para o formulário, e a validação recusava um campo escondido, sem mensagem nenhuma na tela.
+        $this->billDueDay = $conta->due_day ? (string) $conta->due_day : '';
+        $this->billDueWeekday = $conta->recurrence === RecurrenceType::Weekly && $conta->due_weekday !== null ? (string) $conta->due_weekday : '';
+        $this->billDueMonth = $conta->recurrence === RecurrenceType::Annual && $conta->due_month ? (string) $conta->due_month : '';
         $this->billNecessity = $conta->necessity?->value ?? '';
         $this->billCategoryId = $conta->category_id ?? '';
         $this->billSubcategoryId = $conta->subcategory_id ?? '';
@@ -371,9 +373,7 @@ class FixedBillsIndex extends Component
             'name' => $data['billName'],
             'amount' => $data['billAmount'],
             'recurrence' => RecurrenceType::from($data['billRecurrence']),
-            'due_day' => $data['billDueDay'] !== null ? (int) $data['billDueDay'] : null,
-            'due_weekday' => $data['billDueWeekday'] !== null ? (int) $data['billDueWeekday'] : null,
-            'due_month' => $data['billDueMonth'] !== null ? (int) $data['billDueMonth'] : null,
+            ...$this->dueFields($data['billRecurrence'], $data['billDueDay'], $data['billDueWeekday'], $data['billDueMonth']),
             'necessity' => Necessity::from($data['billNecessity']),
             'category_id' => $categoria->id,
             'subcategory_id' => $subcategoriaId,
@@ -428,6 +428,25 @@ class FixedBillsIndex extends Component
         }
 
         return ExpenseSubcategory::query()->findOrFail($this->billSubcategoryId)->id;
+    }
+
+    /**
+     * Dia, dia da semana e mês de um vencimento: SÓ o que a recorrência usa (mensal usa o dia; semanal, o dia da semana; anual, o dia e o mês), o resto
+     * vai NULO. O campo vazio do formulário é uma string vazia e `(int) ''` é 0: gravar assim deixava 0 em mês e dia da semana de conta mensal, e esse 0
+     * voltava ao abrir a edição.
+     *
+     * @return array{due_day: ?int, due_weekday: ?int, due_month: ?int}
+     */
+    private function dueFields(string $recorrencia, ?string $dia, ?string $semana, ?string $mes): array
+    {
+        $tipo = RecurrenceType::from($recorrencia);
+        $inteiro = fn (?string $v): ?int => $v !== null && $v !== '' && ctype_digit($v) ? (int) $v : null;
+
+        return [
+            'due_day' => in_array($tipo, [RecurrenceType::Monthly, RecurrenceType::Annual], true) ? $inteiro($dia) : null,
+            'due_weekday' => $tipo === RecurrenceType::Weekly ? $inteiro($semana) : null,
+            'due_month' => $tipo === RecurrenceType::Annual ? $inteiro($mes) : null,
+        ];
     }
 
     private function resetBillForm(): void
@@ -522,9 +541,9 @@ class FixedBillsIndex extends Component
         $this->incomeName = $receita->name;
         $this->incomeAmount = $receita->amount;
         $this->incomeRecurrence = $receita->recurrence->value;
-        $this->incomeDueDay = (string) ($receita->due_day ?? '');
-        $this->incomeDueWeekday = (string) ($receita->due_weekday ?? '');
-        $this->incomeDueMonth = (string) ($receita->due_month ?? '');
+        $this->incomeDueDay = $receita->due_day ? (string) $receita->due_day : '';
+        $this->incomeDueWeekday = $receita->recurrence === RecurrenceType::Weekly && $receita->due_weekday !== null ? (string) $receita->due_weekday : '';
+        $this->incomeDueMonth = $receita->recurrence === RecurrenceType::Annual && $receita->due_month ? (string) $receita->due_month : '';
         $this->incomeCategoryId = $receita->category_id ?? '';
         $this->incomeMemberId = $receita->member_id ?? '';
         $this->incomeIsPrivate = $receita->is_private;
@@ -595,9 +614,7 @@ class FixedBillsIndex extends Component
             'name' => $data['incomeName'],
             'amount' => $data['incomeAmount'],
             'recurrence' => RecurrenceType::from($data['incomeRecurrence']),
-            'due_day' => $data['incomeDueDay'] !== null ? (int) $data['incomeDueDay'] : null,
-            'due_weekday' => $data['incomeDueWeekday'] !== null ? (int) $data['incomeDueWeekday'] : null,
-            'due_month' => $data['incomeDueMonth'] !== null ? (int) $data['incomeDueMonth'] : null,
+            ...$this->dueFields($data['incomeRecurrence'], $data['incomeDueDay'], $data['incomeDueWeekday'], $data['incomeDueMonth']),
             'category_id' => $categoria->id,
             'member_id' => $memberId,
             'bank_account_id' => $conta?->id,

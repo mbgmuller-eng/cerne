@@ -221,6 +221,7 @@
                 </div>
 
                 <x-form-consequence :lines="$billConsequence" />
+                <x-form-errors />
 
                 <div class="flex justify-end">
                     <button type="submit" class="btn-primary px-4 py-2" wire:loading.attr="disabled">{{ $editingBillId ? 'Salvar alterações' : 'Salvar conta fixa' }}</button>
@@ -454,6 +455,7 @@
                 </div>
 
                 <x-form-consequence :lines="$incomeConsequence" />
+                <x-form-errors />
 
                 <div class="flex justify-end">
                     <button type="submit" class="btn-primary px-4 py-2" wire:loading.attr="disabled">{{ $editingIncomeId ? 'Salvar alterações' : 'Salvar receita recorrente' }}</button>
