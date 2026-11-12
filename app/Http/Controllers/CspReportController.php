@@ -20,7 +20,9 @@ class CspReportController extends Controller
         $relato = is_array($corpo) ? ($corpo['csp-report'] ?? $corpo) : [];
 
         if (is_array($relato)) {
-            Log::notice('csp-report', [
+            // Nível `error` de propósito: a produção roda com LOG_LEVEL=error, e um relato em nível menor seria descartado, deixando a
+            // fase de observação da política sem nenhum dado. Só existe enquanto a política estrita está em Report-Only.
+            Log::error('csp-report', [
                 'directive' => mb_substr((string) ($relato['effective-directive'] ?? $relato['violated-directive'] ?? ''), 0, 60),
                 'blocked' => $this->host((string) ($relato['blocked-uri'] ?? '')),
                 'page' => $this->rota((string) ($relato['document-uri'] ?? '')),

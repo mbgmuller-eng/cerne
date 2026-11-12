@@ -84,7 +84,7 @@ class SecurityHeadersTest extends TestCase
             'script-sample' => 'conteudo-que-nao-deve-ser-gravado',
         ]])->assertNoContent();
 
-        Log::shouldHaveReceived('notice')->once()->withArgs(function (string $mensagem, array $contexto): bool {
+        Log::shouldHaveReceived('error')->once()->withArgs(function (string $mensagem, array $contexto): bool {
             $this->assertSame('csp-report', $mensagem);
             $this->assertSame(['directive' => 'script-src-elem', 'blocked' => 'cdn.exemplo.com', 'page' => '/dividas'], $contexto);
             $this->assertStringNotContainsString('segredo', json_encode($contexto));
