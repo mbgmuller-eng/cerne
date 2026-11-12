@@ -53,7 +53,9 @@ final class DebtAgreementSimulator
 
         if ($referencia !== null) {
             foreach ($linhas as $i => $l) {
-                if ($l['installments'] > $linhas[$referencia]['installments']) {
+                // "Quanto custa parcelar" só faz sentido quando a proposta parcelada NÃO sai mais barata que a de referência (igual = sem juros embutidos, taxa zero). Uma parcelada mais barata
+                // (comum ao comparar ofertas de datas diferentes) não tem custo de parcelamento a mostrar, e a conta daria taxa zero ou negativa.
+                if ($l['installments'] > $linhas[$referencia]['installments'] && bccomp($l['total'], $linhas[$referencia]['total'], 2) >= 0) {
                     // Com entrada: o que sobra do pagamento à vista, depois de pagar a entrada hoje, é o que as parcelas precisam valer.
                     $linhas[$i]['implicit_rate'] = self::implicitRate(bcsub($linhas[$referencia]['total'], $l['down'], 2), bcsub($l['total'], $l['down'], 2), $l['installments']);
                     $linhas[$i]['reference'] = $linhas[$referencia]['label'];

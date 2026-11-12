@@ -95,6 +95,17 @@ class DebtAgreementSimulationSavedTest extends TestCase
         self::assertGreaterThan($semEntrada['implicit_rate'], $comEntrada['implicit_rate']);
     }
 
+    public function test_parcelada_mais_barata_que_a_referencia_nao_mostra_taxa_de_parcelamento(): void
+    {
+        $r = DebtAgreementSimulator::compare('27000.00', [
+            ['label' => 'À vista', 'total' => '15000.00', 'installments' => 1],
+            ['label' => 'Oferta melhor', 'total' => '14000.00', 'down' => '2000.00', 'installments' => 10],
+        ]);
+
+        self::assertNull($r['proposals'][1]['implicit_rate'], 'parcelar custou menos que a referência: não há custo de parcelamento a mostrar');
+        self::assertArrayNotHasKey('reference', $r['proposals'][1]);
+    }
+
     public function test_entrada_maior_ou_igual_ao_total_nao_conta(): void
     {
         $r = DebtAgreementSimulator::compare('1000.00', [['label' => 'X', 'total' => '500.00', 'down' => '500.00', 'installments' => 5]]);

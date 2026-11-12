@@ -177,7 +177,7 @@ class DebtShow extends Component
     /** Teto de propostas numa simulação e de simulações guardadas por dívida. */
     public const MAX_SIM_PROPOSALS = 10;
 
-    public const MAX_SAVED_SIMULATIONS = 30;
+    public const MAX_SAVED_SIMULATIONS = 60;
 
     /** @var list<array{label: string, total: string, down: string, installments: string}> */
     public array $agSimRows = [];
@@ -1049,6 +1049,8 @@ class DebtShow extends Component
         ]);
 
         $this->agSimName = '';
+        // O painel "Propostas de acordo" da tela lê o mesmo armazenamento: avisa para ele ler de novo.
+        $this->dispatch('simulations-changed');
         session()->flash('sim_status', 'Simulação guardada. Ela fica nesta lista para você comparar com uma proposta nova.');
     }
 
@@ -1084,6 +1086,21 @@ class DebtShow extends Component
         if ($this->agCompareId === $id) {
             $this->agCompareId = '';
         }
+
+        $this->dispatch('simulations-changed');
+    }
+
+    /** "Usar esta proposta" no painel de propostas: abre o Registrar acordo já preenchido (os valores ainda passam pela validação ao salvar). */
+    #[\Livewire\Attributes\On('use-agreement-proposal')]
+    public function useProposalFromPanel(string $total, string $down, int $installments): void
+    {
+        abort_unless($this->debt->status->isUnscheduled(), 404);
+
+        $this->showAgreementSim = false;
+        $this->openAgreement();
+        $this->agreementTotal = $total;
+        $this->agreementInstallments = (string) $installments;
+        $this->agreementDown = bccomp($down, '0', 2) > 0 ? $down : '';
     }
 
     /**

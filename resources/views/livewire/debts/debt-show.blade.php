@@ -216,6 +216,9 @@
     </section>
     @endif
 
+    {{-- Propostas de acordo: a lista das ofertas guardadas, com cadastro e comparação (some sozinha se a dívida não é de acordo e não tem histórico). --}}
+    <livewire:debts.debt-proposals-panel :debt-id="$debt->id" :key="'propostas-'.$debt->id" />
+
     @if ($debt->notes)
         <section class="card p-5">
             <h2 class="text-sm font-semibold text-slate-900 dark:text-white">Observações</h2>
