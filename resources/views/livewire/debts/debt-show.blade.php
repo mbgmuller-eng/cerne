@@ -922,9 +922,23 @@
                 Aplicar a nova categoria também às parcelas já pagas (por padrão, só valem as próximas)
             </label>
             <x-form-consequence :lines="$consequenciaEdicao" />
+            @if ($impactoDono)
+                <div class="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-200" role="alert" data-owner-change-confirm>
+                    <p class="font-medium">Confirme antes de salvar</p>
+                    <p class="mt-1 text-xs">
+                        Mudar de quem é a dívida (ou ocultar) vale para a dívida inteira e leva junto
+                        {{ collect([
+                            $impactoDono['installments'] > 0 ? $impactoDono['installments'].($impactoDono['installments'] === 1 ? ' parcela' : ' parcelas') : null,
+                            $impactoDono['expenses'] > 0 ? $impactoDono['expenses'].($impactoDono['expenses'] === 1 ? ' despesa de pagamento já feito' : ' despesas de pagamentos já feitos') : null,
+                            $impactoDono['simulations'] > 0 ? $impactoDono['simulations'].($impactoDono['simulations'] === 1 ? ' simulação guardada' : ' simulações guardadas') : null,
+                        ])->filter()->values()->pipe(fn ($itens) => $itens->count() > 1 ? $itens->slice(0, -1)->join(', ').' e '.$itens->last() : $itens->first()) }}.
+                        Quem não for o novo dono deixa de ver tudo isso. Clique em "Confirmar e salvar" para seguir, ou volte a escolha anterior.
+                    </p>
+                </div>
+            @endif
             <div class="flex flex-wrap items-center justify-between gap-3">
                 <button type="button" wire:click="deleteDebt" wire:confirm="Apagar este contrato e o cronograma? As despesas já lançadas continuam no fluxo de caixa." class="btn-ghost px-3 py-1.5 text-xs text-red-700 dark:text-red-400">Apagar contrato</button>
-                <button type="submit" class="btn-primary px-4 py-2 text-sm">Salvar</button>
+                <button type="submit" class="btn-primary px-4 py-2 text-sm">{{ $impactoDono ? 'Confirmar e salvar' : 'Salvar' }}</button>
             </div>
         </form>
     </x-modal>

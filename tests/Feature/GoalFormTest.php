@@ -91,10 +91,17 @@ class GoalFormTest extends TestCase
         self::assertSame($this->usuario->id, $novo->created_by_user_id);
     }
 
-    public function test_objetivo_parcelado_exige_o_valor_da_parcela(): void
+    public function test_quanto_guardar_por_mes_e_opcional_em_qualquer_forma_de_juntar(): void
     {
+        // Antes só o "parcelado" pedia o valor, e ele não entrava em conta nenhuma: agora é o aporte mensal que alimenta a previsão, opcional sempre.
         Livewire::test(GoalsIndex::class)->call('openForm')
             ->set('name', 'Intercâmbio')->set('estimatedValue', '85000')->set('fundingMethod', 'installments')
+            ->call('save')->assertHasNoErrors();
+        self::assertNull(Goal::query()->where('name', 'Intercâmbio')->sole()->installment_amount);
+        Goal::query()->where('name', 'Intercâmbio')->delete();
+
+        Livewire::test(GoalsIndex::class)->call('openForm')
+            ->set('name', 'Intercâmbio')->set('estimatedValue', '85000')->set('fundingMethod', 'installments')->set('installmentAmount', 'muito')
             ->call('save')->assertHasErrors(['installmentAmount']);
 
         Livewire::test(GoalsIndex::class)->call('openForm')

@@ -9,6 +9,7 @@ use App\Models\Concerns\BelongsToProfile;
 use App\Models\Concerns\InvalidatesDashboard;
 use App\Models\Concerns\RespectsMemberPrivacy;
 use App\Support\Money;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
@@ -133,5 +134,99 @@ class Goal extends Model
 
         return $this->status === GoalStatus::Achieved
             || bccomp($this->accumulated(), $this->estimated_value, 2) >= 0;
+    }
+
+    /**
+     * Previsão no ritmo de "quanto vou guardar por mês" (a coluna `installment_amount`, que a tela chama assim): em que mês o objetivo chega
+     * guardando esse valor todo mês, se isso é antes ou depois da data-alvo e quanto falta aumentar para chegar a tempo. Não conta rendimento.
+     *
+     * Nulo quando não há o que prever: sem aporte informado, objetivo já alcançado ou ligado a consórcio (aí o avanço é pelas parcelas pagas).
+     *
+     * @return array{months: int, date: CarbonImmutable, on_track: ?bool, months_late: ?int, extra_needed: ?string, too_long: bool}|null
+     */
+    public function forecast(?CarbonImmutable $hoje = null): ?array
+    {
+        if ($this->usesInstallments() || $this->isAchieved()) {
+            return null;
+        }
+
+        $mensal = $this->installment_amount;
+        $falta = $this->remaining();
+
+        if ($mensal === null || bccomp((string) $mensal, '0', 2) <= 0 || bccomp($falta, '0', 2) <= 0) {
+            return null;
+        }
+
+        $hoje ??= CarbonImmutable::now();
+
+        // Quantos aportes cheios cabem no que falta, arredondado para cima (bcmath: é conta de dinheiro).
+        $meses = bcdiv($falta, (string) $mensal, 0);
+
+        if (bccomp(bcmul($meses, (string) $mensal, 2), $falta, 2) < 0) {
+            $meses = bcadd($meses, '1', 0);
+        }
+
+        $meses = max(1, (int) $meses);
+        $dataAlvo = $this->target_date !== null ? CarbonImmutable::instance($this->target_date) : null;
+        $noRitmo = null;
+        $atraso = null;
+        $faltaAumentar = null;
+
+        if ($dataAlvo !== null) {
+            if ($dataAlvo->isFuture()) {
+                // Mesma contagem de monthlyNeeded(): meses inteiros até a data-alvo, no mínimo 1.
+                $mesesAteAlvo = max(1, (int) ceil($hoje->diffInMonths($dataAlvo)));
+                $noRitmo = $meses <= $mesesAteAlvo;
+
+                if (! $noRitmo) {
+                    $atraso = $meses - $mesesAteAlvo;
+                    $preciso = Money::parse(bcdiv($falta, (string) $mesesAteAlvo, 2));
+                    $extra = bcsub($preciso, (string) $mensal, 2);
+                    $faltaAumentar = bccomp($extra, '0', 2) > 0 ? $extra : null;
+                }
+            } else {
+                // Data-alvo que já passou: não há "a tempo" a medir, só a previsão.
+                $noRitmo = false;
+            }
+        }
+
+        return [
+            'months' => $meses,
+            'date' => $hoje->addMonthsNoOverflow($meses),
+            'on_track' => $noRitmo,
+            'months_late' => $atraso,
+            'extra_needed' => $faltaAumentar,
+            'too_long' => $meses > 600,
+        ];
+    }
+
+    /** A previsão em uma frase para a lista e para o aviso "Ao salvar"; nulo quando não há previsão. */
+    public function forecastLine(?CarbonImmutable $hoje = null): ?string
+    {
+        $f = $this->forecast($hoje);
+
+        if ($f === null) {
+            return null;
+        }
+
+        $ritmo = 'No ritmo de '.Money::format((string) $this->installment_amount).' por mês';
+
+        if ($f['too_long']) {
+            return $ritmo.', o objetivo levaria mais de 50 anos. Aumente o valor guardado por mês.';
+        }
+
+        $linha = $ritmo.', chega em '.$f['date']->format('m/Y');
+
+        if ($f['on_track'] === true) {
+            return $linha.', antes da data-alvo.';
+        }
+
+        if ($f['months_late'] !== null) {
+            $linha .= ', '.$f['months_late'].' '.($f['months_late'] === 1 ? 'mês' : 'meses').' depois da data-alvo.';
+
+            return $f['extra_needed'] !== null ? $linha.' Para chegar a tempo, guarde '.Money::format($f['extra_needed']).' por mês.' : $linha;
+        }
+
+        return $linha.($f['on_track'] === false ? ', depois da data-alvo.' : '.');
     }
 }

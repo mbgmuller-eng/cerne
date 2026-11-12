@@ -185,6 +185,8 @@ class EditAndImportConsequenceTest extends TestCase
             ->call('openEdit')
             ->set('editMemberId', $bruno->id)
             ->assertSee('Mudar de quem é vale para a dívida inteira: as parcelas e as despesas dos pagamentos já feitos passam para Bruno.')
+            // O 1º "Salvar" só pede a confirmação (há parcelas e uma despesa para levar junto); o 2º grava.
+            ->call('saveEdit')->assertSet('editAwaitingOwnerConfirm', true)
             ->call('saveEdit')->assertHasNoErrors();
 
         $this->assertSame(3, DebtInstallment::withoutProfileScope()->where('debt_id', $divida->id)->where('member_id', $bruno->id)->count());

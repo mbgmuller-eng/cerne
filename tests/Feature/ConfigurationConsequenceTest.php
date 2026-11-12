@@ -124,8 +124,8 @@ class ConfigurationConsequenceTest extends TestCase
         Livewire::test(GoalsIndex::class)->call('openForm')
             ->set('fundingMethod', 'installments')
             ->assertSee('Com a data, o Cerne calcula quanto guardar por mês.')
-            ->assertSee('Só descreve o objetivo na lista. Não muda o cálculo de quanto guardar por mês.')
-            ->assertSee('Fica guardado com o objetivo. Não entra no cálculo de quanto guardar por mês.')
+            ->assertSee('Só descreve o objetivo na lista.')
+            ->assertSee('Com ele, a tela estima em que mês o objetivo chega. Não conta rendimento.')
             ->assertSee('É o valor que você informa e atualiza à mão. Com investimento ou consórcio ligado, ele não vale.');
     }
 

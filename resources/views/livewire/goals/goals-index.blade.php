@@ -89,6 +89,10 @@
                         @endif
                     </div>
 
+                    @if ($previsao = $objetivo->forecastLine())
+                        <p @class(['mt-2 text-xs', 'text-slate-500 dark:text-slate-400' => $objetivo->forecast()['on_track'] !== false, 'text-amber-700 dark:text-amber-400' => $objetivo->forecast()['on_track'] === false]) data-goal-forecast>{{ $previsao }}</p>
+                    @endif
+
                     <div class="mt-3 flex flex-wrap justify-end gap-1">
                         @if (! $objetivo->isAchieved())
                             <button type="button" wire:click="markAchieved('{{ $objetivo->id }}')" wire:confirm="Marcar este objetivo como conquistado?" class="btn-ghost px-2 py-1 text-xs">Marcar como conquistado</button>
@@ -187,16 +191,14 @@
                                 <option value="{{ $valor }}">{{ $rotulo }}</option>
                             @endforeach
                         </select>
-                        <p class="mt-1 text-xs text-slate-400">Só descreve o objetivo na lista. Não muda o cálculo de quanto guardar por mês.</p>
+                        <p class="mt-1 text-xs text-slate-400">Só descreve o objetivo na lista.</p>
                     </div>
-                    @if ($fundingMethod === 'installments')
-                        <div>
-                            <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Valor da parcela</label>
-                            <input type="text" wire:model="installmentAmount" inputmode="decimal" class="input mt-1.5" placeholder="Ex.: 1500,00">
-                            <p class="mt-1 text-xs text-slate-400">Fica guardado com o objetivo. Não entra no cálculo de quanto guardar por mês.</p>
-                            @error('installmentAmount') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
-                        </div>
-                    @endif
+                    <div>
+                        <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Quanto vou guardar por mês <span class="font-normal text-slate-400">(opcional)</span></label>
+                        <input type="text" wire:model.live.blur="installmentAmount" inputmode="decimal" class="input mt-1.5" placeholder="Ex.: 1500,00" data-goal-monthly>
+                        <p class="mt-1 text-xs text-slate-400">Com ele, a tela estima em que mês o objetivo chega. Não conta rendimento.</p>
+                        @error('installmentAmount') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                    </div>
                 @endif
 
                 @if ($linkType === '')

@@ -132,7 +132,8 @@ class GoalsIndex extends Component
             'estimatedValue' => ['required', 'string', 'max:20', 'regex:/^[0-9.,\s]+$/'],
             'targetDate' => ['nullable', 'date_format:Y-m-d'],
             'fundingMethod' => ['required', Rule::enum(FundingMethod::class)],
-            'installmentAmount' => $this->fundingMethod === FundingMethod::Installments->value && ! $ligadoADivida ? ['required', 'string', 'max:20', 'regex:/^[0-9.,\s]+$/'] : $dinheiro,
+            // Opcional: é o "quanto vou guardar por mês" que alimenta a previsão (Goal::forecast), qualquer que seja a forma de juntar.
+            'installmentAmount' => $dinheiro,
             'currentAmount' => $dinheiro,
             'linkType' => ['nullable', 'in:investment,debt'],
             'linkedInvestmentId' => [$ligadoAInvestimento ? 'required' : 'nullable', 'string'],
@@ -145,7 +146,7 @@ class GoalsIndex extends Component
             'installmentAmount.regex' => 'Informe o valor só com números (ex.: 1500,00).',
             'currentAmount.regex' => 'Informe o valor só com números (ex.: 5000,00).',
         ], [
-            'name' => 'nome', 'estimatedValue' => 'valor do objetivo', 'targetDate' => 'data-alvo', 'installmentAmount' => 'valor da parcela',
+            'name' => 'nome', 'estimatedValue' => 'valor do objetivo', 'targetDate' => 'data-alvo', 'installmentAmount' => 'quanto guardar por mês',
             'currentAmount' => 'quanto já tem', 'linkedInvestmentId' => 'investimento', 'linkedDebtId' => 'consórcio', 'priority' => 'prioridade',
         ]);
 
@@ -289,6 +290,7 @@ class GoalsIndex extends Component
             'estimated_value' => $valor,
             'target_date' => preg_match('/^\d{4}-\d{2}-\d{2}$/', $this->targetDate) === 1 ? $this->targetDate : null,
             'current_amount' => $semLigacao && preg_match('/^[0-9.,\s]+$/', $this->currentAmount) === 1 ? Money::parse($this->currentAmount) : '0.00',
+            'installment_amount' => $consorcio === null && preg_match('/^[0-9.,\s]+$/', $this->installmentAmount) === 1 && $this->installmentAmount !== '' ? Money::parse($this->installmentAmount) : null,
             'linked_investment_id' => $investimento?->id,
             'linked_debt_id' => $consorcio?->id,
         ]);
@@ -319,6 +321,13 @@ class GoalsIndex extends Component
             } else {
                 $linhas[] = 'Sem data-alvo, o Cerne não calcula quanto guardar por mês.';
             }
+        }
+
+        // A previsão com o aporte informado: a MESMA conta da lista (Goal::forecastLine).
+        $previsao = $objetivo->forecastLine();
+
+        if ($previsao !== null) {
+            $linhas[] = $previsao;
         }
 
         if ($this->editingId !== null) {

@@ -96,6 +96,9 @@ class DebtShow extends Component
 
     public bool $editReclassify = false;
 
+    /** Mudar o dono (ou a marca de oculto) leva junto parcelas, despesas e simulações: o primeiro "Salvar" só pede a confirmação, o segundo grava. */
+    public bool $editAwaitingOwnerConfirm = false;
+
     // Reajuste da carta (consórcio)
     public bool $showAdjustment = false;
 
@@ -813,7 +816,35 @@ class DebtShow extends Component
         $this->editPrivate = $this->debt->is_private;
         $this->editNotes = (string) $this->debt->notes;
         $this->editReclassify = false;
+        $this->editAwaitingOwnerConfirm = false;
         $this->showEdit = true;
+    }
+
+    /** Mexer no dono ou na marca de oculto depois do pedido de confirmação desfaz o pedido: a confirmação vale para a escolha que foi mostrada. */
+    public function updatedEditMemberId(): void
+    {
+        $this->editAwaitingOwnerConfirm = false;
+    }
+
+    public function updatedEditPrivate(): void
+    {
+        $this->editAwaitingOwnerConfirm = false;
+    }
+
+    /**
+     * O que a troca de dono (ou de "oculto") leva junto, por contagem no banco: as parcelas, as despesas dos pagamentos já feitos e as simulações
+     * guardadas (DebtService::update propaga a marca para os três).
+     *
+     * @return array{installments: int, expenses: int, simulations: int, total: int}
+     */
+    private function ownerChangeImpact(): array
+    {
+        $parcelas = DebtInstallment::query()->where('debt_id', $this->debt->id);
+        $despesas = (clone $parcelas)->whereNotNull('expense_id')->count();
+        $total = (clone $parcelas)->count();
+        $simulacoes = DebtSimulation::query()->where('debt_id', $this->debt->id)->count();
+
+        return ['installments' => $total, 'expenses' => $despesas, 'simulations' => $simulacoes, 'total' => $total + $despesas + $simulacoes];
     }
 
     public function updatedEditCategoryId(): void
@@ -837,6 +868,15 @@ class DebtShow extends Component
 
         $membro = $this->editMemberId !== '' && $this->membros()->contains('id', $this->editMemberId) ? $this->editMemberId : null;
 
+        // Trocou o dono ou a marca de oculto e há o que ela leva junto: antes de gravar, mostra o que vai mudar e espera a confirmação.
+        $mudouDono = (string) $membro !== (string) $this->debt->member_id || ($membro !== null && $this->editPrivate) !== (bool) $this->debt->is_private;
+
+        if ($mudouDono && ! $this->editAwaitingOwnerConfirm && $this->ownerChangeImpact()['total'] > 0) {
+            $this->editAwaitingOwnerConfirm = true;
+
+            return;
+        }
+
         try {
             app(DebtService::class)->update($this->debt, [
                 'name' => $dados['editName'], 'creditor' => $dados['editCreditor'] ?: null,
@@ -850,6 +890,7 @@ class DebtShow extends Component
             return;
         }
 
+        $this->editAwaitingOwnerConfirm = false;
         $this->showEdit = false;
         $this->debt->refresh();
     }
@@ -1003,6 +1044,7 @@ class DebtShow extends Component
             'simulacoesSalvas' => $this->showAgreementSim ? $this->savedSimulations() : collect(),
             'comparacaoComSalva' => $this->showAgreementSim ? $this->comparisonWithSaved() : null,
             'consequenciaAcordo' => $this->agreementConsequence(),
+            'impactoDono' => $this->editAwaitingOwnerConfirm ? $this->ownerChangeImpact() : null,
             'basesTaxa' => DebtRateBasis::options(),
             'ultimaPaga' => (int) $parcelas->where('status', DebtInstallmentStatus::Paid)->max('number'),
             'quantidadePuladas' => $parcelas->where('status', DebtInstallmentStatus::Diluted)->count(),
