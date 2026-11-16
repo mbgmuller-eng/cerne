@@ -60,7 +60,11 @@
             <button type="button" wire:click="addGroup" class="btn-ghost px-2 py-1 text-xs">+ Grupo</button>
         </div>
         <p @class(['mt-1 text-xs', 'text-slate-400' => abs((float) $somaGrupos - 100) <= 0.05 || empty($draft['groups']), 'text-red-700 dark:text-red-400' => ! empty($draft['groups']) && abs((float) $somaGrupos - 100) > 0.05]) data-groups-sum>
-            Os grupos somam {{ $fmt($somaGrupos) }}% do que vai para investimentos.
+            @if (empty($draft['groups']))
+                Sem grupos: a meta vale para o investimento como um todo. Use "+ Grupo" para dividi-lo em reservas, aposentadoria ou o que fizer sentido para você.
+            @else
+                Os grupos somam {{ $fmt($somaGrupos) }}% do que vai para investimentos.
+            @endif
         </p>
 
         <div class="mt-3 space-y-4">

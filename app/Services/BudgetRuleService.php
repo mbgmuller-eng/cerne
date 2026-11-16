@@ -155,7 +155,8 @@ class BudgetRuleService
             }
         }
 
-        $areas['investment']['unmapped'] = $semDestino;
+        // Sem grupos a meta vale para o investimento como um todo e não há onde "mapear": nada a listar como sem destino.
+        $areas['investment']['unmapped'] = $s['groups'] === [] ? [] : $semDestino;
 
         return [
             'year' => $year,

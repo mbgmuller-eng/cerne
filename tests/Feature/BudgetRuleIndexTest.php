@@ -111,6 +111,51 @@ class BudgetRuleIndexTest extends TestCase
         self::assertSame(BudgetStructure::normalize(BudgetStructure::default()), BudgetStructure::normalize($regra->structure));
     }
 
+    public function test_a_tela_sem_regra_oferece_o_personalizado_que_comeca_em_branco(): void
+    {
+        Livewire::test(BudgetRuleIndex::class)
+            ->assertSee('Personalizado')
+            ->call('startWith', 'personalizado')
+            ->assertSet('showEditor', true)
+            ->assertSet('draft.areas.essential', '50.00')
+            ->assertSet('draft.areas.discretionary', '30.00')
+            ->assertSet('draft.areas.investment', '20.00')
+            ->assertSet('draft.groups', []);
+    }
+
+    public function test_o_personalizado_pode_ficar_so_com_as_tres_areas_e_o_painel_funciona_sem_grupos(): void
+    {
+        $this->receita('10000.00');
+        $this->investimento('Ações', '700.00'); // sem grupos não há onde mapear: não vira "sem item na regra"
+
+        Livewire::test(BudgetRuleIndex::class)
+            ->call('startWith', 'personalizado')
+            ->call('saveRule')->assertSet('showEditor', false)
+            ->assertSee('Investimentos · 20%')
+            ->assertSee('R$ 700,00')
+            ->assertSee('Sem grupos: a meta vale para o investimento como um todo')
+            ->assertDontSeeHtml('data-unmapped')
+            ->assertDontSeeHtml('data-goal-allocation');
+
+        self::assertSame('2000.00', app(\App\Services\BudgetRuleService::class)->report(2026, 11)['areas']['investment']['target']);
+    }
+
+    public function test_montar_a_regra_do_zero_com_grupo_e_item_proprios(): void
+    {
+        $c = Livewire::test(BudgetRuleIndex::class)->call('startWith', 'personalizado')
+            ->call('addGroup')
+            ->set('draft.groups.0.name', 'Tudo em renda variável')->set('draft.groups.0.percent', '100')
+            ->call('addItem', 0)
+            ->set('draft.groups.0.items.0.name', 'Ações')->set('draft.groups.0.items.0.percent', '100')
+            ->set('draft.groups.0.items.0.categories', ['Ações', 'FIIs'])
+            ->call('saveRule')->assertSet('showEditor', false);
+
+        $regra = BudgetRule::query()->sole();
+        $grupo = BudgetStructure::normalize($regra->structure)['groups'][0];
+        self::assertSame('Tudo em renda variável', $grupo['name']);
+        self::assertSame(['Ações', 'FIIs'], $grupo['items'][0]['categories']);
+    }
+
     public function test_salvar_o_mesmo_mes_de_novo_atualiza_a_mesma_regra(): void
     {
         $this->regra('2026-11');

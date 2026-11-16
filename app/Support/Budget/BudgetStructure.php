@@ -45,12 +45,18 @@ final class BudgetStructure
         return [
             'cerne' => ['name' => 'Cerne 50/20/30', 'description' => '50% essencial, 20% supérfluo e 30% investimentos, em três terços: reservas, aposentadoria e objetivos.'],
             'classico' => ['name' => 'Clássico 50/30/20', 'description' => '50% essencial, 30% supérfluo e 20% investimentos, nos mesmos três terços.'],
+            'personalizado' => ['name' => 'Personalizado', 'description' => 'Começa em branco: você define os percentuais e monta os grupos e itens de investimento do seu jeito (ou deixa só as três áreas).'],
         ];
     }
 
     /** @return array<string, mixed> */
     public static function preset(string $chave): array
     {
+        // Em branco: só as três áreas (um ponto de partida comum, 50/30/20) e nenhum grupo. A pessoa monta o resto, ou fica só com as áreas.
+        if ($chave === 'personalizado') {
+            return ['version' => 1, 'areas' => ['essential' => '50', 'discretionary' => '30', 'investment' => '20'], 'groups' => []];
+        }
+
         $areas = $chave === 'classico'
             ? ['essential' => '50', 'discretionary' => '30', 'investment' => '20']
             : ['essential' => '50', 'discretionary' => '20', 'investment' => '30'];
@@ -228,10 +234,6 @@ final class BudgetStructure
             if ($temPercentual && ! self::near($somaItens, '100')) {
                 $erros[] = "Os itens com percentual do grupo \"{$nome}\" somam ".self::fmt($somaItens).'%. Precisam somar 100%.';
             }
-        }
-
-        if (bccomp((string) ($areas['investment'] ?? '0'), '0', 2) > 0 && $grupos === []) {
-            $erros[] = 'Investimentos tem percentual, mas nenhum grupo para dividi-lo.';
         }
 
         if ($grupos !== [] && ! self::near($somaGrupos, '100')) {

@@ -59,7 +59,7 @@
             </p>
             <div class="mt-4 flex flex-wrap gap-2">
                 @foreach ($presets as $chave => $preset)
-                    <button type="button" wire:click="startWith('{{ $chave }}')" class="btn-primary px-4 py-2 text-sm" data-preset="{{ $chave }}">{{ $preset['name'] }}</button>
+                    <button type="button" wire:click="startWith('{{ $chave }}')" class="{{ $chave === 'personalizado' ? 'btn-secondary' : 'btn-primary' }} px-4 py-2 text-sm" data-preset="{{ $chave }}">{{ $preset['name'] }}</button>
                 @endforeach
                 @foreach ($modelos as $modelo)
                     <button type="button" wire:click="useTemplate('{{ $modelo->id }}')" class="btn-secondary px-4 py-2 text-sm">Meu modelo: {{ $modelo->name }}</button>
@@ -117,6 +117,10 @@
                 <h2 class="text-sm font-semibold text-slate-900 dark:text-white">Para onde vai o investimento</h2>
                 <p class="text-xs text-slate-500 dark:text-slate-400">Meta de {{ Money::format($inv['target']) }} · lançado {{ Money::format($inv['realized']) }}</p>
             </div>
+
+            @if (count($inv['groups']) === 0)
+                <p class="mt-3 text-sm text-slate-500 dark:text-slate-400" data-no-groups>Sem grupos: a meta vale para o investimento como um todo. Em "Editar regra" você pode dividi-lo em grupos e itens.</p>
+            @endif
 
             <div class="mt-4 space-y-5">
                 @foreach ($inv['groups'] as $grupo)

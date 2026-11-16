@@ -108,7 +108,7 @@ return [
             'title' => 'Regra de orçamento',
             'summary' => 'Defina quanto da receita vai para cada área e veja, no mês, o que deveria ir e o que foi.',
             'steps' => [
-                'Escolha um modelo pronto (ou o seu, se você é consultor) e ajuste os percentuais de essencial, supérfluo e investimentos.',
+                'Escolha um modelo pronto, o seu (se você é consultor) ou "Personalizado", que começa em branco. Ajuste os percentuais de essencial, supérfluo e investimentos.',
                 'Dentro de investimentos, divida em grupos (reservas, aposentadoria, objetivos) e em itens ligados às categorias de investimento.',
                 'Seguro de vida e parcela de consórcio entram como compromisso fixo: saem do grupo antes, com o valor que está cadastrado.',
                 'A receita do mês é o que já entrou mais o previsto nas receitas recorrentes. As metas saem dela.',
