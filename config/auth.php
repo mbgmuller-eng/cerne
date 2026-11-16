@@ -41,6 +41,8 @@ return [
         'web' => [
             'driver' => 'session',
             'provider' => 'users',
+            // "Manter conectado": 30 dias (o padrão do Laravel é 400). O cookie de lembrança dispensa senha E segundo passo enquanto vale; ver TrustedDeviceService.
+            'remember' => (int) env('CERNE_REMEMBER_MINUTES', 43200),
         ],
     ],
 

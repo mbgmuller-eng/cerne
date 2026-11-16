@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Profile;
 
+use App\Services\TrustedDeviceService;
 use App\Services\TwoFactorService;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\RateLimiter;
@@ -118,9 +119,34 @@ class TwoFactorSettings extends Component
         $this->reset('password');
     }
 
+    /** Tira UM navegador da lista de confiáveis. Se for o deste aparelho, o cookie também sai. */
+    public function revokeDevice(string $id, TrustedDeviceService $confiaveis): void
+    {
+        $this->guard();
+
+        $usuario = auth()->user();
+
+        if ($confiaveis->currentId($usuario, request()) === $id) {
+            \Illuminate\Support\Facades\Cookie::queue($confiaveis->forgetCookie($usuario));
+        }
+
+        $confiaveis->revoke($usuario, $id);
+    }
+
+    public function revokeAllDevices(TrustedDeviceService $confiaveis): void
+    {
+        $this->guard();
+
+        $usuario = auth()->user();
+
+        \Illuminate\Support\Facades\Cookie::queue($confiaveis->forgetCookie($usuario));
+        $confiaveis->revokeAll($usuario);
+    }
+
     public function render()
     {
         $usuario = auth()->user();
+        $confiaveis = app(TrustedDeviceService::class);
         $segredo = session()->get(self::SESSION_SECRET);
         $dois = app(TwoFactorService::class);
 
@@ -130,6 +156,9 @@ class TwoFactorSettings extends Component
             'qr' => is_string($segredo) ? $dois->qrSvg($usuario, $segredo) : null,
             'exigido' => $usuario->mustUseTwoFactor() && config('cerne.security.two_factor_required'),
             'codigosRestantes' => count($usuario->two_factor_recovery_codes ?? []),
+            'navegadores' => \App\Models\TrustedDevice::query()->where('user_id', $usuario->id)->where('expires_at', '>', now())->orderByDesc('last_used_at')->get(),
+            'navegadorAtual' => $confiaveis->currentId($usuario, request()),
+            'diasConfianca' => $confiaveis->days($usuario),
         ]);
     }
 

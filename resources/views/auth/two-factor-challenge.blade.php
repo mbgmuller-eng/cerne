@@ -14,6 +14,14 @@
             @enderror
         </div>
 
+        <label class="flex items-start gap-2.5 text-sm text-slate-600 dark:text-slate-400">
+            <input name="trust" type="checkbox" value="1" class="mt-0.5 h-4 w-4 shrink-0 rounded border-slate-300 text-brand-700 focus:ring-brand-500 dark:border-slate-600 dark:bg-slate-800" data-trust-browser>
+            <span>
+                Confiar neste navegador por {{ $dias }} dias
+                <span class="mt-0.5 block text-xs text-slate-400">Neste navegador, o código não é pedido nos próximos {{ $dias }} dias. A senha continua sendo pedida. Não marque em computador de uso comum.</span>
+            </span>
+        </label>
+
         <button type="submit" class="btn-primary w-full py-2.5">Confirmar</button>
     </form>
 

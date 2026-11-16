@@ -60,6 +60,9 @@ class ChangePassword extends Component
 
         $usuario->forceFill(['password' => $this->newPassword, 'remember_token' => Str::random(60)])->save();
 
+        // Senha nova: nenhum navegador continua dispensando o código do segundo passo.
+        app(\App\Services\TrustedDeviceService::class)->revokeAll($usuario);
+
         // Sessões ficam no banco: apagar as outras linhas encerra o acesso dos outros aparelhos; esta continua.
         DB::table(config('session.table', 'sessions'))
             ->where('user_id', $usuario->id)

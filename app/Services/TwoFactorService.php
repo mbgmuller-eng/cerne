@@ -129,6 +129,9 @@ class TwoFactorService
 
         $codigos = $this->generateRecoveryCodes();
 
+        // Segundo passo (re)configurado: nenhum navegador que confiava no segredo antigo continua confiável.
+        app(TrustedDeviceService::class)->revokeAll($usuario);
+
         $usuario->forceFill([
             'two_factor_secret' => $segredo,
             'two_factor_recovery_codes' => $codigos,
@@ -141,6 +144,8 @@ class TwoFactorService
 
     public function disable(User $usuario): void
     {
+        app(TrustedDeviceService::class)->revokeAll($usuario);
+
         $usuario->forceFill([
             'two_factor_secret' => null,
             'two_factor_recovery_codes' => null,

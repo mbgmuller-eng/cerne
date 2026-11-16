@@ -70,6 +70,9 @@ class PasswordResetController extends Controller
                     'email_verified_at' => $usuario->email_verified_at ?? now(),
                 ])->save();
 
+                // Redefiniu a senha: nenhum navegador continua dispensando o código do segundo passo.
+                app(\App\Services\TrustedDeviceService::class)->revokeAll($usuario);
+
                 // Sessões ficam no banco: apagar as linhas é o que encerra o acesso de quem já estava dentro.
                 DB::table(config('session.table', 'sessions'))->where('user_id', $usuario->id)->delete();
 

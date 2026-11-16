@@ -102,6 +102,10 @@ return [
     */
     'security' => [
         'two_factor_required' => (bool) env('CERNE_TWO_FACTOR_REQUIRED', false),
+
+        // "Confiar neste navegador" (dispensa o código do segundo passo, nunca a senha): prazo absoluto em dias. Menor para quem vê dado de outras pessoas.
+        'trusted_device_days' => (int) env('CERNE_TRUSTED_DEVICE_DAYS', 30),
+        'trusted_device_days_professional' => (int) env('CERNE_TRUSTED_DEVICE_DAYS_PROFESSIONAL', 14),
     ],
 
     'ai' => [

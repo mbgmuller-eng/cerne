@@ -72,6 +72,7 @@ class TenancyCoverageTest extends TestCase
         // Metodologia do consultor: não é dado de cliente nem de perfil algum; o escopo do próprio model restringe ao consultor logado.
         EngagementPlanTemplate::class => 'modelo de passo a passo do consultor (consultant_id) — metodologia dele, sem perfil; o escopo do model só deixa o próprio consultor ver',
 
+        \App\Models\TrustedDevice::class => 'navegador em que a pessoa escolheu confiar (dispensa o código do segundo passo): é da CONTA (user_id), não de perfil, e só guarda o hash do token',
         BudgetRuleTemplate::class => 'modelo de regra de orçamento do consultor (consultant_id): metodologia dele, sem perfil; o escopo do model só deixa o próprio consultor ver',
 
         // Registro técnico do envio de lembretes do acompanhamento.

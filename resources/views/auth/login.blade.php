@@ -45,7 +45,7 @@
 
         <label class="flex items-center gap-2.5 text-sm text-slate-600 dark:text-slate-400">
             <input name="remember" type="checkbox" value="1" class="h-4 w-4 rounded border-slate-300 text-brand-700 focus:ring-brand-500 dark:border-slate-600 dark:bg-slate-800">
-            Manter conectado
+            Manter conectado por {{ intdiv((int) config('auth.guards.web.remember'), 1440) }} dias
         </label>
 
         <button type="submit" class="btn-primary w-full py-2.5">Entrar</button>

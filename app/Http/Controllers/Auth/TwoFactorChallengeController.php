@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Services\TrustedDeviceService;
 use App\Services\TwoFactorService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -29,7 +30,9 @@ class TwoFactorChallengeController extends Controller
             return redirect()->route('login');
         }
 
-        return view('auth.two-factor-challenge');
+        $usuario = User::query()->find($this->pendente($request)['id']);
+
+        return view('auth.two-factor-challenge', ['dias' => $usuario !== null ? app(TrustedDeviceService::class)->days($usuario) : 30]);
     }
 
     public function store(Request $request, TwoFactorService $dois): RedirectResponse
@@ -76,7 +79,14 @@ class TwoFactorChallengeController extends Controller
 
         $usuario->forceFill(['last_login_at' => now()])->save();
 
-        return redirect()->intended(route('dashboard'));
+        $resposta = redirect()->intended(route('dashboard'));
+
+        // "Confiar neste navegador": só depois de o código conferir. Dispensa o código (nunca a senha) aqui, por 30 dias (14 para profissional).
+        if ($request->boolean('trust')) {
+            $resposta->withCookie(app(TrustedDeviceService::class)->issue($usuario, $request));
+        }
+
+        return $resposta;
     }
 
     /** @return array{id: string, remember: bool, expires_at: int}|null */

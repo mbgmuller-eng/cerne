@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Services\TrustedDeviceService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -46,6 +47,19 @@ class LoginController extends Controller
 
         if ($candidato !== null && $candidato->is_active && $candidato->hasTwoFactor() && Auth::validate([...$credentials, 'is_active' => true])) {
             RateLimiter::clear($this->throttleKey($request));
+
+            // Navegador em que a pessoa escolheu "confiar" (ainda dentro do prazo): a senha conferiu e o código é dispensado. O token do cookie troca a cada uso.
+            $confiaveis = app(TrustedDeviceService::class);
+            $dispositivo = $confiaveis->recognize($candidato, $request);
+
+            if ($dispositivo !== null) {
+                Auth::login($candidato, $request->boolean('remember'));
+                $request->session()->regenerate();
+                $candidato->forceFill(['last_login_at' => now()])->save();
+
+                return redirect()->intended(route('dashboard'))->withCookie($confiaveis->renew($dispositivo, $candidato, $request));
+            }
+
             $request->session()->regenerate();
             $request->session()->put(TwoFactorChallengeController::SESSION_KEY, [
                 'id' => $candidato->id,
