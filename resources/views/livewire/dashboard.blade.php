@@ -97,6 +97,9 @@
         </div>
     </div>
 
+    {{-- Regra de orçamento do mês (meta x lançado por área) ---------------- --}}
+    <livewire:budget.rule-summary />
+
     {{-- Evolução ---------------------------------------------------------- --}}
     <div class="card p-6">
         <div class="flex flex-wrap items-baseline justify-between gap-2">

@@ -288,6 +288,14 @@ Schedule::call(function (): void {
     logger()->info('Roteiros do acompanhamento', ['itens_alterados' => $mudaram]);
 })->dailyAt('06:30')->name('acompanhamento-roteiro')->withoutOverlapping();
 
+// Regra de orçamento: a partir do dia 20, avisa uma vez por mês cada pessoa quando falta para a meta de investimentos (o valor sai do contexto dela).
+// Idempotente pelo livro de lembretes (engagement_reminders: usuário + perfil + tipo com o mês).
+Schedule::call(function (): void {
+    $enviados = app(\App\Services\BudgetGapNotifier::class)->notifyShortfalls();
+
+    logger()->info('Regra de orçamento', ['avisados' => $enviados]);
+})->dailyAt('08:30')->name('regra-de-orcamento')->withoutOverlapping();
+
 // Objetivos: avisa (no máximo uma vez por mês por objetivo) quem guardou menos de 70% do planejado nos últimos meses fechados. Idempotente pelo livro
 // de lembretes (engagement_reminders: usuário + objetivo + tipo com o mês). Objetivo privado só avisa o dono.
 Schedule::call(function (): void {

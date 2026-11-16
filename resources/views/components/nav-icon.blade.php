@@ -34,6 +34,9 @@
         @case('shield')
             <path d="M12 3l7 3v5c0 5-3.5 8.5-7 10-3.5-1.5-7-5-7-10V6l7-3z"/><path d="M9 12l2 2 4-4"/>
             @break
+        @case('pie')
+            <path d="M21 12a9 9 0 1 1-9-9v9h9z"/><path d="M15 3.5A9 9 0 0 1 20.5 9H15z"/>
+            @break
         @case('target')
             <circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.5"/>
             @break

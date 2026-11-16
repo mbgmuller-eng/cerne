@@ -390,6 +390,9 @@
         </form>
     </x-modal>
 
+    {{-- Regra de orçamento do mês que se está olhando --}}
+    <livewire:budget.rule-summary :year="$year" :month="$month" :key="'regra-'.$year.'-'.$month" />
+
     {{-- Totais -------------------------------------------------------- --}}
     <div class="grid gap-4 sm:grid-cols-3">
         <div class="card p-5">

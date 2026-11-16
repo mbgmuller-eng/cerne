@@ -104,6 +104,45 @@ return [
             'tip' => 'Excluir um objetivo não apaga o investimento nem o consórcio ligados a ele.',
         ],
 
+        'budget.index' => [
+            'title' => 'Regra de orçamento',
+            'summary' => 'Defina quanto da receita vai para cada área e veja, no mês, o que deveria ir e o que foi.',
+            'steps' => [
+                'Escolha um modelo pronto (ou o seu, se você é consultor) e ajuste os percentuais de essencial, supérfluo e investimentos.',
+                'Dentro de investimentos, divida em grupos (reservas, aposentadoria, objetivos) e em itens ligados às categorias de investimento.',
+                'Seguro de vida e parcela de consórcio entram como compromisso fixo: saem do grupo antes, com o valor que está cadastrado.',
+                'A receita do mês é o que já entrou mais o previsto nas receitas recorrentes. As metas saem dela.',
+                'O realizado vem dos lançamentos de investimento do fluxo de caixa. Transferência para a conta de investimento não conta: só a compra do ativo.',
+                'Em "Dividir o balde de objetivos", o Cerne sugere quanto guardar por mês em cada objetivo, e você aplica se concordar.',
+            ],
+            'tip' => 'Mudar a regra vale a partir do mês que você escolher: os meses anteriores seguem a regra que valia.',
+        ],
+
+        'consultant.budget-templates' => [
+            'title' => 'Modelos de regra',
+            'summary' => 'Guarde a sua forma de dividir a receita e aplique a vários clientes de uma vez.',
+            'steps' => [
+                'Use "Novo modelo" e comece por um modelo pronto. Ajuste os percentuais de essencial, supérfluo e investimentos.',
+                'Divida investimentos em grupos e itens, ligados às categorias de investimento. Seguro de vida e consórcio entram como compromisso fixo.',
+                'Em "Aplicar a clientes", marque quem vai receber e o mês em que a regra passa a valer.',
+                'Aplicar copia o modelo para o cliente. Mudar o modelo depois não altera quem já recebeu.',
+                'O cliente continua podendo ajustar a própria regra, e você enxerga o resultado em "Regra da carteira".',
+            ],
+            'tip' => 'Só os clientes com vínculo ativo aparecem para receber o modelo.',
+        ],
+
+        'consultant.portfolio.budget' => [
+            'title' => 'Regra da carteira',
+            'summary' => 'Veja, no mês, como cada cliente está em relação à regra de orçamento dele.',
+            'steps' => [
+                'Cada linha mostra a receita do mês e, por área, o que foi lançado contra a meta ou o limite.',
+                'Essencial e supérfluo têm limite: passar dele aparece em vermelho. Em investimentos, o que importa é bater a meta.',
+                'No alto, veja quantos clientes estão dentro dos limites e quantos bateram a meta de investimento.',
+                'Use as setas para ver outros meses e "Abrir perfil" para ajustar a regra de um cliente.',
+            ],
+            'tip' => 'Os números enxergam tudo do cliente, inclusive o que é privado entre o casal.',
+        ],
+
         'documents.index' => [
             'title' => 'Importar arquivo',
             'summary' => 'Envie o PDF ou o CSV de um extrato ou fatura: o Cerne lê e você confere antes de gravar.',

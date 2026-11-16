@@ -23,6 +23,7 @@
     $navFinancas = [
         ['dashboard', 'Visão geral', 'Início', 'home'],
         ['cashflow.index', 'Fluxo de caixa', 'Fluxo', 'flow'],
+        ['budget.index', 'Regra de orçamento', 'Regra', 'pie'],
         ['fixedbills.index', 'Contas fixas', 'Fixas', 'bills'],
         ['accounts.index', 'Contas & Cartões', 'Contas', 'cards'],
         ['debts.index', 'Dívidas', 'Dívidas', 'debt'],
@@ -206,8 +207,10 @@
                 ['consultant.portfolio', 'Painel da carteira', 'Carteira', 'invest'],
                 ['consultant.portfolio.investments', 'Investimentos da carteira', 'Invest.', 'flow'],
                 ['consultant.portfolio.debts', 'Dívidas da carteira', 'Dívidas', 'debt'],
+                ['consultant.portfolio.budget', 'Regra da carteira', 'Regra', 'pie'],
                 ['consultant.week', 'Minha semana', 'Semana', 'calendar'],
                 ['consultant.plan-templates', 'Modelos de roteiro', 'Modelos', 'bills'],
+                ['consultant.budget-templates', 'Modelos de regra', 'Modelos', 'pie'],
             ],
         ],
         [

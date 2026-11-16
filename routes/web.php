@@ -238,6 +238,7 @@ Route::middleware(['auth', 'verified', 'termos', 'dois-passos', 'cuidado'])->gro
         Route::get('/acompanhamento/reunioes/{meeting}/evento.ics', [\App\Http\Controllers\EngagementCalendarController::class, 'meeting'])->name('engagement.meeting.ics');
         Route::get('/acompanhamento/tarefas/{task}/evento.ics', [\App\Http\Controllers\EngagementCalendarController::class, 'task'])->name('engagement.task.ics');
         Route::get('/objetivos', GoalsIndex::class)->name('goals.index');
+        Route::get('/regra', \App\Livewire\Budget\BudgetRuleIndex::class)->name('budget.index');
 
         // Documentos: visível ao consultor/corretor também (ao contrário de
         // Saúde) — só que filtrado por categoria (DocumentVisibilityScope).
@@ -288,6 +289,8 @@ Route::middleware(['auth', 'verified', 'termos', 'dois-passos', 'cuidado'])->gro
         Route::get('/agenda', \App\Livewire\Consultant\ConsultantCalendar::class)->name('consultant.calendar');
         Route::get('/recebimentos', \App\Livewire\Consultant\ProfessionalIncome::class)->name('consultant.income');
         Route::get('/modelos-de-roteiro', \App\Livewire\Consultant\EngagementTemplates::class)->name('consultant.plan-templates');
+        Route::get('/modelos-de-regra', \App\Livewire\Consultant\BudgetTemplates::class)->name('consultant.budget-templates');
+        Route::get('/carteira/regra', \App\Livewire\Consultant\PortfolioBudget::class)->name('consultant.portfolio.budget');
         Route::get('/leads', LeadsIndex::class)->name('consultant.leads');
         Route::get('/leads/metricas', \App\Livewire\Consultant\LeadMetrics::class)->name('consultant.leads.metrics');
         // Anexo de lead (simulação em PDF etc.): só o dono do lead abre — a checagem é no controlador.

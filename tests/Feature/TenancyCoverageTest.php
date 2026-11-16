@@ -15,6 +15,7 @@ use App\Models\DataExport;
 use App\Models\ErrorLog;
 use App\Models\ImpersonationLog;
 use App\Models\SecurityIncident;
+use App\Models\BudgetRuleTemplate;
 use App\Models\EngagementPlanTemplate;
 use App\Models\EngagementReminder;
 use App\Models\FeeAgreement;
@@ -70,6 +71,8 @@ class TenancyCoverageTest extends TestCase
 
         // Metodologia do consultor: não é dado de cliente nem de perfil algum; o escopo do próprio model restringe ao consultor logado.
         EngagementPlanTemplate::class => 'modelo de passo a passo do consultor (consultant_id) — metodologia dele, sem perfil; o escopo do model só deixa o próprio consultor ver',
+
+        BudgetRuleTemplate::class => 'modelo de regra de orçamento do consultor (consultant_id): metodologia dele, sem perfil; o escopo do model só deixa o próprio consultor ver',
 
         // Registro técnico do envio de lembretes do acompanhamento.
         EngagementReminder::class => 'lembrete do acompanhamento já enviado a um usuário (user_id): só sustenta o índice único (usuário, assunto, tipo), nunca é consultado por perfil',
