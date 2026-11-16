@@ -117,6 +117,12 @@ class DocumentUpload extends Model
             : str_pad((string) $this->reference_month, 2, '0', STR_PAD_LEFT).'/'.$this->reference_year;
     }
 
+    /** O arquivo é um CSV (ou texto) de extrato ou fatura, e não um PDF? Pela extensão do nome enviado. */
+    public function isCsv(): bool
+    {
+        return in_array(strtolower(pathinfo((string) $this->original_filename, PATHINFO_EXTENSION)), ['csv', 'txt'], true);
+    }
+
     /** O arquivo em si, para enviar à API. */
     public function contents(): string
     {

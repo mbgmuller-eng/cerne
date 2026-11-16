@@ -561,6 +561,16 @@ Reuniões, tarefas, demandas e notas (`Engagement*`). Regras que não se quebram
 - **Reunião recorrente**: `scheduleSeries` cria N reuniões comuns ligadas por `series_id` (permite cancelar "esta e as próximas"). **Agenda**: `.ics` por reunião e por prazo de tarefa (`EngagementCalendarController`).
 - Quem decide se o cliente recebe o plano em PDF é o **consultor**, ao encerrar o vínculo (`ConsultantLinkService::end`, `plan_delivery`).
 
+### Importação em CSV (extrato bancário e fatura de cartão)
+
+A tela "Importar arquivo" (`DocumentsIndex`) aceita CSV (e `.txt`) além do PDF, **só para extrato bancário e fatura de cartão** (`DocumentType::acceptsCsv`). Teste: `DocumentCsvImportTest`. Regras:
+
+- **Mesmo caminho do PDF, só muda o que vai à API**: o CSV é lido pela IA como TEXTO entre as marcas `<arquivo_csv>` (`DocumentExtractionService::userContent`) com o mesmo esquema de saída; o resultado cai em `extraction_summary` e **só vira lançamento depois da revisão** (regra 5), idêntico ao PDF. O tipo do arquivo vem da extensão do nome enviado (`DocumentUpload::isCsv`).
+- **Texto limpo antes de enviar** (`CsvText::normalize`): banco brasileiro exporta em Windows-1252/ISO-8859-1 e o Excel põe BOM; tudo vira UTF-8 sem BOM e com `\n`. Arquivo com byte nulo é binário e é recusado.
+- **Confere ANTES de gastar uma leitura** (`DocumentsIndex::arquivoCsvValido`): tipo que não aceita CSV, arquivo sem lançamento (só cabeçalho) e acima de `cerne.ai.max_csv_rows` (500, `CERNE_AI_MAX_CSV_ROWS`) são recusados na tela com a orientação (exportar por mês). O teto existe porque a resposta da IA lista cada linha em JSON e já truncou (`max_tokens`) com poucas centenas de lançamentos. Excel (`.xlsx`) não é aceito: exporte como CSV.
+- **O conteúdo do CSV é dado de terceiros**: a instrução de CSV (`DocumentSchemas::csvRules`) manda tratar descrição como dado e ignorar ordens escondidas nela. Os tetos diários de envio valem igual ao PDF.
+- Relatório de outro app (`external_report`) e os demais tipos seguem só em PDF. O CSV também entra na retenção de 90 dias do arquivo original.
+
 ### Dinheiro que não vira lançamento
 
 Na revisão de extrato, estes casos **mexem no saldo da conta sem criar receita nem

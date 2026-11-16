@@ -126,6 +126,10 @@ return [
 
         'max_upload_mb' => 32,
         'max_pdf_pages' => 600,
+
+        // CSV de extrato ou fatura: teto de lançamentos por arquivo. A resposta da IA lista cada linha em JSON e já truncou (stop_reason "max_tokens")
+        // com poucas centenas de lançamentos; recusar antes, com a orientação de dividir por período, sai mais barato que pagar uma leitura que falha.
+        'max_csv_rows' => (int) env('CERNE_AI_MAX_CSV_ROWS', 500),
         'require_review' => true,
         'job_tries' => 3,
 

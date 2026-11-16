@@ -69,6 +69,12 @@ enum DocumentType: string
         return ! in_array($this, [self::InsurancePolicy, self::ConsortiumStatement], true);
     }
 
+    /** O CSV só faz sentido onde o banco exporta uma linha por lançamento: extrato bancário e fatura de cartão. */
+    public function acceptsCsv(): bool
+    {
+        return in_array($this, [self::BankStatement, self::CreditCardInvoice], true);
+    }
+
     /** Tipos que a IA sabe extrair hoje. */
     public function isExtractable(): bool
     {

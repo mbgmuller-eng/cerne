@@ -53,7 +53,7 @@ class PwaController extends Controller
                     'url' => route('cashflow.index'),
                 ],
                 [
-                    'name' => 'Importar PDF',
+                    'name' => 'Importar arquivo',
                     'url' => route('documents.index'),
                 ],
             ],

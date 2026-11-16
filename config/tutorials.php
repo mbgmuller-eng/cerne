@@ -105,15 +105,15 @@ return [
         ],
 
         'documents.index' => [
-            'title' => 'Importar PDF',
-            'summary' => 'Envie o PDF de um extrato ou fatura: o Cerne lê e você confere antes de gravar.',
+            'title' => 'Importar arquivo',
+            'summary' => 'Envie o PDF ou o CSV de um extrato ou fatura: o Cerne lê e você confere antes de gravar.',
             'steps' => [
-                'Escolha o arquivo PDF, o tipo (extrato bancário, fatura de cartão e outros) e a conta ou o cartão. Depois, “Enviar”.',
+                'Escolha o arquivo (PDF, ou CSV no caso de extrato e fatura), o tipo e a conta ou o cartão. Depois, “Enviar”.',
                 'A leitura é automática, mas nada é gravado sem a sua revisão.',
                 'Quando o status for “Aguardando revisão”, abra “Revisar” e confira cada linha, com necessidade e categoria.',
                 'Possíveis duplicatas vêm desmarcadas. Marque apenas o que deseja importar.',
                 'Pagamento de fatura e transferência entre suas contas não viram despesa: use a opção própria na linha.',
-                'O limite é de 32 MB e 600 páginas por arquivo.',
+                'O limite é de 32 MB e 600 páginas por arquivo; o CSV aceita até 500 lançamentos por envio.',
             ],
             'tip' => 'Apólice e extrato de consórcio não são importados aqui: a apólice vai em Seguros, e o consórcio em Dívidas.',
         ],

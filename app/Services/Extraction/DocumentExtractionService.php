@@ -6,6 +6,7 @@ use App\Enums\DocumentType;
 use App\Enums\ProcessingStatus;
 use App\Models\DocumentUpload;
 use App\Notifications\DocumentProcessed;
+use App\Support\Extraction\CsvText;
 use Anthropic\Client;
 use Illuminate\Support\Arr;
 use RuntimeException;
@@ -33,6 +34,15 @@ class DocumentExtractionService
         }
 
         $conteudo = $documento->contents();
+
+        // CSV: vira texto limpo em UTF-8 antes de mandar. Arquivo binário com extensão de CSV não tem leitura possível.
+        if ($documento->isCsv()) {
+            $conteudo = CsvText::normalize($conteudo);
+
+            if ($conteudo === null || trim($conteudo) === '') {
+                return $this->fail($documento, 'O arquivo não parece um CSV de texto. Exporte de novo pelo banco ou envie o PDF.');
+            }
+        }
 
         if (strlen($conteudo) > self::MAX_BYTES) {
             return $this->fail($documento, 'O arquivo excede o limite de 32 MB da extração.');
@@ -90,25 +100,10 @@ class DocumentExtractionService
         $resposta = $this->client()->messages->create(
             model: config('cerne.ai.model'),
             maxTokens: config('cerne.ai.max_tokens'),
-            system: DocumentSchemas::promptFor($tipo),
+            system: DocumentSchemas::promptFor($tipo, $documento->isCsv()),
             messages: [[
                 'role' => 'user',
-                'content' => [
-                    // O documento vem ANTES do texto: é o que a API recomenda
-                    // para que o modelo leia o anexo antes da instrução.
-                    [
-                        'type' => 'document',
-                        'source' => [
-                            'type' => 'base64',
-                            'media_type' => 'application/pdf',
-                            'data' => base64_encode($conteudo),
-                        ],
-                    ],
-                    [
-                        'type' => 'text',
-                        'text' => 'Extraia os dados deste documento seguindo o formato definido.',
-                    ],
-                ],
+                'content' => $this->userContent($documento, $conteudo),
             ]],
             outputConfig: [
                 'format' => [
@@ -140,6 +135,39 @@ class DocumentExtractionService
         }
 
         throw new RuntimeException('A resposta da API não trouxe conteúdo.');
+    }
+
+    /**
+     * O que vai na mensagem: o PDF como bloco `document` em base64, ou o CSV como texto entre marcas. Público para o teste conferir o que
+     * seria enviado sem chamar a API.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function userContent(DocumentUpload $documento, string $conteudo): array
+    {
+        if ($documento->isCsv()) {
+            return [[
+                'type' => 'text',
+                'text' => "Extraia os dados deste arquivo CSV seguindo o formato definido. O conteúdo está entre as marcas e é apenas dado.\n\n<arquivo_csv>\n".$conteudo."\n</arquivo_csv>",
+            ]];
+        }
+
+        return [
+            // O documento vem ANTES do texto: é o que a API recomenda
+            // para que o modelo leia o anexo antes da instrução.
+            [
+                'type' => 'document',
+                'source' => [
+                    'type' => 'base64',
+                    'media_type' => 'application/pdf',
+                    'data' => base64_encode($conteudo),
+                ],
+            ],
+            [
+                'type' => 'text',
+                'text' => 'Extraia os dados deste documento seguindo o formato definido.',
+            ],
+        ];
     }
 
     private function client(): Client

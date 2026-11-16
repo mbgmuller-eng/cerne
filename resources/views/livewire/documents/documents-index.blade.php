@@ -7,7 +7,7 @@
 <div class="space-y-6">
 
     <div>
-        <h1 class="font-display text-3xl font-semibold tracking-tight text-slate-900 dark:text-white">Importar PDF</h1>
+        <h1 class="font-display text-3xl font-semibold tracking-tight text-slate-900 dark:text-white">Importar arquivo</h1>
         <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
             Extrato, fatura ou relatório de outro aplicativo financeiro — a leitura é automática, mas nada é gravado sem sua revisão.
         </p>
@@ -30,11 +30,11 @@
     <form wire:submit="enviar" class="card p-5">
         <div class="grid gap-4 sm:grid-cols-[1fr_auto_auto] sm:items-end">
             <div>
-                <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Arquivo PDF</label>
+                <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Arquivo (PDF ou CSV)</label>
                 <input
                     type="file"
                     wire:model="arquivo"
-                    accept="application/pdf"
+                    accept="application/pdf,.csv,.txt,text/csv,text/plain"
                     class="mt-1 block w-full text-sm text-slate-700 dark:text-slate-300 file:mr-3 file:rounded-lg file:border-0 file:bg-slate-100 dark:file:bg-slate-700 file:px-3 file:py-1.5 file:text-sm file:text-slate-700 dark:file:text-slate-300 hover:file:bg-slate-200 dark:hover:file:bg-slate-600"
                 >
                 @error('arquivo')
@@ -110,6 +110,7 @@
 
         <p class="mt-3 text-xs text-slate-400">
             Até {{ config('cerne.ai.max_upload_mb') }} MB e {{ config('cerne.ai.max_pdf_pages') }} páginas por arquivo.
+            O CSV vale só para extrato bancário e fatura de cartão, com até {{ config('cerne.ai.max_csv_rows') }} lançamentos por envio (exporte um mês de cada vez).
         </p>
     </form>
 

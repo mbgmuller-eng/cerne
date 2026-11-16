@@ -23,6 +23,7 @@ use App\Services\Extraction\ExternalReportReview;
 use App\Services\Extraction\DebtInstallmentMatcher;
 use App\Services\Extraction\InvoicePaymentMatcher;
 use App\Services\Extraction\OwnTransferMatcher;
+use App\Support\Extraction\CsvText;
 use App\Support\Forms\FormConsequence;
 use App\Support\Money;
 use App\Support\ProfileContext;
@@ -35,7 +36,7 @@ use Livewire\Component;
 use Livewire\WithFileUploads;
 
 /**
- * Tela 8 — Importar PDF.
+ * Tela 8 — Importar arquivo (PDF; CSV de extrato e fatura).
  *
  * O fluxo tem três passos e o do meio é o que importa: upload →
  * **revisão** → confirmação. Nenhum lançamento nasce sem alguém olhar.
@@ -170,7 +171,9 @@ class DocumentsIndex extends Component
             'arquivo' => [
                 'required',
                 'file',
-                'mimes:pdf',
+                // CSV e texto só para extrato e fatura (conferido em enviar()): o banco exporta uma linha por lançamento.
+                'mimes:pdf,csv,txt',
+                'extensions:pdf,csv,txt',
                 'max:'.(config('cerne.ai.max_upload_mb') * 1024),
             ],
             'documentType' => ['required', 'string', Rule::in(array_keys($this->tiposDisponiveis()))],
@@ -189,6 +192,10 @@ class DocumentsIndex extends Component
     public function enviar(): void
     {
         $data = $this->validate();
+
+        if (! $this->arquivoCsvValido()) {
+            return;
+        }
 
         $externo = $this->documentType === DocumentType::ExternalReport->value;
 
@@ -246,6 +253,51 @@ class DocumentsIndex extends Component
 
         $this->reset('arquivo', 'uploadBankAccountId', 'uploadCreditCardId', 'updateBalance');
         session()->flash('status', 'Documento enviado. A leitura acontece em segundo plano.');
+    }
+
+    /**
+     * CSV e texto: só extrato bancário e fatura de cartão, e só com lançamentos e dentro do teto de linhas. Confere ANTES de gravar o envio
+     * e de chamar a API (cada leitura é paga): arquivo que não vai dar certo é recusado aqui, com a orientação do que fazer.
+     */
+    private function arquivoCsvValido(): bool
+    {
+        $extensao = strtolower((string) pathinfo($this->arquivo->getClientOriginalName(), PATHINFO_EXTENSION));
+
+        if (! in_array($extensao, ['csv', 'txt'], true)) {
+            return true;
+        }
+
+        if (! DocumentType::from($this->documentType)->acceptsCsv()) {
+            $this->addError('arquivo', 'CSV só vale para extrato bancário e fatura de cartão. Para este tipo, envie o PDF.');
+
+            return false;
+        }
+
+        $texto = CsvText::normalize($this->arquivo->get());
+
+        if ($texto === null) {
+            $this->addError('arquivo', 'O arquivo não parece um CSV de texto. Exporte de novo pelo banco ou envie o PDF.');
+
+            return false;
+        }
+
+        $linhas = CsvText::dataRows($texto);
+
+        if ($linhas < 1) {
+            $this->addError('arquivo', 'O arquivo não tem nenhum lançamento: confira se é o CSV certo, com o cabeçalho e as linhas.');
+
+            return false;
+        }
+
+        $teto = (int) config('cerne.ai.max_csv_rows');
+
+        if ($linhas > $teto) {
+            $this->addError('arquivo', "O arquivo tem {$linhas} lançamentos e o limite é {$teto} por envio. Exporte em períodos menores, por exemplo um mês de cada vez.");
+
+            return false;
+        }
+
+        return true;
     }
 
     public function revisar(string $id, CategorizationRuleMatcher $matcher): void
