@@ -47,7 +47,7 @@
                                 {{ $objetivo->funding_method->label() }}
                                 @if ($objetivo->target_date) · até {{ $objetivo->target_date->format('m/Y') }} @endif
                                 @if ($objetivo->member) · {{ $objetivo->member->name }} @else · do casal @endif
-                                @if ($objetivo->linkedInvestment) · vinculado a {{ $objetivo->linkedInvestment->name }} @endif
+                                @if ($objetivo->investments->isNotEmpty()) · ligado a {{ $objetivo->investments->pluck('name')->implode(', ') }} @elseif ($objetivo->hasInvestmentLinks()) · ligado a investimento que você não vê @endif
                                 @if ($objetivo->linkedDebt) · consórcio {{ $objetivo->linkedDebt->name }} @endif
                             </p>
                         </div>
@@ -151,22 +151,29 @@
                     <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Como o objetivo avança</label>
                     <select wire:model.live="linkType" class="select mt-1.5 w-full">
                         <option value="">Pelo dinheiro que eu informar</option>
-                        <option value="investment">Pelo saldo de um investimento</option>
+                        <option value="investment">Pelo saldo de investimentos</option>
                         <option value="debt">Pelas parcelas pagas de um consórcio</option>
                     </select>
                 </div>
 
                 @if ($linkType === 'investment')
                     <div class="@sm:col-span-2">
-                        <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Investimento</label>
-                        <select wire:model.live="linkedInvestmentId" class="select mt-1.5 w-full">
-                            <option value="">Escolha</option>
-                            @foreach ($investimentos as $inv)
-                                <option value="{{ $inv->id }}">{{ $inv->institution ? $inv->institution.' · ' : '' }}{{ $inv->displayName() }}</option>
-                            @endforeach
-                        </select>
-                        <p class="mt-1 text-xs text-slate-400">O quanto já guardou é o saldo desse investimento.</p>
-                        @error('linkedInvestmentId') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                        <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Investimentos ligados</label>
+                        <div class="mt-1.5 max-h-56 space-y-0.5 overflow-y-auto rounded-lg border border-slate-200 p-1.5 dark:border-white/10" data-goal-investments>
+                            @forelse ($investimentos as $inv)
+                                <label class="flex cursor-pointer items-center justify-between gap-3 rounded-md px-2 py-1.5 text-sm hover:bg-slate-50 dark:hover:bg-white/5" wire:key="goal-inv-{{ $inv->id }}">
+                                    <span class="flex min-w-0 items-center gap-2">
+                                        <input type="checkbox" wire:model.live="linkedInvestmentIds" value="{{ $inv->id }}" class="h-4 w-4 shrink-0 rounded border-slate-300 text-brand-600 focus:ring-brand-500">
+                                        <span class="truncate text-slate-700 dark:text-slate-300">{{ $inv->institution ? $inv->institution.' · ' : '' }}{{ $inv->displayName() }}</span>
+                                    </span>
+                                    <span class="shrink-0 text-xs tabular-nums text-slate-500 dark:text-slate-400">{{ Money::format($inv->current_amount) }}</span>
+                                </label>
+                            @empty
+                                <p class="px-2 py-1.5 text-sm text-slate-500 dark:text-slate-400">Nenhum investimento ativo para ligar.</p>
+                            @endforelse
+                        </div>
+                        <p class="mt-1 text-xs text-slate-400">O quanto já guardou é a soma dos saldos dos marcados. O mesmo investimento pode servir a mais de um objetivo: o saldo inteiro conta em cada um.</p>
+                        @error('linkedInvestmentIds') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
                     </div>
                 @elseif ($linkType === 'debt')
                     <div class="@sm:col-span-2">

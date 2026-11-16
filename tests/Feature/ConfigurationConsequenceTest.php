@@ -93,7 +93,7 @@ class ConfigurationConsequenceTest extends TestCase
         ]);
 
         Livewire::test(GoalsIndex::class)->call('openForm')
-            ->set('name', 'Carro')->set('estimatedValue', '10000,00')->set('linkType', 'investment')->set('linkedInvestmentId', $investimento->id)
+            ->set('name', 'Carro')->set('estimatedValue', '10000,00')->set('linkType', 'investment')->set('linkedInvestmentIds', [$investimento->id])
             ->assertSee('O avanço vem do saldo de '.$investimento->displayName().': R$ 4.000,00 de R$ 10.000,00 (40,0%).')
             ->call('save')->assertHasNoErrors();
 
@@ -110,7 +110,7 @@ class ConfigurationConsequenceTest extends TestCase
 
         Livewire::test(GoalsIndex::class)
             ->call('edit', $objetivo->id)
-            ->set('linkType', 'investment')->set('linkedInvestmentId', $investimento->id)
+            ->set('linkType', 'investment')->set('linkedInvestmentIds', [$investimento->id])
             ->assertSee('O valor que estava em "Quanto já tem" (R$ 500,00) deixa de valer')
             ->set('status', 'achieved')
             ->assertSee('Conquistado: o objetivo sai da lista em andamento e deixa de entrar nos totais do topo.')

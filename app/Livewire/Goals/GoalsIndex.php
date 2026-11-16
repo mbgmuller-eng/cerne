@@ -16,6 +16,7 @@ use App\Models\ProfileMember;
 use App\Support\Money;
 use App\Support\ProfileContext;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
@@ -50,7 +51,8 @@ class GoalsIndex extends Component
     /** '' (sem ligação), 'investment' ou 'debt' (consórcio). */
     public string $linkType = '';
 
-    public string $linkedInvestmentId = '';
+    /** @var list<string> Investimentos ligados: o que o objetivo tem é a soma dos saldos deles. */
+    public array $linkedInvestmentIds = [];
 
     public string $linkedDebtId = '';
 
@@ -76,7 +78,7 @@ class GoalsIndex extends Component
     public function openForm(): void
     {
         $this->resetValidation();
-        $this->reset('editingId', 'name', 'estimatedValue', 'targetDate', 'installmentAmount', 'currentAmount', 'linkType', 'linkedInvestmentId', 'linkedDebtId', 'isPrivate', 'notes');
+        $this->reset('editingId', 'name', 'estimatedValue', 'targetDate', 'installmentAmount', 'currentAmount', 'linkType', 'linkedInvestmentIds', 'linkedDebtId', 'isPrivate', 'notes');
         $this->fundingMethod = FundingMethod::LumpSum->value;
         $this->status = GoalStatus::Active->value;
         $this->priority = (string) ((int) Goal::query()->max('priority') + 1);
@@ -96,9 +98,9 @@ class GoalsIndex extends Component
         $this->fundingMethod = $objetivo->funding_method->value;
         $this->installmentAmount = (string) $objetivo->installment_amount;
         $this->currentAmount = (string) $objetivo->current_amount;
-        $this->linkedInvestmentId = (string) $objetivo->linked_investment_id;
+        $this->linkedInvestmentIds = $objetivo->investments()->pluck('investment_records.id')->map(fn ($id) => (string) $id)->all();
         $this->linkedDebtId = (string) $objetivo->linked_debt_id;
-        $this->linkType = $objetivo->linked_debt_id ? 'debt' : ($objetivo->linked_investment_id ? 'investment' : '');
+        $this->linkType = $objetivo->linked_debt_id ? 'debt' : ($objetivo->hasInvestmentLinks() ? 'investment' : '');
         $this->memberId = (string) $objetivo->member_id;
         $this->isPrivate = $objetivo->is_private;
         $this->priority = (string) $objetivo->priority;
@@ -138,7 +140,8 @@ class GoalsIndex extends Component
             'installmentAmount' => $dinheiro,
             'currentAmount' => $dinheiro,
             'linkType' => ['nullable', 'in:investment,debt'],
-            'linkedInvestmentId' => [$ligadoAInvestimento ? 'required' : 'nullable', 'string'],
+            'linkedInvestmentIds' => [$ligadoAInvestimento ? 'required' : 'nullable', 'array', 'max:30'],
+            'linkedInvestmentIds.*' => ['string'],
             'linkedDebtId' => [$ligadoADivida ? 'required' : 'nullable', 'string'],
             'priority' => ['nullable', 'integer', 'min:1', 'max:999'],
             'status' => ['required', 'in:active,achieved'],
@@ -147,9 +150,11 @@ class GoalsIndex extends Component
             'estimatedValue.regex' => 'Informe o valor só com números (ex.: 100000,00).',
             'installmentAmount.regex' => 'Informe o valor só com números (ex.: 1500,00).',
             'currentAmount.regex' => 'Informe o valor só com números (ex.: 5000,00).',
+            'linkedInvestmentIds.required' => 'Escolha ao menos um investimento da lista.',
+            'linkedInvestmentIds.max' => 'Escolha no máximo 30 investimentos.',
         ], [
             'name' => 'nome', 'estimatedValue' => 'valor do objetivo', 'targetDate' => 'data-alvo', 'installmentAmount' => 'quanto guardar por mês',
-            'currentAmount' => 'quanto já tem', 'linkedInvestmentId' => 'investimento', 'linkedDebtId' => 'consórcio', 'priority' => 'prioridade',
+            'currentAmount' => 'quanto já tem', 'linkedInvestmentIds' => 'investimentos', 'linkedDebtId' => 'consórcio', 'priority' => 'prioridade',
         ]);
 
         $valor = Money::parse($dados['estimatedValue']);
@@ -160,14 +165,17 @@ class GoalsIndex extends Component
             return;
         }
 
-        $investimento = null;
+        $investimentos = collect();
         $consorcio = null;
 
         if ($ligadoAInvestimento) {
-            $investimento = InvestmentRecord::query()->active()->find($dados['linkedInvestmentId']);
+            // O id vem do navegador: só vale o que a pessoa enxerga (os escopos do investimento) e que está na lista do formulário (ativo, ou já ligado a este objetivo).
+            $ids = array_values(array_unique($dados['linkedInvestmentIds']));
+            $jaLigados = $this->editingId !== null ? $this->editable($this->editingId)->investments()->pluck('investment_records.id')->all() : [];
+            $investimentos = $this->candidateInvestments($jaLigados)->whereIn('id', $ids)->get();
 
-            if ($investimento === null) {
-                $this->addError('linkedInvestmentId', 'Escolha um investimento da lista.');
+            if ($investimentos->count() !== count($ids)) {
+                $this->addError('linkedInvestmentIds', 'Escolha só investimentos da lista.');
 
                 return;
             }
@@ -194,7 +202,6 @@ class GoalsIndex extends Component
                 ? $consorcio->installment_amount
                 : (($dados['installmentAmount'] ?? '') !== '' ? Money::parse($dados['installmentAmount']) : null),
             'current_amount' => ($dados['currentAmount'] ?? '') !== '' && ! $ligadoAInvestimento && ! $ligadoADivida ? Money::parse($dados['currentAmount']) : '0.00',
-            'linked_investment_id' => $investimento?->id,
             'linked_debt_id' => $consorcio?->id,
             'priority' => (int) ($dados['priority'] ?: ((int) Goal::query()->max('priority') + 1)),
             'status' => GoalStatus::from($dados['status']),
@@ -212,10 +219,39 @@ class GoalsIndex extends Component
                 GoalContribution::withoutProfileScope()->where('goal_id', $objetivo->id)->update(['member_id' => $objetivo->member_id, 'is_private' => $objetivo->is_private]);
             }
         } else {
-            Goal::create($campos + ['created_by_user_id' => auth()->id()]);
+            $objetivo = Goal::create($campos + ['created_by_user_id' => auth()->id()]);
         }
 
+        $this->syncInvestments($objetivo, $ligadoAInvestimento ? $investimentos->pluck('id')->all() : null);
+
         $this->showForm = false;
+    }
+
+    /**
+     * Grava as ligações do objetivo com investimentos. Mexe só no que a pessoa enxerga: um investimento privado do cônjuge, ligado a um objetivo
+     * do casal, continua ligado quando o outro edita (senão salvar apagaria, sem aviso, o que ele nem vê). Trocar para "dinheiro informado" ou
+     * "consórcio" (`$ids` nulo) desfaz todas as ligações, inclusive as que a pessoa não enxerga: o objetivo deixou de avançar por investimento.
+     *
+     * @param  list<string>|null  $ids
+     */
+    private function syncInvestments(Goal $objetivo, ?array $ids): void
+    {
+        if ($ids === null) {
+            DB::table('goal_investment')->where('goal_id', $objetivo->id)->delete();
+
+            return;
+        }
+
+        $visiveis = $objetivo->investments()->pluck('investment_records.id')->all();
+
+        $objetivo->investments()->detach(array_values(array_diff($visiveis, $ids)));
+        $objetivo->investments()->syncWithoutDetaching(array_values(array_diff($ids, $visiveis)));
+    }
+
+    /** Os investimentos que o formulário oferece: os ativos e os que já estão ligados ao objetivo (mesmo que depois tenham sido encerrados). */
+    private function candidateInvestments(array $jaLigados)
+    {
+        return InvestmentRecord::query()->where(fn ($q) => $q->active()->orWhereIn('id', $jaLigados));
     }
 
     // ------------------------------------------------------------------ ações
@@ -290,26 +326,28 @@ class GoalsIndex extends Component
             return [];
         }
 
-        $investimento = $this->linkType === 'investment' && $this->linkedInvestmentId !== '' ? InvestmentRecord::query()->active()->find($this->linkedInvestmentId) : null;
+        $investimentos = $this->linkType === 'investment' && $this->linkedInvestmentIds !== [] ? InvestmentRecord::query()->whereIn('id', $this->linkedInvestmentIds)->get() : collect();
         $consorcio = $this->linkType === 'debt' && $this->linkedDebtId !== '' ? $this->consorcios()->firstWhere('id', $this->linkedDebtId) : null;
-        $semLigacao = $investimento === null && $consorcio === null;
+        $semLigacao = $investimentos->isEmpty() && $consorcio === null;
 
         $objetivo = (new Goal)->forceFill([
             'estimated_value' => $valor,
             'target_date' => preg_match('/^\d{4}-\d{2}-\d{2}$/', $this->targetDate) === 1 ? $this->targetDate : null,
             'current_amount' => $semLigacao && preg_match('/^[0-9.,\s]+$/', $this->currentAmount) === 1 ? Money::parse($this->currentAmount) : '0.00',
             'installment_amount' => $consorcio === null && preg_match('/^[0-9.,\s]+$/', $this->installmentAmount) === 1 && $this->installmentAmount !== '' ? Money::parse($this->installmentAmount) : null,
-            'linked_investment_id' => $investimento?->id,
             'linked_debt_id' => $consorcio?->id,
         ]);
-        $objetivo->setRelation('linkedInvestment', $investimento);
+        $objetivo->setRelation('investments', $investimentos);
         $objetivo->setRelation('linkedDebt', $consorcio);
 
         $linhas = [];
         $pct = number_format($objetivo->progressPercentage(), 1, ',', '.').'%';
 
-        if ($investimento !== null) {
-            $linhas[] = 'O avanço vem do saldo de '.$investimento->displayName().': '.Money::format($objetivo->accumulated()).' de '.Money::format($valor).' ('.$pct.'). Você não precisa informar quanto já tem.';
+        if ($investimentos->isNotEmpty()) {
+            $origem = $investimentos->count() === 1
+                ? 'do saldo de '.$investimentos->first()->displayName()
+                : 'da soma dos saldos de '.$investimentos->count().' investimentos ('.$investimentos->map->displayName()->implode(', ').')';
+            $linhas[] = 'O avanço vem '.$origem.': '.Money::format($objetivo->accumulated()).' de '.Money::format($valor).' ('.$pct.'). Você não precisa informar quanto já tem.';
         } elseif ($consorcio !== null) {
             $progresso = $objetivo->installmentProgress();
             $linhas[] = 'O avanço vem das parcelas pagas do consórcio: '.$progresso['paid'].' de '.$progresso['total'].' ('.$pct.' de '.Money::format($valor).').';
@@ -341,7 +379,7 @@ class GoalsIndex extends Component
         if ($this->editingId !== null) {
             $antes = Goal::query()->find($this->editingId);
 
-            if (! $semLigacao && $antes !== null && $antes->linked_investment_id === null && $antes->linked_debt_id === null && bccomp((string) $antes->current_amount, '0', 2) > 0) {
+            if (! $semLigacao && $antes !== null && ! $antes->hasInvestmentLinks() && $antes->linked_debt_id === null && bccomp((string) $antes->current_amount, '0', 2) > 0) {
                 $linhas[] = 'O valor que estava em "Quanto já tem" ('.Money::format($antes->current_amount).') deixa de valer: o avanço passa a vir da ligação escolhida.';
             }
 
@@ -367,7 +405,8 @@ class GoalsIndex extends Component
             ->active()
             ->byPriority()
             ->withContributionTotal()
-            ->with('member', 'linkedInvestment', 'linkedDebt')
+            ->withInvestmentCount()
+            ->with('member', 'investments', 'linkedDebt')
             ->get();
     }
 
@@ -377,7 +416,8 @@ class GoalsIndex extends Component
         return Goal::query()
             ->where('status', GoalStatus::Achieved)
             ->withContributionTotal()
-            ->with('member')
+            ->withInvestmentCount()
+            ->with('member', 'investments')
             ->get();
     }
 
@@ -412,7 +452,7 @@ class GoalsIndex extends Component
             'totalAccumulated' => $this->totalAccumulated,
             'totalMonthlyNeeded' => $this->totalMonthlyNeeded,
             'membros' => $this->membros(),
-            'investimentos' => $this->showForm ? InvestmentRecord::query()->active()->orderBy('institution')->orderBy('name')->get() : collect(),
+            'investimentos' => $this->showForm ? $this->candidateInvestments($this->linkedInvestmentIds)->orderBy('institution')->orderBy('name')->get() : collect(),
             'consorcios' => $this->showForm ? $this->consorcios() : collect(),
             'metodos' => FundingMethod::options(),
             'goalConsequence' => $this->goalConsequence(),

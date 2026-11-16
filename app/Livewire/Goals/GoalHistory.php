@@ -149,7 +149,7 @@ class GoalHistory extends Component
 
     private function goalFor(string $id): Goal
     {
-        return Goal::query()->withContributionTotal()->findOrFail($id);
+        return Goal::query()->withContributionTotal()->withInvestmentCount()->findOrFail($id);
     }
 
     private function goal(): Goal

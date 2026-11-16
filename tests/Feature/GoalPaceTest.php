@@ -197,7 +197,8 @@ class GoalPaceTest extends TestCase
         self::assertNull($this->ritmo($alcancado));
 
         $investimento = InvestmentRecord::factory()->create(['profile_id' => $this->perfil->id]);
-        $ligado = $this->objetivo(['name' => 'Ligado', 'linked_investment_id' => $investimento->id]);
+        $ligado = $this->objetivo(['name' => 'Ligado']);
+        $ligado->investments()->attach($investimento->id);
         self::assertNull($this->ritmo($ligado));
 
         $pausado = $this->objetivo(['name' => 'Pausado', 'status' => GoalStatus::Achieved]);

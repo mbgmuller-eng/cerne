@@ -172,7 +172,9 @@ class GoalPaceService
         $enviados = 0;
         $mes = $hoje->format('Y-m');
 
-        Goal::withoutGlobalScopes()->active()->whereNull('linked_investment_id')->whereNull('linked_debt_id')
+        Goal::withoutGlobalScopes()->active()->whereNull('linked_debt_id')
+            ->whereNotExists(fn ($q) => $q->selectRaw('1')->from('goal_investment')->whereColumn('goal_investment.goal_id', 'goals.id'))
+            ->withInvestmentCount()
             ->whereNotNull('installment_amount')->where('installment_amount', '>', 0)
             ->withContributionTotal()
             ->chunkById(200, function ($objetivos) use (&$enviados, $hoje, $mes): void {

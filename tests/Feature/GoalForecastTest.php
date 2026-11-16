@@ -44,7 +44,7 @@ class GoalForecastTest extends TestCase
             'estimated_value' => '10000.00', 'current_amount' => '0.00', 'installment_amount' => '1000.00', 'target_date' => null,
             'status' => GoalStatus::Active, 'funding_method' => FundingMethod::LumpSum,
         ], $campos));
-        $g->setRelation('linkedInvestment', null);
+        $g->setRelation('investments', collect());
         $g->setRelation('linkedDebt', null);
 
         return $g;

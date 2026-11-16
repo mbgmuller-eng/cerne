@@ -241,7 +241,8 @@ class GoalHistoryTest extends TestCase
     public function test_objetivo_ligado_a_investimento_nao_tem_historico_nem_botao(): void
     {
         $investimento = InvestmentRecord::factory()->for($this->perfil, 'profile')->create(['current_amount' => '3000.00', 'name' => 'CDB Reserva']);
-        $g = $this->objetivo(['linked_investment_id' => $investimento->id, 'current_amount' => '0.00', 'name' => 'Ligado']);
+        $g = $this->objetivo(['current_amount' => '0.00', 'name' => 'Ligado']);
+        $g->investments()->attach($investimento->id);
 
         self::assertFalse($g->acceptsContributions());
         Livewire::test(GoalHistory::class)->dispatch('open-goal-history', id: $g->id)->assertNotFound();

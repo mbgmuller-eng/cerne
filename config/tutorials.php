@@ -96,8 +96,8 @@ return [
             'summary' => 'Seus sonhos e metas por ordem de prioridade, com quanto falta para cada um.',
             'steps' => [
                 'Use “Novo objetivo” e informe o nome, o valor, a data-alvo e a prioridade (1 é a mais importante).',
-                'Escolha como ele avança: pelo dinheiro que você informa, pelo saldo de um investimento ou pelas parcelas pagas de um consórcio.',
-                'Com um investimento ligado, o acumulado é o saldo do investimento inteiro, não um valor digitado.',
+                'Escolha como ele avança: pelo dinheiro que você informa, pelo saldo de investimentos ou pelas parcelas pagas de um consórcio.',
+                'Com investimentos ligados (pode marcar mais de um), o acumulado é a soma dos saldos deles, não um valor digitado.',
                 '“Guardar por mês” só aparece quando o objetivo tem data-alvo no futuro.',
                 '“Marcar como conquistado” leva o objetivo para a lista de conquistados, e “Reabrir” o traz de volta.',
             ],

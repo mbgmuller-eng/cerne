@@ -131,11 +131,11 @@ class GoalFormTest extends TestCase
         $inv = InvestmentRecord::factory()->create(['profile_id' => $this->perfil->id, 'member_id' => $this->membro->id, 'current_amount' => '30000.00', 'name' => 'CDB Reserva']);
 
         Livewire::test(GoalsIndex::class)->call('openForm')
-            ->set('name', 'Reserva')->set('estimatedValue', '60000')->set('linkType', 'investment')->set('linkedInvestmentId', $inv->id)->set('currentAmount', '999')
+            ->set('name', 'Reserva')->set('estimatedValue', '60000')->set('linkType', 'investment')->set('linkedInvestmentIds', [$inv->id])->set('currentAmount', '999')
             ->call('save')->assertHasNoErrors();
 
         $objetivo = Goal::query()->where('name', 'Reserva')->sole();
-        self::assertSame($inv->id, $objetivo->linked_investment_id);
+        self::assertSame([$inv->id], $objetivo->investments()->pluck('investment_records.id')->all());
         self::assertSame('0.00', (string) $objetivo->current_amount, 'com investimento ligado, o valor informado não vale');
         self::assertSame('30000.00', (string) $objetivo->accumulated());
     }
@@ -144,7 +144,7 @@ class GoalFormTest extends TestCase
     {
         Livewire::test(GoalsIndex::class)->call('openForm')
             ->set('name', 'Reserva')->set('estimatedValue', '60000')->set('linkType', 'investment')
-            ->call('save')->assertHasErrors(['linkedInvestmentId']);
+            ->call('save')->assertHasErrors(['linkedInvestmentIds']);
     }
 
     public function test_liga_a_um_consorcio_usa_a_carta_e_avanca_pelas_parcelas(): void
@@ -244,7 +244,8 @@ class GoalFormTest extends TestCase
         $consorcio = $this->consorcio();
         $inv = InvestmentRecord::factory()->create(['profile_id' => $this->perfil->id, 'member_id' => $this->membro->id]);
         $a = $this->objetivo(['name' => 'A', 'linked_debt_id' => $consorcio->id, 'funding_method' => FundingMethod::Installments]);
-        $b = $this->objetivo(['name' => 'B', 'linked_investment_id' => $inv->id]);
+        $b = $this->objetivo(['name' => 'B']);
+        $b->investments()->attach($inv->id);
 
         Livewire::test(GoalsIndex::class)->call('delete', $a->id)->call('delete', $b->id);
 

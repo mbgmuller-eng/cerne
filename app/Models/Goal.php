@@ -16,11 +16,13 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\DB;
 
 #[Fillable([
     'profile_id', 'member_id', 'name', 'priority', 'estimated_value', 'target_date',
-    'funding_method', 'installment_amount', 'current_amount', 'linked_investment_id', 'linked_debt_id',
+    'funding_method', 'installment_amount', 'current_amount', 'linked_debt_id',
     'status', 'notes', 'created_by_user_id', 'is_private',
 ])]
 class Goal extends Model
@@ -46,9 +48,34 @@ class Goal extends Model
         return $this->belongsTo(ProfileMember::class, 'member_id');
     }
 
-    public function linkedInvestment(): BelongsTo
+    /**
+     * Os investimentos cujo saldo faz o objetivo avançar (tabela `goal_investment`). Lê sob os escopos do investimento: quem não enxerga um
+     * investimento (privado do cônjuge) não o soma, então o total nunca entrega por subtração o que a privacidade esconde. Quem só precisa saber
+     * SE há ligação usa `hasInvestmentLinks()`, que não depende do que a pessoa enxerga.
+     */
+    public function investments(): BelongsToMany
     {
-        return $this->belongsTo(InvestmentRecord::class, 'linked_investment_id');
+        return $this->belongsToMany(InvestmentRecord::class, 'goal_investment', 'goal_id', 'investment_id');
+    }
+
+    /** Traz, numa só consulta, quantos investimentos o objetivo tem ligados (`investments_count`, sem os escopos: é só a existência da ligação). */
+    public function scopeWithInvestmentCount(Builder $query): Builder
+    {
+        return $query->withCount(['investments as investments_count' => fn ($q) => $q->withoutGlobalScopes()]);
+    }
+
+    /** O objetivo avança pelo saldo de investimentos? Independe de a pessoa enxergar cada um deles. */
+    public function hasInvestmentLinks(): bool
+    {
+        if (array_key_exists('investments_count', $this->attributes)) {
+            return (int) $this->attributes['investments_count'] > 0;
+        }
+
+        if ($this->relationLoaded('investments')) {
+            return $this->investments->isNotEmpty();
+        }
+
+        return $this->exists && DB::table('goal_investment')->where('goal_id', $this->getKey())->exists();
     }
 
     /** O consórcio que financia este objetivo: o progresso é pelas parcelas pagas, não pelo dinheiro. */
@@ -75,7 +102,7 @@ class Goal extends Model
     /** Este objetivo guarda histórico de aportes? Não quando o avanço vem de investimento ou de consórcio. */
     public function acceptsContributions(): bool
     {
-        return $this->linked_investment_id === null && $this->linked_debt_id === null;
+        return ! $this->hasInvestmentLinks() && $this->linked_debt_id === null;
     }
 
     public function usesInstallments(): bool
@@ -100,7 +127,7 @@ class Goal extends Model
     }
 
     /**
-     * Valor acumulado. Havendo investimento vinculado, ele é a fonte da
+     * Valor acumulado. Havendo investimento vinculado, a soma dos saldos deles é a fonte da
      * verdade — manter dois números à mão é garantia de divergirem.
      */
     public function accumulated(): string
@@ -113,8 +140,11 @@ class Goal extends Model
             return $p['total'] > 0 ? Money::parse(bcdiv(bcmul($this->estimated_value, (string) $p['paid'], 4), (string) $p['total'], 4)) : '0.00';
         }
 
-        if ($this->linkedInvestment !== null) {
-            return $this->linkedInvestment->current_amount;
+        // Ligado a investimentos: a SOMA dos saldos que a pessoa enxerga (vários investimentos somam; o saldo inteiro de cada um).
+        if ($this->hasInvestmentLinks()) {
+            return $this->relationLoaded('investments')
+                ? Money::sum($this->investments->pluck('current_amount'))
+                : Money::parse((string) $this->investments()->sum('investment_records.current_amount'));
         }
 
         // Sem ligação: o saldo inicial (`current_amount`) mais os aportes registrados, nunca abaixo de zero.

@@ -67,6 +67,10 @@ class UserDataExporter
                         $this->addModel($zip, $pasta, $classe, $perfil, $temporarios);
                     }
 
+                    // A ligação objetivo x investimento mora numa tabela sem model: só entram as dos objetivos que ESTA pessoa enxerga (escopos ligados).
+                    $ligacoes = DB::table('goal_investment')->whereIn('goal_id', \App\Models\Goal::query()->select('id'))->get(['goal_id', 'investment_id'])->map(fn ($l) => (array) $l)->all();
+                    $this->addJson($zip, $pasta.'/objetivos-investimentos.json', $ligacoes, $temporarios);
+
                     $this->addVaultFiles($zip, $pasta, $perfil, $bytesArquivos, $faltou);
                 } finally {
                     $this->context->clear();
