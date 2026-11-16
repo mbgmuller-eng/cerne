@@ -157,6 +157,64 @@ class DocumentCsvImportTest extends TestCase
         Queue::assertPushed(ProcessDocumentJob::class);
     }
 
+    // ------------------------------------------------------------------ troca de tipo (o 404 ao enviar fatura)
+
+    public function test_fatura_com_o_id_do_cartao_sobrando_no_campo_da_conta_nao_da_404(): void
+    {
+        // O navegador reaproveitava o mesmo <select> ao trocar o tipo, e o id do cartão chegava dentro da propriedade da conta: BankAccount::findOrFail dava 404.
+        Livewire::test(DocumentsIndex::class)
+            ->set('arquivo', $this->csv(2, 'fatura.csv'))
+            ->set('documentType', 'credit_card_invoice')
+            ->set('uploadBankAccountId', $this->cartao->id)
+            ->set('uploadCreditCardId', $this->cartao->id)
+            ->call('enviar')
+            ->assertHasNoErrors()
+            ->assertOk();
+
+        $documento = DocumentUpload::withoutProfileScope()->sole();
+        self::assertSame($this->cartao->id, $documento->credit_card_id);
+        self::assertNull($documento->bank_account_id, 'a fatura não leva conta bancária');
+    }
+
+    public function test_extrato_com_o_id_de_um_cartao_sobrando_nao_grava_cartao(): void
+    {
+        $this->enviar($this->csv(), 'bank_statement');
+        DocumentUpload::withoutProfileScope()->delete();
+
+        Livewire::test(DocumentsIndex::class)
+            ->set('arquivo', $this->csv())
+            ->set('documentType', 'bank_statement')
+            ->set('uploadBankAccountId', $this->conta->id)
+            ->set('uploadCreditCardId', $this->cartao->id)
+            ->call('enviar')
+            ->assertHasNoErrors();
+
+        $documento = DocumentUpload::withoutProfileScope()->sole();
+        self::assertSame($this->conta->id, $documento->bank_account_id);
+        self::assertNull($documento->credit_card_id, 'o extrato não leva cartão');
+    }
+
+    public function test_trocar_o_tipo_limpa_a_conta_e_o_cartao_escolhidos(): void
+    {
+        Livewire::test(DocumentsIndex::class)
+            ->set('uploadBankAccountId', $this->conta->id)
+            ->set('uploadCreditCardId', $this->cartao->id)
+            ->set('documentType', 'credit_card_invoice')
+            ->assertSet('uploadBankAccountId', '')
+            ->assertSet('uploadCreditCardId', '');
+    }
+
+    public function test_cada_campo_tem_a_propria_chave_para_o_navegador_nao_reaproveitar_o_select(): void
+    {
+        $extrato = Livewire::test(DocumentsIndex::class)->set('documentType', 'bank_statement')->html();
+        self::assertStringContainsString('importar-campo-conta', $extrato);
+        self::assertStringNotContainsString('importar-campo-cartao', $extrato);
+
+        $fatura = Livewire::test(DocumentsIndex::class)->set('documentType', 'credit_card_invoice')->html();
+        self::assertStringContainsString('importar-campo-cartao', $fatura);
+        self::assertStringNotContainsString('importar-campo-conta', $fatura);
+    }
+
     public function test_a_tela_avisa_que_aceita_csv_e_quais_tipos(): void
     {
         Livewire::test(DocumentsIndex::class)

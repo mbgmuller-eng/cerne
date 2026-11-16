@@ -51,8 +51,9 @@
                 </select>
             </div>
 
+            {{-- wire:key próprio em cada campo: sem ele o navegador reaproveita o MESMO <select> ao trocar o tipo e o cartão escolhido ia parar na propriedade da conta. --}}
             @if (in_array($documentType, ['bank_statement', 'external_report'], true))
-                <div>
+                <div wire:key="importar-campo-conta">
                     <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">{{ $documentType === 'external_report' ? 'Conta dos lançamentos' : 'Conta do extrato' }}</label>
                     <select wire:model="uploadBankAccountId" class="select mt-1.5">
                         <option value="">Selecione a conta</option>
@@ -65,7 +66,7 @@
                     @enderror
                 </div>
             @elseif ($documentType === 'credit_card_invoice')
-                <div>
+                <div wire:key="importar-campo-cartao">
                     <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Cartão da fatura</label>
                     <select wire:model="uploadCreditCardId" class="select mt-1.5">
                         <option value="">Selecione o cartão</option>

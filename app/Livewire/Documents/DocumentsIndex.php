@@ -158,6 +158,12 @@ class DocumentsIndex extends Component
     /** Índice do item com o "confirma?" de exclusão aberto — nulo = nenhum. */
     public ?int $confirmandoExclusaoItem = null;
 
+    /** Trocar o tipo troca o campo (conta ou cartão): o que estava escolhido no outro não vale mais. */
+    public function updatedDocumentType(): void
+    {
+        $this->reset('uploadBankAccountId', 'uploadCreditCardId');
+    }
+
     public function mount(): void
     {
         $this->redirectOrAbortWithoutProfile();
@@ -222,11 +228,15 @@ class DocumentsIndex extends Component
             config('cerne.documents.disk'),
         );
 
-        $conta = $data['uploadBankAccountId'] !== ''
+        // Só a conta ou o cartão que o TIPO usa: o campo do outro pode chegar com sobra (era o id do cartão dentro da conta, o que dava 404).
+        $usaConta = in_array($this->documentType, [DocumentType::BankStatement->value, DocumentType::ExternalReport->value], true);
+        $usaCartao = $this->documentType === DocumentType::CreditCardInvoice->value;
+
+        $conta = $usaConta && $data['uploadBankAccountId'] !== ''
             ? BankAccount::query()->findOrFail($data['uploadBankAccountId'])
             : null;
 
-        $cartao = $data['uploadCreditCardId'] !== ''
+        $cartao = $usaCartao && $data['uploadCreditCardId'] !== ''
             ? CreditCard::query()->findOrFail($data['uploadCreditCardId'])
             : null;
 
