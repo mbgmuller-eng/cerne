@@ -282,6 +282,23 @@ class GoalPaceTest extends TestCase
         self::assertSame(2, $servico->notifyBehind());
     }
 
+    public function test_a_rotina_agendada_roda_de_verdade_e_avisa(): void
+    {
+        // Roda o fechamento registrado em routes/console.php (e não só o serviço): um nome de classe errado ali derrubou a rotina todo dia sem teste ver.
+        Notification::fake();
+        $g = $this->objetivo();
+        $this->aporte($g, '100.00', '2026-10-10');
+
+        $evento = collect(app(\Illuminate\Console\Scheduling\Schedule::class)->events())->first(fn ($e) => $e->description === 'objetivos-atrasados');
+        self::assertNotNull($evento, 'a rotina precisa estar agendada');
+        self::assertSame('15 8 * * *', $evento->expression);
+
+        $evento->run($this->app);
+
+        Notification::assertSentToTimes($this->usuarioAna, GoalBehindPace::class, 1);
+        Notification::assertSentToTimes($this->usuarioBruno, GoalBehindPace::class, 1);
+    }
+
     public function test_objetivo_privado_so_avisa_o_dono(): void
     {
         Notification::fake();

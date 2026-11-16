@@ -291,7 +291,7 @@ Schedule::call(function (): void {
 // Objetivos: avisa (no máximo uma vez por mês por objetivo) quem guardou menos de 70% do planejado nos últimos meses fechados. Idempotente pelo livro
 // de lembretes (engagement_reminders: usuário + objetivo + tipo com o mês). Objetivo privado só avisa o dono.
 Schedule::call(function (): void {
-    $enviados = app(AppServicesGoalPaceService::class)->notifyBehind();
+    $enviados = app(\App\Services\GoalPaceService::class)->notifyBehind();
 
     logger()->info('Objetivos abaixo do planejado', ['avisados' => $enviados]);
 })->dailyAt('08:15')->name('objetivos-atrasados')->withoutOverlapping();
