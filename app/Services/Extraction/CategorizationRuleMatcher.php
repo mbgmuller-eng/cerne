@@ -26,6 +26,16 @@ class CategorizationRuleMatcher
     private const MATCH_WINDOW_DAYS = 3;
 
     /**
+     * Conta fixa: o pagamento costuma sair ANTES do vencimento (aluguel pago uma semana antes) ou um pouco depois. O vencimento pode estar até 15 dias
+     * depois do lançamento e até 10 dias antes dele. A janela maior só entra quando NADA cai na janela curta (3 dias), e só para ocorrência EM ABERTO: a mais
+     * próxima na janela curta, de qualquer situação, continua mandando (conta semanal: a linha de uma semana já paga não pode casar com a da semana
+     * seguinte). A pessoa continua confirmando cada linha na revisão.
+     */
+    public const FIXED_BILL_DAYS_BEFORE_DUE = 15;
+
+    public const FIXED_BILL_DAYS_AFTER_DUE = 10;
+
+    /**
      * @return array{rule: ExpenseCategorizationRule, category_id: string, subcategory_id: ?string, necessity: \App\Enums\Necessity, fixed_bill_payment: ?FixedBillPayment}|null
      */
     public function matchExpense(string $descricao, CarbonImmutable $data, ?string $valor = null): ?array
@@ -42,7 +52,7 @@ class CategorizationRuleMatcher
             'subcategory_id' => $regra->subcategory_id,
             'necessity' => $regra->necessity,
             'fixed_bill_payment' => $regra->fixed_bill_id !== null
-                ? $this->closestOccurrence(FixedBillPayment::query()->where('fixed_bill_id', $regra->fixed_bill_id), $data)
+                ? $this->closestFixedBillPayment($regra->fixed_bill_id, $data)
                 : null,
         ];
     }
@@ -88,6 +98,19 @@ class CategorizationRuleMatcher
             ->filter(fn ($regra) => $regra->amount === null || ($valor !== null && bccomp($regra->amount, $valor, 2) === 0))
             ->sort(fn ($a, $b) => [$b->amount !== null, mb_strlen($b->pattern), $a->created_at] <=> [$a->amount !== null, mb_strlen($a->pattern), $b->created_at])
             ->first();
+    }
+
+    /** A mais próxima na janela curta (qualquer situação); sem ela, a mais próxima EM ABERTO na janela larga (pagamento adiantado ou com atraso). */
+    private function closestFixedBillPayment(string $contaFixaId, CarbonImmutable $data): ?FixedBillPayment
+    {
+        $janela = FixedBillPayment::query()->where('fixed_bill_id', $contaFixaId)
+            ->whereBetween('due_date', [$data->subDays(self::FIXED_BILL_DAYS_AFTER_DUE)->toDateString(), $data->addDays(self::FIXED_BILL_DAYS_BEFORE_DUE)->toDateString()])
+            ->get()
+            ->sortBy(fn (FixedBillPayment $o) => abs($o->due_date->diffInDays($data)))
+            ->values();
+
+        return $janela->first(fn (FixedBillPayment $o) => abs($o->due_date->diffInDays($data)) <= self::MATCH_WINDOW_DAYS)
+            ?? $janela->first(fn (FixedBillPayment $o) => $o->status->isOutstanding());
     }
 
     /**

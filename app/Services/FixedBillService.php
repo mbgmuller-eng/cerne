@@ -213,7 +213,7 @@ class FixedBillService
                 // Conta no cartão: o valor vai para a fatura (sem mexer em saldo nenhum; o dinheiro sai quando a fatura for paga).
                 $this->launchOnCard($bill, $cartao, $valor, CarbonImmutable::parse($paidAt)->startOfDay(), $userId);
             } elseif ($bill->bank_account_id !== null && $bill->category_id !== null) {
-                ExpenseRecord::create([
+                $despesa = ExpenseRecord::create([
                     'profile_id' => $bill->profile_id,
                     'member_id' => $bill->member_id,
                     'description' => $bill->name,
@@ -231,6 +231,9 @@ class FixedBillService
                 BankAccount::withoutProfileScope()
                     ->find($bill->bank_account_id)
                     ?->applyToBalance('-'.$valor);
+
+                // A ligação impede que essa despesa seja oferecida depois como candidata a "conciliar" outra conta.
+                $payment->update(['expense_id' => $despesa->id]);
             }
 
             return $payment->refresh();

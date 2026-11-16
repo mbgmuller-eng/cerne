@@ -125,11 +125,10 @@ class CategorizationRuleMatcherTest extends TestCase
         self::assertFalse($match['fixed_bill_payment']->status->isOutstanding());
     }
 
-    public function test_fora_da_janela_de_3_dias_nao_casa_a_ocorrencia(): void
+    /** @return array{0: \App\Models\FinancialProfile, 1: FixedBill, 2: FixedBillPayment} conta mensal (uma só ocorrência no mês) com regra ligada */
+    private function contaMensalComRegra(): array
     {
         [$perfil] = $this->criarPerfil();
-        // Mensal, não semanal: só uma ocorrência no mês — sem risco de
-        // "fora da janela de uma" na verdade bater com a semana seguinte.
         $contaFixa = FixedBill::factory()->for($perfil, 'profile')->create(['due_day' => 12]);
         app(FixedBillService::class)->generateForMonth(2026, 9);
         $pagamento = FixedBillPayment::where('fixed_bill_id', $contaFixa->id)->orderBy('due_date')->first();
@@ -138,10 +137,52 @@ class CategorizationRuleMatcherTest extends TestCase
             'pattern' => 'ADRIANA', 'category_id' => $contaFixa->category_id, 'fixed_bill_id' => $contaFixa->id,
         ]);
 
-        $match = app(CategorizationRuleMatcher::class)->matchExpense('PIX ADRIANA', $pagamento->due_date->addDays(5));
+        return [$perfil, $contaFixa, $pagamento];
+    }
 
-        self::assertNotNull($match);
-        self::assertNull($match['fixed_bill_payment']);
+    public function test_fora_da_janela_larga_nao_casa_a_ocorrencia(): void
+    {
+        [, , $pagamento] = $this->contaMensalComRegra();
+        $casador = app(CategorizationRuleMatcher::class);
+
+        // Pagou 16 dias antes do vencimento (a janela vai até 15) ou 11 dias depois (vai até 10): longe demais.
+        self::assertNull($casador->matchExpense('PIX ADRIANA', $pagamento->due_date->subDays(16))['fixed_bill_payment']);
+        self::assertNull($casador->matchExpense('PIX ADRIANA', $pagamento->due_date->addDays(11))['fixed_bill_payment']);
+    }
+
+    public function test_pagamento_adiantado_ou_com_atraso_casa_a_ocorrencia_em_aberto(): void
+    {
+        [, , $pagamento] = $this->contaMensalComRegra();
+        $casador = app(CategorizationRuleMatcher::class);
+
+        // O caso real: aluguel pago 7 dias antes do vencimento. Antes a janela era de 3 dias e a baixa nem era sugerida.
+        foreach ([-15, -7, -1, 0, 5, 10] as $dias) {
+            $achada = $casador->matchExpense('PIX ADRIANA', $pagamento->due_date->addDays($dias))['fixed_bill_payment'];
+            self::assertNotNull($achada, "pagamento {$dias} dias do vencimento");
+            self::assertSame($pagamento->id, $achada->id);
+        }
+    }
+
+    public function test_prefere_a_ocorrencia_em_aberto_e_a_paga_so_vale_na_janela_curta(): void
+    {
+        [$perfil, $contaFixa, $setembro] = $this->contaMensalComRegra();
+        app(FixedBillService::class)->generateForMonth(2026, 10);
+        $outubro = FixedBillPayment::where('fixed_bill_id', $contaFixa->id)->whereMonth('due_date', 10)->first();
+        $casador = app(CategorizationRuleMatcher::class);
+
+        // Setembro já pago (vence 12/09) e outubro em aberto (12/10). Lançamento de 03/10: a de setembro está a 21 dias (fora), a de outubro a 9 dias.
+        $setembro->update(['status' => FixedBillPaymentStatus::Paid, 'amount_paid' => $contaFixa->amount, 'paid_at' => $setembro->due_date]);
+        $achada = $casador->matchExpense('PIX ADRIANA', $outubro->due_date->subDays(9))['fixed_bill_payment'];
+        self::assertSame($outubro->id, $achada->id);
+
+        // Lançamento de 20/09 (8 dias depois do vencimento de setembro, já paga; outubro a 22 dias): a paga está na janela larga mas NÃO na curta,
+        // então não casa (seria marcar a linha como "já dado baixa" por engano).
+        self::assertNull($casador->matchExpense('PIX ADRIANA', $setembro->due_date->addDays(8))['fixed_bill_payment']);
+
+        // Dentro da janela curta, a paga ainda casa (para a revisão desmarcar a linha: já foi dado baixa).
+        $paga = $casador->matchExpense('PIX ADRIANA', $setembro->due_date->addDays(2))['fixed_bill_payment'];
+        self::assertSame($setembro->id, $paga->id);
+        self::assertFalse($paga->status->isOutstanding());
     }
 
     public function test_matchincome_casa_regra_de_receita(): void

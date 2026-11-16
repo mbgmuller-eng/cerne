@@ -46,6 +46,7 @@ return [
                 'Ao abrir a tela ou mudar de mês, os vencimentos do mês são gerados sozinhos.',
                 'Marque “Pagar” quando quitar, ou “Pular” se não houver cobrança naquele mês.',
                 'Em conta de valor variável, digite o valor na linha antes de pagar.',
+                'Se o extrato já pagou uma conta, ela aparece em "Contas que parecem já pagas pelo extrato": concilie em vez de pagar, para não contar duas vezes.',
                 'A aba “Receitas recorrentes” funciona do mesmo jeito, com “Receber”.',
             ],
             'tip' => 'A despesa só é lançada no Fluxo de caixa se a conta tiver categoria e conta para debitar. Sem isso, “Pagar” apenas marca como paga.',

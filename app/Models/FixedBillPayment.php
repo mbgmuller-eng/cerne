@@ -21,7 +21,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  */
 #[Fillable([
     'profile_id', 'fixed_bill_id', 'year', 'month', 'due_date',
-    'amount_paid', 'status', 'paid_at', 'notes',
+    'amount_paid', 'status', 'paid_at', 'expense_id', 'notes',
 ])]
 class FixedBillPayment extends Model
 {
@@ -48,6 +48,12 @@ class FixedBillPayment extends Model
     public function fixedBill(): BelongsTo
     {
         return $this->belongsTo(FixedBill::class);
+    }
+
+    /** A despesa que quitou este vencimento: a que "Pagar" gerou ou o lançamento do extrato conciliado (nula no histórico antigo). */
+    public function expense(): BelongsTo
+    {
+        return $this->belongsTo(ExpenseRecord::class, 'expense_id');
     }
 
     /** Ainda pesa no mês: pendente ou vencida. */

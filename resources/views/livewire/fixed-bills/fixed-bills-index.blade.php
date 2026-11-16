@@ -45,6 +45,43 @@
             <button wire:click="toggleBillForm" class="btn-primary px-3 py-1.5">+ Conta fixa</button>
         </div>
 
+        @if (session('reconcile_status'))
+            <p class="rounded-xl bg-brand-50 px-3 py-2 text-sm text-brand-900 ring-1 ring-brand-200 dark:bg-brand-500/10 dark:text-brand-200 dark:ring-brand-500/20" data-reconcile-status>{{ session('reconcile_status') }}</p>
+        @endif
+
+        {{-- Conciliar: conta em aberto que o extrato já pagou --}}
+        @if (count($sugestoes) > 0)
+            <div class="card space-y-3 p-5" data-reconcile-panel>
+                <div>
+                    <h2 class="text-sm font-semibold text-slate-900 dark:text-white">Contas que parecem já pagas pelo extrato</h2>
+                    <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                        O Cerne achou lançamentos deste mês que batem com contas ainda em aberto. Conciliar marca a conta como paga, ligada ao lançamento: não cria despesa nova nem mexe no saldo.
+                        Não use "Pagar" nessas contas, senão o valor é contado duas vezes.
+                    </p>
+                </div>
+                <ul class="divide-y divide-slate-100 dark:divide-white/10">
+                    @foreach ($sugestoes as $sugestao)
+                        <li class="py-2" wire:key="conciliar-{{ $sugestao['payment']->id }}" data-reconcile-row="{{ $sugestao['payment']->id }}">
+                            <label class="flex cursor-pointer items-start gap-3">
+                                <input type="checkbox" wire:model.live="reconcileSelection" value="{{ $sugestao['payment']->id }}" class="mt-1 h-4 w-4 shrink-0 rounded border-slate-300 text-brand-600 focus:ring-brand-500">
+                                <span class="min-w-0 text-sm">
+                                    <span class="block font-medium text-slate-800 dark:text-slate-200">{{ $sugestao['payment']->fixedBill->name }} <span class="text-xs font-normal text-slate-500 dark:text-slate-400">· vence {{ $sugestao['payment']->due_date->format('d/m') }} · {{ Money::format($sugestao['payment']->effectiveAmount()) }}</span></span>
+                                    <span class="block truncate text-xs text-slate-500 dark:text-slate-400">
+                                        lançamento "{{ $sugestao['expense']->description }}" de {{ $sugestao['expense']->expense_date->format('d/m') }}, {{ Money::format(ltrim((string) $sugestao['expense']->amount, '-')) }}
+                                        ({{ $sugestao['basis'] === 'rule' ? 'reconhecido pela regra de categorização' : 'o nome da conta aparece na descrição' }})
+                                    </span>
+                                </span>
+                            </label>
+                        </li>
+                    @endforeach
+                </ul>
+                <x-form-consequence :lines="$linhasConciliar" />
+                <div class="flex justify-end">
+                    <button type="button" wire:click="reconcileSelected" wire:loading.attr="disabled" class="btn-primary px-4 py-2 text-sm" data-reconcile-submit @disabled(count($reconcileSelection) === 0)>Conciliar marcadas</button>
+                </div>
+            </div>
+        @endif
+
         <x-modal wire-model="showBillForm">
             <form wire:submit="saveBill" class="space-y-4">
                 <div class="flex items-baseline justify-between">

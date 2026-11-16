@@ -18,6 +18,7 @@ use App\Models\IncomeCategory;
 use App\Models\ProfileMember;
 use App\Models\RecurringIncome;
 use App\Models\RecurringIncomeOccurrence;
+use App\Services\FixedBillReconciliationService;
 use App\Services\FixedBillService;
 use App\Services\RecurringIncomeService;
 use App\Support\Forms\FormConsequence;
@@ -61,6 +62,9 @@ class FixedBillsIndex extends Component
 
     #[Url]
     public string $tab = 'despesas';
+
+    /** @var list<string> contas (ocorrências) marcadas para conciliar com o lançamento sugerido; começa com todas as sugeridas marcadas. */
+    public array $reconcileSelection = [];
 
     /** Valor digitado para as contas/receitas de valor variável, indexado pelo id do vencimento. */
     public array $valorPago = [];
@@ -160,6 +164,7 @@ class FixedBillsIndex extends Component
         // navegar para um mês futuro antes de o cron chegar nele.
         app(FixedBillService::class)->generateForMonth($this->year, $this->month);
         app(RecurringIncomeService::class)->generateForMonth($this->year, $this->month);
+        $this->resetReconcileSelection();
     }
 
     public function setTab(string $tab): void
@@ -174,6 +179,7 @@ class FixedBillsIndex extends Component
         $this->month = $d->month;
         app(FixedBillService::class)->generateForMonth($this->year, $this->month);
         app(RecurringIncomeService::class)->generateForMonth($this->year, $this->month);
+        $this->resetReconcileSelection();
     }
 
     public function nextMonth(): void
@@ -183,11 +189,62 @@ class FixedBillsIndex extends Component
         $this->month = $d->month;
         app(FixedBillService::class)->generateForMonth($this->year, $this->month);
         app(RecurringIncomeService::class)->generateForMonth($this->year, $this->month);
+        $this->resetReconcileSelection();
     }
 
     // -----------------------------------------------------------------
     // Despesa — pagar / pular / cadastrar
     // -----------------------------------------------------------------
+
+    // -----------------------------------------------------------------
+    // Conciliar: conta já paga pelo extrato (o lançamento existe)
+    // -----------------------------------------------------------------
+
+    /**
+     * As sugestões de AGORA. Não é propriedade computada de propósito: ela fica em cache durante a requisição, e depois de conciliar o painel
+     * continuaria mostrando o que acabou de ser baixado.
+     *
+     * @return list<array{payment: FixedBillPayment, expense: \App\Models\ExpenseRecord, basis: string, distance: int}>
+     */
+    private function loadSuggestions(): array
+    {
+        return app(FixedBillReconciliationService::class)->suggestions($this->year, $this->month);
+    }
+
+    private function resetReconcileSelection(): void
+    {
+        $this->reconcileSelection = array_map(fn (array $s) => $s['payment']->id, $this->loadSuggestions());
+    }
+
+    /**
+     * Concilia as contas marcadas. A conta e o lançamento são REFEITOS aqui, no servidor: do navegador só vêm os ids das contas marcadas, e cada uma
+     * recebe o lançamento que o Cerne sugere agora (nunca um id de lançamento digitado).
+     */
+    public function reconcileSelected(FixedBillReconciliationService $servico): void
+    {
+        $conciliadas = 0;
+        $recusas = [];
+
+        foreach ($this->loadSuggestions() as $sugestao) {
+            if (! in_array($sugestao['payment']->id, $this->reconcileSelection, true)) {
+                continue;
+            }
+
+            try {
+                $servico->reconcile($sugestao['payment']->id, $sugestao['expense']->id);
+                $conciliadas++;
+            } catch (\InvalidArgumentException $e) {
+                $recusas[] = $sugestao['payment']->fixedBill->name.': '.$e->getMessage();
+            }
+        }
+
+        $this->resetReconcileSelection();
+
+        // Aviso próprio, mostrado dentro da tela: o "status" global só aparece num carregamento completo da página, não depois de uma ação do Livewire.
+        session()->flash('reconcile_status', $conciliadas === 0
+            ? 'Nenhuma conta foi conciliada.'
+            : ($conciliadas === 1 ? '1 conta conciliada' : $conciliadas.' contas conciliadas').' com o lançamento do extrato.'.($recusas !== [] ? ' Não deu para conciliar: '.implode(' ', $recusas) : ''));
+    }
 
     public function pay(string $paymentId, FixedBillService $service): void
     {
@@ -851,7 +908,19 @@ class FixedBillsIndex extends Component
         $bankAccounts = BankAccount::query()->active()->orderBy('bank_name')->get();
         $creditCards = CreditCard::query()->where('is_active', true)->orderBy('card_name')->get();
 
+        $sugestoes = $this->loadSuggestions();
+        $marcadas = array_values(array_filter($sugestoes, fn (array $s) => in_array($s['payment']->id, $this->reconcileSelection, true)));
+        $linhasConciliar = [];
+
+        if ($marcadas !== []) {
+            $abate = Money::sum(array_map(fn (array $s) => $s['payment']->effectiveAmount(), $marcadas));
+            $linhasConciliar[] = count($marcadas).' '.(count($marcadas) === 1 ? 'conta passa' : 'contas passam').' a paga'.(count($marcadas) === 1 ? '' : 's').', ligada'.(count($marcadas) === 1 ? '' : 's').' ao lançamento do extrato. Nenhuma despesa nova é criada e o saldo das contas não muda.';
+            $linhasConciliar[] = 'O "Ainda a pagar" do mês cai de '.Money::format($this->outstanding).' para '.Money::format(bcsub($this->outstanding, $abate, 2)).'.';
+        }
+
         return view('livewire.fixed-bills.fixed-bills-index', [
+            'sugestoes' => $sugestoes,
+            'linhasConciliar' => $linhasConciliar,
             'creditCards' => $creditCards,
             'billConsequence' => $this->billConsequence($bankAccounts, $creditCards),
             'incomeConsequence' => $this->incomeConsequence($bankAccounts),
