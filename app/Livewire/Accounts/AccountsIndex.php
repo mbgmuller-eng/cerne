@@ -595,6 +595,30 @@ class AccountsIndex extends Component
         return ctype_digit($valor) && (int) $valor >= 1 && (int) $valor <= 31 ? (int) $valor : null;
     }
 
+    /**
+     * Quanto de cada cartão está comprometido: a soma das faturas ainda não pagas (aberta, fechada ou vencida). É o que o limite já "gastou".
+     *
+     * @return array<string, string> cartão => valor
+     */
+    private function cardUsed(): array
+    {
+        return \App\Models\CreditCardInvoice::query()
+            ->outstanding()
+            ->selectRaw('credit_card_id, SUM(total_amount) as total')
+            ->groupBy('credit_card_id')
+            ->pluck('total', 'credit_card_id')
+            ->map(fn ($v) => Money::parse($v))
+            ->all();
+    }
+
+    /** O que se comprou no cartão neste mês (em SQL), para o resumo do pé da lista de cartões. */
+    private function cardMonthSpend(): string
+    {
+        $hoje = \Carbon\CarbonImmutable::now();
+
+        return Money::parse(\App\Models\ExpenseRecord::query()->forPeriod($hoje->year, $hoje->month)->whereNotNull('credit_card_id')->sum('amount'));
+    }
+
     public function render()
     {
         $profileId = app(ProfileContext::class)->profileId();
@@ -616,6 +640,8 @@ class AccountsIndex extends Component
             'currentInvoices' => $this->currentInvoices,
             'totalBalance' => $this->totalBalance,
             'totalCardDebt' => $this->totalCardDebt,
+            'cardUsed' => $this->cardUsed(),
+            'cardMonthSpend' => $this->cardMonthSpend(),
             'members' => $membros,
             'knownBanks' => Bank::names(),
         ]);

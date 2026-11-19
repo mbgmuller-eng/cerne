@@ -32,10 +32,12 @@
             <p class="mt-1 text-xs text-slate-400">Cadastre um sonho ou meta, com valor e prazo, e acompanhe o quanto já avançou.</p>
         </div>
     @else
-        <ul class="space-y-3">
+        <ul class="grid gap-3 lg:grid-cols-2">
             @foreach ($goals as $objetivo)
-                <li class="card p-5">
-                    <div class="flex flex-wrap items-start justify-between gap-3">
+                <li class="card p-5" data-goal-card>
+                    <div class="flex items-start gap-4">
+                        <x-anel-progresso :pct="$objetivo->progressPercentage()" :cor="$objetivo->isAchieved() ? 'text-emerald-600 dark:text-emerald-400' : 'text-brand-700 dark:text-brand-400'" />
+                    <div class="flex min-w-0 flex-1 flex-wrap items-start justify-between gap-3">
                         <div class="min-w-0">
                             <div class="flex items-center gap-2">
                                 <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand-800 text-xs font-medium text-white">
@@ -55,13 +57,10 @@
                         <div class="shrink-0 text-right">
                             <p class="text-sm tabular-nums text-slate-800 dark:text-slate-200">{{ Money::format($objetivo->estimated_value) }}</p>
                             @if ($mensal = $objetivo->monthlyNeeded())
-                                <p class="text-xs tabular-nums text-slate-500 dark:text-slate-400">{{ Money::format($mensal) }}/mês</p>
+                                <p class="text-xs tabular-nums text-slate-500 dark:text-slate-400" data-goal-ideal>ideal {{ Money::format($mensal) }}/mês</p>
                             @endif
                         </div>
                     </div>
-
-                    <div class="mt-3 h-2 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-700">
-                        <div class="h-full rounded-full bg-brand-700 dark:bg-brand-400" style="width: {{ $objetivo->progressPercentage() }}%"></div>
                     </div>
 
                     <div class="mt-2 flex items-baseline justify-between">
@@ -84,7 +83,7 @@
                             @if ($objetivo->isAchieved())
                                 <span class="text-xs text-brand-700 dark:text-brand-300">objetivo alcançado</span>
                             @else
-                                <span class="text-xs text-slate-400">faltam {{ Money::format($objetivo->remaining()) }}</span>
+                                <span class="text-xs text-slate-400">faltam {{ Money::format($objetivo->remaining()) }}@if ($objetivo->target_date && $objetivo->target_date->isFuture()) · {{ max(1, (int) ceil(now()->diffInMonths($objetivo->target_date))) }} {{ max(1, (int) ceil(now()->diffInMonths($objetivo->target_date))) === 1 ? 'mês' : 'meses' }}@endif</span>
                             @endif
                         @endif
                     </div>

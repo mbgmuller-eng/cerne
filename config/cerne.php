@@ -156,6 +156,25 @@ return [
 
     /*
     |---------------------------------------------------------------------------
+    | Assistente de conversa ("Pergunte ao Cerne")
+    |---------------------------------------------------------------------------
+    | Responde perguntas sobre as finanças do perfil aberto, só por ferramentas de LEITURA que rodam sob o ProfileContext da pessoa (o que o
+    | casal oculta, o assistente não vê). Desligado por padrão: cada pergunta é uma chamada paga e leva dado financeiro à API, então a decisão
+    | de ligar (custo e texto da Política de Privacidade) é do dono do projeto.
+    */
+
+    'assistant' => [
+        'enabled' => (bool) env('CERNE_ASSISTANT_ENABLED', false),
+        'questions_per_day' => (int) env('CERNE_ASSISTANT_QUESTIONS_PER_DAY', 30),
+        // Voltas de "pergunta -> ferramenta -> resposta" antes de desistir (impede laço infinito e custo sem fim).
+        'max_steps' => 5,
+        'max_tokens' => 1024,
+        // Mensagens anteriores que seguem na conversa (a conversa só existe na tela: nada disso é gravado).
+        'max_history' => 10,
+    ],
+
+    /*
+    |---------------------------------------------------------------------------
     | Armazenamento de documentos
     |---------------------------------------------------------------------------
     | Disco privado: extrato bancário não pode ficar em pasta pública.

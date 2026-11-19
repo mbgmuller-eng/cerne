@@ -256,7 +256,7 @@
                         <div class="flex min-w-0 items-center gap-3">
                             <x-bank-badge :initials="$account->bankInitials()" :color="$account->color_hex ?? '#0F766E'" />
                             <div class="min-w-0">
-                                <p class="truncate text-sm font-medium text-slate-800 dark:text-slate-200">{{ $account->bank_name }}</p>
+                                <a href="{{ route('accounts.statement', $account) }}" class="block truncate text-sm font-medium text-slate-800 hover:underline dark:text-slate-200">{{ $account->bank_name }}</a>
                                 <p class="truncate text-xs text-slate-500 dark:text-slate-400">
                                     {{ $account->account_type->label() }}
                                     @if ($account->member) · {{ $account->member->name }} @endif
@@ -288,6 +288,7 @@
                                         x-show="open" x-transition x-cloak @click="open = false"
                                         class="absolute right-0 z-10 mt-1 w-36 overflow-hidden rounded-xl bg-white py-1 shadow-card ring-1 ring-brand-950/5 dark:bg-slate-800 dark:ring-white/10"
                                     >
+                                        <a href="{{ route('accounts.statement', $account) }}" class="block w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-700" data-ver-extrato>Ver extrato</a>
                                         <button wire:click="editAccount('{{ $account->id }}')" type="button" class="block w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-700">Editar</button>
                                         <button wire:click="confirmDeleteAccount('{{ $account->id }}')" type="button" class="block w-full px-3 py-2 text-left text-sm text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-500/10">
                                             {{ $account->hasActivity() ? 'Desativar' : 'Excluir' }}
@@ -328,10 +329,17 @@
                 <p class="text-sm text-slate-500 dark:text-slate-400">Nenhum cartão cadastrado.</p>
             </div>
         @else
-            <ul class="mt-3 space-y-3">
+            <ul class="mt-3 grid items-start gap-3 md:grid-cols-2" data-cartoes>
                 @foreach ($cards as $card)
-                    @php $invoice = $currentInvoices->get($card->id); @endphp
-                    <li class="card">
+                    @php
+                        $invoice = $currentInvoices->get($card->id);
+                        $usado = (string) ($cardUsed[$card->id] ?? '0');
+                        $limite = (string) $card->credit_limit;
+                        $temLimite = bccomp($limite, '0', 2) > 0;
+                        $pctUso = $temLimite ? min(100, ((float) $usado / (float) $limite) * 100) : 0;
+                        $corUso = $pctUso >= 90 ? 'bg-red-600 dark:bg-red-400' : ($pctUso >= 70 ? 'bg-amber-500 dark:bg-amber-400' : 'bg-brand-700 dark:bg-brand-400');
+                    @endphp
+                    <li class="card" data-cartao="{{ $card->id }}">
                         <div class="flex items-center justify-between gap-4 px-5 py-4">
                             <div class="flex min-w-0 items-center gap-3">
                                 <x-bank-badge :initials="$card->bankInitials()" :color="$card->color_hex ?? '#B45309'" />
@@ -381,6 +389,21 @@
                             </div>
                         </div>
 
+                        {{-- Limite: quanto já foi usado pelas faturas em aberto e quanto resta --}}
+                        <div class="px-5 pb-4" data-cartao-limite>
+                            @if ($temLimite)
+                                <div class="grid grid-cols-3 gap-2 text-xs">
+                                    <div><p class="text-slate-500 dark:text-slate-400">Limite</p><p class="figure text-sm text-slate-800 dark:text-slate-200">{{ Money::format($limite) }}</p></div>
+                                    <div class="text-center"><p class="text-slate-500 dark:text-slate-400">Em aberto</p><p class="figure text-sm text-slate-800 dark:text-slate-200">{{ Money::format($usado) }}</p></div>
+                                    <div class="text-right"><p class="text-slate-500 dark:text-slate-400">Disponível</p><p class="figure text-sm {{ bccomp($limite, $usado, 2) < 0 ? 'text-red-700 dark:text-red-400' : 'text-emerald-700 dark:text-emerald-400' }}">{{ Money::format(bcsub($limite, $usado, 2)) }}</p></div>
+                                </div>
+                                <x-barra-progresso class="mt-2" :progresso="$pctUso" :cor="$corUso" />
+                                <p class="mt-1.5 text-right text-xs text-slate-400">{{ number_format($pctUso, 0, ',', '.') }}% do limite usado</p>
+                            @else
+                                <p class="text-xs text-slate-400">Informe o limite do cartão (em Editar) para acompanhar quanto ainda resta.</p>
+                            @endif
+                        </div>
+
                         @if ($invoice)
                             <div class="border-t border-slate-100 dark:border-white/10 px-5 py-3">
                                 <a href="{{ route('invoices.show', $invoice) }}" class="text-sm text-brand-800 dark:text-brand-300 hover:underline">
@@ -391,6 +414,15 @@
                     </li>
                 @endforeach
             </ul>
+        @endif
+
+        @if (! $cards->isEmpty())
+            @php $limiteTotal = Money::sum($cards->pluck('credit_limit')); @endphp
+            <div class="mt-3 flex flex-wrap items-center justify-center gap-x-6 gap-y-1 rounded-2xl bg-white px-4 py-3 text-sm shadow-card ring-1 ring-slate-200 dark:bg-slate-800 dark:ring-white/10" data-cartoes-resumo>
+                <span class="text-slate-500 dark:text-slate-400">Limite disponível <strong class="figure ml-1 font-semibold text-emerald-700 dark:text-emerald-400">{{ Money::format(bcsub($limiteTotal, Money::sum($cards->map(fn ($c) => $cardUsed[$c->id] ?? 0)), 2)) }}</strong></span>
+                <span class="text-slate-500 dark:text-slate-400">Compras no mês <strong class="figure ml-1 font-semibold text-slate-800 dark:text-slate-200">{{ Money::format($cardMonthSpend) }}</strong></span>
+                <span class="text-slate-500 dark:text-slate-400">Total de faturas <strong class="figure ml-1 font-semibold text-amber-700 dark:text-amber-400">{{ Money::format($totalCardDebt) }}</strong></span>
+            </div>
         @endif
 
         @if ($inactiveCards->isNotEmpty())

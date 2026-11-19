@@ -283,7 +283,8 @@ class BudgetRuleIndexTest extends TestCase
             ->assertSet('ym', '2026-11')
             ->call('previousMonth')->assertSet('ym', '2026-10')
             ->call('previousMonth')->assertSet('ym', '2026-09')
-            ->assertSee('Mês atual')
+            // Fora do mês de hoje o rótulo do seletor vira o atalho "Voltar ao mês atual".
+            ->assertSeeHtml('title="Voltar ao mês atual"')
             ->call('currentMonth')->assertSet('ym', '2026-11')
             ->call('nextMonth')->assertSet('ym', '2026-12');
     }

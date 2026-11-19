@@ -52,6 +52,29 @@ return [
             'tip' => 'A despesa só é lançada no Fluxo de caixa se a conta tiver categoria e conta para debitar. Sem isso, “Pagar” apenas marca como paga.',
         ],
 
+        'search.index' => [
+            'title' => 'Buscar',
+            'summary' => 'Ache um lançamento, conta, dívida, objetivo, investimento, apólice ou documento digitando parte do nome.',
+            'steps' => [
+                'Digite pelo menos 2 letras: o resultado aparece enquanto você escreve.',
+                'Os resultados vêm separados por tipo. Toque em um para abrir a tela dele.',
+                'Em qualquer tela, aperte a tecla “/” para vir direto à busca.',
+            ],
+            'tip' => 'A busca olha nomes e descrições. Dados protegidos, como o nome do segurado e as anotações, não entram.',
+        ],
+
+        'assistant.index' => [
+            'title' => 'Pergunte ao Cerne',
+            'summary' => 'Converse com o assistente sobre as finanças do perfil: gastos, saldos, vencimentos e objetivos.',
+            'steps' => [
+                'Escreva a pergunta do jeito que falaria, como “quanto gastei com delivery este mês?”.',
+                'O assistente consulta os seus dados e responde com os valores. Ele vê o mesmo que você vê.',
+                'Ele só consulta: para lançar, pagar ou alterar algo, use as telas do app.',
+                'Use “Nova conversa” para recomeçar. A conversa não fica gravada.',
+            ],
+            'tip' => 'Confira os valores importantes nas telas: o assistente pode errar.',
+        ],
+
         'accounts.index' => [
             'title' => 'Contas e cartões',
             'summary' => 'Os saldos das suas contas e as faturas de cartão ainda em aberto.',

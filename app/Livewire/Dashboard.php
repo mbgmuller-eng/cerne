@@ -4,6 +4,8 @@ namespace App\Livewire;
 
 use App\Services\DashboardService;
 use App\Support\ProfileContext;
+use Carbon\CarbonImmutable;
+use Livewire\Attributes\Url;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 
@@ -18,6 +20,42 @@ class Dashboard extends Component
 {
     /** 'reais' (tudo convertido) ou 'moedas' (dividido em reais, USDT, BTC e ETH). Lembrado na sessão. */
     public string $exibicao = 'reais';
+
+    /** Mês mostrado (na URL, para sobreviver ao recarregar e poder ser enviado). Vazio = mês de hoje. */
+    #[Url]
+    public ?int $ano = null;
+
+    #[Url]
+    public ?int $mes = null;
+
+    public function previousMonth(): void
+    {
+        $alvo = $this->referencia()->subMonth();
+        $this->ano = $alvo->year;
+        $this->mes = $alvo->month;
+    }
+
+    public function nextMonth(): void
+    {
+        $alvo = $this->referencia()->addMonth();
+        $this->ano = $alvo->year;
+        $this->mes = $alvo->month;
+    }
+
+    public function currentMonth(): void
+    {
+        $this->ano = null;
+        $this->mes = null;
+    }
+
+    private function referencia(): CarbonImmutable
+    {
+        $hoje = CarbonImmutable::now();
+        $ano = $this->ano ?? $hoje->year;
+        $mes = min(12, max(1, $this->mes ?? $hoje->month));
+
+        return CarbonImmutable::create($ano, $mes, 1);
+    }
 
     public function exibir(string $modo): void
     {
@@ -77,7 +115,9 @@ class Dashboard extends Component
         return view('livewire.dashboard', [
             'profile' => $profile,
             'member' => $context->member(),
-            'dados' => $dashboard->overview(),
+            'dados' => $dashboard->overview($this->referencia()->year, $this->referencia()->month),
+            'referencia' => $this->referencia(),
+            'ehMesAtual' => $this->referencia()->isSameMonth(CarbonImmutable::now()),
         ]);
     }
 }

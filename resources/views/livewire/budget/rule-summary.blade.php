@@ -31,7 +31,7 @@
                                 <span class="font-medium text-slate-700 dark:text-slate-300">{{ $a['name'] }} · {{ rtrim(rtrim(number_format((float) $a['percent'], 2, ',', ''), '0'), ',') }}%</span>
                                 <span class="tabular-nums text-slate-500 dark:text-slate-400">{{ Money::format($a['realized']) }} de {{ Money::format($a['target']) }}</span>
                             </div>
-                            <div class="mt-1.5 h-2 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-700"><div class="h-full rounded-full {{ $cor }}" style="width: {{ $a['progress'] }}%"></div></div>
+                            <x-barra-progresso class="mt-1.5" :progresso="$a['progress']" :cor="$cor" :hoje="$ano === now()->year && $mes === now()->month ? round(now()->day / now()->daysInMonth * 100, 1) : null" />
                             <p class="mt-1 text-xs {{ $a['status'] === 'over' ? 'text-red-700 dark:text-red-400' : 'text-slate-500 dark:text-slate-400' }}">
                                 @if ($a['direction'] === 'max')
                                     {{ $a['status'] === 'over' ? 'Passou '.Money::format($a['over']) : 'Dentro do limite' }}

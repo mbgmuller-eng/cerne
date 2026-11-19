@@ -175,6 +175,8 @@
     $areaAdmin = request()->routeIs('admin.*');
     $dentroDoPerfil = $profile && ! $areaConsultor && ! $areaAdmin;
     $mostraAsideDesktop = $dentroDoPerfil || $areaConsultor || $areaAdmin;
+    // A busca percorre as telas financeiras do perfil: fica fora para corretor (só Seguros) e para quem está num perfil de cuidado.
+    $podeBuscar = $dentroDoPerfil && ! $emPerfilDeCuidado && ! $user?->isBroker();
 
     // Menu do profissional, em grupos por tipo de trabalho:
     //  - Consultoria: carteira e investimentos, tela financeira (só consultor);
@@ -352,9 +354,13 @@
 </head>
 <body
     class="h-full bg-paper text-slate-800 antialiased dark:text-slate-200"
-    x-data="{ menu: false }"
+    x-data="{ menu: false, topo: false }"
     x-effect="document.documentElement.classList.toggle('overflow-hidden', menu)"
     @resize.window="if (window.innerWidth >= 1024) menu = false"
+    @scroll.window.passive="topo = window.scrollY > 600"
+@if ($podeBuscar)
+    @keydown.window="if (event.key === '/' && ! event.ctrlKey && ! event.metaKey && ! event.altKey && ! ['INPUT','TEXTAREA','SELECT'].includes(document.activeElement?.tagName) && ! document.activeElement?.isContentEditable) { event.preventDefault(); window.Livewire?.navigate ? Livewire.navigate('{{ route('search.index') }}') : (window.location = '{{ route('search.index') }}') }"
+@endif
 >
 
 <div class="flex min-h-full">
@@ -476,6 +482,11 @@
                         </button>
                     </form>
                     <div class="flex items-center gap-1">
+                        @if ($podeBuscar)
+                            <a href="{{ route('search.index') }}" wire:navigate aria-label="Buscar (atalho: /)" title="Buscar (atalho: /)" data-busca-link class="flex h-9 w-9 items-center justify-center rounded-xl text-white/60 transition hover:bg-white/10 hover:text-white">
+                                <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+                            </a>
+                        @endif
                         @if ($temTutorial)
                             <x-help-button class="!text-white/60" />
                         @endif
@@ -786,6 +797,12 @@
                         @endunless
                     </div>
 
+                    @if ($podeBuscar)
+                        <a href="{{ route('search.index') }}" wire:navigate aria-label="Buscar" title="Buscar" data-busca-link class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-white/70 transition hover:bg-white/10 hover:text-white lg:hidden">
+                            <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+                        </a>
+                    @endif
+
                     @if ($temTutorial)
                         <x-help-button class="shrink-0 {{ $dentroDoPerfil ? '!text-white/60' : '' }}" />
                     @endif
@@ -846,6 +863,12 @@
 @if ($dentroDoPerfil && ! $emPerfilDeCuidado && ! $user?->isBroker() && ! request()->routeIs(['subscription.*', 'my-account', 'care.*']))
     <x-quick-add :na-tela="request()->routeIs('cashflow.index')" />
 @endif
+
+{{-- Voltar ao topo (celular): aparece depois de rolar e fica logo acima do "+". Some com o menu aberto. --}}
+<button type="button" x-show="topo && ! menu" x-cloak x-transition.opacity @click="window.scrollTo({ top: 0, behavior: 'smooth' })" aria-label="Voltar ao topo" data-voltar-topo
+        class="fixed right-4 bottom-[calc(5.25rem+env(safe-area-inset-bottom))] z-[35] flex h-10 w-10 transform-gpu items-center justify-center rounded-full bg-white text-slate-600 shadow-lg ring-1 ring-slate-200 will-change-transform lg:hidden dark:bg-slate-800 dark:text-slate-200 dark:ring-white/10">
+    <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 14 6-6 6 6"/></svg>
+</button>
 
 <script>
     // Cacheia apenas os arquivos estáticos. Dado financeiro nunca entra

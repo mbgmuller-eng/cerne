@@ -15,7 +15,7 @@
     <div class="flex flex-wrap items-end justify-between gap-4">
         <div>
             <h1 class="font-display text-3xl font-semibold tracking-tight text-slate-900 dark:text-white">Fluxo de caixa</h1>
-            <p class="mt-1 text-sm text-slate-500 dark:text-slate-400 first-letter:uppercase">{{ $periodLabel }}</p>
+            <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Receitas e despesas do mês, com os filtros que você escolher.</p>
         </div>
 
         <div class="flex flex-wrap items-center gap-2">
@@ -39,12 +39,11 @@
                     <p x-show="suportado && ! gravando && ! processando" x-cloak class="w-full text-xs text-slate-500 dark:text-slate-400">Toque em "Falar despesa" e diga o gasto.</p>
                 @endif
             </div>
-
-            <span class="mx-1 h-5 w-px bg-slate-200 dark:bg-white/10"></span>
-            <button wire:click="previousMonth" class="btn-secondary px-3 py-1.5">←</button>
-            <button wire:click="nextMonth" class="btn-secondary px-3 py-1.5">→</button>
         </div>
     </div>
+
+    {{-- O mês fica numa faixa própria, grudada abaixo do cabeçalho no celular enquanto a página rola (ver x-seletor-mes). --}}
+    <x-seletor-mes :rotulo="$periodLabel" class="w-full lg:w-auto" />
 
     {{-- Casal / cada membro — só quando há algo marcado como oculto ---- --}}
     @if ($showPrivacyTabs)
@@ -521,10 +520,11 @@
                                 <input type="checkbox" wire:model.live="selecionadas" value="{{ $despesa->id }}" class="shrink-0 rounded border-slate-300 dark:border-slate-600 text-brand-700 dark:text-brand-400 focus:ring-brand-500">
                             @endunless
                             @if ($despesa->is_refund)
-                                <span class="h-8 w-1 shrink-0 rounded-full bg-emerald-500"></span>
+                                <span class="hidden h-8 w-1 shrink-0 rounded-full bg-emerald-500 sm:block"></span>
                             @else
-                                <span class="h-8 w-1 shrink-0 rounded-full" style="background: {{ $despesa->necessity->color() }}"></span>
+                                <span class="hidden h-8 w-1 shrink-0 rounded-full sm:block" style="background: {{ $despesa->necessity->color() }}"></span>
                             @endif
+                            <x-icone-categoria :nome="$despesa->category->name" tamanho="h-9 w-9" />
                             <div class="min-w-0">
                                 <p class="truncate text-sm text-slate-800 dark:text-slate-200">{{ $despesa->description }}</p>
                                 <p class="truncate text-xs text-slate-500 dark:text-slate-400">
@@ -589,6 +589,8 @@
             <ul class="mt-3 card divide-y divide-slate-100 dark:divide-white/10">
                 @foreach ($incomes as $receita)
                     <li class="flex items-center justify-between gap-4 px-5 py-3">
+                        <div class="flex min-w-0 items-center gap-3">
+                        <x-icone-categoria :nome="$receita->category->name" tamanho="h-9 w-9" />
                         <div class="min-w-0">
                             <p class="truncate text-sm text-slate-800 dark:text-slate-200">{{ $receita->description ?: $receita->category->name }}</p>
                             <p class="truncate text-xs text-slate-500 dark:text-slate-400">
@@ -597,6 +599,7 @@
                                 @if ($receita->member) · {{ $receita->member->name }} @endif
                                 @if ($receita->is_recurring) · recorrente @endif
                             </p>
+                        </div>
                         </div>
 
                         <div class="flex shrink-0 items-center gap-3">

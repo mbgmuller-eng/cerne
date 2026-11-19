@@ -31,19 +31,14 @@
             <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Quanto da receita deveria ir para cada área, e quanto foi.</p>
         </div>
         <div class="flex flex-wrap items-center gap-2">
-            <div class="flex items-center gap-1 rounded-lg ring-1 ring-slate-200 dark:ring-white/10">
-                <button type="button" wire:click="previousMonth" class="btn-ghost px-2.5 py-1.5 text-sm" aria-label="Mês anterior">‹</button>
-                <span class="min-w-[9rem] px-1 text-center text-sm font-medium first-letter:uppercase text-slate-800 dark:text-slate-200" data-budget-month>{{ $mesTexto }}</span>
-                <button type="button" wire:click="nextMonth" class="btn-ghost px-2.5 py-1.5 text-sm" aria-label="Próximo mês">›</button>
-            </div>
-            @unless ($ehMesAtual)
-                <button type="button" wire:click="currentMonth" class="btn-ghost px-2 py-1.5 text-xs">Mês atual</button>
-            @endunless
             @if ($relatorio !== null)
                 <button type="button" wire:click="openEditor" class="btn-secondary px-3 py-1.5 text-sm" data-edit-rule>Editar regra</button>
             @endif
         </div>
     </div>
+
+    {{-- O mês fica numa faixa própria, grudada abaixo do cabeçalho no celular enquanto a página rola (ver x-seletor-mes). --}}
+    <x-seletor-mes :rotulo="$mesTexto" :hoje="$ehMesAtual ? null : 'currentMonth'" class="w-full lg:w-auto" data-budget-month />
 
     @if (session('budget_status'))
         <p class="rounded-xl bg-brand-50 px-3 py-2 text-sm text-brand-900 ring-1 ring-brand-200 dark:bg-brand-500/10 dark:text-brand-200 dark:ring-brand-500/20" data-budget-status>{{ session('budget_status') }}</p>
@@ -98,7 +93,7 @@
                     </div>
                     <p class="figure mt-2 text-xl font-medium text-slate-900 dark:text-white">{{ Money::format($a['realized']) }}</p>
                     <p class="text-xs text-slate-500 dark:text-slate-400">{{ $a['direction'] === 'max' ? 'limite' : 'meta' }} de {{ Money::format($a['target']) }}</p>
-                    <div class="mt-3 h-2 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-700"><div class="h-full rounded-full {{ $barra($a['status']) }}" style="width: {{ $a['progress'] }}%"></div></div>
+                    <x-barra-progresso class="mt-3" :progresso="$a['progress']" :cor="$barra($a['status'])" :hoje="$ehMesAtual ? round(now()->day / now()->daysInMonth * 100, 1) : null" />
                     <p class="mt-2 text-xs {{ $a['status'] === 'over' ? 'text-red-700 dark:text-red-400' : 'text-slate-500 dark:text-slate-400' }}">
                         @if ($a['direction'] === 'max')
                             {{ $a['status'] === 'over' ? 'Passou '.Money::format($a['over']).' do limite.' : 'Ainda cabem '.Money::format(bcsub($a['target'], $a['realized'], 2)).'.' }}

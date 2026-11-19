@@ -80,9 +80,27 @@
             </a>
         @endif
 
+        @php
+            // Os grupos recolhem para o menu não virar uma lista longa: abre o que tem a tela de agora (ou o primeiro, se nenhum tiver).
+            $indiceAtivo = null;
+            foreach ($secoes as $i => $sec) {
+                foreach ($sec['items'] as $item) {
+                    if (request()->routeIs($item[0])) {
+                        $indiceAtivo = $i;
+                        break 2;
+                    }
+                }
+            }
+            $indiceAtivo ??= array_key_first($secoes);
+        @endphp
+
         @foreach ($secoes as $secao)
-            <div @class(['pt-4' => ! $loop->first])>
-                <p @class(['px-3 pb-1 text-[10px] font-semibold tracking-wide uppercase', $secao['tint']])>{{ $secao['label'] }}</p>
+            <div @class(['pt-2' => ! $loop->first]) x-data="{ aberto: {{ $loop->index === $indiceAtivo ? 'true' : 'false' }} }" data-menu-grupo>
+                <button type="button" @click="aberto = ! aberto" :aria-expanded="aberto" data-menu-grupo-titulo @class(['flex w-full items-center justify-between rounded-lg px-3 py-2 text-[10px] font-semibold tracking-wide uppercase transition', $secao['tint']])>
+                    <span>{{ $secao['label'] }}</span>
+                    <svg class="h-3.5 w-3.5 transition" :class="aberto ? 'rotate-180' : ''" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd" /></svg>
+                </button>
+                <div x-show="aberto" x-cloak class="space-y-0.5">
                 @foreach ($secao['items'] as [$rota, $rotulo, $icone, $selo, $tipoSelo])
                     @if (($secao['cadastrosDe'] ?? null) !== null && $loop->index === $secao['cadastrosDe'])
                         <p @class(['px-3 pt-4 pb-1 text-[10px] font-semibold tracking-wide uppercase', 'text-white/40' => $escuro, 'text-slate-400 dark:text-slate-500' => ! $escuro])>Cadastros e regras</p>
@@ -101,6 +119,7 @@
                         @endif
                     </a>
                 @endforeach
+                </div>
             </div>
         @endforeach
 

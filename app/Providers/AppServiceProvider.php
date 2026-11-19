@@ -17,6 +17,9 @@ class AppServiceProvider extends ServiceProvider
     {
         // Um contexto por requisição: é o que o escopo global de tenancy lê.
         $this->app->singleton(ProfileContext::class);
+
+        // O assistente conversa pela API da Anthropic; os testes trocam este cliente por um de mentira.
+        $this->app->bind(\App\Services\Assistant\AssistantClient::class, \App\Services\Assistant\AnthropicAssistantClient::class);
     }
 
     public function boot(): void

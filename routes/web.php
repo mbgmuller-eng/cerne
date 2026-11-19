@@ -238,6 +238,8 @@ Route::middleware(['auth', 'verified', 'termos', 'dois-passos', 'cuidado'])->gro
         Route::get('/acompanhamento/reunioes/{meeting}/evento.ics', [\App\Http\Controllers\EngagementCalendarController::class, 'meeting'])->name('engagement.meeting.ics');
         Route::get('/acompanhamento/tarefas/{task}/evento.ics', [\App\Http\Controllers\EngagementCalendarController::class, 'task'])->name('engagement.task.ics');
         Route::get('/objetivos', GoalsIndex::class)->name('goals.index');
+        Route::get('/busca', \App\Livewire\GlobalSearch::class)->name('search.index');
+        Route::get('/pergunte', \App\Livewire\Assistant\AskCerne::class)->name('assistant.index');
         Route::get('/regra', \App\Livewire\Budget\BudgetRuleIndex::class)->name('budget.index');
 
         // Documentos: visível ao consultor/corretor também (ao contrário de
@@ -276,6 +278,7 @@ Route::middleware(['auth', 'verified', 'termos', 'dois-passos', 'cuidado'])->gro
         Route::get('/importar', DocumentsIndex::class)->name('documents.index');
         Route::get('/regras-de-categorizacao', CategorizationRulesIndex::class)->name('categorization-rules.index');
         Route::get('/contas', AccountsIndex::class)->name('accounts.index');
+        Route::get('/contas/{account}/extrato', \App\Livewire\Accounts\AccountStatement::class)->name('accounts.statement');
         Route::get('/faturas/{invoice}', InvoiceShow::class)->name('invoices.show');
 
         Route::get('/carteira', PortfolioOverview::class)->name('consultant.portfolio');

@@ -5,12 +5,14 @@ namespace App\Services;
 use App\Enums\Necessity;
 use App\Models\BankAccount;
 use App\Models\CreditCardInvoice;
+use App\Models\ExpenseCategory;
 use App\Models\ExpenseRecord;
 use App\Models\FixedBillPayment;
 use App\Models\Goal;
 use App\Models\IncomeRecord;
 use App\Models\InsurancePolicy;
 use App\Models\InvestmentRecord;
+use App\Models\RecurringIncomeOccurrence;
 use App\Support\CurrencyBreakdown;
 use App\Support\Money;
 use App\Support\ProfileContext;
@@ -61,6 +63,11 @@ class DashboardService
                 'protecao' => $this->insuranceSummary(),
                 // Financiamentos e empréstimos: só números em texto, que o cache guarda sem problema.
                 'dividas' => app(DebtService::class)->summary($year, $month),
+                'variacao' => $this->variation($year, $month),
+                'ranking' => $this->categoryRanking($year, $month),
+                'contas' => $this->accountsTable($year, $month),
+                'recentes' => $this->recentExpenses($year, $month),
+                'vencidas' => $this->overdueCount(),
             ];
         });
     }
@@ -189,6 +196,169 @@ class DashboardService
             ->groupBy('year', 'month')
             ->get()
             ->mapWithKeys(fn ($linha) => [$linha->year.'-'.$linha->month => $linha->total]);
+    }
+
+    // -----------------------------------------------------------------
+    // Comparação, ranking, contas e últimas despesas
+    // -----------------------------------------------------------------
+
+    /**
+     * Quanto cada total do mês mudou contra o mês anterior, em %. Mês anterior sem valor não tem comparação (null): dividir por zero seria
+     * inventar um número. `bom` diz se a mudança é boa (receita e sobra sobem = bom; despesa sobe = ruim), para a tela escolher a cor.
+     *
+     * @return array<string, array{pct: float|null, sobe: bool, bom: bool}>
+     */
+    public function variation(int $year, int $month): array
+    {
+        $anterior = CarbonImmutable::create($year, $month, 1)->subMonth();
+        $atual = $this->monthSummary($year, $month);
+        $antes = $this->monthSummary($anterior->year, $anterior->month);
+
+        $linha = function (string $campo, bool $subirEBom) use ($atual, $antes): array {
+            $base = $antes[$campo];
+
+            if (bccomp($base, '0', 2) === 0) {
+                return ['pct' => null, 'sobe' => false, 'bom' => true];
+            }
+
+            $delta = bcsub($atual[$campo], $base, 2);
+            // Percentual sobre o MÓDULO da base: com sobra negativa antes, "melhorou" continua sendo subir.
+            $pct = round(((float) $delta / abs((float) $base)) * 100, 1);
+
+            return ['pct' => abs($pct), 'sobe' => $pct >= 0, 'bom' => $subirEBom ? $pct >= 0 : $pct <= 0];
+        };
+
+        return [
+            'receitas' => $linha('receitas', true),
+            'despesas' => $linha('despesas', false),
+            'sobra' => $linha('sobra', true),
+        ];
+    }
+
+    /**
+     * As categorias que mais pesaram no mês (até 6), com a parte de cada uma no total.
+     *
+     * @return list<array{nome: string, valor: string, pct: float}>
+     */
+    public function categoryRanking(int $year, int $month): array
+    {
+        $linhas = ExpenseRecord::query()
+            ->forPeriod($year, $month)
+            ->whereNotNull('category_id')
+            ->selectRaw('category_id, SUM(amount) as total')
+            ->groupBy('category_id')
+            ->orderByDesc('total')
+            ->limit(6)
+            ->get();
+
+        if ($linhas->isEmpty()) {
+            return [];
+        }
+
+        $nomes = ExpenseCategory::query()->whereIn('id', $linhas->pluck('category_id'))->pluck('name', 'id');
+        $total = Money::parse(ExpenseRecord::query()->forPeriod($year, $month)->sum('amount'));
+
+        return $linhas->map(fn ($l) => [
+            'nome' => (string) ($nomes[$l->category_id] ?? 'Sem categoria'),
+            'valor' => Money::parse($l->total),
+            'pct' => Money::percentageOf($l->total, $total),
+        ])->all();
+    }
+
+    /**
+     * Cada conta bancária no mês: o que entrou, o que saiu, o saldo de hoje e o previsto. O previsto é o saldo mais o que ainda vai entrar (receitas
+     * recorrentes pendentes) menos o que ainda vai sair (contas fixas pendentes ou vencidas) DAQUELE mês e DESSA conta: é estimativa, não promessa.
+     * O saldo inicial do mês (`inicial`) é o de hoje desfeito do que o mês movimentou; só vale para o mês corrente, porque o saldo é o de hoje.
+     *
+     * @return array{linhas: list<array<string, mixed>>, totais: array<string, string>, mes_atual: bool}
+     */
+    public function accountsTable(int $year, int $month): array
+    {
+        $contas = BankAccount::query()->active()->orderBy('bank_name')->get();
+        $hoje = CarbonImmutable::now();
+        $mesAtual = $year === $hoje->year && $month === $hoje->month;
+
+        $entradas = IncomeRecord::query()->forPeriod($year, $month)->where('affects_balance', true)->whereNotNull('bank_account_id')
+            ->selectRaw('bank_account_id, SUM(amount) as total')->groupBy('bank_account_id')->pluck('total', 'bank_account_id');
+        $saidas = ExpenseRecord::query()->forPeriod($year, $month)->where('affects_balance', true)->whereNotNull('bank_account_id')
+            ->selectRaw('bank_account_id, SUM(amount) as total')->groupBy('bank_account_id')->pluck('total', 'bank_account_id');
+
+        $aEntrar = [];
+        foreach (RecurringIncomeOccurrence::query()->outstanding()->forPeriod($year, $month)->with('recurringIncome')->get() as $o) {
+            $conta = $o->recurringIncome?->bank_account_id;
+            if ($conta !== null) {
+                $aEntrar[$conta] = bcadd($aEntrar[$conta] ?? '0', $o->effectiveAmount(), 2);
+            }
+        }
+        $aSair = [];
+        foreach (FixedBillPayment::query()->outstanding()->forPeriod($year, $month)->with('fixedBill')->get() as $p) {
+            $conta = $p->fixedBill?->bank_account_id;
+            if ($conta !== null) {
+                $aSair[$conta] = bcadd($aSair[$conta] ?? '0', $p->effectiveAmount(), 2);
+            }
+        }
+
+        $linhas = $contas->map(function (BankAccount $c) use ($entradas, $saidas, $aEntrar, $aSair): array {
+            $receitas = Money::parse($entradas[$c->id] ?? 0);
+            $despesas = Money::parse($saidas[$c->id] ?? 0);
+            $saldo = Money::parse($c->current_balance);
+
+            return [
+                'id' => $c->id,
+                'nome' => $c->bank_name,
+                'tipo' => $c->account_type instanceof \BackedEnum ? $c->account_type->value : (string) $c->account_type,
+                'cor' => $c->color_hex,
+                'receitas' => $receitas,
+                'despesas' => $despesas,
+                'saldo' => $saldo,
+                'inicial' => bcsub(bcadd($saldo, $despesas, 2), $receitas, 2),
+                'previsto' => bcsub(bcadd($saldo, $aEntrar[$c->id] ?? '0', 2), $aSair[$c->id] ?? '0', 2),
+                'consolidada' => (bool) $c->included_in_consolidated,
+            ];
+        })->all();
+
+        $consolidadas = collect($linhas)->where('consolidada', true);
+        $soma = fn (string $campo) => Money::sum($consolidadas->pluck($campo));
+
+        return [
+            'linhas' => $linhas,
+            'totais' => [
+                'receitas' => $soma('receitas'),
+                'despesas' => $soma('despesas'),
+                'saldo' => $soma('saldo'),
+                'inicial' => $soma('inicial'),
+                'previsto' => $soma('previsto'),
+            ],
+            'mes_atual' => $mesAtual,
+        ];
+    }
+
+    /**
+     * As últimas despesas do mês (até 6), com categoria e dia.
+     *
+     * @return list<array{descricao: string, categoria: string, dia: string, valor: string}>
+     */
+    public function recentExpenses(int $year, int $month): array
+    {
+        return ExpenseRecord::query()
+            ->forPeriod($year, $month)
+            ->with('category')
+            ->orderByDesc('expense_date')
+            ->orderByDesc('created_at')
+            ->limit(6)
+            ->get()
+            ->map(fn (ExpenseRecord $e) => [
+                'descricao' => (string) $e->description,
+                'categoria' => (string) ($e->category?->name ?? 'Sem categoria'),
+                'dia' => $e->expense_date->format('d/m'),
+                'valor' => Money::parse($e->amount),
+            ])->all();
+    }
+
+    /** Quantas contas fixas já venceram sem pagamento (aparece no cartão de alerta do alto da tela). */
+    public function overdueCount(): int
+    {
+        return FixedBillPayment::query()->where('status', \App\Enums\FixedBillPaymentStatus::Overdue)->count();
     }
 
     // -----------------------------------------------------------------
