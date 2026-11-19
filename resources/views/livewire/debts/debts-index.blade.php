@@ -18,6 +18,7 @@
             <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Financiamentos, empréstimos, consórcios e dívidas em aberto, com as parcelas ligadas às suas despesas.</p>
         </div>
         <div class="flex flex-wrap gap-2">
+            <a href="{{ route('debts.analytics') }}" class="btn-ghost px-3 py-1.5 text-sm" data-ir-analises>Análises</a>
             <a href="{{ route('debts.tax') }}" class="btn-ghost px-3 py-1.5 text-sm">Imposto de renda</a>
             <button type="button" wire:click="$dispatch('open-consortium-import')" class="btn-secondary px-3 py-1.5 text-sm">Importar extrato do consórcio</button>
             <button type="button" wire:click="openForm" class="btn-secondary px-3 py-1.5 text-sm">Nova dívida</button>

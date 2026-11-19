@@ -49,6 +49,8 @@
         ['target', 'Objetivos que se acompanham', 'Previsão a partir do quanto você guarda por mês, histórico de aportes e aviso quando o seu ritmo ficar abaixo do planejado.'],
         ['mic', 'Fale a despesa', 'Diga "gastei 45 reais de Uber" e o Cerne preenche o lançamento. Você confere e salva.'],
         ['search', 'Busque em tudo', 'Lançamentos, contas, dívidas, objetivos, investimentos, apólices e documentos em uma busca só. Aperte "/" em qualquer tela para começar.'],
+        ['pie', 'Análises com gráficos e PDF', 'Rosca por categoria, evolução mês a mês, ritmo de gasto contra o mês anterior, juros de cada parcela e concentração por instituição, com um PDF de cada área para guardar ou enviar.'],
+        ['bills', 'Apoio ao Imposto de renda', 'O saldo de cada dívida em 31/12 e o resumo dos investimentos do ano, em tela, PDF e CSV, para conferir antes de declarar. É conferência com o que está registrado, não a declaração.'],
         ['bell', 'Avisos no momento certo', 'Contas e faturas a vencer, parcelas de dívida, apólices a renovar, consultas e exames, objetivos abaixo do planejado: no app, por e-mail e no celular.'],
     ];
 

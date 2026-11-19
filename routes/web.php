@@ -227,12 +227,15 @@ Route::middleware(['auth', 'verified', 'termos', 'dois-passos', 'cuidado'])->gro
         Route::get('/painel', Dashboard::class)->name('dashboard');
 
         Route::get('/fluxo-de-caixa', CashFlowIndex::class)->name('cashflow.index');
+        Route::get('/fluxo-de-caixa/analises', \App\Livewire\CashFlow\CashFlowAnalysis::class)->name('cashflow.analytics');
         Route::get('/contas-fixas', FixedBillsIndex::class)->name('fixedbills.index');
         Route::get('/dividas', \App\Livewire\Debts\DebtsIndex::class)->name('debts.index');
         Route::get('/dividas/imposto-de-renda', \App\Livewire\Debts\DebtTaxReport::class)->name('debts.tax');
+        Route::get('/dividas/analises', \App\Livewire\Debts\DebtAnalysis::class)->name('debts.analytics');
         Route::get('/dividas/{debt}', \App\Livewire\Debts\DebtShow::class)->name('debts.show');
         Route::get('/investimentos', InvestmentsIndex::class)->name('investments.index');
         Route::get('/investimentos/imposto-de-renda', \App\Livewire\Investments\InvestmentTaxReport::class)->name('investments.tax');
+        Route::get('/investimentos/analises', \App\Livewire\Investments\InvestmentAnalysis::class)->name('investments.analytics');
         Route::get('/investimentos/desempenho', \App\Livewire\Investments\InvestmentPerformance::class)->name('investments.performance');
         Route::get('/seguros', InsuranceIndex::class)->name('insurance.index');
         // Acompanhamento do consultor financeiro com o cliente: só existe com vínculo ativo (ver EngagementAccess).

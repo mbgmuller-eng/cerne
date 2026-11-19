@@ -19,6 +19,7 @@
         </div>
 
         <div class="flex flex-wrap items-center gap-2">
+            <a href="{{ route('cashflow.analytics', array_filter(['ano' => $year, 'mes' => $month])) }}" class="btn-ghost px-3 py-1.5" data-ir-analises>Análises</a>
             <button wire:click="toggleIncomeForm" class="btn-secondary px-3 py-1.5">+ Receita</button>
             <button wire:click="toggleExpenseForm" class="btn-primary px-3 py-1.5">+ Despesa</button>
 

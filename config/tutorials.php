@@ -75,6 +75,41 @@ return [
             'tip' => 'Confira os valores importantes nas telas: o assistente pode errar.',
         ],
 
+        'cashflow.analytics' => [
+            'title' => 'Análises do fluxo de caixa',
+            'summary' => 'Para onde vai o dinheiro, como cada categoria evolui e em que ritmo você gasta no mês.',
+            'steps' => [
+                'Escolha o mês no alto. Os gráficos acompanham o mês escolhido.',
+                'Na rosca, clique em uma categoria para ver as subcategorias dela.',
+                'O gráfico de linhas compara a despesa acumulada do mês com a do mês anterior, dia a dia.',
+                'Use “Ver em tabela” sob cada gráfico para conferir os números e “Baixar PDF” para guardar ou enviar.',
+            ],
+            'tip' => 'O que um cônjuge marcou como privado não entra nos seus totais.',
+        ],
+
+        'debts.analytics' => [
+            'title' => 'Análises de dívidas',
+            'summary' => 'Quanto de cada parcela de um financiamento ou empréstimo é juro, e quanto amortiza a dívida.',
+            'steps' => [
+                'Escolha a dívida no alto, quando houver mais de uma com juros.',
+                'As colunas mostram as próximas parcelas divididas em juros, amortização e taxas.',
+                'Os cartões somam o que já foi pago em juros e o que o contrato ainda vai cobrar.',
+                'Baixe o PDF para levar a conversa ao banco ou ao seu consultor.',
+            ],
+            'tip' => 'Os números vêm do cronograma do contrato, sem correção que o credor aplique por fora.',
+        ],
+
+        'investments.analytics' => [
+            'title' => 'Análises de investimentos',
+            'summary' => 'Onde o seu patrimônio está concentrado, por instituição.',
+            'steps' => [
+                'A barra em destaque é a instituição que mais pesa no seu patrimônio.',
+                'Passe o mouse (ou toque) em uma barra para ver o valor e a parte exata.',
+                'Para rentabilidade e proventos ao longo do tempo, use a tela de Desempenho.',
+            ],
+            'tip' => 'O Cerne mostra a distribuição, mas não recomenda quanto manter em cada instituição.',
+        ],
+
         'accounts.index' => [
             'title' => 'Contas e cartões',
             'summary' => 'Os saldos das suas contas e as faturas de cartão ainda em aberto.',

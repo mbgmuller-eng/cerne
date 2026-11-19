@@ -142,7 +142,7 @@ class LandingPageTest extends TestCase
     {
         $this->get('/')->assertOk()
             ->assertSeeHtml('id="recursos"')->assertSeeHtml('id="cuidado"')->assertSeeHtml('id="celular"')->assertSeeHtml('id="seguranca"')
-            ->assertSee('Importe e confira')->assertSee('Fale a despesa')->assertSee('Busque em tudo')
+            ->assertSee('Importe e confira')->assertSee('Análises com gráficos e PDF')->assertSee('Fale a despesa')->assertSee('Busque em tudo')
             ->assertSee('Pessoa acompanhada')->assertSee('Verificação em dois passos')
             ->assertSee('<meta name="description"', false);
     }

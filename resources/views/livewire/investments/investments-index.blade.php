@@ -13,7 +13,10 @@
             <h1 class="font-display text-3xl font-semibold tracking-tight text-slate-900 dark:text-white">Investimentos</h1>
             <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Carteira, rentabilidade e movimentações.</p>
         </div>
-        <a href="{{ route('investments.tax') }}" class="btn-ghost px-3 py-1.5">Imposto de renda</a>
+        <div class="flex flex-wrap gap-2">
+            <a href="{{ route('investments.analytics') }}" class="btn-ghost px-3 py-1.5" data-ir-analises>Análises</a>
+            <a href="{{ route('investments.tax') }}" class="btn-ghost px-3 py-1.5">Imposto de renda</a>
+        </div>
     </div>
 
     {{-- Totais -------------------------------------------------------- --}}
