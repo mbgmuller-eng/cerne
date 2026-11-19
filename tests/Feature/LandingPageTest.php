@@ -86,7 +86,8 @@ class LandingPageTest extends TestCase
             ->assertSee('Ir para o painel')
             ->assertSeeHtml('data-ir-ao-painel')
             ->assertSee(route('dashboard'), false)
-            ->assertDontSee('Minha conta');
+            // O link "Minha conta" do cabeçalho e do rodapé vira "Ir para o painel" (o texto da página cita Minha conta em outros contextos).
+            ->assertDontSee('>Minha conta</a>', false);
     }
 
     public function test_visitante_continua_vendo_minha_conta_que_leva_ao_login(): void
@@ -111,5 +112,66 @@ class LandingPageTest extends TestCase
     public function test_termos_abre_pra_qualquer_um(): void
     {
         $this->get(route('legal.terms'))->assertOk();
+    }
+
+    public function test_toda_imagem_das_paginas_publicas_existe(): void
+    {
+        // Uma imagem que some do disco vira um quadro quebrado na vitrine; o ?v= usa filemtime e já estouraria, mas aqui o erro fica claro.
+        foreach (['/', '/profissionais'] as $url) {
+            $html = $this->get($url)->assertOk()->getContent();
+            preg_match_all('#images/marketing/([a-z0-9-]+\.jpg)#', $html, $m);
+
+            self::assertNotEmpty($m[1], "a página {$url} deveria ter capturas de tela");
+            foreach (array_unique($m[1]) as $arquivo) {
+                self::assertFileExists(public_path('images/marketing/'.$arquivo), "{$url} aponta para uma imagem que não existe: {$arquivo}");
+            }
+        }
+    }
+
+    public function test_vitrine_do_usuario_mostra_as_telas_novas_com_legenda(): void
+    {
+        $resposta = $this->get('/')->assertOk();
+
+        foreach (['Extrato por dia', 'Regra de orçamento', 'Objetivos', 'Dívidas', 'Agenda de saúde', 'Ficha de saúde'] as $aba) {
+            $resposta->assertSee($aba);
+        }
+        $resposta->assertSeeHtml('data-vitrine="extrato"')->assertSeeHtml('data-vitrine="regra"')->assertSeeHtml('data-vitrine="dividas"');
+    }
+
+    public function test_landing_descreve_recursos_cuidado_celular_e_seguranca(): void
+    {
+        $this->get('/')->assertOk()
+            ->assertSeeHtml('id="recursos"')->assertSeeHtml('id="cuidado"')->assertSeeHtml('id="celular"')->assertSeeHtml('id="seguranca"')
+            ->assertSee('Importe e confira')->assertSee('Fale a despesa')->assertSee('Busque em tudo')
+            ->assertSee('Pessoa acompanhada')->assertSee('Verificação em dois passos')
+            ->assertSee('<meta name="description"', false);
+    }
+
+    public function test_preco_da_pessoa_acompanhada_vem_da_configuracao(): void
+    {
+        config(['billing.care_seat_price' => '6.90']);
+
+        $this->get('/')->assertOk()->assertSee('R$ 6,90');
+    }
+
+    public function test_pagina_de_profissionais_mostra_acompanhamento_recebimentos_e_leads(): void
+    {
+        $this->get('/profissionais')->assertOk()
+            ->assertSeeHtml('id="recursos"')
+            ->assertSee('Recebimentos')->assertSee('Minha semana')->assertSee('Leads')->assertSee('Passo a passo do plano')
+            ->assertSee('Convite assistido de familiares')
+            ->assertSee('<meta name="description"', false);
+    }
+
+    public function test_tom_de_voz_das_duas_paginas_publicas(): void
+    {
+        // Sem coloquial (num, numa, pra) e sem travessão: regra de texto público do projeto.
+        foreach (['/', '/profissionais'] as $url) {
+            $html = $this->get($url)->assertOk()->getContent();
+            $texto = strip_tags(preg_replace('#<(script|style)\b.*?</\1>#si', '', $html));
+
+            self::assertDoesNotMatchRegularExpression('/\b(num|numa|pra|pras|pro|pros)\b/iu', $texto, "tom coloquial em {$url}");
+            self::assertStringNotContainsString('—', $texto, "travessão em {$url}");
+        }
     }
 }

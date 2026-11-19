@@ -18,20 +18,43 @@
     $exemplos = collect([30, 50, 100])->filter(fn (int $teto) => \App\Support\ProfessionalPricing::isValidCap($teto));
     $moneyProf = fn (string $valor) => \App\Support\Money::format($valor);
 
+    // [chave, rótulo, imagem, texto alternativo, legenda]
     $telas = [
         ['carteira', 'Painel da carteira', 'carteira-consultor', 'Painel da carteira de um consultor financeiro',
-            'Todos os clientes vinculados em uma tela: patrimônio investido, prêmios de seguro por mês, composição da carteira entre individual e casal, e quem ainda não tem seguro de vida.'],
+            'Todos os clientes vinculados em uma tela: patrimônio investido mês a mês, prêmios de seguro, composição da carteira entre individual e casal, e quem ainda não tem seguro de vida.'],
+        ['semana', 'Minha semana', 'semana', 'Minha semana: reuniões, tarefas e demandas dos clientes',
+            'O que pede atenção nos acompanhamentos: reuniões dos próximos 7 dias, tarefas vencidas, demandas para responder, atas por registrar e clientes sem reunião marcada.'],
+        ['recebimentos', 'Recebimentos', 'recebimentos', 'Recebimentos do profissional: honorários e comissões por mês',
+            'Quanto entra por mês: honorários fixos por cliente, comissão de seguros, percentual sobre patrimônio e comissão de consórcio. O Cerne prevê e você dá baixa quando recebe. Só você vê esta tela.'],
+        ['leads', 'Leads', 'leads', 'Funil de leads de consultoria e de seguros',
+            'Os contatos que ainda não são clientes, em consultoria e em seguros, com próximo contato, registro de cada conversa, conversão em cliente e métricas do funil.'],
         ['seguros', 'Seguros da carteira', 'carteira-seguros', 'Apólices da carteira agrupadas por tipo, cliente e seguradora',
             'As apólices de todos os clientes, separadas por tipo, cliente e seguradora, com valor segurado, prêmio mensal e data de vencimento à vista.'],
         ['investimentos', 'Investimentos da carteira', 'carteira-investimentos', 'Investimentos de cada cliente da carteira',
             'Os investimentos de cada cliente, com patrimônio, quantidade de ativos e rentabilidade. Filtre por instituição e período de crescimento.'],
+        ['dividas', 'Dívidas da carteira', 'carteira-dividas', 'Dívidas dos clientes: financiamentos, empréstimos e consórcios',
+            'O que cada cliente deve, quanto paga de parcela no mês e cada contrato, com o consórcio separado do que é dívida. Um clique abre a dívida do cliente.'],
+        ['regra', 'Regra da carteira', 'carteira-regra', 'Regra de orçamento de cada cliente da carteira',
+            'Como cada cliente está em relação à regra de orçamento: receita do mês, essencial, supérfluo e meta de investimento. Monte um modelo e aplique a vários clientes de uma vez.'],
         ['datas', 'Datas importantes', 'carteira-datas', 'Vencimentos e aniversários da carteira',
             'Aniversários de clientes, aniversário e vencimento de apólice e vencimento de investimento, por período, com o contato de cada cliente.'],
         ['cliente', 'Cliente aberto', 'carteira-cliente', 'Perfil de um cliente aberto por um consultor, sem a área de Saúde',
             'Abra o perfil de um cliente com um clique. O Cerne avisa que você está no perfil dele e mostra só a sua área: a área de Saúde não aparece.'],
     ];
+
+    $recursos = [
+        ['users', 'Carteira consolidada', 'Patrimônio, prêmios, composição entre individual e casal e quem está sem seguro de vida, de todos os clientes, em uma tela só.'],
+        ['calendar', 'Acompanhamento organizado', 'Reuniões com lembrete e recorrência, tarefas suas e do cliente, demandas, notas privadas e arquivo de calendário (.ics) de cada compromisso.'],
+        ['bills', 'Passo a passo do plano', 'Monte o roteiro a partir de modelos. Itens com critério são marcados pelo próprio Cerne quando o cliente cumpre o critério, e o resto você marca.'],
+        ['coins', 'Recebimentos previstos', 'Honorário fixo mensal, trimestral, semestral ou anual, comissão de seguros, percentual sobre patrimônio e comissão de consórcio. Você dá baixa quando recebe.'],
+        ['contact', 'Leads e cotações', 'Funil de consultoria e de seguros. A simulação em PDF é lida por IA e pré-preenche a cotação, para você conferir. Apólices a vencer viram leads de renovação.'],
+        ['pie', 'Regra de orçamento do cliente', 'Crie modelos de regra e aplique a vários clientes. Veja quem está dentro dos limites e quem não bateu a meta de investimento.'],
+        ['mail', 'Convite assistido de familiares', 'Monte o acesso de um filho ou familiar ao cliente. O cliente aprova antes de qualquer e-mail sair, e fica registrado quem liberou, quando e com que base.'],
+        ['shield', 'Privacidade por desenho', 'Saúde nunca, Documentos só o que o cliente autorizar. Encerrou o vínculo, o acesso aos dados acaba na hora, e o histórico do acompanhamento fica guardado.'],
+    ];
 ?>
-<x-layouts.marketing title="Cerne para profissionais: acompanhe a carteira dos seus clientes" publico="profissional">
+<x-layouts.marketing title="Cerne para profissionais: acompanhe a carteira dos seus clientes" publico="profissional"
+    description="Para consultores financeiros e corretores de seguros: carteira de clientes, acompanhamento com reuniões e tarefas, recebimentos, leads e regras claras do que cada profissional vê. 7 dias grátis.">
 
     {{-- Hero --}}
     <section class="mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-24">
@@ -71,8 +94,11 @@
                     <h3 class="font-display text-lg font-semibold text-slate-900 dark:text-white">Consultor financeiro</h3>
                     <ul class="mt-3 space-y-1.5 text-sm text-slate-600 dark:text-slate-300">
                         <li>Carteira com todos os clientes vinculados</li>
-                        <li>Patrimônio e investimentos consolidados, mês a mês</li>
-                        <li>Vida financeira do casal, unida ou separada</li>
+                        <li>Patrimônio, investimentos e dívidas consolidados</li>
+                        <li>Regra de orçamento de cada cliente, com modelos</li>
+                        <li>Reuniões, tarefas, demandas e passo a passo</li>
+                        <li>Recebimentos: honorários, comissões e percentual</li>
+                        <li>Leads de consultoria e agenda</li>
                     </ul>
                     <div class="mt-auto pt-5"><a href="{{ route('checkout.professional', ['papel' => 'consultant']) }}" class="btn-secondary w-full">Quero ser consultor parceiro</a></div>
                 </div>
@@ -82,6 +108,9 @@
                     <ul class="mt-3 space-y-1.5 text-sm text-slate-600 dark:text-slate-300">
                         <li>Apólices de todos os clientes, por seguradora</li>
                         <li>Vencimento e renovação, sem precisar perguntar</li>
+                        <li>Leads de seguros com cotações e leitura de PDF</li>
+                        <li>Renovações viram leads automaticamente</li>
+                        <li>Comissão e agenciamento previstos por apólice</li>
                         <li>Perfil de cada cliente, com histórico</li>
                     </ul>
                     <div class="mt-auto pt-5"><a href="{{ route('checkout.professional', ['papel' => 'broker']) }}" class="btn-secondary w-full">Quero ser corretor parceiro</a></div>
@@ -121,6 +150,25 @@
         </div>
     </section>
 
+    {{-- Recursos --}}
+    <section id="recursos" class="scroll-mt-28 border-t border-slate-200/70 bg-white/60 py-16 dark:border-white/10 dark:bg-white/5">
+        <div class="mx-auto max-w-6xl px-4 sm:px-6">
+            <p class="eyebrow">Recursos</p>
+            <h2 class="mt-2 font-display text-3xl font-semibold tracking-tight text-slate-900 dark:text-white">Mais do que uma lista de clientes</h2>
+            <p class="mt-2 max-w-2xl text-sm text-slate-500 dark:text-slate-400">O acompanhamento, a agenda e o financeiro do seu trabalho no mesmo lugar em que está a vida dos seus clientes.</p>
+
+            <div class="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+                @foreach ($recursos as [$icone, $titulo, $texto])
+                    <div class="card p-5" data-recurso>
+                        <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-50 text-brand-800 dark:bg-white/10 dark:text-brand-200"><x-nav-icon :name="$icone" /></span>
+                        <h3 class="mt-4 font-display text-base font-semibold text-slate-900 dark:text-white">{{ $titulo }}</h3>
+                        <p class="mt-1.5 text-sm text-slate-600 dark:text-slate-300">{{ $texto }}</p>
+                    </div>
+                @endforeach
+            </div>
+        </div>
+    </section>
+
     {{-- Como funciona --}}
     <section id="como-funciona" class="scroll-mt-28 border-y border-slate-200/70 bg-white/60 py-16 dark:border-white/10 dark:bg-white/5">
         <div class="mx-auto max-w-6xl px-4 sm:px-6">
@@ -130,7 +178,7 @@
                 @foreach ([
                     ['Você assina', 'Escolha quantos clientes vai acompanhar e teste 7 dias grátis. O preço depende só desse número, não de pacote.'],
                     ['Convida o cliente', 'Envie o convite por e-mail. Quem ainda não tem conta se cadastra pelo link; quem já tem, autoriza o vínculo com um clique.'],
-                    ['Acompanha', 'O cliente usa todas as áreas do Cerne sem pagar nada, e você acompanha a sua área na carteira.'],
+                    ['Acompanha', 'O cliente usa todas as áreas do Cerne sem pagar nada. Você acompanha a sua área na carteira, marca reuniões, define tarefas e controla o que recebe.'],
                 ] as $i => [$titulo, $texto])
                     <li class="card p-6">
                         <span class="flex h-8 w-8 items-center justify-center rounded-full bg-brand-800 text-sm font-semibold text-white">{{ $i + 1 }}</span>
@@ -252,6 +300,11 @@
                     'O que eu consigo ver dos meus clientes?' => 'Consultores e corretores acompanham a parte financeira e de seguros dos clientes vinculados e ativos. Dados de Saúde, nunca. Documentos, só o que o cliente autorizar.',
                     'Como funciona a cobrança?' => 'Mensal, processada pela Asaas, só em cartão de crédito ou Pix. Você escolhe a forma de pagamento perto do fim do teste, e avisamos 3 dias antes por e-mail e dentro do Cerne. Depois do último dia de teste, o acesso fica bloqueado até o pagamento ser confirmado. Nos meses seguintes você recebe o link de pagamento; quem escolhe Pix recebe um aviso por e-mail 3 dias antes de cada vencimento.',
                     'Posso cancelar quando quiser?' => 'Sim, pela sua área de conta, sem precisar falar com ninguém. O acesso é encerrado na hora do cancelamento, sem desconto proporcional do período já pago.',
+                    'O que o cliente vê do acompanhamento?' => 'Tudo o que é combinado entre vocês: reuniões marcadas, tarefas, demandas, o passo a passo e as notas que você escolher compartilhar. As suas notas privadas, os seus recebimentos e os seus leads o cliente nunca vê.',
+                    'Os valores de recebimentos aparecem para o cliente ou para outro profissional?' => 'Não. Os recebimentos são só seus: nem o cliente nem outro profissional do mesmo cliente têm acesso.',
+                    'Como funciona o convite de um cliente?' => 'Você convida pelo e-mail. Quem ainda não tem conta se cadastra pelo link; quem já tem, autoriza o vínculo com um clique. O cliente que você cadastra ativa o próprio acesso e define a própria senha: você nunca recebe o link nem a senha dele.',
+                    'E se o vínculo com um cliente terminar?' => 'O seu acesso aos dados dele acaba na hora, e o histórico do acompanhamento fica guardado. Ao encerrar, você escolhe se o cliente recebe o plano em PDF.',
+                    'Os meus leads precisam virar clientes pagantes do Cerne?' => 'Não. Lead é o contato que ainda não é cliente, e você o trabalha no funil sem custo adicional. Quando ele vira cliente e aceita o vínculo, passa a contar no seu limite de clientes.',
                     'Profissionais de saúde podem usar?' => 'Ainda não. Hoje o Cerne está aberto para consultores financeiros e corretores de seguros. Estamos preparando uma área para profissionais de saúde, como personal trainers e nutricionistas.',
                 ] as $pergunta => $resposta)
                     <div class="card overflow-hidden" x-data="{ open: false }">

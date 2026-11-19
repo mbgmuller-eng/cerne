@@ -32,10 +32,10 @@ enum PlatformModule: string
     public function summary(): string
     {
         return match ($this) {
-            self::Financas => 'fluxo de caixa, contas fixas, investimentos e objetivos',
+            self::Financas => 'fluxo de caixa, contas fixas, cartões, dívidas, investimentos, objetivos e regra de orçamento',
             self::Seguros => 'apólices, vencimentos e renovações',
             self::Documentos => 'CNH, passaporte, apólices e exames em um cofre com controle de acesso',
-            self::Saude => 'treino com histórico, ficha de saúde e QR de emergência',
+            self::Saude => 'ficha de saúde com QR de emergência, agenda de consultas, academia e cuidado de familiares',
         };
     }
 }

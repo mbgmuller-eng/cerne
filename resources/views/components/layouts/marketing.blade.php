@@ -1,11 +1,11 @@
-@props(['title' => 'Cerne', 'publico' => 'usuario', 'checkout' => false])
+@props(['title' => 'Cerne', 'publico' => 'usuario', 'checkout' => false, 'description' => null])
 @php
     $paraProfissional = $publico === 'profissional';
 
     // Links do menu: âncoras da própria página, que mudam conforme o público.
     $menu = $paraProfissional
-        ? [['#painel', 'Painel'], ['#como-funciona', 'Como funciona'], ['#precos', 'Preços'], ['#perguntas', 'Perguntas']]
-        : [['#por-dentro', 'Por dentro'], ['#modulos', 'Módulos'], ['#planos', 'Planos'], ['#perguntas', 'Perguntas']];
+        ? [['#painel', 'Telas'], ['#recursos', 'Recursos'], ['#como-funciona', 'Como funciona'], ['#precos', 'Preços'], ['#perguntas', 'Perguntas']]
+        : [['#por-dentro', 'Por dentro'], ['#modulos', 'Módulos'], ['#recursos', 'Recursos'], ['#cuidado', 'Cuidado'], ['#planos', 'Planos'], ['#perguntas', 'Perguntas']];
     $destinoCta = $paraProfissional ? '#precos' : '#planos';
     $rotuloCta = $paraProfissional ? 'Começar' : 'Assinar';
 @endphp
@@ -24,6 +24,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>{{ $title }}</title>
+    @if ($description)
+        <meta name="description" content="{{ $description }}">
+        <meta property="og:type" content="website">
+        <meta property="og:site_name" content="Cerne">
+        <meta property="og:title" content="{{ $title }}">
+        <meta property="og:description" content="{{ $description }}">
+        <meta property="og:url" content="{{ url()->current() }}">
+        <meta property="og:image" content="{{ asset('images/marketing/'.($paraProfissional ? 'carteira-consultor' : 'painel').'.jpg') }}">
+        <meta name="twitter:card" content="summary_large_image">
+        <link rel="canonical" href="{{ url()->current() }}">
+    @endif
     <link rel="manifest" href="{{ route('pwa.manifest') }}">
     <meta name="theme-color" content="#0b1d3a">
     <link rel="icon" href="{{ asset('icons/icon-192.png') }}" type="image/png">

@@ -483,6 +483,16 @@ Não há barra inferior: o celular tem um **menu lateral que desliza da esquerda
 
 `cerne.app.br/` é **sempre o site** (vitrine), logado ou não; o login é `/entrar`. Quem está logado vê no site "Ir para o painel" no lugar de "Minha conta" / "Já tenho conta" (`marketing.blade.php`, `landing.blade.php`), e dentro do app há o link "Site do Cerne" (`data-site-do-cerne`) nas três barras laterais e no menu do celular. **Nunca volte a redirecionar a raiz para o painel**: o login e o aceite já levam ao `dashboard` por conta própria (`intended`), e o redirecionamento da raiz escondia o site de quem estava logado. Teste: `LandingPageTest`.
 
+### Site público (`landing.blade.php`, `professionals.blade.php`)
+
+O site foi revisado em 2026-11-19: o texto tinha parado na primeira fase do produto e as capturas eram de outubro. Regras para ele não envelhecer de novo:
+
+- **Feature nova que o cliente ou o profissional percebe entra no site** (vitrine, "Recursos" ou lista do módulo) **no mesmo trabalho que a entrega**, com o texto escrito a partir do código, nunca da intenção. Não anuncie o que está desligado (o assistente `Pergunte ao Cerne` fica fora enquanto `CERNE_ASSISTANT_ENABLED` for falso) nem número que não confirmamos (ex.: quantidade de exercícios).
+- **Capturas** (`public/images/marketing`) saem de `node scripts/capture-marketing-screenshots.cjs` (Chrome local, servidor em 127.0.0.1:8000, dados do `DevSeeder` e de demonstração; `--only=` e `--out=` para refazer ou revisar antes de trocar). **Mudou uma tela do app, refaça a captura dela.** Confira cada imagem antes de publicar: nada de aviso de "chave da API", tela vazia, saldo negativo ou o cartão de "primeira vez nesta tela" (o script já esconde esses dois últimos). Os Termos precisam estar aceitos no banco local, senão a captura sai na tela de aceite.
+- **Tom**: sem travessão, sem "num", "numa" e "pra" (o `LandingPageTest::test_tom_de_voz_das_duas_paginas_publicas` barra nas duas páginas). Toda imagem referenciada tem de existir no disco (`test_toda_imagem_das_paginas_publicas_existe`).
+- **A fonte do resumo de cada módulo** nos planos, no checkout e na assinatura é `PlatformModule::summary()`; o preço da pessoa acompanhada vem de `billing.care_seat_price`. Não copie esses valores para o texto da página.
+- O layout público (`marketing.blade.php`) leva `description` (e as marcas de compartilhamento) por página: página nova passa o `description`.
+
 ### Menu lateral (desktop)
 
 As três barras (cliente dentro do perfil, área do consultor e do administrador) ficam em `components/layouts/app.blade.php` e valem as mesmas regras (`SidebarMenuTest`):
