@@ -293,7 +293,6 @@ Route::middleware(['auth', 'verified', 'termos', 'dois-passos', 'cuidado'])->gro
         Route::get('/carteira/datas-importantes', ImportantDates::class)->name('consultant.portfolio.important-dates');
         Route::get('/semana', \App\Livewire\Consultant\EngagementWeek::class)->name('consultant.week');
         // Convite assistido (consultor): fora do prefixo family.* de propósito, que é o das telas de leitura de quem acompanha as finanças.
-        Route::get('/acesso-da-familia', \App\Livewire\Family\FamilyAccessAssist::class)->name('consultant.family-access');
         Route::get('/agenda', \App\Livewire\Consultant\ConsultantCalendar::class)->name('consultant.calendar');
         Route::get('/recebimentos', \App\Livewire\Consultant\ProfessionalIncome::class)->name('consultant.income');
         Route::get('/modelos-de-roteiro', \App\Livewire\Consultant\EngagementTemplates::class)->name('consultant.plan-templates');

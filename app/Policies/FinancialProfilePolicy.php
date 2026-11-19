@@ -58,8 +58,9 @@ class FinancialProfilePolicy
     }
 
     /**
-     * Convite assistido: só o consultor vinculado ao cliente monta o acesso de um familiar em nome da pessoa (com a base declarada). Nunca o corretor,
-     * nunca o perfil de cuidado (que tem o próprio caminho).
+     * Convite assistido (só o consultor vinculado ao cliente, nunca o corretor nem o perfil de cuidado). **Sem tela desde 2026-11-19**, por decisão do
+     * dono do produto: o acesso da família é só do próprio usuário, e o consultor não vê a opção nem quem tem acesso. A regra e o serviço
+     * (`CaregiverService::assistedGrant`) ficam porque os pedidos já criados ainda esperam a aprovação do dono; nenhuma rota chega a eles.
      */
     public function manageFamilyAccess(User $user, FinancialProfile $profile): bool
     {

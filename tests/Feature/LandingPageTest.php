@@ -159,7 +159,7 @@ class LandingPageTest extends TestCase
         $this->get('/profissionais')->assertOk()
             ->assertSeeHtml('id="recursos"')
             ->assertSee('Recebimentos')->assertSee('Minha semana')->assertSee('Leads')->assertSee('Passo a passo do plano')
-            ->assertSee('Convite assistido de familiares')
+            ->assertDontSee('Convite assistido')
             ->assertSee('<meta name="description"', false);
     }
 

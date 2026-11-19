@@ -33,16 +33,12 @@
         ['categorization-rules.index', 'Regras de categorização', 'Regras', 'tag'],
         ['budget.index', 'Regra de orçamento', 'Regra', 'pie'],
     ];
-    // Convite assistido: só o consultor, dentro do perfil de um cliente dele (nunca o corretor).
-    if ($profile && $context->isConsultant() && $user?->isConsultant()) {
-        array_splice($navFinancas, array_search('investments.index', array_column($navFinancas, 0), true), 0, [['consultant.family-access', 'Acesso da família', 'Família', 'contact']]);
-    }
     // Acompanhamento: só quem tem vínculo ativo com um consultor financeiro (cliente), ou o consultor dentro do perfil de um
     // cliente dele. Sem consultor, a área não existe.
     if ($profile && app(\App\Services\EngagementAccess::class)->viewer() !== null) {
         array_splice($navFinancas, array_search('investments.index', array_column($navFinancas, 0), true), 0, [['engagement.index', 'Acompanhamento', 'Consultoria', 'contact']]);
     }
-    // Calculado DEPOIS das inserções acima: Acompanhamento e Acesso da família empurram os cadastros para baixo.
+    // Calculado DEPOIS das inserções acima: o Acompanhamento empurra os cadastros para baixo.
     $cadastrosDe = array_search('accounts.index', array_column($navFinancas, 0), true);
     $navSeguros = [
         ['insurance.index', 'Apólices', 'Seguros', 'shield'],

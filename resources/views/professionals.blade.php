@@ -49,7 +49,6 @@
         ['coins', 'Recebimentos previstos', 'Honorário fixo mensal, trimestral, semestral ou anual, comissão de seguros, percentual sobre patrimônio e comissão de consórcio. Você dá baixa quando recebe.'],
         ['contact', 'Leads e cotações', 'Funil de consultoria e de seguros. A simulação em PDF é lida por IA e pré-preenche a cotação, para você conferir. Apólices a vencer viram leads de renovação.'],
         ['pie', 'Regra de orçamento do cliente', 'Crie modelos de regra e aplique a vários clientes. Veja quem está dentro dos limites e quem não bateu a meta de investimento.'],
-        ['mail', 'Convite assistido de familiares', 'Monte o acesso de um filho ou familiar ao cliente. O cliente aprova antes de qualquer e-mail sair, e fica registrado quem liberou, quando e com que base.'],
         ['shield', 'Privacidade por desenho', 'Saúde nunca, Documentos só o que o cliente autorizar. Encerrou o vínculo, o acesso aos dados acaba na hora, e o histórico do acompanhamento fica guardado.'],
     ];
 ?>

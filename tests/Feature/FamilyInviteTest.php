@@ -8,7 +8,6 @@ use App\Enums\CaregiverStatus;
 use App\Enums\ConsultantClientStatus;
 use App\Enums\MemberRole;
 use App\Livewire\Care\CareIndex;
-use App\Livewire\Family\FamilyAccessAssist;
 use App\Mail\CaregiverInviteMail;
 use App\Models\ConsultantClient;
 use App\Models\FinancialProfile;
@@ -223,55 +222,20 @@ class FamilyInviteTest extends TestCase
         app(CaregiverService::class)->assistedGrant($this->perfil, $semVinculo, [$this->membroPai->id], 'F', 'f@exemplo.com', true, CaregiverAccess::Read, true, CaregiverGrantBasis::Authorized);
     }
 
-    public function test_o_dono_ou_o_conjuge_nao_usam_o_convite_assistido_nem_o_corretor(): void
+    public function test_o_consultor_nao_ve_nem_abre_o_acesso_da_familia_do_cliente(): void
     {
-        $corretor = User::factory()->broker()->create();
-        ConsultantClient::factory()->create(['consultant_id' => $corretor->id, 'client_id' => $this->pai->id, 'status' => ConsultantClientStatus::Active, 'accepted_at' => now()]);
-
-        foreach ([$this->pai, $this->mae, $corretor] as $usuario) {
-            $this->actingAs($usuario);
-            app(ProfileContext::class)->set($this->perfil, $usuario->id === $this->pai->id ? $this->membroPai : ($usuario->id === $this->mae->id ? $this->membroMae : null), $usuario->id === $corretor->id);
-            Livewire::test(FamilyAccessAssist::class)->assertStatus(403);
-        }
+        // Decisão do dono (2026-11-19): o acesso da família é só do próprio usuário. O consultor não vê a opção no menu, não abre a tela
+        // (a rota nem existe) e não enxerga quem tem acesso.
+        ProfileCaregiver::query()->create([
+            'profile_id' => $this->perfil->id, 'member_id' => $this->membroPai->id, 'invited_email' => 'f@exemplo.com', 'invited_name' => 'Filha Secreta',
+            'access_level' => CaregiverAccess::Read, 'status' => CaregiverStatus::Active, 'can_view_finance' => true,
+        ]);
 
         $this->comoConsultor();
-        Livewire::test(FamilyAccessAssist::class)->assertOk()->assertSee('Acesso da família')->assertSee('Dilermando')->assertSee('Esposa');
-    }
 
-    public function test_a_tela_do_consultor_exige_a_declaracao_e_libera_o_acesso(): void
-    {
-        Mail::fake();
-        Notification::fake();
-        $this->comoConsultor();
-
-        $tela = Livewire::test(FamilyAccessAssist::class)
-            ->set('name', 'Filho A')->set('email', 'filho@exemplo.com')->set('health', false)->set('finance', true);
-
-        $tela->call('grant')->assertHasErrors(['basis', 'declared']);
-        $this->assertSame(0, ProfileCaregiver::query()->count());
-
-        $tela->set('basis', 'representative')->set('declared', true)->call('grant')->assertHasNoErrors();
-
-        $acessos = ProfileCaregiver::query()->get();
-        $this->assertCount(2, $acessos, 'os dois do casal vêm marcados por padrão');
-        $this->assertTrue($acessos->every(fn ($a) => ! $a->can_view_health && $a->can_view_finance && $a->grant_basis === CaregiverGrantBasis::Representative));
-    }
-
-    public function test_o_consultor_encerra_o_que_ele_montou_e_a_propria_pessoa_tambem(): void
-    {
-        Mail::fake();
-        Notification::fake();
-        $this->comoConsultor();
-        app(CaregiverService::class)->assistedGrant($this->perfil, $this->consultor, [$this->membroPai->id], 'Filho A', 'a@exemplo.com', false, CaregiverAccess::Read, true, CaregiverGrantBasis::Authorized);
-        app(CaregiverService::class)->assistedGrant($this->perfil, $this->consultor, [$this->membroPai->id], 'Filho B', 'b@exemplo.com', false, CaregiverAccess::Read, true, CaregiverGrantBasis::Authorized);
-        [$a, $b] = [ProfileCaregiver::query()->where('invited_email', 'a@exemplo.com')->sole(), ProfileCaregiver::query()->where('invited_email', 'b@exemplo.com')->sole()];
-
-        Livewire::test(FamilyAccessAssist::class)->call('revoke', $a->id);
-        $this->assertSame(CaregiverStatus::Revoked, $a->fresh()->status);
-
-        // A pessoa (o pai) também encerra, pelo "Quem me acompanha" dele.
-        Livewire::actingAs($this->pai)->test(CareIndex::class)->call('revoke', $b->id);
-        $this->assertSame(CaregiverStatus::Revoked, $b->fresh()->status);
+        $this->get('/acesso-da-familia')->assertNotFound();
+        $this->withSession([\App\Http\Middleware\SetProfileContext::SESSION_KEY => $this->perfil->id])->get(route('cashflow.index'))->assertOk()->assertSee('Fluxo de caixa')->assertDontSee('Acesso da família')->assertDontSee('Filha Secreta');
+        self::assertFalse(\Illuminate\Support\Facades\Route::has('consultant.family-access'));
     }
 
     public function test_o_consultor_nao_encerra_o_que_a_pessoa_liberou_sozinha(): void

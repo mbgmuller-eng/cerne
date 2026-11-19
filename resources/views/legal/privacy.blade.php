@@ -62,7 +62,7 @@
                     <li><strong>Envio de e-mails e notificações:</strong> o provedor de e-mail e os serviços de notificação dos fabricantes do navegador (como Google, Apple, Mozilla e Microsoft), que recebem o aviso para entregá-lo no seu aparelho. Isso pode envolver transferência internacional.</li>
                     <li><strong>Hospedagem:</strong> o provedor onde o Cerne roda guarda os dados em nosso nome.</li>
                     <li><strong>Consultor ou corretor vinculado:</strong> somente o que a seção 2 descreve, e só enquanto o vínculo estiver ativo.</li>
-                    <li><strong>Cuidadores e pessoas que acompanham você:</strong> somente o que as seções 8 e 9 descrevem (saúde e/ou finanças em leitura, conforme o acesso), e só enquanto o acesso estiver ativo. O acesso é sempre dado por você, pelo responsável pela pessoa acompanhada ou, no convite assistido, pelo seu consultor com a base que ele declara, nunca pelo Cerne por conta própria.</li>
+                    <li><strong>Cuidadores e pessoas que acompanham você:</strong> somente o que as seções 8 e 9 descrevem (saúde e/ou finanças em leitura, conforme o acesso), e só enquanto o acesso estiver ativo. O acesso é sempre dado por você ou pelo responsável pela pessoa acompanhada, nunca pelo Cerne nem pelo seu consultor ou corretor.</li>
                     <li><strong>Autoridades:</strong> quando a lei ou uma ordem judicial exigir.</li>
                 </ul>
                 <p class="mt-2">Não vendemos dados pessoais nem os usamos para publicidade de terceiros. As cotações de moedas que o app consulta (como CoinGecko, Binance e AwesomeAPI) não recebem nenhum dado seu.</p>
@@ -171,10 +171,6 @@
                     <p>
                         <strong>Avisos.</strong> Quem acompanha recebe, conforme o que escolher ligar, os lembretes das suas consultas, o aviso de conta ou fatura que vence ou está atrasada, um resumo semanal das finanças e, se você combinar um limite de valor, o aviso de um gasto que chegue a esse limite.
                         Os avisos seguem a mesma regra do que a pessoa enxerga: nada que seja privado, e só o que é de quem ela acompanha. Quando um familiar se oferece para levar você a uma consulta, o nome dele aparece para quem acompanha a sua saúde.
-                    </p>
-                    <p>
-                        <strong>Convite assistido.</strong> Quando você não consegue fazer o convite sozinho, o seu consultor vinculado pode montar o acesso em seu nome. Para isso ele declara que você autorizou (presencialmente ou por escrito) ou que é o seu representante legal (por procuração ou curatela).
-                        O Cerne guarda quem liberou, quando e com que base, você é avisado na hora e pode encerrar o acesso quando quiser. O Cerne não confere a autorização nem o documento: a declaração é de quem a faz.
                     </p>
                     <p>
                         A lista completa de quem tem acesso, desde quando, com que alcance e com que base, aparece na tela Pessoas e acessos e vai na cópia dos seus dados. Você pode encerrar qualquer acesso a qualquer momento.
