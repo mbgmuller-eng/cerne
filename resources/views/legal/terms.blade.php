@@ -1,9 +1,5 @@
 <x-layouts.marketing title="Termos de Uso · Cerne">
     <div class="mx-auto max-w-3xl px-4 py-16 sm:px-6">
-        <div class="mb-8 rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-900 ring-1 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-200 dark:ring-amber-500/20">
-            Rascunho: este texto ainda não passou por revisão jurídica. Não é a versão final.
-        </div>
-
         <h1 class="font-display text-3xl font-semibold tracking-tight text-slate-900 dark:text-white">Termos de Uso</h1>
         <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">Versão de {{ \Carbon\CarbonImmutable::parse(config('cerne.legal.terms_version'))->translatedFormat('d \d\e F \d\e Y') }}. O tratamento dos seus dados está na <a href="{{ route('legal.privacy') }}" class="underline">Política de Privacidade</a>.</p>
 

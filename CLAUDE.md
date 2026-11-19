@@ -204,7 +204,7 @@ continua). Regras que não se quebram:
 
 ### Privacidade e LGPD
 
-Texto da política em `/privacidade` (rascunho, **sem revisão jurídica**), plano de incidente em `INCIDENTES.md`. Regras que não se quebram:
+Texto da política em `/privacidade` (versão `terms_version` de 2026-11-19; o aviso de rascunho saiu da política e dos Termos de Uso por decisão do dono, **mas o texto ainda não passou por advogado**), plano de incidente em `INCIDENTES.md`. **Política e recurso andam juntos: quem passa a mandar dado a um terceiro novo (nova leitura por IA, novo operador) atualiza as seções 2, 3 e 13 da política e sobe a versão.** Regras que não se quebram:
 
 - **Aceite versionado** (`config cerne.legal.terms_version`, `RequiresCurrentTerms`, grupo `termos` de toda rota autenticada): mudar o texto dos Termos ou da
   Política exige subir a versão, e todo mundo aceita de novo no próximo acesso. Todo caminho que cria conta grava `terms_accepted_at` **e** `terms_version`.

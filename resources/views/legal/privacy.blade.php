@@ -5,10 +5,6 @@
 @endphp
 <x-layouts.marketing title="Política de Privacidade · Cerne">
     <div class="mx-auto max-w-3xl px-4 py-16 sm:px-6">
-        <div class="mb-8 rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-900 ring-1 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-200 dark:ring-amber-500/20">
-            Rascunho: este texto ainda não passou por revisão jurídica. Não é a versão final.
-        </div>
-
         <h1 class="font-display text-3xl font-semibold tracking-tight text-slate-900 dark:text-white">Política de Privacidade</h1>
         <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">Versão de {{ $versao }}. Vale junto com os <a href="{{ route('legal.terms') }}" class="underline">Termos de Uso</a>.</p>
 
@@ -33,7 +29,11 @@
                     <p><strong>Cadastro e acesso:</strong> nome, e-mail, telefone, data de nascimento, senha (guardada em formato irreversível) e as preferências do app. Servem para criar a conta, entrar com segurança e falar com você. Base legal: execução do contrato.</p>
                     <p><strong>Cobrança:</strong> CPF ou CNPJ, endereço e os dados da assinatura. O cartão de crédito é digitado no ambiente da processadora de pagamentos e não passa pelos nossos servidores. Servem para cobrar e emitir nota fiscal. Base legal: execução do contrato e cumprimento de obrigação legal.</p>
                     <p><strong>Finanças:</strong> contas, lançamentos, cartões, investimentos, dívidas, objetivos, seguros e o que mais você cadastrar ou importar. Servem para o app funcionar. Base legal: execução do contrato.</p>
-                    <p><strong>Documentos:</strong> os arquivos que você guarda no cofre (documentos pessoais, apólices, exames) e os PDFs que você envia para importação. Base legal: execução do contrato.</p>
+                    <p><strong>Documentos:</strong> os arquivos que você guarda no cofre (documentos pessoais, apólices, exames) e os arquivos (PDF ou CSV) que você envia para importação. Base legal: execução do contrato.</p>
+                    <p>
+                        <strong>Despesa por voz:</strong> quando você lança um gasto falando, o navegador transcreve a sua fala. Esse serviço de transcrição é do fabricante do navegador (como o Google, no Chrome) e segue a política dele.
+                        Só o texto transcrito chega ao Cerne, que o envia à Anthropic (seção 3) para sugerir descrição, valor e categoria. Nada é lançado sem a sua confirmação. Base legal: execução do contrato.
+                    </p>
                     <p>
                         <strong>Saúde (dado pessoal sensível):</strong> ficha de saúde (tipo sanguíneo, alergias, condições, medicamentos), agenda de consultas e exames, itens de cuidado e treinos de academia.
                         Só são tratados com o seu <strong>consentimento específico e destacado</strong>, pedido antes de você abrir a área de Saúde. Base legal: consentimento (LGPD, art. 11, I).
@@ -49,7 +49,7 @@
                         e para identificar o acesso na lista de quem acompanha. Base legal: execução do contrato.
                     </p>
                     <p><strong>Relação com consultor ou corretor:</strong> quando você vincula um profissional, ele passa a ver os dados financeiros e de seguros combinados com você. Dados de saúde nunca são visíveis a consultores ou corretores.</p>
-                    <p><strong>Registros técnicos:</strong> endereço de IP, tipo de navegador e erros do sistema, usados para segurança e para corrigir falhas. O registro de erros não guarda os seus dados financeiros. Base legal: legítimo interesse (segurança e melhoria do serviço).</p>
+                    <p><strong>Registros técnicos:</strong> endereço de IP, tipo de navegador e erros do sistema, usados para segurança e para corrigir falhas. O registro de erros não guarda os seus dados financeiros. Base legal: legítimo interesse (segurança e melhoria do serviço). O uso de cookies está na seção 12.</p>
                 </div>
             </section>
 
@@ -57,8 +57,9 @@
                 <h2 class="{{ $h2 }}">3. Com quem compartilhamos</h2>
                 <ul class="mt-2 list-disc space-y-2 pl-5">
                     <li><strong>Processadora de pagamentos (Asaas):</strong> cobrança, Pix e emissão de nota fiscal.</li>
-                    <li><strong>Leitura de documentos por inteligência artificial (Anthropic):</strong> quando você envia um PDF (extrato, fatura, apólice, relatório) para importação, o conteúdo do arquivo é enviado para a Anthropic ler e devolver os dados. Isso envolve transferência internacional (Estados Unidos). O resultado nunca vira lançamento sem a sua confirmação na tela.</li>
-                    <li><strong>Envio de e-mails e notificações:</strong> o provedor de e-mail e os serviços de notificação do seu navegador, para os avisos que você ligou.</li>
+                    <li><strong>Inteligência artificial (Anthropic):</strong> quando você envia um arquivo para importação (PDF ou CSV de extrato ou fatura, extrato de consórcio, apólice ou relatório de outro aplicativo) ou fala um gasto, o conteúdo é enviado à Anthropic para ler e devolver os dados. Consultores e corretores que enviam a simulação em PDF de um possível cliente usam o mesmo serviço. Isso envolve transferência internacional (Estados Unidos). O resultado nunca vira lançamento sem a sua confirmação na tela (seção 13).</li>
+                    <li><strong>Assistente de conversa (recurso opcional, &ldquo;Pergunte ao Cerne&rdquo;):</strong> quando estiver disponível na sua conta e você fizer uma pergunta, enviamos à Anthropic a pergunta e os números que ele precisar consultar para responder (como totais do mês, saldos, vencimentos e objetivos), somente do que você enxerga no perfil aberto. A conversa não fica gravada no Cerne, e o assistente só consulta: não lança, não paga e não altera nada.</li>
+                    <li><strong>Envio de e-mails e notificações:</strong> o provedor de e-mail e os serviços de notificação dos fabricantes do navegador (como Google, Apple, Mozilla e Microsoft), que recebem o aviso para entregá-lo no seu aparelho. Isso pode envolver transferência internacional.</li>
                     <li><strong>Hospedagem:</strong> o provedor onde o Cerne roda guarda os dados em nosso nome.</li>
                     <li><strong>Consultor ou corretor vinculado:</strong> somente o que a seção 2 descreve, e só enquanto o vínculo estiver ativo.</li>
                     <li><strong>Cuidadores e pessoas que acompanham você:</strong> somente o que as seções 8 e 9 descrevem (saúde e/ou finanças em leitura, conforme o acesso), e só enquanto o acesso estiver ativo. O acesso é sempre dado por você, pelo responsável pela pessoa acompanhada ou, no convite assistido, pelo seu consultor com a base que ele declara, nunca pelo Cerne por conta própria.</li>
@@ -71,7 +72,7 @@
                 <h2 class="{{ $h2 }}">4. Quem da equipe do Cerne pode ver os seus dados</h2>
                 <p class="mt-2">
                     O acesso da equipe a uma conta acontece só para dar suporte, com um motivo escrito, e cada acesso fica registrado (quem, quando e por quê). Você pode ver esses acessos na cópia dos seus dados.
-                    Alguns campos mais sensíveis (CPF/CNPJ e o conteúdo da ficha e da agenda de saúde) ficam cifrados no banco de dados.
+                    Os campos mais sensíveis ficam cifrados no banco de dados: CPF/CNPJ, telefone, agência e número de conta, anotações, nome do segurado, o conteúdo da ficha e da agenda de saúde, os textos dos avisos e os dados lidos dos documentos que você importa.
                 </p>
             </section>
 
@@ -85,6 +86,9 @@
                     <li><strong>Cópia dos seus dados:</strong> o arquivo para baixar fica disponível por 7 dias e depois é apagado.</li>
                     <li><strong>Contatos perdidos (para consultores e corretores):</strong> os anexos saem do servidor 12 meses depois de o contato ser marcado como perdido.</li>
                     <li><strong>Registro de acessos da equipe:</strong> guardado por 5 anos, como prova de quem acessou o quê.</li>
+                    <li><strong>Cópias de segurança:</strong> fazemos cópias cifradas do banco de dados e dos arquivos, mantidas por 7 dias. Depois de uma exclusão, o dado pode continuar nessas cópias por até 7 dias, até elas serem substituídas.</li>
+                    <li><strong>Registros técnicos:</strong> os registros do servidor ficam por 14 dias. Os registros de erro do sistema, que não trazem os seus dados financeiros, saem 90 dias depois de resolvidos ou ignorados e, se ficarem em aberto, depois de 180 dias.</li>
+                    <li><strong>Navegadores confiáveis:</strong> a confiança num navegador, na verificação em dois passos, vale por até 30 dias (14 para consultores, corretores e administradores) ou até você removê-la em Minha conta.</li>
                 </ul>
             </section>
 
@@ -94,10 +98,13 @@
                 <ul class="mt-2 list-disc space-y-2 pl-5">
                     <li>confirmar que tratamos os seus dados e acessá-los;</li>
                     <li>corrigi-los (você edita direto no app);</li>
-                    <li><strong>baixar uma cópia</strong> em formato aberto, em Minha conta;</li>
+                    <li><strong>baixar uma cópia</strong> em formato aberto, em Minha conta, que também serve para levar os dados a outro serviço;</li>
+                    <li>pedir a anonimização, o bloqueio ou a eliminação de dados desnecessários, excessivos ou tratados em desacordo com a lei;</li>
                     <li><strong>excluir a sua conta e os seus dados</strong>, em Minha conta, com 7 dias de carência para desistir;</li>
                     <li><strong>revogar o consentimento</strong> para dados de saúde, em Minha conta;</li>
                     <li>pedir informações sobre com quem compartilhamos os dados e se opor a um tratamento;</li>
+                    <li>saber o que acontece se você não der um consentimento (por exemplo, sem o consentimento de saúde, a área de Saúde fica fechada);</li>
+                    <li>pedir a revisão de uma decisão tomada apenas de forma automatizada (seção 13);</li>
                     <li>reclamar à Autoridade Nacional de Proteção de Dados (ANPD).</li>
                 </ul>
                 <p class="mt-2">Se preferir, faça o pedido pelo e-mail @if ($c['dpo_email'])<a href="mailto:{{ $c['dpo_email'] }}" class="underline">{{ $c['dpo_email'] }}</a>@else do rodapé do site @endif e respondemos em até 15 dias.</p>
@@ -180,7 +187,7 @@
                 <p class="mt-2">
                     Cada cliente só enxerga os próprios dados, com isolamento aplicado em todas as consultas. A conexão é protegida (HTTPS), as senhas são guardadas de forma irreversível,
                     campos sensíveis são cifrados, o acesso da equipe é registrado e arquivos pessoais ficam em área privada, sem endereço público.
-                    Se houver um incidente de segurança que possa causar risco ou dano relevante, avisamos você e a ANPD no prazo da regulamentação.
+                    Você pode ativar a verificação em dois passos, com um aplicativo autenticador, em Minha conta. Se houver um incidente de segurança que possa causar risco ou dano relevante, avisamos você e a ANPD no prazo da regulamentação.
                 </p>
             </section>
 
@@ -190,8 +197,29 @@
             </section>
 
             <section>
-                <h2 class="{{ $h2 }}">12. Mudanças nesta política</h2>
-                <p class="mt-2">Quando o texto mudar de forma que afete os seus direitos, pedimos que você leia e aceite a nova versão no próximo acesso.</p>
+                <h2 class="{{ $h2 }}">12. Cookies e armazenamento no navegador</h2>
+                <p class="mt-2">Usamos apenas o que é necessário para o app funcionar. Não usamos cookies de publicidade nem de rastreamento, e não há ferramentas de análise de terceiros no site nem no app.</p>
+                <ul class="mt-2 list-disc space-y-2 pl-5">
+                    <li><strong>Sessão e segurança:</strong> o cookie da sua sessão e o que protege os formulários contra envio forjado. Sem eles não é possível entrar.</li>
+                    <li><strong>Manter conectado:</strong> se você marcar a opção ao entrar, um cookie mantém a sua sessão por até 30 dias.</li>
+                    <li><strong>Confiar neste navegador:</strong> se você marcar a opção na verificação em dois passos, um cookie cifrado dispensa o código por até 30 dias (14 para consultores, corretores e administradores). Você remove cada navegador em Minha conta.</li>
+                    <li><strong>Preferências:</strong> as suas preferências de aparência, como o tema e o menu lateral recolhido, ficam guardadas no seu navegador ou na sua conta.</li>
+                    <li><strong>Arquivos do app:</strong> o navegador guarda cópias de arquivos estáticos (imagens, estilos e códigos da tela) para o app abrir mais rápido. Dados financeiros nunca entram nesse armazenamento.</li>
+                </ul>
+            </section>
+
+            <section>
+                <h2 class="{{ $h2 }}">13. Inteligência artificial e decisões automatizadas</h2>
+                <p class="mt-2">
+                    O Cerne usa inteligência artificial (Anthropic) para ler documentos, sugerir a categoria de um gasto falado e, quando o recurso estiver disponível, responder perguntas no assistente de conversa.
+                    Nenhuma decisão que afete os seus direitos é tomada apenas por esse tratamento automatizado: o que a inteligência artificial lê ou sugere só vira lançamento, baixa ou cadastro depois da sua confirmação na tela,
+                    e o assistente apenas consulta. Ela pode errar, por isso confira os valores. Você pode pedir a revisão de um tratamento automatizado ao encarregado indicado na seção 1.
+                </p>
+            </section>
+
+            <section>
+                <h2 class="{{ $h2 }}">14. Mudanças nesta política</h2>
+                <p class="mt-2">Quando o texto mudar de forma que afete os seus direitos, pedimos que você leia e aceite a nova versão no próximo acesso. Guardamos a versão e a data do seu aceite.</p>
             </section>
         </div>
     </div>
