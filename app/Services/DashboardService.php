@@ -203,8 +203,8 @@ class DashboardService
     // -----------------------------------------------------------------
 
     /**
-     * Quanto cada total do mês mudou contra o mês anterior, em %. Mês anterior sem valor não tem comparação (null): dividir por zero seria
-     * inventar um número. `bom` diz se a mudança é boa (receita e sobra sobem = bom; despesa sobe = ruim), para a tela escolher a cor.
+     * Quanto cada total do mês mudou contra o mês anterior, em %. **Zero de um dos lados não tem comparação (null)**: de zero para um valor seria
+     * dividir por zero, e de um valor para zero seria "100% a menos", que só diz que não há lançamento, não que algo mudou. `bom` diz se a mudança é boa (receita e sobra sobem = bom; despesa sobe = ruim), para a tela escolher a cor.
      *
      * @return array<string, array{pct: float|null, sobe: bool, bom: bool}>
      */
@@ -217,7 +217,7 @@ class DashboardService
         $linha = function (string $campo, bool $subirEBom) use ($atual, $antes): array {
             $base = $antes[$campo];
 
-            if (bccomp($base, '0', 2) === 0) {
+            if (bccomp($base, '0', 2) === 0 || bccomp($atual[$campo], '0', 2) === 0) {
                 return ['pct' => null, 'sobe' => false, 'bom' => true];
             }
 

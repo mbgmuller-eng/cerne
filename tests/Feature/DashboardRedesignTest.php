@@ -93,6 +93,34 @@ class DashboardRedesignTest extends TestCase
         self::assertNull($v['receitas']['pct'], 'dividir por zero seria inventar um número');
     }
 
+    public function test_valor_zerado_de_qualquer_lado_nao_gera_percentual(): void
+    {
+        // Outubro tinha movimento e novembro está zerado: "100% a menos" só diz que não há lançamento, não que algo mudou.
+        $this->receita('1000.00', '2026-10-05');
+        $this->despesa('400.00', '2026-10-10');
+
+        $v = app(DashboardService::class)->variation(2026, 11);
+        foreach (['receitas', 'despesas', 'sobra'] as $campo) {
+            self::assertNull($v[$campo]['pct'], "{$campo}: de um valor para zero não se compara");
+        }
+
+        // Os dois zerados também não.
+        $vazio = app(DashboardService::class)->variation(2026, 6);
+        foreach (['receitas', 'despesas', 'sobra'] as $campo) {
+            self::assertNull($vazio[$campo]['pct']);
+        }
+
+        Livewire::test(Dashboard::class)->assertDontSeeHtml('data-variacao')->assertDontSee('poupança de');
+    }
+
+    public function test_com_valor_dos_dois_lados_o_percentual_continua_aparecendo(): void
+    {
+        $this->receita('1000.00', '2026-10-05');
+        $this->receita('1500.00', '2026-11-05');
+
+        Livewire::test(Dashboard::class)->assertSeeHtml('data-variacao')->assertSee('50,0%')->assertSee('poupança de');
+    }
+
     public function test_ranking_das_categorias_ordena_e_calcula_a_parte_de_cada_uma(): void
     {
         $this->despesa('600.00', '2026-11-03', 'Mercado Teste');

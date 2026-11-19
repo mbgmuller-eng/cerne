@@ -212,6 +212,15 @@ class AnalyticsTest extends TestCase
         self::assertStringContainsString('50% a menos', $ritmo['nota']);
     }
 
+    public function test_ritmo_nao_compara_quando_o_mes_atual_esta_zerado(): void
+    {
+        $this->despesa('1000.00', '2026-10-05');
+
+        $ritmo = collect(app(CashFlowAnalytics::class)->report(2026, 11, ChartPalette::pdf())['secoes'])->firstWhere('id', 'ritmo');
+
+        self::assertNull($ritmo['nota'], 'de um valor para zero não é uma variação');
+    }
+
     public function test_destino_de_cada_100_reais_e_a_divisao_da_receita(): void
     {
         $this->receita('1000.00', '2026-11-05');

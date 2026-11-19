@@ -44,7 +44,7 @@ class CashFlowAnalytics
                 ['Receitas', Money::format($resumo['receitas']), 'lançadas no mês'],
                 ['Despesas', Money::format($resumo['despesas']), $emAndamento ? 'até hoje' : 'no mês'],
                 ['Sobra', Money::format($resumo['sobra']), 'receitas menos despesas'],
-                ['Taxa de poupança', number_format((float) $resumo['taxa_poupanca'], 1, ',', '.').'%', 'da receita que sobrou'],
+                ['Taxa de poupança', bccomp($resumo['receitas'], '0', 2) > 0 ? number_format((float) $resumo['taxa_poupanca'], 1, ',', '.').'%' : '—', bccomp($resumo['receitas'], '0', 2) > 0 ? 'da receita que sobrou' : 'sem receita no mês'],
             ],
             'secoes' => array_values(array_filter([
                 $this->secaoCategorias($porCategoria, $cores, $p, $emAndamento),
@@ -263,7 +263,8 @@ class CashFlowAnalytics
         $noCorte = $corte > 0 ? $serieAtual[$corte] : '0.00';
         $anteriorNoCorte = $serieAnterior[min(max($corte, 1), $anterior->daysInMonth)] ?? '0.00';
         $nota = null;
-        if ($corte > 0 && bccomp($anteriorNoCorte, '0', 2) > 0) {
+        // Zero de um dos lados não tem comparação: "100% a menos" só diz que ainda não há lançamento.
+        if ($corte > 0 && bccomp($anteriorNoCorte, '0', 2) > 0 && bccomp($noCorte, '0', 2) > 0) {
             $dif = Money::percentageOf(bcsub($noCorte, $anteriorNoCorte, 2), $anteriorNoCorte);
             $nota = 'Até o dia '.$corte.' você gastou '.Money::format($noCorte).'; no mês anterior, até o mesmo dia, '.Money::format($anteriorNoCorte).' ('
                 .($dif === 0.0 ? 'igual' : number_format(abs($dif), 0, ',', '.').'% '.($dif < 0 ? 'a menos' : 'a mais')).').';

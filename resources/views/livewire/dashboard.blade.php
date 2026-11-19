@@ -135,7 +135,10 @@
             </div>
             <p class="figure mt-2 text-lg font-medium sm:text-xl {{ (float) $m['sobra'] < 0 ? 'text-red-700 dark:text-red-400' : 'text-slate-900 dark:text-white' }}">{{ Money::format($m['sobra']) }}</p>
             <x-variacao :dado="$variacao['sobra']" class="mt-3" />
-            <p class="mt-2 text-xs text-slate-500 dark:text-slate-400">poupança de {{ number_format($m['taxa_poupanca'], 1, ',', '.') }}%</p>
+            {{-- Sem receita no mês não há o que poupar: "poupança de 0,0%" seria um número sem sentido. --}}
+            @if (bccomp($m['receitas'], '0', 2) > 0)
+                <p class="mt-2 text-xs text-slate-500 dark:text-slate-400">poupança de {{ number_format($m['taxa_poupanca'], 1, ',', '.') }}%</p>
+            @endif
         </div>
         <a href="{{ route('accounts.index') }}" class="card card-hover p-4 sm:p-5" data-kpi="faturas">
             <div class="flex items-center gap-2.5">
