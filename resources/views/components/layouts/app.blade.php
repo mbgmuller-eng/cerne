@@ -456,6 +456,11 @@
                     </div>
                 @endif
 
+                <a href="{{ route('home') }}" title="Site do Cerne" class="nav-item-chrome mb-1" data-site-do-cerne>
+                    <x-nav-icon name="site" />
+                    <span class="lateral-texto">Site do Cerne</span>
+                </a>
+
                 <a href="{{ route('my-account') }}" title="Minha conta" @class(['nav-item-chrome mb-1', 'nav-item-chrome-active '.$corAtivoEscuroDesktop => request()->routeIs('my-account')])>
                     <x-nav-icon name="users" />
                     <span class="lateral-texto">Minha conta</span>
@@ -553,6 +558,11 @@
             </nav>
 
             <div class="border-t border-brand-950/5 p-3 dark:border-white/10">
+                <a href="{{ route('home') }}" title="Site do Cerne" class="nav-item mb-1" data-site-do-cerne>
+                    <x-nav-icon name="site" />
+                    <span class="lateral-texto">Site do Cerne</span>
+                </a>
+
                 <a href="{{ route('my-account') }}" title="Minha conta" @class(['nav-item mb-1', 'nav-item-active' => request()->routeIs('my-account')])>
                     <x-nav-icon name="users" />
                     <span class="lateral-texto">Minha conta</span>
@@ -654,6 +664,11 @@
             </nav>
 
             <div class="border-t border-brand-950/5 p-3 dark:border-white/10">
+                <a href="{{ route('home') }}" title="Site do Cerne" class="nav-item mb-1" data-site-do-cerne>
+                    <x-nav-icon name="site" />
+                    <span class="lateral-texto">Site do Cerne</span>
+                </a>
+
                 <a href="{{ route('my-account') }}" title="Minha conta" @class(['nav-item mb-1', 'nav-item-active' => request()->routeIs('my-account')])>
                     <x-nav-icon name="users" />
                     <span class="lateral-texto">Minha conta</span>

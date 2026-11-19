@@ -51,7 +51,11 @@
                 @if ($checkout)
                     <a href="{{ route($paraProfissional ? 'professionals' : 'home') }}{{ $destinoCta }}" class="btn-ghost">Voltar aos planos</a>
                 @else
-                    <a href="{{ route('login') }}" class="btn-ghost">Minha conta</a>
+                    @auth
+                        <a href="{{ route('dashboard') }}" class="btn-ghost" data-ir-ao-painel>Ir para o painel</a>
+                    @else
+                        <a href="{{ route('login') }}" class="btn-ghost">Minha conta</a>
+                    @endauth
                     <a href="{{ $destinoCta }}" class="btn-primary">{{ $rotuloCta }}</a>
                 @endif
             </div>
@@ -95,7 +99,7 @@
                 ·
                 <a href="{{ route('legal.privacy') }}" class="underline hover:text-slate-700 dark:hover:text-slate-200">Política de Privacidade</a>
                 ·
-                <a href="{{ route('login') }}" class="underline hover:text-slate-700 dark:hover:text-slate-200">Minha conta</a>
+                <a href="{{ auth()->check() ? route('dashboard') : route('login') }}" class="underline hover:text-slate-700 dark:hover:text-slate-200">{{ auth()->check() ? 'Ir para o painel' : 'Minha conta' }}</a>
             </p>
         </div>
     </footer>

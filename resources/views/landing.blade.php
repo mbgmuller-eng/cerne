@@ -241,7 +241,11 @@
         <h2 class="font-display text-2xl font-semibold text-slate-900 dark:text-white">Pronto para começar?</h2>
         <div class="mt-6 flex flex-wrap justify-center gap-3">
             <a href="#planos" class="btn-primary px-6 py-3 text-base">Começar 7 dias grátis</a>
-            <a href="{{ route('login') }}" class="btn-secondary px-6 py-3 text-base">Já tenho conta</a>
+            @auth
+                <a href="{{ route('dashboard') }}" class="btn-secondary px-6 py-3 text-base">Ir para o painel</a>
+            @else
+                <a href="{{ route('login') }}" class="btn-secondary px-6 py-3 text-base">Já tenho conta</a>
+            @endauth
         </div>
         <div class="mt-6 flex flex-wrap justify-center gap-2 text-xs text-slate-500 dark:text-slate-400">
             <span class="badge bg-slate-100 dark:bg-slate-800">7 dias grátis</span>

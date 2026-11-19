@@ -479,6 +479,10 @@ Não há barra inferior: o celular tem um **menu lateral que desliza da esquerda
 - **O botão "+" (`x-quick-add`) mora no canto de baixo** (`bottom-[calc(1.25rem+env(safe-area-inset-bottom))]`) e some com o menu aberto (`x-show="! menu"`). `main` mantém `pb-24` só para o botão não cobrir o fim da página.
 - **Nada passa da largura da tela no celular.** Um elemento mais largo que a tela (linha com nome + valor + dois botões sem quebrar, faixa de abas com rótulo longo) alarga a PÁGINA INTEIRA no Chrome do Android e a deixa deslocável para o lado. Linha de lista com vários blocos empilha (`flex-col ... sm:flex-row`, `min-w-0` + `truncate` no texto) e faixa de abas longa rola por dentro (`overflow-x-auto`), nunca o documento. Tabela larga vai dentro de `overflow-x-auto`. Para conferir uma tela: no celular emulado, `document.documentElement.scrollWidth` tem de ser igual a `innerWidth`.
 
+### Site (raiz `/`) e painel
+
+`cerne.app.br/` é **sempre o site** (vitrine), logado ou não; o login é `/entrar`. Quem está logado vê no site "Ir para o painel" no lugar de "Minha conta" / "Já tenho conta" (`marketing.blade.php`, `landing.blade.php`), e dentro do app há o link "Site do Cerne" (`data-site-do-cerne`) nas três barras laterais e no menu do celular. **Nunca volte a redirecionar a raiz para o painel**: o login e o aceite já levam ao `dashboard` por conta própria (`intended`), e o redirecionamento da raiz escondia o site de quem estava logado. Teste: `LandingPageTest`.
+
 ### Menu lateral (desktop)
 
 As três barras (cliente dentro do perfil, área do consultor e do administrador) ficam em `components/layouts/app.blade.php` e valem as mesmas regras (`SidebarMenuTest`):

@@ -77,11 +77,35 @@ class LandingPageTest extends TestCase
             ->assertDontSee('num só lugar');
     }
 
-    public function test_logado_e_redirecionado_pro_painel(): void
+    public function test_logado_continua_vendo_o_site_e_ganha_o_atalho_para_o_painel(): void
     {
+        // A raiz é sempre o site: antes, quem estava logado era jogado no painel e não conseguia mais ver a vitrine.
         $this->actingAs(User::factory()->create())
             ->get('/')
-            ->assertRedirect(route('dashboard'));
+            ->assertOk()
+            ->assertSee('Ir para o painel')
+            ->assertSeeHtml('data-ir-ao-painel')
+            ->assertSee(route('dashboard'), false)
+            ->assertDontSee('Minha conta');
+    }
+
+    public function test_visitante_continua_vendo_minha_conta_que_leva_ao_login(): void
+    {
+        $this->get('/')->assertOk()->assertSee('Minha conta')->assertSee(route('login'), false)->assertDontSee('Ir para o painel');
+    }
+
+    public function test_dentro_do_app_ha_um_link_para_o_site(): void
+    {
+        $usuario = User::factory()->create();
+        $perfil = \App\Models\FinancialProfile::factory()->create(['owner_user_id' => $usuario->id]);
+        \App\Models\ProfileMember::factory()->create(['profile_id' => $perfil->id, 'user_id' => $usuario->id, 'role' => \App\Enums\MemberRole::Primary]);
+
+        $this->actingAs($usuario)->get(route('dashboard'))->assertOk()->assertSeeHtml('data-site-do-cerne')->assertSee(route('home'), false);
+    }
+
+    public function test_entrar_e_a_pagina_de_login_de_quem_nao_esta_logado(): void
+    {
+        $this->get('/entrar')->assertOk()->assertSee('Entrar');
     }
 
     public function test_termos_abre_pra_qualquer_um(): void

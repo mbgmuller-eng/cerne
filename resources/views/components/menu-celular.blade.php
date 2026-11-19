@@ -153,6 +153,11 @@
             </div>
         @endif
 
+        <a href="{{ route('home') }}" class="{{ $escuro ? 'nav-item-chrome' : 'nav-item' }}" data-site-do-cerne>
+            <x-nav-icon name="site" />
+            <span>Site do Cerne</span>
+        </a>
+
         <a href="{{ route('my-account') }}" @class([$escuro ? 'nav-item-chrome' : 'nav-item', ($escuro ? 'nav-item-chrome-active '.$corAtivo : 'nav-item-active') => request()->routeIs('my-account')])>
             <x-nav-icon name="users" />
             <span>Minha conta</span>

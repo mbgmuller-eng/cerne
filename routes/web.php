@@ -63,7 +63,9 @@ use Illuminate\Support\Facades\Route;
 Route::get('/manifest.webmanifest', [PwaController::class, 'manifest'])->name('pwa.manifest');
 
 // Vitrine pública: quem já está logado não precisa ver, cai direto no painel.
-Route::get('/', fn () => Auth::check() ? redirect()->route('dashboard') : view('landing'))->name('home');
+// O endereço raiz é SEMPRE o site, logado ou não: quem quer o painel usa o botão "Ir para o painel" (ou /painel). Antes, quem estava logado era
+// jogado no painel e não conseguia mais ver o site.
+Route::view('/', 'landing')->name('home');
 
 Route::view('/termos', 'legal.terms')->name('legal.terms');
 Route::view('/privacidade', 'legal.privacy')->name('legal.privacy');
