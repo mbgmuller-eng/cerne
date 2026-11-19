@@ -73,6 +73,13 @@ class CashFlowIndex extends Component
     #[Url]
     public string $categoryId = '';
 
+    /**
+     * Filtro por NOME de subcategoria (ex.: "Delivery"). O nome vale em qualquer categoria: "Delivery" existe em
+     * Alimentação e em Lazer, e quem pergunta "quanto gastei com delivery?" quer a soma dos dois.
+     */
+    #[Url]
+    public string $subcategory = '';
+
     #[Url]
     public string $memberId = '';
 
@@ -247,16 +254,36 @@ class CashFlowIndex extends Component
 
     public function clearFilters(): void
     {
-        $this->reset('necessity', 'categoryId', 'memberId');
+        $this->reset('necessity', 'categoryId', 'subcategory', 'memberId');
         $this->selecionadas = [];
     }
 
-    /** Trocar o recorte (necessidade/categoria/membro) pode deixar de mostrar itens marcados — evita "N selecionadas" fantasma. */
+    /** Trocar o recorte (necessidade/categoria/subcategoria/membro) pode deixar de mostrar itens marcados — evita "N selecionadas" fantasma. */
     public function updated(string $name): void
     {
-        if (in_array($name, ['necessity', 'categoryId', 'memberId'], true)) {
+        if (in_array($name, ['necessity', 'categoryId', 'subcategory', 'memberId'], true)) {
             $this->selecionadas = [];
         }
+
+        // Ao trocar a categoria, uma subcategoria escolhida antes que não existe nela deixaria a lista vazia sem motivo à vista.
+        if ($name === 'categoryId' && $this->subcategory !== '' && ! $this->filterSubcategories()->contains($this->subcategory)) {
+            $this->subcategory = '';
+        }
+    }
+
+    /**
+     * Nomes de subcategoria oferecidos no filtro: todas as que a pessoa enxerga ou, com uma categoria escolhida, só as dela.
+     *
+     * @return \Illuminate\Support\Collection<int, string>
+     */
+    private function filterSubcategories(): \Illuminate\Support\Collection
+    {
+        return ExpenseSubcategory::available()
+            ->when($this->categoryId !== '', fn (Builder $q) => $q->where('category_id', $this->categoryId))
+            ->orderBy('name')
+            ->pluck('name')
+            ->unique()
+            ->values();
     }
 
     private function periodStart(): CarbonImmutable
@@ -1210,6 +1237,11 @@ class CashFlowIndex extends Component
             $query->where('category_id', $this->categoryId);
         }
 
+        if ($this->subcategory !== '') {
+            // Por nome, e dentro do que o escopo da subcategoria deixa a pessoa ver (compartilhadas e as do próprio perfil).
+            $query->whereIn('subcategory_id', ExpenseSubcategory::query()->where('is_active', true)->where('name', $this->subcategory)->select('id'));
+        }
+
         if ($this->memberId !== '') {
             $query->where('member_id', $this->memberId);
         }
@@ -1525,6 +1557,7 @@ class CashFlowIndex extends Component
             'balance' => $this->balance,
             'byNecessity' => $this->byNecessity,
             'categories' => ExpenseCategory::available()->get(),
+            'filterSubcategories' => $this->filterSubcategories(),
             'expenseFormCategories' => $this->expenseFormCategories,
             'incomeCategories' => IncomeCategory::available()->get(),
             'expenseSubcategories' => $this->expenseSubcategories,

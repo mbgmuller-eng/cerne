@@ -9,7 +9,7 @@ use Tests\TestCase;
 /**
  * Menu do profissional em grupos: Consultoria (só consultor), Seguros,
  * Gestão (todo profissional) e Plataforma (só administrador), na barra
- * lateral e na barra inferior do celular.
+ * lateral (desktop) e no menu lateral do celular.
  */
 class ProfessionalNavTest extends TestCase
 {
@@ -33,12 +33,13 @@ class ProfessionalNavTest extends TestCase
         }
     }
 
-    private function barraInferior(string $html): string
+    /** O menu lateral do celular (que desliza da esquerda). */
+    private function menuCelular(string $html): string
     {
-        $inicio = strpos($html, 'class="relative flex border-t border-brand-950/5 bg-white/95');
-        self::assertNotFalse($inicio, 'A barra inferior do profissional não apareceu.');
+        $inicio = strpos($html, '<aside data-menu-celular');
+        self::assertNotFalse($inicio, 'O menu do celular não apareceu.');
 
-        return substr($html, $inicio, strpos($html, '</nav>', $inicio) - $inicio);
+        return substr($html, $inicio, strpos($html, '</aside>', $inicio) - $inicio);
     }
 
     public function test_consultor_ve_os_grupos_na_ordem_e_sem_a_plataforma(): void
@@ -59,20 +60,19 @@ class ProfessionalNavTest extends TestCase
         self::assertStringNotContainsString('Painel admin', $lateral);
     }
 
-    public function test_barra_inferior_do_consultor_tem_uma_aba_por_grupo(): void
+    public function test_menu_do_celular_do_consultor_tem_um_grupo_por_secao(): void
     {
         $html = $this->actingAs(User::factory()->consultant()->create())
             ->get(route('consultant.portfolio'))
             ->getContent();
 
-        $barra = $this->barraInferior($html);
+        $menu = $this->menuCelular($html);
 
-        $this->menuNaMesmaOrdem($barra, ['Consultoria', 'Seguros', 'Gestão', 'Minha conta']);
-        // Grupo com duas telas abre gaveta; Seguros, com uma só, vai direto.
-        self::assertStringContainsString("secao = secao === 'consultoria'", $barra);
-        self::assertStringContainsString("secao = secao === 'gestao'", $barra);
-        self::assertStringContainsString('href="'.route('consultant.portfolio.insurance').'"', $barra);
-        self::assertStringNotContainsString('Plataforma', $barra);
+        $this->menuNaMesmaOrdem($menu, ['Consultoria', 'Seguros', 'Gestão', 'Minha conta']);
+        self::assertStringContainsString('href="'.route('consultant.portfolio.insurance').'"', $menu);
+        self::assertStringNotContainsString('Plataforma', $menu);
+        // Já está na área do profissional: o atalho de volta seria um link para a própria tela.
+        self::assertStringNotContainsString('Voltar para', $menu);
     }
 
     public function test_so_o_administrador_ve_a_plataforma_e_ela_vem_por_ultimo(): void
@@ -82,7 +82,7 @@ class ProfessionalNavTest extends TestCase
         $html = $this->actingAs($admin)->get(route('consultant.portfolio'))->assertOk()->getContent();
 
         $this->menuNaMesmaOrdem($this->barraLateral($html), ['Gestão', 'Leads', 'Plataforma', 'Painel admin']);
-        $this->menuNaMesmaOrdem($this->barraInferior($html), ['Consultoria', 'Seguros', 'Gestão', 'Plataforma', 'Minha conta']);
+        $this->menuNaMesmaOrdem($this->menuCelular($html), ['Consultoria', 'Seguros', 'Gestão', 'Plataforma', 'Painel admin', 'Minha conta']);
     }
 
     public function test_corretor_nao_tem_consultoria_so_seguros_e_gestao(): void
@@ -100,21 +100,20 @@ class ProfessionalNavTest extends TestCase
         self::assertStringNotContainsString('Investimentos da carteira', $lateral);
         self::assertStringNotContainsString('Painel admin', $lateral);
 
-        $barra = $this->barraInferior($html);
-        $this->menuNaMesmaOrdem($barra, ['Seguros', 'Gestão', 'Minha conta']);
-        self::assertStringNotContainsString('Consultoria', $barra);
+        $menu = $this->menuCelular($html);
+        $this->menuNaMesmaOrdem($menu, ['Seguros', 'Gestão', 'Minha conta']);
+        self::assertStringNotContainsString('Consultoria', $menu);
     }
 
-    public function test_gaveta_da_consultoria_lista_as_duas_telas(): void
+    public function test_menu_do_celular_lista_as_telas_da_consultoria(): void
     {
         $html = $this->actingAs(User::factory()->consultant()->create())
             ->get(route('consultant.portfolio'))
             ->getContent();
 
-        $gaveta = substr($html, strpos($html, "x-show=\"secao === 'consultoria'\""));
-        $gaveta = substr($gaveta, 0, strpos($gaveta, '<nav'));
+        $menu = $this->menuCelular($html);
 
-        self::assertStringContainsString('href="'.route('consultant.portfolio').'"', $gaveta);
-        self::assertStringContainsString('href="'.route('consultant.portfolio.investments').'"', $gaveta);
+        self::assertStringContainsString('href="'.route('consultant.portfolio').'"', $menu);
+        self::assertStringContainsString('href="'.route('consultant.portfolio.investments').'"', $menu);
     }
 }

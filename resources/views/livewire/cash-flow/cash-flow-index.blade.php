@@ -466,6 +466,16 @@
         </div>
 
         <div>
+            <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Subcategoria</label>
+            <select wire:model.live="subcategory" class="select mt-1.5" data-subcategory-filter>
+                <option value="">Todas</option>
+                @foreach ($filterSubcategories as $nomeSubcategoria)
+                    <option value="{{ $nomeSubcategoria }}">{{ $nomeSubcategoria }}</option>
+                @endforeach
+            </select>
+        </div>
+
+        <div>
             <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Membro</label>
             <select wire:model.live="memberId" class="select mt-1.5">
                 {{-- "Consolidado" = todos os membros que este usuário pode ver --}}
@@ -476,7 +486,7 @@
             </select>
         </div>
 
-        @if ($necessity || $categoryId || $memberId)
+        @if ($necessity || $categoryId || $subcategory || $memberId)
             <button wire:click="clearFilters" class="pb-1.5 text-sm text-slate-500 dark:text-slate-400 hover:text-brand-800 dark:text-brand-300">Limpar filtros</button>
         @endif
     </div>

@@ -197,26 +197,6 @@
         @apply bg-white/10 font-medium text-white;
     }
 
-    /* Item da barra inferior (celular) */
-    .tab-item {
-        @apply flex flex-1 flex-col items-center gap-0.5 py-2 text-[10px] font-medium text-slate-500 transition dark:text-slate-400;
-    }
-
-    .tab-item-active {
-        @apply text-brand-700 dark:text-accent-400;
-    }
-
-    /* Mesma ideia de nav-item-chrome, pra barra inferior do celular
-       dentro do perfil — fundo sempre escuro (cor do módulo ativo), não
-       o tema claro/escuro. */
-    .tab-item-chrome {
-        @apply flex flex-1 flex-col items-center gap-0.5 py-2 text-[10px] font-medium text-white/60 transition;
-    }
-
-    .tab-item-chrome-active {
-        @apply text-white;
-    }
-
     /* Seletor de tema (claro/sistema/escuro) — ver x-theme-switcher e
        resources/js/app.js, que alterna esta mesma classe no clique. */
     .theme-switch-btn {
@@ -235,4 +215,87 @@
     .scrollbar-none::-webkit-scrollbar {
         display: none;
     }
+}
+
+/*
+ * Menu lateral recolhido (desktop): só os ícones, numa trilha estreita. As marcas (lateral-*) estão em components/layouts/app.blade.php;
+ * a classe menu-recolhido fica na tag <html> (ver resources/js/app.js). Fora de @layer de propósito: precisa vencer a largura w-64 da barra.
+ */
+html.menu-recolhido [data-lateral] {
+    width: 4.5rem;
+}
+
+html.menu-recolhido [data-lateral] .lateral-texto,
+html.menu-recolhido [data-lateral] .lateral-tema,
+html.menu-recolhido [data-lateral] .badge {
+    display: none;
+}
+
+html.menu-recolhido [data-lateral] .lateral-cab {
+    padding: 1.25rem 0 0.75rem;
+}
+
+html.menu-recolhido [data-lateral] .lateral-cab > div {
+    flex-direction: column;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+html.menu-recolhido [data-lateral] nav {
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+    overflow-x: hidden;
+}
+
+html.menu-recolhido [data-lateral] .nav-item,
+html.menu-recolhido [data-lateral] .nav-item-chrome {
+    justify-content: center;
+    padding-left: 0;
+    padding-right: 0;
+}
+
+/* O título da seção vira uma linha fina que separa os grupos (o texto some, a linha fica). */
+html.menu-recolhido [data-lateral] .lateral-titulo {
+    height: 1px;
+    margin: 0.75rem 0.5rem 0.5rem;
+    padding: 0;
+    overflow: hidden;
+    font-size: 0;
+    background: currentColor;
+    opacity: 0.18;
+}
+
+html.menu-recolhido [data-lateral] .lateral-secao:first-child > .lateral-titulo {
+    display: none;
+}
+
+html.menu-recolhido [data-lateral] .lateral-secao {
+    padding-top: 0;
+}
+
+html.menu-recolhido [data-lateral] .lateral-usuario {
+    justify-content: center;
+    padding-left: 0;
+    padding-right: 0;
+}
+
+html.menu-recolhido [data-lateral] .lateral-rodape {
+    flex-direction: column;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+html.menu-recolhido [data-lateral] .lateral-rodape > div {
+    flex-direction: column;
+}
+
+/* Recolhido: mais compacto na vertical, para o menu inteiro caber em telas baixas. O ícone de Minha conta já representa a pessoa, então o avatar sai. */
+html.menu-recolhido [data-lateral] .nav-item,
+html.menu-recolhido [data-lateral] .nav-item-chrome {
+    padding-top: 0.4rem;
+    padding-bottom: 0.4rem;
+}
+
+html.menu-recolhido [data-lateral] .lateral-usuario {
+    display: none;
 }

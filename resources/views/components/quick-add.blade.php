@@ -1,15 +1,12 @@
-{{-- Botão redondo "+" fixo no canto inferior direito, por cima da barra de
-     navegação. Atalho para lançar receita, despesa ou falar uma despesa.
+{{-- Botão redondo "+" fixo no canto inferior direito, por cima do fim da página. Atalho para lançar receita, despesa ou falar uma despesa.
 
      No Fluxo de caixa os formulários abrem na hora (evento do Livewire e do
      navegador); nas outras telas o atalho leva ao Fluxo de caixa com
      ?acao=... e a tela abre o formulário (ver CashFlowIndex::mount). Assim
      os formulários continuam sendo um só, com as mesmas validações.
 
-     z-[35]: acima da barra inferior (z-30) e abaixo das janelas (z-40), que
-     o cobrem sozinhas. Some com a gaveta do menu aberta (`secao` vem do
-     x-data do <body>). transform-gpu pelo mesmo motivo da barra: Android
-     Chrome faz elemento fixed sumir na rolagem sem camada própria. --}}
+     z-[35]: abaixo das janelas e do menu lateral (z-40 e z-50), que o cobrem sozinhos. Some com o menu do celular aberto (`menu` vem do x-data
+     do <body>). transform-gpu: Android Chrome faz elemento fixed sumir na rolagem sem camada própria. --}}
 @props(['naTela' => false])
 
 <div
@@ -35,10 +32,10 @@
             Livewire.dispatch('quick-add', { tipo: acao });
         },
     }"
-    x-show="secao === null"
+    x-show="! menu"
     @keydown.escape.window="aberto = false"
     @click.outside="aberto = false"
-    class="fixed right-4 bottom-[calc(5.5rem+env(safe-area-inset-bottom))] z-[35] transform-gpu will-change-transform lg:right-8 lg:bottom-8"
+    class="fixed right-4 bottom-[calc(1.25rem+env(safe-area-inset-bottom))] z-[35] transform-gpu will-change-transform lg:right-8 lg:bottom-8"
     data-quick-add
 >
     <div

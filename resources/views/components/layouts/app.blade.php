@@ -23,24 +23,27 @@
     $navFinancas = [
         ['dashboard', 'Visão geral', 'Início', 'home'],
         ['cashflow.index', 'Fluxo de caixa', 'Fluxo', 'flow'],
-        ['budget.index', 'Regra de orçamento', 'Regra', 'pie'],
         ['fixedbills.index', 'Contas fixas', 'Fixas', 'bills'],
-        ['accounts.index', 'Contas & Cartões', 'Contas', 'cards'],
         ['debts.index', 'Dívidas', 'Dívidas', 'debt'],
         ['investments.index', 'Investimentos', 'Invest.', 'invest'],
         ['goals.index', 'Objetivos', 'Metas', 'target'],
         ['documents.index', 'Importar', 'Importar', 'upload'],
+        // Cadastros e regras ficam juntos, no fim do grupo (ver 'cadastrosDe' em $navSections): é o que se mexe de vez em quando, não o que se olha todo dia.
+        ['accounts.index', 'Contas & Cartões', 'Contas', 'cards'],
         ['categorization-rules.index', 'Regras de categorização', 'Regras', 'tag'],
+        ['budget.index', 'Regra de orçamento', 'Regra', 'pie'],
     ];
+    // Convite assistido: só o consultor, dentro do perfil de um cliente dele (nunca o corretor).
+    if ($profile && $context->isConsultant() && $user?->isConsultant()) {
+        array_splice($navFinancas, array_search('investments.index', array_column($navFinancas, 0), true), 0, [['consultant.family-access', 'Acesso da família', 'Família', 'contact']]);
+    }
     // Acompanhamento: só quem tem vínculo ativo com um consultor financeiro (cliente), ou o consultor dentro do perfil de um
     // cliente dele. Sem consultor, a área não existe.
     if ($profile && app(\App\Services\EngagementAccess::class)->viewer() !== null) {
-        array_splice($navFinancas, 6, 0, [['engagement.index', 'Acompanhamento', 'Consultoria', 'contact']]);
+        array_splice($navFinancas, array_search('investments.index', array_column($navFinancas, 0), true), 0, [['engagement.index', 'Acompanhamento', 'Consultoria', 'contact']]);
     }
-    // Convite assistido: só o consultor, dentro do perfil de um cliente dele (nunca o corretor).
-    if ($profile && $context->isConsultant() && $user?->isConsultant()) {
-        array_splice($navFinancas, 7, 0, [['consultant.family-access', 'Acesso da família', 'Família', 'contact']]);
-    }
+    // Calculado DEPOIS das inserções acima: Acompanhamento e Acesso da família empurram os cadastros para baixo.
+    $cadastrosDe = array_search('accounts.index', array_column($navFinancas, 0), true);
     $navSeguros = [
         ['insurance.index', 'Apólices', 'Seguros', 'shield'],
     ];
@@ -65,7 +68,7 @@
     $navSections = $user?->isBroker()
         ? [['label' => 'Seguros', 'items' => $navSeguros]]
         : array_values(array_filter([
-            ['label' => 'Finanças', 'items' => $navFinancas],
+            ['label' => 'Finanças', 'items' => $navFinancas, 'cadastrosDe' => $cadastrosDe],
             ['label' => 'Seguros', 'items' => $navSeguros],
             ['label' => 'Documentos', 'items' => $navDocumentos],
             $context->isConsultant() ? null : ['label' => 'Saúde', 'items' => $navSaude],
@@ -154,27 +157,7 @@
         return $s + ['tint' => $tintPorSetor[$s['label']] ?? 'text-white/40'];
     })->all();
 
-    // Barra inferior do celular: uma aba por CATEGORIA (Finanças, Seguros,
-    // Documentos, Saúde) mais "Minha conta" — 5 cabem. Categoria com várias
-    // telas abre uma gaveta com elas; com uma tela só vai direto, uma gaveta
-    // de um item só seria um toque a mais sem ganho nenhum. As categorias
-    // vêm de $navSections, então corretor (só Seguros) e consultor com
-    // cliente aberto (sem Saúde) ganham só as abas a que têm direito.
-    $iconesDasAbas = ['Finanças' => 'invest', 'Seguros' => 'shield', 'Documentos' => 'folder', 'Saúde' => 'heart'];
     $naMinhaConta = request()->routeIs('my-account');
-    $abasInferiores = collect($navSections)->map(function (array $s) use ($iconesDasAbas, $moduloAtivo, $naMinhaConta) {
-        $chave = \Illuminate\Support\Str::slug($s['label']);
-
-        return [
-            'chave' => $chave,
-            'label' => $s['label'],
-            'icone' => $iconesDasAbas[$s['label']] ?? 'menu',
-            'tint' => $s['tint'],
-            'items' => $s['items'],
-            'ativa' => ! $naMinhaConta && $moduloAtivo === $chave,
-            'direta' => count($s['items']) === 1,
-        ];
-    })->all();
     // "Painel da carteira" e as telas irmãs não são telas DE um perfil —
     // são a área de gestão do consultor. Sem esta distinção, o perfil do
     // último cliente aberto (guardado na sessão) continuava ditando o menu
@@ -274,8 +257,47 @@
         ['admin.insurers', 'Seguradoras', 'Seguradoras', 'shield', $seguradorasPendentes],
         ['admin.exercises', 'Exercícios', 'Exercícios', 'dumbbell', $exerciciosPendentes],
     ];
-    $cadastrosPendentes = $bancosPendentes + $seguradorasPendentes + $exerciciosPendentes;
-    $cadastrosAtivo = collect($cadastrosAdmin)->contains(fn (array $item) => request()->routeIs($item[0]));
+
+    // Menu lateral do celular (no lugar da barra inferior, que tinha uma gaveta por categoria): as MESMAS telas da barra lateral do desktop, em
+    // grupos. Cada item: [rota, rótulo, ícone, selo ou null, tipo do selo ('erro' | 'pendente' | null)].
+    $gavetaSecoes = [];
+    if ($dentroDoPerfil) {
+        foreach ($navSections as $secao) {
+            $gavetaSecoes[] = [
+                'label' => $secao['label'],
+                'tint' => $secao['tint'],
+                'cadastrosDe' => $secao['cadastrosDe'] ?? null,
+                'items' => array_map(fn (array $i) => [$i[0], $i[1], $i[3], null, null], $secao['items']),
+            ];
+        }
+    } elseif ($areaConsultor) {
+        foreach ([...$secoesProfissional, ...($secaoPlataforma ? [$secaoPlataforma] : [])] as $secao) {
+            $gavetaSecoes[] = [
+                'label' => $secao['label'],
+                'tint' => 'text-slate-400 dark:text-slate-500',
+                'cadastrosDe' => null,
+                'items' => array_map(fn (array $i) => [$i[0], $i[1], $i[3], null, null], $secao['items']),
+            ];
+        }
+    } elseif ($areaAdmin) {
+        $gavetaSecoes[] = [
+            'label' => 'Plataforma',
+            'tint' => 'text-slate-400 dark:text-slate-500',
+            'cadastrosDe' => null,
+            'items' => [
+                ['admin.users', 'Contas e perfis', 'admin', null, null],
+                ['admin.errors', 'Erros', 'alert', $errosAbertos > 0 ? $errosAbertos : null, 'erro'],
+                ['admin.access-log', 'Acessos', 'lock', null, null],
+                ['admin.incidents', 'Incidentes', 'shield', null, null],
+            ],
+        ];
+        $gavetaSecoes[] = [
+            'label' => 'Cadastros',
+            'tint' => 'text-slate-400 dark:text-slate-500',
+            'cadastrosDe' => null,
+            'items' => array_map(fn (array $i) => [$i[0], $i[1], $i[3], $i[4] > 0 ? $i[4] : null, 'pendente'], $cadastrosAdmin),
+        ];
+    }
 
     // Preferência de tema da CONTA, não do navegador — ver
     // App\Enums\ThemePreference e resources/js/app.js.
@@ -300,6 +322,14 @@
             }
         })();
     </script>
+    {{-- Menu lateral recolhido: preferência deste navegador, aplicada ANTES do primeiro desenho para a barra não piscar larga e encolher. --}}
+    <script>
+        (function () {
+            try {
+                if (localStorage.getItem('cerne.menu') === 'recolhido') document.documentElement.classList.add('menu-recolhido');
+            } catch (e) {}
+        })();
+    </script>
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <meta name="vapid-public-key" content="{{ config('webpush.vapid.public_key') }}">
@@ -320,7 +350,12 @@
          página, e o navegador cai no fallback do sistema silenciosamente. --}}
     {{ \Illuminate\Support\Facades\Vite::fonts() }}
 </head>
-<body class="h-full bg-paper text-slate-800 antialiased dark:text-slate-200" x-data="{ secao: null }">
+<body
+    class="h-full bg-paper text-slate-800 antialiased dark:text-slate-200"
+    x-data="{ menu: false }"
+    x-effect="document.documentElement.classList.toggle('overflow-hidden', menu)"
+    @resize.window="if (window.innerWidth >= 1024) menu = false"
+>
 
 <div class="flex min-h-full">
 
@@ -333,19 +368,24 @@
              só o acento do item ativo (ver $corAtivoEscuroDesktop) — por
              isso os textos aqui usam tom fixo (branco translúcido), que
              funciona em cima de QUALQUER um dos dois fundos escuros. --}}
-        <aside @class(['sticky top-0 z-30 hidden h-screen w-64 shrink-0 flex-col lg:flex dark:bg-slate-900', $corBarraModulo])>
-            <div class="px-6 pt-6 pb-4">
-                <a href="{{ route('dashboard') }}" class="flex items-center gap-2">
-                    <x-brand-mark class="h-7 w-7" />
-                    <span class="font-display text-2xl font-semibold tracking-tight text-white">Cerne</span>
-                </a>
-                <p class="mt-1 truncate text-xs text-white/50">{{ $profile->profile_name }}</p>
+        <aside data-lateral @class(['sticky top-0 z-30 hidden h-screen w-64 shrink-0 transition-[width] duration-200 flex-col lg:flex dark:bg-slate-900', $corBarraModulo])>
+            <div class="lateral-cab px-6 pt-6 pb-4">
+                <div class="flex items-center justify-between gap-2">
+                    <a href="{{ route('dashboard') }}" class="flex items-center gap-2">
+                        <x-brand-mark class="h-7 w-7" />
+                        <span class="lateral-texto font-display text-2xl font-semibold tracking-tight text-white">Cerne</span>
+                    </a>
+                    <button type="button" data-alternar-menu aria-label="Recolher ou abrir o menu" title="Recolher ou abrir o menu" class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition text-white/60 hover:bg-white/10 hover:text-white">
+                        <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+                    </button>
+                </div>
+                <p class="lateral-texto mt-1 truncate text-xs text-white/50">{{ $profile->profile_name }}</p>
             </div>
 
             @if ($voltarAoPainel)
                 <a href="{{ route($voltarAoPainel['rota']) }}" class="mx-3 mb-3 flex items-center gap-3 rounded-xl bg-white/10 px-3 py-2.5 text-white transition hover:bg-white/15">
                     <x-nav-icon name="back" />
-                    <span class="min-w-0 leading-tight">
+                    <span class="lateral-texto min-w-0 leading-tight">
                         <span class="block text-[10px] font-semibold tracking-wide text-white/50 uppercase">Voltar para</span>
                         <span class="block truncate text-sm font-medium">{{ $voltarAoPainel['nome'] }}</span>
                     </span>
@@ -354,17 +394,20 @@
 
             <nav class="flex-1 space-y-0.5 overflow-y-auto px-3">
                 @foreach ($navSections as $secao)
-                    <div @class(['pt-4' => ! $loop->first])>
-                        <p @class(['px-3 pb-1 text-[10px] font-semibold tracking-wide uppercase', $secao['tint']])>
+                    <div @class(['lateral-secao', 'pt-4' => ! $loop->first])>
+                        <p @class(['lateral-titulo px-3 pb-1 text-[10px] font-semibold tracking-wide uppercase', $secao['tint']])>
                             {{ $secao['label'] }}
                             @if ($secao['emBreve'] ?? false)
                                 <span class="ml-1 rounded bg-white/10 px-1.5 py-0.5 text-[9px] font-normal tracking-normal text-white/50 normal-case">em breve</span>
                             @endif
                         </p>
                         @foreach ($secao['items'] as [$route, $label, $curto, $icone])
-                            <a href="{{ route($route) }}" @class(['nav-item-chrome', 'nav-item-chrome-active '.$corAtivoEscuroDesktop => request()->routeIs($route)])>
+                            @if (isset($secao['cadastrosDe']) && $loop->index === $secao['cadastrosDe'])
+                                <p class="lateral-titulo px-3 pt-4 pb-1 text-[10px] font-semibold tracking-wide text-white/40 uppercase">Cadastros e regras</p>
+                            @endif
+                            <a href="{{ route($route) }}" title="{{ $label }}" @class(['nav-item-chrome', 'nav-item-chrome-active '.$corAtivoEscuroDesktop => request()->routeIs($route)])>
                                 <x-nav-icon :name="$icone" />
-                                <span>{{ $label }}</span>
+                                <span class="lateral-texto">{{ $label }}</span>
                             </a>
                         @endforeach
                     </div>
@@ -375,24 +418,24 @@
                 @if ($user->isLinkedProfessional() || $user->isPlatformAdmin())
                     <div class="pt-4" x-data="{ aberto: false }">
                         <button type="button" @click="aberto = ! aberto" :aria-expanded="aberto" class="flex w-full items-center justify-between px-3 pb-1 text-[10px] font-semibold tracking-wide text-white/50 uppercase transition hover:text-white/80">
-                            <span>Área do profissional</span>
+                            <span class="lateral-texto">Área do profissional</span>
                             <svg class="h-3 w-3 transition" :class="aberto ? 'rotate-180' : ''" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd" /></svg>
                         </button>
                         <div x-show="aberto" x-cloak class="space-y-0.5">
                             @if ($user->isLinkedProfessional())
                                 @foreach ($navConsultor as [$route, $label, $curto, $icone])
                                     @if ($route !== 'admin.users')
-                                        <a href="{{ route($route) }}" class="nav-item-chrome">
+                                        <a href="{{ route($route) }}" title="{{ $label }}" class="nav-item-chrome">
                                             <x-nav-icon :name="$icone" />
-                                            <span>{{ $label }}</span>
+                                            <span class="lateral-texto">{{ $label }}</span>
                                         </a>
                                     @endif
                                 @endforeach
                             @endif
                             @if ($user->isPlatformAdmin())
-                                <a href="{{ route('admin.users') }}" class="nav-item-chrome">
+                                <a href="{{ route('admin.users') }}" title="Painel admin" class="nav-item-chrome">
                                     <x-nav-icon name="admin" />
-                                    <span>Painel admin</span>
+                                    <span class="lateral-texto">Painel admin</span>
                                 </a>
                             @endif
                         </div>
@@ -402,21 +445,21 @@
 
             <div class="border-t border-white/10 p-3">
                 @if ($context->isConsultant())
-                    <div class="mb-2 rounded-xl bg-amber-500/10 px-3 py-2 text-xs text-amber-300 ring-1 ring-amber-500/20">
+                    <div class="lateral-texto mb-2 rounded-xl bg-amber-500/10 px-3 py-2 text-xs text-amber-300 ring-1 ring-amber-500/20">
                         Você está vendo este perfil <span class="font-medium">como {{ $user?->isBroker() ? 'corretor' : 'consultor' }}</span>.
                     </div>
                 @endif
 
-                <a href="{{ route('my-account') }}" @class(['nav-item-chrome mb-1', 'nav-item-chrome-active '.$corAtivoEscuroDesktop => request()->routeIs('my-account')])>
+                <a href="{{ route('my-account') }}" title="Minha conta" @class(['nav-item-chrome mb-1', 'nav-item-chrome-active '.$corAtivoEscuroDesktop => request()->routeIs('my-account')])>
                     <x-nav-icon name="users" />
-                    <span>Minha conta</span>
+                    <span class="lateral-texto">Minha conta</span>
                 </a>
 
-                <div class="flex items-center gap-3 px-2 py-1.5">
+                <div class="lateral-usuario flex items-center gap-3 px-2 py-1.5">
                     <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/10 text-xs font-semibold text-white">
                         {{ mb_strtoupper(mb_substr($user->name, 0, 1)) }}
                     </div>
-                    <div class="min-w-0 flex-1">
+                    <div class="lateral-texto min-w-0 flex-1">
                         <p class="truncate text-sm font-medium text-white">{{ $user->name }}</p>
                         <p class="truncate text-xs text-white/50">{{ $user->email }}</p>
                     </div>
@@ -424,12 +467,12 @@
 
                 {{-- Segunda linha do rodapé: Sair à esquerda e as ferramentas (tutorial, notificações) à direita. Tudo numa linha só com o nome
                      espremia o nome e o e-mail até virarem "M…". --}}
-                <div class="mt-1 flex items-center justify-between px-1">
+                <div class="lateral-rodape mt-1 flex items-center justify-between px-1">
                     <form method="POST" action="{{ route('logout') }}">
                         @csrf
                         <button type="submit" class="btn-ghost !text-white/60 px-2" title="Sair">
                             <x-nav-icon name="logout" class="h-4 w-4" />
-                            <span class="ml-1.5 text-xs">Sair</span>
+                            <span class="lateral-texto ml-1.5 text-xs">Sair</span>
                         </button>
                     </form>
                     <div class="flex items-center gap-1">
@@ -446,31 +489,36 @@
                     </div>
                 </div>
 
-                <div class="mt-2 flex justify-center">
+                <div class="lateral-tema mt-2 flex justify-center">
                     <x-theme-switcher :current="$theme" />
                 </div>
             </div>
         </aside>
     @elseif ($areaConsultor)
         {{-- Área de gestão do consultor: carteira e clientes, não um perfil. --}}
-        <aside class="sticky top-0 z-30 hidden h-screen w-64 shrink-0 flex-col border-r border-brand-950/5 bg-white lg:flex dark:border-white/10 dark:bg-slate-900">
-            <div class="px-6 pt-6 pb-4">
-                <a href="{{ route($homeRouteProfissional) }}" class="flex items-center gap-2">
-                    <x-brand-mark class="h-7 w-7" />
-                    <span class="font-display text-2xl font-semibold tracking-tight text-brand-800 dark:text-white">Cerne</span>
-                </a>
-                <p class="mt-1 truncate text-xs text-slate-500 dark:text-slate-400">{{ $user?->isBroker() ? 'Painel do corretor' : 'Painel do consultor' }}</p>
+        <aside data-lateral class="sticky top-0 z-30 hidden h-screen w-64 shrink-0 transition-[width] duration-200 flex-col border-r border-brand-950/5 bg-white lg:flex dark:border-white/10 dark:bg-slate-900">
+            <div class="lateral-cab px-6 pt-6 pb-4">
+                <div class="flex items-center justify-between gap-2">
+                    <a href="{{ route($homeRouteProfissional) }}" class="flex items-center gap-2">
+                        <x-brand-mark class="h-7 w-7" />
+                        <span class="lateral-texto font-display text-2xl font-semibold tracking-tight text-brand-800 dark:text-white">Cerne</span>
+                    </a>
+                    <button type="button" data-alternar-menu aria-label="Recolher ou abrir o menu" title="Recolher ou abrir o menu" class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition text-slate-500 hover:bg-slate-100 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-white/10 dark:hover:text-white">
+                        <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+                    </button>
+                </div>
+                <p class="lateral-texto mt-1 truncate text-xs text-slate-500 dark:text-slate-400">{{ $user?->isBroker() ? 'Painel do corretor' : 'Painel do consultor' }}</p>
             </div>
 
             <nav class="flex flex-1 flex-col overflow-y-auto px-3">
                 @foreach ($secoesProfissional as $secao)
-                    <div @class(['pt-5' => ! $loop->first])>
-                        <p class="px-3 pb-1 text-[10px] font-semibold tracking-wide text-slate-400 uppercase dark:text-slate-500">{{ $secao['label'] }}</p>
+                    <div @class(['lateral-secao', 'pt-5' => ! $loop->first])>
+                        <p class="lateral-titulo px-3 pb-1 text-[10px] font-semibold tracking-wide text-slate-400 uppercase dark:text-slate-500">{{ $secao['label'] }}</p>
                         <div class="space-y-0.5">
                             @foreach ($secao['items'] as [$route, $label, $curto, $icone])
-                                <a href="{{ route($route) }}" @class(['nav-item', 'nav-item-active' => request()->routeIs($route)])>
+                                <a href="{{ route($route) }}" title="{{ $label }}" @class(['nav-item', 'nav-item-active' => request()->routeIs($route)])>
                                     <x-nav-icon :name="$icone" />
-                                    <span>{{ $label }}</span>
+                                    <span class="lateral-texto">{{ $label }}</span>
                                 </a>
                             @endforeach
                         </div>
@@ -481,11 +529,11 @@
                 @if ($secaoPlataforma)
                     <div class="mt-auto pt-6">
                         <div class="border-t border-brand-950/5 pt-4 dark:border-white/10">
-                            <p class="px-3 pb-1 text-[10px] font-semibold tracking-wide text-slate-400 uppercase dark:text-slate-500">{{ $secaoPlataforma['label'] }}</p>
+                            <p class="lateral-titulo px-3 pb-1 text-[10px] font-semibold tracking-wide text-slate-400 uppercase dark:text-slate-500">{{ $secaoPlataforma['label'] }}</p>
                             @foreach ($secaoPlataforma['items'] as [$route, $label, $curto, $icone])
-                                <a href="{{ route($route) }}" class="nav-item">
+                                <a href="{{ route($route) }}" title="{{ $label }}" class="nav-item">
                                     <x-nav-icon :name="$icone" />
-                                    <span>{{ $label }}</span>
+                                    <span class="lateral-texto">{{ $label }}</span>
                                 </a>
                             @endforeach
                         </div>
@@ -494,27 +542,27 @@
             </nav>
 
             <div class="border-t border-brand-950/5 p-3 dark:border-white/10">
-                <a href="{{ route('my-account') }}" @class(['nav-item mb-1', 'nav-item-active' => request()->routeIs('my-account')])>
+                <a href="{{ route('my-account') }}" title="Minha conta" @class(['nav-item mb-1', 'nav-item-active' => request()->routeIs('my-account')])>
                     <x-nav-icon name="users" />
-                    <span>Minha conta</span>
+                    <span class="lateral-texto">Minha conta</span>
                 </a>
 
-                <div class="flex items-center gap-3 px-2 py-1.5">
+                <div class="lateral-usuario flex items-center gap-3 px-2 py-1.5">
                     <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-100 text-xs font-semibold text-brand-800 dark:bg-white/10 dark:text-white">
                         {{ mb_strtoupper(mb_substr($user->name, 0, 1)) }}
                     </div>
-                    <div class="min-w-0 flex-1">
+                    <div class="lateral-texto min-w-0 flex-1">
                         <p class="truncate text-sm font-medium text-slate-800 dark:text-slate-100">{{ $user->name }}</p>
                         <p class="truncate text-xs text-slate-500 dark:text-slate-400">{{ $user->email }}</p>
                     </div>
                 </div>
 
-                <div class="mt-1 flex items-center justify-between px-1">
+                <div class="lateral-rodape mt-1 flex items-center justify-between px-1">
                     <form method="POST" action="{{ route('logout') }}">
                         @csrf
                         <button type="submit" class="btn-ghost px-2" title="Sair">
                             <x-nav-icon name="logout" class="h-4 w-4" />
-                            <span class="ml-1.5 text-xs">Sair</span>
+                            <span class="lateral-texto ml-1.5 text-xs">Sair</span>
                         </button>
                     </form>
                     <div class="flex items-center gap-1">
@@ -525,62 +573,67 @@
                     </div>
                 </div>
 
-                <div class="mt-2 flex justify-center">
+                <div class="lateral-tema mt-2 flex justify-center">
                     <x-theme-switcher :current="$theme" />
                 </div>
             </div>
         </aside>
     @elseif ($areaAdmin)
         {{-- Área de gestão da plataforma: toda conta, todo perfil. --}}
-        <aside class="sticky top-0 z-30 hidden h-screen w-64 shrink-0 flex-col border-r border-brand-950/5 bg-white lg:flex dark:border-white/10 dark:bg-slate-900">
-            <div class="px-6 pt-6 pb-4">
-                <a href="{{ route('admin.users') }}" class="flex items-center gap-2">
-                    <x-brand-mark class="h-7 w-7" />
-                    <span class="font-display text-2xl font-semibold tracking-tight text-brand-800 dark:text-white">Cerne</span>
-                </a>
-                <p class="mt-1 truncate text-xs text-slate-500 dark:text-slate-400">Painel admin</p>
+        <aside data-lateral class="sticky top-0 z-30 hidden h-screen w-64 shrink-0 transition-[width] duration-200 flex-col border-r border-brand-950/5 bg-white lg:flex dark:border-white/10 dark:bg-slate-900">
+            <div class="lateral-cab px-6 pt-6 pb-4">
+                <div class="flex items-center justify-between gap-2">
+                    <a href="{{ route('admin.users') }}" class="flex items-center gap-2">
+                        <x-brand-mark class="h-7 w-7" />
+                        <span class="lateral-texto font-display text-2xl font-semibold tracking-tight text-brand-800 dark:text-white">Cerne</span>
+                    </a>
+                    <button type="button" data-alternar-menu aria-label="Recolher ou abrir o menu" title="Recolher ou abrir o menu" class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition text-slate-500 hover:bg-slate-100 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-white/10 dark:hover:text-white">
+                        <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+                    </button>
+                </div>
+                <p class="lateral-texto mt-1 truncate text-xs text-slate-500 dark:text-slate-400">Painel admin</p>
             </div>
 
             <nav class="flex flex-1 flex-col overflow-y-auto px-3">
                 @if ($voltarAoPainel)
                     <a href="{{ route($voltarAoPainel['rota']) }}" class="mb-6 flex items-center gap-3 rounded-xl border border-brand-950/10 bg-slate-50 px-3 py-2.5 text-brand-800 transition hover:bg-slate-100 dark:border-white/10 dark:bg-white/5 dark:text-white dark:hover:bg-white/10">
                         <x-nav-icon name="back" />
-                        <span class="min-w-0 leading-tight">
+                        <span class="lateral-texto min-w-0 leading-tight">
                             <span class="block text-[10px] font-semibold tracking-wide text-slate-400 uppercase dark:text-slate-500">Voltar para</span>
                             <span class="block truncate text-sm font-medium">{{ $voltarAoPainel['nome'] }}</span>
                         </span>
                     </a>
                 @endif
 
-                <p class="px-3 pb-1 text-[10px] font-semibold tracking-wide text-slate-400 uppercase dark:text-slate-500">Plataforma</p>
+                <p class="lateral-titulo px-3 pb-1 text-[10px] font-semibold tracking-wide text-slate-400 uppercase dark:text-slate-500">Plataforma</p>
                 <div class="space-y-0.5">
-                    <a href="{{ route('admin.users') }}" @class(['nav-item', 'nav-item-active' => request()->routeIs('admin.users')])>
+                    <a href="{{ route('admin.users') }}" title="Contas e perfis" @class(['nav-item', 'nav-item-active' => request()->routeIs('admin.users')])>
                         <x-nav-icon name="admin" />
-                        <span>Contas e perfis</span>
+                        <span class="lateral-texto">Contas e perfis</span>
                     </a>
-                    <a href="{{ route('admin.errors') }}" @class(['nav-item', 'nav-item-active' => request()->routeIs('admin.errors')])>
+                    <a href="{{ route('admin.errors') }}" title="Erros" @class(['nav-item', 'nav-item-active' => request()->routeIs('admin.errors')])>
                         <x-nav-icon name="alert" />
-                        <span>Erros</span>
+                        <span class="lateral-texto">Erros</span>
                         @if ($errosAbertos > 0)
                             <span class="badge ml-auto bg-red-50 text-red-800 ring-1 ring-red-200 dark:bg-red-500/10 dark:text-red-300 dark:ring-red-500/20">{{ $errosAbertos }}</span>
                         @endif
                     </a>
-                    <a href="{{ route('admin.access-log') }}" @class(['nav-item', 'nav-item-active' => request()->routeIs('admin.access-log')])>
+                    <a href="{{ route('admin.access-log') }}" title="Acessos" @class(['nav-item', 'nav-item-active' => request()->routeIs('admin.access-log')])>
                         <x-nav-icon name="lock" />
-                        <span>Acessos</span>
+                        <span class="lateral-texto">Acessos</span>
                     </a>
-                    <a href="{{ route('admin.incidents') }}" @class(['nav-item', 'nav-item-active' => request()->routeIs('admin.incidents')])>
+                    <a href="{{ route('admin.incidents') }}" title="Incidentes" @class(['nav-item', 'nav-item-active' => request()->routeIs('admin.incidents')])>
                         <x-nav-icon name="shield" />
-                        <span>Incidentes</span>
+                        <span class="lateral-texto">Incidentes</span>
                     </a>
                 </div>
 
-                <p class="mt-5 px-3 pb-1 text-[10px] font-semibold tracking-wide text-slate-400 uppercase dark:text-slate-500">Cadastros</p>
+                <p class="mt-5 lateral-titulo px-3 pb-1 text-[10px] font-semibold tracking-wide text-slate-400 uppercase dark:text-slate-500">Cadastros</p>
                 <div class="space-y-0.5">
                     @foreach ($cadastrosAdmin as [$route, $label, $curto, $icone, $pendentes])
-                        <a href="{{ route($route) }}" @class(['nav-item', 'nav-item-active' => request()->routeIs($route)])>
+                        <a href="{{ route($route) }}" title="{{ $label }}" @class(['nav-item', 'nav-item-active' => request()->routeIs($route)])>
                             <x-nav-icon :name="$icone" />
-                            <span>{{ $label }}</span>
+                            <span class="lateral-texto">{{ $label }}</span>
                             @if ($pendentes > 0)
                                 <span class="badge ml-auto bg-amber-50 text-amber-900 ring-1 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-300 dark:ring-amber-500/20">{{ $pendentes }}</span>
                             @endif
@@ -590,26 +643,26 @@
             </nav>
 
             <div class="border-t border-brand-950/5 p-3 dark:border-white/10">
-                <a href="{{ route('my-account') }}" @class(['nav-item mb-1', 'nav-item-active' => request()->routeIs('my-account')])>
+                <a href="{{ route('my-account') }}" title="Minha conta" @class(['nav-item mb-1', 'nav-item-active' => request()->routeIs('my-account')])>
                     <x-nav-icon name="users" />
-                    <span>Minha conta</span>
+                    <span class="lateral-texto">Minha conta</span>
                 </a>
-                <div class="flex items-center gap-3 px-2 py-1.5">
+                <div class="lateral-usuario flex items-center gap-3 px-2 py-1.5">
                     <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-100 text-xs font-semibold text-brand-800 dark:bg-white/10 dark:text-white">
                         {{ mb_strtoupper(mb_substr($user->name, 0, 1)) }}
                     </div>
-                    <div class="min-w-0 flex-1">
+                    <div class="lateral-texto min-w-0 flex-1">
                         <p class="truncate text-sm font-medium text-slate-800 dark:text-slate-100">{{ $user->name }}</p>
                         <p class="truncate text-xs text-slate-500 dark:text-slate-400">{{ $user->email }}</p>
                     </div>
                 </div>
 
-                <div class="mt-1 flex items-center justify-between px-1">
+                <div class="lateral-rodape mt-1 flex items-center justify-between px-1">
                     <form method="POST" action="{{ route('logout') }}">
                         @csrf
                         <button type="submit" class="btn-ghost px-2" title="Sair">
                             <x-nav-icon name="logout" class="h-4 w-4" />
-                            <span class="ml-1.5 text-xs">Sair</span>
+                            <span class="lateral-texto ml-1.5 text-xs">Sair</span>
                         </button>
                     </form>
                     <div class="flex items-center gap-1">
@@ -620,7 +673,7 @@
                     </div>
                 </div>
 
-                <div class="mt-2 flex justify-center">
+                <div class="lateral-tema mt-2 flex justify-center">
                     <x-theme-switcher :current="$theme" />
                 </div>
             </div>
@@ -673,6 +726,17 @@
             'border-b border-brand-950/5 bg-white/90 backdrop-blur dark:border-white/10 dark:bg-slate-900/90' => ! $dentroDoPerfil,
         ])>
             <div class="mx-auto flex h-14 max-w-6xl 2xl:max-w-[96rem] items-center justify-between gap-3 px-4">
+                <div class="flex shrink-0 items-center gap-1">
+                @if ($mostraAsideDesktop)
+                    {{-- Abre o menu lateral do celular (ver x-menu-celular, no fim da página). Só existe onde a barra lateral do desktop existe. --}}
+                    <button type="button" @click="menu = true" :aria-expanded="menu" aria-label="Abrir o menu" data-abrir-menu @class([
+                        '-ml-2 flex h-10 w-10 items-center justify-center rounded-xl transition',
+                        'text-white hover:bg-white/10' => $dentroDoPerfil,
+                        'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-white/10' => ! $dentroDoPerfil,
+                    ])>
+                        <svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+                    </button>
+                @endif
                 <a href="{{ route('dashboard') }}" @class([
                     'flex shrink-0 items-center gap-2 font-display text-xl font-semibold tracking-tight',
                     'text-white' => $dentroDoPerfil,
@@ -681,6 +745,7 @@
                     <x-brand-mark class="h-6 w-6" />
                     Cerne
                 </a>
+                </div>
 
                 {{-- O sino fica FORA do trecho rolável, de propósito: um
                      ancestral com overflow-x força overflow-y a também virar
@@ -706,13 +771,11 @@
                             ])>{{ $user?->isBroker() ? 'corretor' : 'consultor' }}</span>
                         @endif
 
-                        {{-- O caminho de volta à área do profissional, no celular, é a aba "Carteira" da barra inferior (com todas as telas dele). --}}
+                        {{-- Onde há barra lateral (desktop) e menu lateral (celular), o tema, o Sair e o caminho de volta à área do profissional moram lá:
+                             o cabeçalho do celular fica só com o essencial. Sem perfil (nenhum dos dois menus existe), eles continuam aqui. --}}
+                        @unless ($mostraAsideDesktop)
+                            <x-theme-switcher :current="$theme" />
 
-                        <x-theme-switcher :current="$theme" />
-
-                        {{-- Na área do profissional e no admin o Sair mora em Minha conta
-                             (no PC, na lateral): o cabeçalho fica só com o essencial. --}}
-                        @unless ($areaConsultor || $areaAdmin)
                             <form method="POST" action="{{ route('logout') }}">
                                 @csrf
                                 <button type="submit" @class(['btn-ghost', '!text-white/60' => $dentroDoPerfil]) title="Sair">
@@ -739,7 +802,7 @@
         <main @class([
             'mx-auto w-full flex-1 px-4 py-6 sm:px-6 sm:py-8 lg:px-10 lg:py-10',
             'max-w-6xl 2xl:max-w-[96rem]' => ! $wide,
-            'pb-24 lg:pb-10' => $mostraAsideDesktop,  // espaço para a barra inferior no celular
+            'pb-24 lg:pb-10' => $mostraAsideDesktop,  // espaço para o botão "+" (no canto, por cima do fim da página) no celular
             // Cuidador de leitura não vê os botões de escrita (a trava de verdade é no servidor, ver CaregiverWriteGuard); o de edição também não
             // vê o que é só do dono (ex.: trocar o QR de emergência).
             '[&_[data-write]]:hidden' => $context->isCaregiver() && ! $context->canWriteAsCaregiver(),
@@ -759,259 +822,22 @@
 </div>
 
 {{-- ============================================================
-     Barra inferior (celular e tablet)
+     Menu lateral (celular e tablet): desliza da esquerda, no lugar da barra inferior.
      ============================================================ --}}
-@if ($dentroDoPerfil || $areaConsultor || $areaAdmin)
-    {{-- Fundo da gaveta, FORA do contêiner da barra de propósito: o contêiner usa transform (para a barra não sumir na rolagem), e um elemento fixed
-         dentro de um ancestral com transform passa a se posicionar por ele, não pela tela. Aqui ele cobre a tela inteira e tocar fora fecha a gaveta. --}}
-    <div
-        x-show="secao !== null"
-        x-transition.opacity
-        x-cloak
-        @click="secao = null"
-        class="fixed inset-0 z-30 bg-brand-950/30 backdrop-blur-sm lg:hidden"
-        aria-hidden="true"
-    ></div>
-@endif
-@if ($dentroDoPerfil)
-    {{-- transform-gpu/will-change-transform: em alguns Android (Chrome,
-         principalmente com o app instalado na tela inicial), um elemento
-         fixed com backdrop-blur some durante a rolagem rápida — o
-         navegador falha em recompor a camada em GPUs mais fracas. Forçar
-         a própria camada de composição evita isso; não muda nada visual
-         nos aparelhos que já funcionavam. --}}
-    <div data-barra="cliente" class="fixed inset-x-0 bottom-0 z-30 lg:hidden transform-gpu will-change-transform">
-        {{-- Gaveta da categoria tocada: as telas dela, no mesmo desenho de
-             sempre. Fecha tocando fora ou na aba de novo. --}}
-        <div
-            x-show="secao !== null"
-            x-transition:enter="transition ease-out duration-200"
-            x-transition:enter-start="translate-y-full"
-            x-transition:enter-end="translate-y-0"
-            x-transition:leave="transition ease-in duration-150"
-            x-transition:leave-start="translate-y-0"
-            x-transition:leave-end="translate-y-full"
-            x-cloak
-            @class(['relative rounded-t-3xl px-4 pt-3 pb-4 shadow-[0_-8px_32px_-8px_rgb(11_29_58_/_0.2)]', $corBarraModulo])
-        >
-            <div class="mx-auto mb-3 h-1 w-10 rounded-full bg-white/20"></div>
-            <div class="max-h-[60vh] overflow-y-auto">
-                @foreach ($abasInferiores as $aba)
-                    @unless ($aba['direta'])
-                        <div x-show="secao === '{{ $aba['chave'] }}'" x-cloak class="pb-1">
-                            <p @class(['px-1 pb-2 text-[10px] font-semibold tracking-wide uppercase', $aba['tint']])>{{ $aba['label'] }}</p>
-                            <div class="grid grid-cols-4 gap-1">
-                                @foreach ($aba['items'] as [$route, $label, $curto, $icone])
-                                    <a href="{{ route($route) }}" @class(['tab-item-chrome rounded-xl py-3', 'tab-item-chrome-active bg-white/10' => request()->routeIs($route)])>
-                                        <x-nav-icon :name="$icone" class="h-6 w-6" />
-                                        <span>{{ $curto }}</span>
-                                    </a>
-                                @endforeach
-                            </div>
-                        </div>
-                    @endunless
-                @endforeach
-
-                {{-- O profissional dentro do perfil de um cliente: todas as telas dele, em grupos, a um toque (era uma faixa de ícones sem nome no cabeçalho). --}}
-                @if ($user?->isLinkedProfessional())
-                    <div x-show="secao === 'profissional'" x-cloak data-gaveta-profissional class="pb-1">
-                        @foreach ($abasProfissional as $grupo)
-                            <div @class(['pt-3' => ! $loop->first])>
-                                <p class="px-1 pb-2 text-[10px] font-semibold tracking-wide text-white/40 uppercase">{{ $grupo['label'] }}</p>
-                                <div class="grid grid-cols-4 gap-1">
-                                    @foreach ($grupo['items'] as [$route, $label, $curto, $icone])
-                                        <a href="{{ route($route) }}" class="tab-item-chrome rounded-xl py-3">
-                                            <x-nav-icon :name="$icone" class="h-6 w-6" />
-                                            <span>{{ $curto }}</span>
-                                        </a>
-                                    @endforeach
-                                </div>
-                            </div>
-                        @endforeach
-                    </div>
-                @endif
-            </div>
-        </div>
-
-        {{-- Abas --}}
-        <nav @class(['relative flex border-t border-white/10', $corBarraModulo]) style="padding-bottom: env(safe-area-inset-bottom)">
-            @foreach ($abasInferiores as $aba)
-                @if ($aba['direta'])
-                    <a href="{{ route($aba['items'][0][0]) }}" @class(['tab-item-chrome', 'tab-item-chrome-active' => $aba['ativa']])>
-                        <x-nav-icon :name="$aba['icone']" class="h-6 w-6" />
-                        <span>{{ $aba['label'] }}</span>
-                    </a>
-                @else
-                    <button
-                        type="button"
-                        @click="secao = secao === '{{ $aba['chave'] }}' ? null : '{{ $aba['chave'] }}'"
-                        @class(['tab-item-chrome', 'tab-item-chrome-active' => $aba['ativa']])
-                        :class="secao === '{{ $aba['chave'] }}' ? 'text-white' : ''"
-                        :aria-expanded="secao === '{{ $aba['chave'] }}'"
-                    >
-                        <x-nav-icon :name="$aba['icone']" class="h-6 w-6" />
-                        <span>{{ $aba['label'] }}</span>
-                    </button>
-                @endif
-            @endforeach
-            @if ($user?->isLinkedProfessional())
-                <button
-                    type="button"
-                    @click="secao = secao === 'profissional' ? null : 'profissional'"
-                    class="tab-item-chrome"
-                    :class="secao === 'profissional' ? 'text-white' : ''"
-                    :aria-expanded="secao === 'profissional'"
-                    title="{{ $voltarAoPainel['nome'] ?? 'Minha área' }}"
-                >
-                    <x-nav-icon name="back" class="h-6 w-6" />
-                    <span>Carteira</span>
-                </button>
-            @endif
-            <a href="{{ route('my-account') }}" @class(['tab-item-chrome', 'tab-item-chrome-active' => $naMinhaConta])>
-                <x-nav-icon name="users" class="h-6 w-6" />
-                <span>Minha conta</span>
-            </a>
-        </nav>
-    </div>
-@elseif ($areaConsultor)
-    <div data-barra="profissional" class="fixed inset-x-0 bottom-0 z-30 lg:hidden transform-gpu will-change-transform">
-        {{-- Gaveta do grupo tocado --}}
-        <div
-            x-show="secao !== null"
-            x-transition:enter="transition ease-out duration-200"
-            x-transition:enter-start="translate-y-full"
-            x-transition:enter-end="translate-y-0"
-            x-transition:leave="transition ease-in duration-150"
-            x-transition:leave-start="translate-y-0"
-            x-transition:leave-end="translate-y-full"
-            x-cloak
-            class="relative rounded-t-3xl border-t border-brand-950/5 bg-white px-4 pt-3 pb-4 shadow-[0_-8px_32px_-8px_rgb(11_29_58_/_0.2)] dark:border-white/10 dark:bg-slate-900"
-        >
-            <div class="mx-auto mb-3 h-1 w-10 rounded-full bg-slate-200 dark:bg-white/20"></div>
-            <div class="max-h-[60vh] overflow-y-auto">
-            @foreach ($abasProfissional as $aba)
-                @unless ($aba['direta'])
-                    <div x-show="secao === '{{ $aba['chave'] }}'" x-cloak class="pb-1">
-                        <p class="px-1 pb-2 text-[10px] font-semibold tracking-wide text-slate-400 uppercase dark:text-slate-500">{{ $aba['label'] }}</p>
-                        <div class="grid grid-cols-4 gap-1">
-                            @foreach ($aba['items'] as [$route, $label, $curto, $icone])
-                                <a href="{{ route($route) }}" @class(['tab-item rounded-xl py-3', 'tab-item-active bg-slate-100 dark:bg-white/10' => request()->routeIs($route)])>
-                                    <x-nav-icon :name="$icone" class="h-6 w-6" />
-                                    <span>{{ $curto }}</span>
-                                </a>
-                            @endforeach
-                        </div>
-                    </div>
-                @endunless
-            @endforeach
-            </div>
-        </div>
-
-        {{-- Abas --}}
-        <nav
-            class="relative flex border-t border-brand-950/5 bg-white/95 backdrop-blur dark:border-white/10 dark:bg-slate-900/95"
-            style="padding-bottom: env(safe-area-inset-bottom)"
-        >
-            @foreach ($abasProfissional as $aba)
-                @if ($aba['direta'])
-                    <a href="{{ route($aba['items'][0][0]) }}" @class(['tab-item', 'tab-item-active' => $aba['ativa']])>
-                        <x-nav-icon :name="$aba['icone']" class="h-6 w-6" />
-                        <span>{{ $aba['label'] }}</span>
-                    </a>
-                @else
-                    <button
-                        type="button"
-                        @click="secao = secao === '{{ $aba['chave'] }}' ? null : '{{ $aba['chave'] }}'"
-                        @class(['tab-item', 'tab-item-active' => $aba['ativa']])
-                        :class="secao === '{{ $aba['chave'] }}' ? 'text-brand-700 dark:text-accent-400' : ''"
-                        :aria-expanded="secao === '{{ $aba['chave'] }}'"
-                    >
-                        <x-nav-icon :name="$aba['icone']" class="h-6 w-6" />
-                        <span>{{ $aba['label'] }}</span>
-                    </button>
-                @endif
-            @endforeach
-            <a href="{{ route('my-account') }}" @class(['tab-item', 'tab-item-active' => request()->routeIs('my-account')])>
-                <x-nav-icon name="users" class="h-6 w-6" />
-                <span>Minha conta</span>
-            </a>
-        </nav>
-    </div>
-@elseif ($areaAdmin)
-    <div data-barra="admin" class="fixed inset-x-0 bottom-0 z-30 lg:hidden transform-gpu will-change-transform">
-        {{-- Gaveta de Cadastros: mesmo desenho da barra do profissional. --}}
-        <div
-            x-show="secao !== null"
-            x-transition:enter="transition ease-out duration-200"
-            x-transition:enter-start="translate-y-full"
-            x-transition:enter-end="translate-y-0"
-            x-transition:leave="transition ease-in duration-150"
-            x-transition:leave-start="translate-y-0"
-            x-transition:leave-end="translate-y-full"
-            x-cloak
-            class="relative rounded-t-3xl border-t border-brand-950/5 bg-white px-4 pt-3 pb-4 shadow-[0_-8px_32px_-8px_rgb(11_29_58_/_0.2)] dark:border-white/10 dark:bg-slate-900"
-        >
-            <div class="mx-auto mb-3 h-1 w-10 rounded-full bg-slate-200 dark:bg-white/20"></div>
-            <div class="max-h-[60vh] overflow-y-auto">
-            <div x-show="secao === 'cadastros'" x-cloak class="pb-1">
-                <p class="px-1 pb-2 text-[10px] font-semibold tracking-wide text-slate-400 uppercase dark:text-slate-500">Cadastros</p>
-                <div class="grid grid-cols-3 gap-1">
-                    @foreach ($cadastrosAdmin as [$route, $label, $curto, $icone, $pendentes])
-                        <a href="{{ route($route) }}" @class(['tab-item relative rounded-xl py-3', 'tab-item-active bg-slate-100 dark:bg-white/10' => request()->routeIs($route)])>
-                            <x-nav-icon :name="$icone" class="h-6 w-6" />
-                            <span>{{ $curto }}</span>
-                            @if ($pendentes > 0)
-                                <span class="badge absolute top-1 right-3 bg-amber-50 text-amber-900 ring-1 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-300 dark:ring-amber-500/20">{{ $pendentes }}</span>
-                            @endif
-                        </a>
-                    @endforeach
-                </div>
-            </div>
-            </div>
-        </div>
-
-        <nav
-            data-barra-admin
-            class="relative flex border-t border-brand-950/5 bg-white/95 backdrop-blur dark:border-white/10 dark:bg-slate-900/95"
-            style="padding-bottom: env(safe-area-inset-bottom)"
-        >
-            <a href="{{ route('admin.users') }}" @class(['tab-item', 'tab-item-active' => request()->routeIs('admin.users')])>
-                <x-nav-icon name="admin" class="h-6 w-6" />
-                <span>Contas</span>
-            </a>
-            <a href="{{ route('admin.errors') }}" @class(['tab-item relative', 'tab-item-active' => request()->routeIs('admin.errors')])>
-                <x-nav-icon name="alert" class="h-6 w-6" />
-                <span>Erros</span>
-                @if ($errosAbertos > 0)
-                    <span class="absolute top-1.5 right-1/4 h-2 w-2 rounded-full bg-red-500" aria-label="Há erros abertos"></span>
-                @endif
-            </a>
-            <button
-                type="button"
-                @click="secao = secao === 'cadastros' ? null : 'cadastros'"
-                @class(['tab-item relative', 'tab-item-active' => $cadastrosAtivo])
-                :class="secao === 'cadastros' ? 'text-brand-700 dark:text-accent-400' : ''"
-                :aria-expanded="secao === 'cadastros'"
-            >
-                <x-nav-icon name="folder" class="h-6 w-6" />
-                <span>Cadastros</span>
-                @if ($cadastrosPendentes > 0)
-                    <span class="absolute top-1.5 right-1/4 h-2 w-2 rounded-full bg-amber-500" aria-label="Há sugestões pendentes"></span>
-                @endif
-            </button>
-            {{-- Volta pra área de trabalho: separado das telas da plataforma. --}}
-            @if ($voltarAoPainel)
-                <a href="{{ route($voltarAoPainel['rota']) }}" class="tab-item border-l border-brand-950/10 dark:border-white/10">
-                    <x-nav-icon name="back" class="h-6 w-6" />
-                    <span>{{ $voltarAoPainel['curto'] }}</span>
-                </a>
-            @endif
-            <a href="{{ route('my-account') }}" @class(['tab-item', 'tab-item-active' => request()->routeIs('my-account')])>
-                <x-nav-icon name="users" class="h-6 w-6" />
-                <span>Minha conta</span>
-            </a>
-        </nav>
-    </div>
+@if ($mostraAsideDesktop)
+    <x-menu-celular
+        :secoes="$gavetaSecoes"
+        :escuro="(bool) $dentroDoPerfil"
+        :cor-barra="$corBarraModulo"
+        :cor-ativo="$corAtivoEscuroDesktop"
+        :user="$user"
+        :perfil="$dentroDoPerfil ? $profile : null"
+        :voltar="$areaConsultor ? null : $voltarAoPainel"
+        :abas-profissional="$abasProfissional"
+        :com-area-profissional="$dentroDoPerfil && $user?->isLinkedProfessional()"
+        :consultor-no-perfil="$dentroDoPerfil && $context->isConsultant()"
+        :tema="$theme"
+    />
 @endif
 
 {{-- Atalho de lançamento: quem tem Finanças e está dentro de um perfil. Fora:

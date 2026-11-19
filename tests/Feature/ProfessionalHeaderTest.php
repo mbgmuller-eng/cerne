@@ -12,9 +12,8 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 /**
- * Cabeçalho compacto (celular) do profissional: a barra inferior já traz todas
- * as telas, então o cabeçalho não repete atalhos nem o Sair. A exceção é
- * DENTRO do perfil de um cliente, onde ele é o único caminho de volta.
+ * Cabeçalho compacto (celular) do profissional: o menu lateral já traz todas as telas, o tema e o Sair, então o cabeçalho não repete nada disso:
+ * fica com o botão do menu, a ajuda e o sino.
  */
 class ProfessionalHeaderTest extends TestCase
 {
@@ -67,7 +66,7 @@ class ProfessionalHeaderTest extends TestCase
             ->assertSee(route('logout'), false);
     }
 
-    public function test_dentro_do_perfil_do_cliente_o_consultor_tem_o_caminho_de_volta_na_aba_carteira_e_o_sair_no_cabecalho(): void
+    public function test_dentro_do_perfil_do_cliente_o_consultor_tem_o_caminho_de_volta_e_o_sair_no_menu_do_celular(): void
     {
         $cliente = User::factory()->create();
         $perfil = FinancialProfile::factory()->create(['owner_user_id' => $cliente->id]);
@@ -81,21 +80,28 @@ class ProfessionalHeaderTest extends TestCase
             ->actingAs($consultor)->get(route('dashboard'))->assertOk()->getContent();
         $cabecalho = $this->cabecalho($html);
 
-        // O caminho de volta à área do profissional é a aba "Carteira" da barra inferior (gaveta com todas as telas dele), não mais uma faixa de ícones no cabeçalho.
-        $gaveta = substr($html, (int) strpos($html, 'data-gaveta-profissional'));
-        self::assertStringContainsString('href="'.route('consultant.portfolio').'"', substr($gaveta, 0, (int) strpos($gaveta, '<nav')));
+        // O caminho de volta à área do profissional é a "Área do profissional" do menu lateral (com todas as telas dele), não uma faixa de ícones no cabeçalho.
+        $menu = substr($html, (int) strpos($html, '<aside data-menu-celular'));
+        $menu = substr($menu, 0, (int) strpos($menu, '</aside>'));
+        self::assertStringContainsString('href="'.route('consultant.portfolio').'"', $menu);
+        self::assertStringContainsString(route('logout'), $menu);
         self::assertStringNotContainsString('href="'.route('consultant.portfolio').'"', $cabecalho);
-        self::assertStringContainsString(route('logout'), $cabecalho);
+        self::assertStringNotContainsString(route('logout'), $cabecalho);
+        self::assertStringContainsString('data-abrir-menu', $cabecalho);
     }
 
-    public function test_cliente_comum_continua_com_o_sair_no_cabecalho(): void
+    public function test_cliente_comum_tem_o_sair_no_menu_do_celular_e_o_botao_do_menu_no_cabecalho(): void
     {
         $usuario = User::factory()->create();
         $perfil = FinancialProfile::factory()->create(['owner_user_id' => $usuario->id]);
         ProfileMember::factory()->create(['profile_id' => $perfil->id, 'user_id' => $usuario->id]);
 
-        $cabecalho = $this->cabecalho($this->actingAs($usuario)->get(route('dashboard'))->assertOk()->getContent());
+        $html = $this->actingAs($usuario)->get(route('dashboard'))->assertOk()->getContent();
+        $cabecalho = $this->cabecalho($html);
 
-        self::assertStringContainsString(route('logout'), $cabecalho);
+        self::assertStringContainsString('data-abrir-menu', $cabecalho);
+        self::assertStringNotContainsString(route('logout'), $cabecalho);
+        $menu = substr($html, (int) strpos($html, '<aside data-menu-celular'));
+        self::assertStringContainsString(route('logout'), substr($menu, 0, (int) strpos($menu, '</aside>')));
     }
 }

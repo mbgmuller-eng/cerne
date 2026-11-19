@@ -23,12 +23,13 @@ class AdminNavTest extends TestCase
         return substr($html, $inicio, strpos($html, '</aside>', $inicio) - $inicio);
     }
 
-    private function barraInferior(string $html): string
+    /** O menu lateral do celular (que desliza da esquerda). */
+    private function menuCelular(string $html): string
     {
-        $inicio = strpos($html, 'data-barra-admin');
-        self::assertNotFalse($inicio, 'A barra inferior do admin não apareceu.');
+        $inicio = strpos($html, '<aside data-menu-celular');
+        self::assertNotFalse($inicio, 'O menu do celular não apareceu.');
 
-        return substr($html, $inicio, strpos($html, '</nav>', $inicio) - $inicio);
+        return substr($html, $inicio, strpos($html, '</aside>', $inicio) - $inicio);
     }
 
     public function test_admin_consultor_ve_o_atalho_de_volta_em_destaque_e_a_plataforma_agrupada(): void
@@ -68,32 +69,29 @@ class AdminNavTest extends TestCase
         self::assertStringContainsString('Contas e perfis', $lateral);
     }
 
-    public function test_barra_inferior_do_admin_tem_aba_de_volta_e_minha_conta(): void
+    public function test_menu_do_celular_do_admin_tem_o_caminho_de_volta_e_minha_conta(): void
     {
         $admin = User::factory()->consultant()->create(['is_platform_admin' => true]);
 
-        $barra = $this->barraInferior($this->actingAs($admin)->get(route('admin.users'))->assertOk()->getContent());
+        $menu = $this->menuCelular($this->actingAs($admin)->get(route('admin.users'))->assertOk()->getContent());
 
         $posicao = 0;
-        foreach (['Contas', 'Cadastros', 'Consultoria', 'Minha conta'] as $texto) {
-            $achou = strpos($barra, $texto, $posicao);
-            self::assertNotFalse($achou, "A aba '{$texto}' não aparece (ou está fora de ordem) na barra do celular.");
+        foreach (['Voltar para', 'Painel do consultor', 'Plataforma', 'Contas e perfis', 'Cadastros', 'Minha conta'] as $texto) {
+            $achou = strpos($menu, $texto, $posicao);
+            self::assertNotFalse($achou, "'{$texto}' não aparece (ou está fora de ordem) no menu do celular.");
             $posicao = $achou;
         }
-        self::assertStringContainsString('href="'.route('consultant.portfolio').'"', $barra);
+        self::assertStringContainsString('href="'.route('consultant.portfolio').'"', $menu);
     }
 
-    public function test_gaveta_de_cadastros_no_celular_lista_as_tres_telas(): void
+    public function test_menu_do_celular_lista_os_cadastros(): void
     {
         $admin = User::factory()->create(['is_platform_admin' => true]);
 
-        $html = $this->actingAs($admin)->get(route('admin.users'))->assertOk()->getContent();
+        $menu = $this->menuCelular($this->actingAs($admin)->get(route('admin.users'))->assertOk()->getContent());
 
-        $inicio = strpos($html, "secao === 'cadastros'");
-        self::assertNotFalse($inicio, 'A gaveta de Cadastros não apareceu.');
-        $gaveta = substr($html, $inicio, 2500);
-        foreach (['admin.banks', 'admin.insurers', 'admin.exercises'] as $rota) {
-            self::assertStringContainsString('href="'.route($rota).'"', $gaveta);
+        foreach (['admin.banks', 'admin.insurers', 'admin.exercises', 'admin.errors', 'admin.access-log', 'admin.incidents'] as $rota) {
+            self::assertStringContainsString('href="'.route($rota).'"', $menu);
         }
     }
 
@@ -105,7 +103,8 @@ class AdminNavTest extends TestCase
 
         $lateral = $this->barraLateral($this->actingAs($admin)->get(route('admin.users'))->assertOk()->getContent());
 
-        $pos = strpos($lateral, 'Exercícios');
+        // O rótulo (não a dica title, que repete o nome): é o span que vem logo antes do selo.
+        $pos = strpos($lateral, '>Exercícios</span>');
         self::assertNotFalse($pos);
         // Duas sugestões pendentes de exercício viram o selo "2" ao lado do item.
         self::assertMatchesRegularExpression('/Exercícios<\/span>\s*<span class="badge[^>]*>2<\/span>/u', substr($lateral, $pos - 20, 600));

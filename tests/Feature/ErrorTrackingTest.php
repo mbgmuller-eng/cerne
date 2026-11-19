@@ -489,7 +489,9 @@ class ErrorTrackingTest extends TestCase
         $this->recorder()->record($this->falha());
         $this->actingAs($this->admin());
 
-        $this->get(route('admin.users'))->assertOk()->assertSee('Erros')->assertSee('Há erros abertos');
+        // O selo com o número de erros abertos aparece ao lado de "Erros", na barra lateral do desktop e no menu do celular (2 vezes).
+        $html = $this->get(route('admin.users'))->assertOk()->assertSee('Erros')->getContent();
+        self::assertSame(2, preg_match_all('/Erros<\/span>\s*<span class="badge[^>]*>1<\/span>/u', $html));
     }
 
     public function test_a_tela_mostra_os_totais_de_hoje(): void

@@ -442,3 +442,46 @@ document.addEventListener('alpine:init', () => {
         },
     });
 });
+
+/*
+ * Menu lateral recolhido (só no desktop): preferência deste navegador em localStorage ("cerne.menu"). O <head> já aplica a classe antes do
+ * primeiro desenho; aqui ela é reaplicada a cada navegação interna (o wire:navigate refaz a tag <html> e levaria a classe embora, como já
+ * acontecia com o tema) e o botão alterna e grava.
+ */
+(function () {
+    const root = document.documentElement;
+
+    function lido() {
+        try {
+            return window.localStorage.getItem('cerne.menu') === 'recolhido';
+        } catch (e) {
+            return false;
+        }
+    }
+
+    function aplicar(recolhido) {
+        root.classList.toggle('menu-recolhido', recolhido);
+        document.querySelectorAll('[data-alternar-menu]').forEach((botao) => {
+            botao.setAttribute('aria-expanded', recolhido ? 'false' : 'true');
+        });
+    }
+
+    aplicar(lido());
+    document.addEventListener('DOMContentLoaded', () => aplicar(lido()));
+    document.addEventListener('livewire:navigated', () => aplicar(lido()));
+
+    document.addEventListener('click', (evento) => {
+        if (!evento.target.closest('[data-alternar-menu]')) {
+            return;
+        }
+
+        const recolhido = !root.classList.contains('menu-recolhido');
+        aplicar(recolhido);
+
+        try {
+            window.localStorage.setItem('cerne.menu', recolhido ? 'recolhido' : 'aberto');
+        } catch (e) {
+            // Sem armazenamento (janela privada): o menu recolhe nesta página e volta ao normal na próxima, sem erro.
+        }
+    });
+})();

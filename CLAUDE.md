@@ -468,15 +468,23 @@ Continuação da seção acima. Testes: `RateLimitingTest`, `PasswordResetTest`,
 - **Conta do formulário vem do navegador**: `DebtService::ownAccountId` confere que o `bank_account_id` é do perfil ativo (o escopo global faz o `findOrFail` dar 404 para conta alheia). Id de relação vindo de formulário sempre passa por `findOrFail` sob escopo.
 - **Operação** (`DEPLOY.md`): o endereço do servidor não fica no repositório; o backup usa `~/.my.cnf`, é cifrado (`openssl`) e inclui `storage/app/private`; `.env` de produção leva `SESSION_ENCRYPT=true`, `LOG_*` e `CERNE_TWO_FACTOR_REQUIRED`. `APP_KEY` e a frase do backup ficam no cofre, fora do servidor e fora de pasta sincronizada.
 
-### Navegação no celular (barra inferior)
+### Navegação no celular (menu lateral)
 
-Três barras, no layout (`components/layouts/app.blade.php`, `data-barra`): `cliente` (dentro de um perfil), `profissional` (consultor e corretor na área deles) e `admin`. Regras:
+Não há barra inferior: o celular tem um **menu lateral que desliza da esquerda** (componente `x-menu-celular`, chamado no fim de `components/layouts/app.blade.php`), aberto pelo botão de três linhas do cabeçalho (`data-abrir-menu`). Vale para as três áreas (cliente dentro do perfil, consultor e administrador), e é o mesmo layout da barra lateral do desktop: **as mesmas listas** (`$navSections`, `$secoesProfissional`, `$gavetaSecoes`), então item novo aparece nos dois. Testes: `MobileMenuTest`, `ProfessionalMobileNavTest`, `ProfessionalHeaderTest`, `AdminNavTest`, `ProfessionalNavTest`. Regras:
 
-- **Todo profissional sem cliente aberto tem a barra dele em qualquer tela do app** (`$areaConsultor` não depende mais da lista de rotas): Pessoas e acessos, Minha conta e Assinatura incluídas.
-- **Dentro do perfil de um cliente, o profissional tem a aba "Carteira"** (5ª aba, antes de Minha conta), que abre uma gaveta (`data-gaveta-profissional`) com TODAS as telas dele em grupos (Consultoria, Seguros, Gestão, Plataforma). Não volte a pôr atalhos de ícone no cabeçalho: era uma faixa de 192 px que rolava e escondia 6 de 10 telas.
-- **O fundo da gaveta é um só, fora do contêiner da barra**: o contêiner usa `transform-gpu` (a barra não pode sumir na rolagem do Android) e um `fixed` dentro de um ancestral com `transform` se posiciona por ele, não pela tela. Gaveta nova rola em `max-h-[60vh]`.
-- **Nada passa da largura da tela no celular.** Um elemento mais largo que a tela (linha com nome + valor + dois botões sem quebrar, faixa de abas com rótulo longo) alarga a PÁGINA INTEIRA no Chrome do Android: a barra `fixed` sai do lugar ("tenho que rolar para o menu aparecer"), a tela fica deslocável para o lado e as gavetas aparecem cortadas. Linha de lista com vários blocos empilha (`flex-col ... sm:flex-row`, `min-w-0` + `truncate` no texto) e faixa de abas longa rola por dentro (`overflow-x-auto`), nunca o documento. Tabela larga vai dentro de `overflow-x-auto`. Para conferir uma tela: no celular emulado, `document.documentElement.scrollWidth` tem de ser igual a `innerWidth`.
-- `ProfessionalMobileNavTest` trava tudo isto.
+- **O estado é `menu`, no `x-data` do `<body>`**. Fecha tocando no fundo escuro, no X, com Esc, arrastando para a esquerda, ao escolher uma tela e se a janela virar larga (lg). Aberto, a página por baixo não rola (`overflow-hidden` no `<html>`). O fundo escuro fica FORA da gaveta, de propósito: assim cobre a tela toda e um toque nele fecha. Não existe abrir arrastando da borda: no Android o gesto da borda é o "voltar" do sistema.
+- **O menu leva o que a barra inferior e o cabeçalho espalhavam**: grupos de telas, Minha conta, o tema e o Sair. Onde há menu lateral, o cabeçalho do celular fica só com o botão do menu, a marca, a ajuda e o sino (um cabeçalho com tema e Sair só existe quando NÃO há menu: sem perfil). Dentro do perfil o menu leva a cor do módulo (como a barra lateral do desktop); nas áreas do profissional e do admin é claro/escuro.
+- **Profissional dentro do perfil de um cliente**: "Área do profissional", recolhida, com todas as telas dele em grupos (`data-menu-area-profissional`), e o atalho "Voltar para o painel" no alto. Na própria área do profissional esse atalho não aparece (seria um link para a mesma tela). O corretor só vê o que é dele.
+- **O botão "+" (`x-quick-add`) mora no canto de baixo** (`bottom-[calc(1.25rem+env(safe-area-inset-bottom))]`) e some com o menu aberto (`x-show="! menu"`). `main` mantém `pb-24` só para o botão não cobrir o fim da página.
+- **Nada passa da largura da tela no celular.** Um elemento mais largo que a tela (linha com nome + valor + dois botões sem quebrar, faixa de abas com rótulo longo) alarga a PÁGINA INTEIRA no Chrome do Android e a deixa deslocável para o lado. Linha de lista com vários blocos empilha (`flex-col ... sm:flex-row`, `min-w-0` + `truncate` no texto) e faixa de abas longa rola por dentro (`overflow-x-auto`), nunca o documento. Tabela larga vai dentro de `overflow-x-auto`. Para conferir uma tela: no celular emulado, `document.documentElement.scrollWidth` tem de ser igual a `innerWidth`.
+
+### Menu lateral (desktop)
+
+As três barras (cliente dentro do perfil, área do consultor e do administrador) ficam em `components/layouts/app.blade.php` e valem as mesmas regras (`SidebarMenuTest`):
+
+- **Recolhível**: o botão `data-alternar-menu` (hambúrguer, no topo) troca a barra de 256 px por uma trilha de 72 px só com ícones. A preferência é do NAVEGADOR (`localStorage` `cerne.menu`), não da conta. A classe `menu-recolhido` mora na tag `<html>`; o `<head>` a aplica ANTES do primeiro desenho (senão a barra piscava larga e encolhia) e `resources/js/app.js` a reaplica a cada `livewire:navigated` (o `wire:navigate` refaz a tag `<html>` e levaria a classe embora, como já acontecia com o tema). O estilo é CSS puro no fim de `resources/css/app.css`, FORA de `@layer`, de propósito, para vencer o `w-64` da barra.
+- **Item novo no menu**: o rótulo vai em `<span class="lateral-texto">` (é o que some quando recolhido) e o link leva `title="Nome"` (a dica de quem só vê o ícone). Título de seção leva `lateral-titulo` (vira uma linha fina que separa os grupos); bloco só de texto (aviso, nome e e-mail) leva `lateral-texto`; o seletor de tema leva `lateral-tema`. Mudou CSS: `npm run build` (assets versionados).
+- **Finanças tem o que se olha todo dia no alto e os cadastros juntos no fim**, sob o subtítulo "Cadastros e regras" (`'cadastrosDe'` em `$navSections`): Contas & Cartões, Regras de categorização e Regra de orçamento. O índice é calculado DEPOIS de inserir Acompanhamento e Acesso da família (que empurram o resto para baixo).
 
 ### Tutoriais das telas (botão "?" e cartão de primeira visita)
 
@@ -590,6 +598,13 @@ Reuniões, tarefas, demandas e notas (`Engagement*`). Regras que não se quebram
 - **Tarefa de uma pessoa do casal**: o dono continua `client`/`consultant` (`owner`), e num casal a tarefa do cliente pode ser de UMA pessoa (`engagement_tasks.assignee_member_id`, vazio = os dois). O seletor mostra "Os dois", cada pessoa e "Consultor" (sozinho, só "Cliente" e "Consultor"). Quem lê o nome usa `EngagementTask::responsibleLabel()`, nunca `owner->label()`. Aviso de tarefa nova e lembrete de prazo vão só a quem recebeu (sem login, ao cliente todo); quem criou a própria tarefa não é avisado.
 - **Reunião recorrente**: `scheduleSeries` cria N reuniões comuns ligadas por `series_id` (permite cancelar "esta e as próximas"). **Agenda**: `.ics` por reunião e por prazo de tarefa (`EngagementCalendarController`).
 - Quem decide se o cliente recebe o plano em PDF é o **consultor**, ao encerrar o vínculo (`ConsultantLinkService::end`, `plan_delivery`).
+
+### Fluxo de caixa: filtros
+
+O recorte do mês filtra por necessidade, categoria, **subcategoria** e membro (`CashFlowIndex`; tudo na URL). Regras (`CashFlowSubcategoryFilterTest`):
+
+- **A subcategoria filtra pelo NOME, em qualquer categoria**: "Delivery" existe em Alimentação e em Lazer, e a soma de quem pergunta "quanto gastei com delivery?" junta as duas. Com uma categoria escolhida, a lista do filtro traz só as subcategorias dela, e trocar a categoria solta a subcategoria que não existe na nova (uma que existe nas duas continua).
+- **O total do mês acompanha o recorte**: o cartão "Despesas" e a sobra saem das despesas JÁ filtradas, então escolher uma subcategoria mostra quanto ela somou no mês. A subconsulta da subcategoria passa pelo escopo do perfil como o resto (despesa de outro perfil nunca entra).
 
 ### Importação em CSV (extrato bancário e fatura de cartão)
 
