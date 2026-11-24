@@ -418,7 +418,7 @@ final class FormConsequence
      * @param  array<string, int>  $contagens  despesa, estorno, receita, contaFixa, receitaRecorrente, parcela, fatura, transferencia
      * @return list<string>
      */
-    public static function importReview(array $contagens, bool $fatura, ?string $origem, bool $mexeNoSaldo, bool $oculta): array
+    public static function importReview(array $contagens, bool $fatura, ?string $origem, bool $mexeNoSaldo, bool $oculta, array $regras = []): array
     {
         $partes = [];
 
@@ -459,6 +459,32 @@ final class FormConsequence
 
         if ($oculta) {
             $linhas[] = 'O que for criado fica oculto do seu cônjuge, porque '.($fatura ? 'o cartão' : 'a conta').' não é visível a ele.';
+        }
+
+        return [...$linhas, ...self::importRules($regras)];
+    }
+
+    /**
+     * As regras de categorização que nascem junto com a importação ("Criar regra também") e a conta fixa a que cada uma fica ligada. A ligação vale
+     * para as próximas importações com o mesmo texto; a linha de agora dá baixa no vencimento mais próximo quando há um em aberto.
+     *
+     * @param  list<array{padrao: string, contaFixa: ?string, vencimento: ?string}>  $regras
+     * @return list<string>
+     */
+    public static function importRules(array $regras): array
+    {
+        $linhas = [];
+
+        foreach (array_slice($regras, 0, 5) as $r) {
+            $linhas[] = match (true) {
+                $r['contaFixa'] !== null && $r['vencimento'] !== null => 'Regra "'.$r['padrao'].'": será criada (ou atualizada) e ligada à conta fixa "'.$r['contaFixa'].'". Esta linha dá baixa no vencimento de '.$r['vencimento'].', e as próximas importações com esse texto também.',
+                $r['contaFixa'] !== null => 'Regra "'.$r['padrao'].'": será criada (ou atualizada) e ligada à conta fixa "'.$r['contaFixa'].'". Esta linha não tem vencimento em aberto por perto: só as próximas importações com esse texto dão baixa.',
+                default => 'Regra "'.$r['padrao'].'": será criada (ou atualizada) com a categoria escolhida, e as próximas importações com esse texto já vêm categorizadas.',
+            };
+        }
+
+        if (count($regras) > 5) {
+            $linhas[] = 'E mais '.(count($regras) - 5).' regra(s) criadas do mesmo jeito.';
         }
 
         return $linhas;

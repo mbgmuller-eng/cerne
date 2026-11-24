@@ -164,7 +164,7 @@ class CategorizationRulesIndex extends Component
             ? ExpenseSubcategory::query()->findOrFail($this->expenseSubcategoryId)
             : null;
         $contaFixa = $this->expenseFixedBillId !== ''
-            ? FixedBill::query()->findOrFail($this->expenseFixedBillId)
+            ? FixedBill::query()->whereNull('debt_id')->findOrFail($this->expenseFixedBillId)
             : null;
 
         $payload = [

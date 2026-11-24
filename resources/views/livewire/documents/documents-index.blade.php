@@ -484,6 +484,18 @@
                                                         <input type="checkbox" wire:model="regraValorExatoPorItem.{{ $i }}" class="rounded border-slate-300 dark:border-slate-600 text-brand-700 dark:text-brand-400 focus:ring-brand-500">
                                                         só quando o valor for exatamente {{ Money::format($item['valor'] ?? 0) }}
                                                     </label>
+                                                    @if ($revisando->document_type === \App\Enums\DocumentType::BankStatement && ! $ehReceita && $contasFixas->isNotEmpty())
+                                                        <label class="inline-flex items-center gap-1.5 text-slate-500 dark:text-slate-400">
+                                                            Ligar à conta fixa
+                                                            <select wire:model.live="regraContaFixaPorItem.{{ $i }}" class="input w-44 py-1 text-xs" data-regra-conta-fixa>
+                                                                <option value="">Nenhuma, só categoriza</option>
+                                                                @foreach ($contasFixas as $contaFixa)
+                                                                    <option value="{{ $contaFixa->id }}">{{ $contaFixa->name }}</option>
+                                                                @endforeach
+                                                            </select>
+                                                        </label>
+                                                        <span class="basis-full text-xs text-slate-400">Dá baixa neste lançamento no vencimento mais próximo da conta e, nas próximas importações com esse texto, nos seguintes.</span>
+                                                    @endif
                                                 @endif
 
                                                 <span class="text-slate-300 dark:text-slate-600">·</span>

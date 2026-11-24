@@ -14,6 +14,8 @@ use App\Models\ExpenseCategorizationRule;
 use App\Models\ExpenseCategory;
 use App\Models\ExpenseRecord;
 use App\Models\ExpenseSubcategory;
+use App\Models\FixedBill;
+use App\Models\FixedBillPayment;
 use App\Models\IncomeCategorizationRule;
 use App\Models\IncomeCategory;
 use App\Models\IncomeRecord;
@@ -154,6 +156,21 @@ class DocumentsIndex extends Component
 
     /** Trava a regra pelo valor exato do próprio item (ver ExpenseCategorizationRule::$amount) — caso comum: PIX recorrente de valor fixo pra si mesmo. */
     public array $regraValorExatoPorItem = [];
+
+    /**
+     * Conta fixa a ligar à regra que nasce do item (só extrato, só despesa): id da conta, vazio = a regra só categoriza. Escolher uma conta também
+     * dá baixa NESTA linha no vencimento mais próximo dela (a regra, sozinha, só valeria nas próximas importações).
+     *
+     * @var array<int, string>
+     */
+    public array $regraContaFixaPorItem = [];
+
+    /**
+     * O que a linha tinha antes de a escolha da conta fixa mexer nela (baixa de uma regra que já existia): voltar atrás devolve isso.
+     *
+     * @var array<int, array{pagamento: ?string, nota: ?string}>
+     */
+    public array $baixaAnteriorPorItem = [];
 
     /** Índice do item com o "confirma?" de exclusão aberto — nulo = nenhum. */
     public ?int $confirmandoExclusaoItem = null;
@@ -341,6 +358,8 @@ class DocumentsIndex extends Component
         $this->criarRegraPorItem = [];
         $this->regraPatternPorItem = [];
         $this->regraValorExatoPorItem = [];
+        $this->regraContaFixaPorItem = [];
+        $this->baixaAnteriorPorItem = [];
         $this->contaPorItem = [];
         $this->dicasPorItem = [];
         $this->grupoCategoria = [];
@@ -584,7 +603,7 @@ class DocumentsIndex extends Component
             'revisandoId', 'aceitos', 'categoriaPorItem', 'subcategoriaPorItem', 'novaSubcategoriaPorItem',
             'necessidadePorItem', 'estornoPorItem', 'regraAplicadaPorItem', 'fixedBillPaymentPorItem',
             'recurringIncomeOccurrencePorItem', 'parcelaDividaPorItem', 'parcelaDividaOpcoesPorItem', 'notaPorItem', 'duplicataPorItem',
-            'criarRegraPorItem', 'regraPatternPorItem', 'regraValorExatoPorItem',
+            'criarRegraPorItem', 'regraPatternPorItem', 'regraValorExatoPorItem', 'regraContaFixaPorItem', 'baixaAnteriorPorItem',
             'contaPorItem', 'dicasPorItem', 'grupoCategoria', 'grupoNecessidade',
             'confirmandoExclusaoItem',
         );
@@ -599,7 +618,13 @@ class DocumentsIndex extends Component
     public function updated(string $name): void
     {
         if (str_starts_with($name, 'criarRegraPorItem.')) {
-            $this->prefillRegraPattern((int) substr($name, strlen('criarRegraPorItem.')));
+            $i = (int) substr($name, strlen('criarRegraPorItem.'));
+            $this->prefillRegraPattern($i);
+
+            // Sem regra, não há a que ligar a conta fixa: a baixa que veio desta escolha sai junto.
+            if (($this->criarRegraPorItem[$i] ?? false) !== true) {
+                $this->limparContaFixaDaRegra($i);
+            }
 
             return;
         }
@@ -610,6 +635,7 @@ class DocumentsIndex extends Component
             if ($this->estornoPorItem[$i] ?? false) {
                 unset($this->necessidadePorItem[$i], $this->categoriaPorItem[$i], $this->subcategoriaPorItem[$i], $this->novaSubcategoriaPorItem[$i]);
                 $this->criarRegraPorItem[$i] = false;
+                $this->limparContaFixaDaRegra($i);
             }
 
             return;
@@ -635,6 +661,102 @@ class DocumentsIndex extends Component
 
         $this->categoriaPorItem[$i] = '';
         $this->subcategoriaPorItem[$i] = '';
+    }
+
+    /**
+     * Escolheu (ou tirou) a conta fixa da regra que nasce deste item. Escolher dá baixa nesta linha no vencimento mais próximo da conta, como faria uma
+     * regra que já estivesse ligada a ela (CategorizationRuleMatcher::closestFixedBillPayment): a linha vem sugerida e a pessoa confirma ao importar.
+     * Só vale em extrato e em despesa; o id vem do navegador e é conferido (conta ativa do perfil, que não seja de dívida: essa quem baixa é a parcela).
+     */
+    public function updatedRegraContaFixaPorItem(mixed $valor, string $chave): void
+    {
+        $i = (int) $chave;
+        $this->desfazerBaixaEscolhida($i);
+
+        $id = is_string($valor) ? trim($valor) : '';
+        $item = ($this->revisando?->extractedItems() ?? [])[$i] ?? null;
+        $extrato = $this->revisando?->document_type === DocumentType::BankStatement;
+
+        if ($id === '' || $item === null || ! $extrato || ($item['tipo'] ?? null) === 'receita' || ($this->estornoPorItem[$i] ?? false)) {
+            $this->regraContaFixaPorItem[$i] = '';
+
+            return;
+        }
+
+        $conta = FixedBill::query()->active()->whereNull('debt_id')->find($id);
+
+        if ($conta === null) {
+            $this->regraContaFixaPorItem[$i] = '';
+
+            return;
+        }
+
+        // Guarda o que a linha tinha (uma baixa de regra que já existia, uma nota): trocar ou tirar a conta devolve isso.
+        $this->baixaAnteriorPorItem[$i] = ['pagamento' => $this->fixedBillPaymentPorItem[$i] ?? null, 'nota' => $this->notaPorItem[$i] ?? null];
+
+        $data = $this->parseItemDate($item['data'] ?? null);
+        $pagamento = $data !== null ? app(CategorizationRuleMatcher::class)->closestFixedBillPayment($conta->id, $data) : null;
+
+        if ($pagamento === null) {
+            $this->notaPorItem[$i] = "A conta fixa \"{$conta->name}\" não tem vencimento perto desta data: a regra a liga e as próximas importações dão baixa.";
+
+            return;
+        }
+
+        if (! $pagamento->status->isOutstanding()) {
+            $this->notaPorItem[$i] = "O vencimento mais próximo de \"{$conta->name}\" já está pago ({$pagamento->due_date->format('d/m')}): esta linha entra como despesa e a regra vale nas próximas importações.";
+
+            return;
+        }
+
+        $this->fixedBillPaymentPorItem[$i] = $pagamento->id;
+        $this->notaPorItem[$i] = "Vai dar baixa na conta fixa \"{$conta->name}\", venc. {$pagamento->due_date->format('d/m')}.";
+
+        // Escolher a conta fixa é escolher o destino da linha: os outros destinos sugeridos saem.
+        $this->parcelaDividaPorItem[$i] = '';
+        $this->faturaPorItem[$i] = '';
+        $this->transferenciaPorItem[$i] = false;
+    }
+
+    /** A linha volta ao que era antes da escolha (a baixa de uma regra que já existia, se havia). */
+    private function desfazerBaixaEscolhida(int $i): void
+    {
+        if (! array_key_exists($i, $this->baixaAnteriorPorItem)) {
+            return;
+        }
+
+        $antes = $this->baixaAnteriorPorItem[$i];
+        unset($this->baixaAnteriorPorItem[$i]);
+
+        if ($antes['pagamento'] !== null) {
+            $this->fixedBillPaymentPorItem[$i] = $antes['pagamento'];
+        } else {
+            unset($this->fixedBillPaymentPorItem[$i]);
+        }
+
+        if ($antes['nota'] !== null) {
+            $this->notaPorItem[$i] = $antes['nota'];
+        } else {
+            unset($this->notaPorItem[$i]);
+        }
+    }
+
+    /** A conta fixa escolhida para a regra do item, conferida de novo na hora de gravar (ativa, do perfil, que não seja de dívida). */
+    private function contaFixaDaRegra(int $i): ?string
+    {
+        $id = (string) ($this->regraContaFixaPorItem[$i] ?? '');
+
+        if ($id === '' || $this->revisando?->document_type !== DocumentType::BankStatement) {
+            return null;
+        }
+
+        return FixedBill::query()->active()->whereNull('debt_id')->whereKey($id)->value('id');
+    }
+
+    private function limparContaFixaDaRegra(int $i): void
+    {
+        $this->regraContaFixaPorItem[$i] = '';
+        $this->desfazerBaixaEscolhida($i);
     }
 
     /** Padrão sugerido = a própria descrição do item, editável — só na primeira vez que a pessoa marca "criar regra" pra esse item. */
@@ -1131,16 +1253,22 @@ class DocumentsIndex extends Component
                     ],
                 );
             } else {
-                ExpenseCategorizationRule::query()->updateOrCreate(
-                    ['pattern' => $pattern],
-                    [
-                        'amount' => $valorExato,
-                        'category_id' => $this->categoriaPorItem[$i] ?? null,
-                        'subcategory_id' => ($this->subcategoriaPorItem[$i] ?? '') !== '' ? $this->subcategoriaPorItem[$i] : null,
-                        'necessity' => $this->necessidadePorItem[$i] ?? null,
-                        'is_active' => true,
-                    ],
-                );
+                $atributos = [
+                    'amount' => $valorExato,
+                    'category_id' => $this->categoriaPorItem[$i] ?? null,
+                    'subcategory_id' => ($this->subcategoriaPorItem[$i] ?? '') !== '' ? $this->subcategoriaPorItem[$i] : null,
+                    'necessity' => $this->necessidadePorItem[$i] ?? null,
+                    'is_active' => true,
+                ];
+
+                // Só liga quando a pessoa escolheu uma conta: regra que já estava ligada não perde a ligação por uma reimportação sem escolha.
+                $contaFixaId = $this->contaFixaDaRegra($i);
+
+                if ($contaFixaId !== null) {
+                    $atributos['fixed_bill_id'] = $contaFixaId;
+                }
+
+                ExpenseCategorizationRule::query()->updateOrCreate(['pattern' => $pattern], $atributos);
             }
 
             $criadas++;
@@ -1304,6 +1432,7 @@ class DocumentsIndex extends Component
         $itens = $documento->extractedItems();
         $fatura = $documento->document_type === DocumentType::CreditCardInvoice;
         $c = array_fill_keys(['despesa', 'estorno', 'receita', 'contaFixa', 'receitaRecorrente', 'parcela', 'fatura', 'transferencia'], 0);
+        $regras = [];
 
         foreach ($this->aceitos as $i) {
             $item = $itens[$i] ?? null;
@@ -1313,6 +1442,20 @@ class DocumentsIndex extends Component
             }
 
             $estorno = ($this->estornoPorItem[$i] ?? false) === true;
+
+            // A regra que nasce junto (a mesma condição de criarRegrasMarcadas): padrão preenchido e linha que não é estorno.
+            if (! $estorno && ($this->criarRegraPorItem[$i] ?? false) === true && trim($this->regraPatternPorItem[$i] ?? '') !== '') {
+                $contaFixaId = $this->contaFixaDaRegra($i);
+                $vencimento = $contaFixaId !== null && ($this->fixedBillPaymentPorItem[$i] ?? '') !== ''
+                    ? FixedBillPayment::query()->whereKey($this->fixedBillPaymentPorItem[$i])->first()?->due_date?->format('d/m')
+                    : null;
+
+                $regras[] = [
+                    'padrao' => trim($this->regraPatternPorItem[$i]),
+                    'contaFixa' => $contaFixaId !== null ? FixedBill::query()->whereKey($contaFixaId)->value('name') : null,
+                    'vencimento' => $vencimento,
+                ];
+            }
 
             if ($fatura) {
                 $c[$estorno ? 'estorno' : 'despesa']++;
@@ -1342,6 +1485,7 @@ class DocumentsIndex extends Component
             $origem,
             (bool) $documento->applies_to_balance,
             DocumentCommitService::hiddenFromPartner($documento->member_id, $fatura ? null : $conta, $fatura ? $cartao : null),
+            $regras,
         );
     }
 
@@ -1355,6 +1499,10 @@ class DocumentsIndex extends Component
             'iaConfigurada' => filled(config('cerne.ai.api_key')),
             'bankAccounts' => BankAccount::query()->active()->orderBy('bank_name')->get(),
             'creditCards' => CreditCard::query()->active()->orderBy('card_name')->get(),
+            // Contas fixas que uma regra pode ligar: as de dívida ficam de fora (quem baixa essas é a parcela).
+            'contasFixas' => $this->revisando?->document_type === DocumentType::BankStatement
+                ? FixedBill::query()->active()->whereNull('debt_id')->orderBy('name')->get(['id', 'name'])
+                : collect(),
             'expenseCategories' => ExpenseCategory::query()->available()->get(),
             'expenseSubcategories' => ExpenseSubcategory::query()->available()->get(),
             'incomeCategories' => IncomeCategory::query()->available()->get(),
