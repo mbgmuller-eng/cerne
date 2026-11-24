@@ -291,6 +291,25 @@ final class FormConsequence
     }
 
     /**
+     * A conta fixa que a dívida ganha em Contas fixas (ver DebtFixedBillSync): vinculada à que já existe ou criada, e até quando. Sem parcela em
+     * aberto (tudo já pago) não há o que listar.
+     *
+     * @return list<string>
+     */
+    public static function debtFixedBill(?string $nomeExistente, ?CarbonImmutable $primeiraEmAberto, ?CarbonImmutable $ultima): array
+    {
+        if ($primeiraEmAberto === null || $ultima === null || $ultima->lt($primeiraEmAberto)) {
+            return [];
+        }
+
+        if ($nomeExistente !== null) {
+            return ['Contas fixas: a conta "'.$nomeExistente.'", que já existe, será vinculada a esta dívida. O valor e o vencimento passam a seguir as parcelas, e pagar por lá paga a parcela.'];
+        }
+
+        return ['Contas fixas: esta dívida aparece lá sozinha, vencendo todo dia '.$primeiraEmAberto->day.', até a última parcela ('.$ultima->format('m/Y').'). Pagar por lá paga a parcela, e a conta sai da lista quando a dívida acabar.'];
+    }
+
+    /**
      * Consórcio: as parcelas que nascem, o que as já pagas e as puladas fazem, o destino de cada parcela paga (investimento, não dívida)
      * e quando o Cerne avisa do primeiro reajuste (a mesma data que fica em `next_adjustment_on`).
      *

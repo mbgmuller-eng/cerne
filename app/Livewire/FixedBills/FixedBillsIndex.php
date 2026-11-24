@@ -260,7 +260,14 @@ class FixedBillsIndex extends Component
             return;
         }
 
-        $service->pay($pagamento, $valor ? Money::parse($valor) : null, null, auth()->id());
+        try {
+            $service->pay($pagamento, $valor ? Money::parse($valor) : null, null, auth()->id());
+        } catch (\InvalidArgumentException $e) {
+            // Conta de dívida: a parcela pode já ter sido paga ou removida na dívida.
+            session()->flash('status', $e->getMessage());
+
+            return;
+        }
 
         unset($this->valorPago[$paymentId]);
         session()->flash('status', 'Pagamento registrado.');
@@ -331,6 +338,13 @@ class FixedBillsIndex extends Component
     public function editBill(string $id): void
     {
         $conta = FixedBill::query()->findOrFail($id);
+
+        // O valor, o vencimento, a categoria e a conta de uma conta de dívida seguem as parcelas: editar aqui seria desfeito na próxima atualização.
+        if ($conta->isFromDebt()) {
+            session()->flash('status', 'Esta conta vem de uma dívida: edite as parcelas na própria dívida.');
+
+            return;
+        }
 
         $this->editingBillId = $conta->id;
         $this->billName = $conta->name;
@@ -443,7 +457,15 @@ class FixedBillsIndex extends Component
         ];
 
         if ($this->editingBillId !== null) {
-            $service->update(FixedBill::query()->findOrFail($this->editingBillId), $dados);
+            $editada = FixedBill::query()->findOrFail($this->editingBillId);
+
+            if ($editada->isFromDebt()) {
+                $this->addError('billName', 'Esta conta vem de uma dívida: edite as parcelas na própria dívida.');
+
+                return;
+            }
+
+            $service->update($editada, $dados);
             session()->flash('status', 'Conta fixa atualizada.');
         } else {
             $service->create($dados);

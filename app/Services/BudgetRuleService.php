@@ -382,7 +382,7 @@ class BudgetRuleService
         $total = '0.00';
         $contas = 0;
 
-        foreach (FixedBill::query()->where('is_active', true)->where('necessity', Necessity::Investment->value)->whereIn('category_id', $ids)->get() as $conta) {
+        foreach (FixedBill::query()->where('is_active', true)->whereNull('debt_id')->where('necessity', Necessity::Investment->value)->whereIn('category_id', $ids)->get() as $conta) {
             $vezes = count($conta->occurrencesInMonth($ano, $mes));
 
             if ($vezes > 0) {

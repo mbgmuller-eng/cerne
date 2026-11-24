@@ -42,7 +42,7 @@ class FixedBillReconciliationService
      */
     public function suggestions(int $year, int $month): array
     {
-        $pagamentos = FixedBillPayment::query()->forPeriod($year, $month)->outstanding()->with('fixedBill')->get();
+        $pagamentos = FixedBillPayment::query()->forPeriod($year, $month)->outstanding()->whereNull('debt_installment_id')->with('fixedBill')->get();
 
         if ($pagamentos->isEmpty()) {
             return [];

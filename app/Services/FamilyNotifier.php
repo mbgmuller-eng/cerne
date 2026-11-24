@@ -90,7 +90,7 @@ class FamilyNotifier
         $desde = $hoje->subDays(30)->toDateString();
         $enviados = 0;
 
-        FixedBillPayment::withoutProfileScope()->where('status', FixedBillPaymentStatus::Overdue)
+        FixedBillPayment::withoutProfileScope()->whereNull('debt_installment_id')->where('status', FixedBillPaymentStatus::Overdue)
             ->whereDate('due_date', '<', $hoje->toDateString())->whereDate('due_date', '>=', $desde)
             ->with(['fixedBill' => fn ($q) => $q->withoutGlobalScope(ProfileScope::class)->withoutGlobalScope(MemberPrivacyScope::class)])
             ->chunkById(200, function ($atrasados) use (&$enviados): void {

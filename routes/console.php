@@ -42,7 +42,12 @@ Schedule::call(function (): void {
 // tem conta vencendo em breve.
 Schedule::call(function (): void {
     $service = app(FixedBillService::class);
+
+    // Antes de gerar o mês: as dívidas ganham (ou perdem) a conta fixa delas, para o vencimento já nascer no lugar certo.
+    $dividas = app(\App\Services\DebtFixedBillSync::class)->syncAll();
+
     $resultado = $service->runDailyMaintenance();
+    $resultado['dividas'] = $dividas;
     $resultado['notificados'] = $service->notifyUpcomingDueDates();
 
     logger()->info('Contas fixas', $resultado);

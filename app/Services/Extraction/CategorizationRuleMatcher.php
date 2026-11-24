@@ -103,7 +103,8 @@ class CategorizationRuleMatcher
     /** A mais próxima na janela curta (qualquer situação); sem ela, a mais próxima EM ABERTO na janela larga (pagamento adiantado ou com atraso). */
     private function closestFixedBillPayment(string $contaFixaId, CarbonImmutable $data): ?FixedBillPayment
     {
-        $janela = FixedBillPayment::query()->where('fixed_bill_id', $contaFixaId)
+        // Vencimento que espelha parcela de dívida não baixa por regra: quem baixa é a parcela (DebtInstallmentMatcher).
+        $janela = FixedBillPayment::query()->whereNull('debt_installment_id')->where('fixed_bill_id', $contaFixaId)
             ->whereBetween('due_date', [$data->subDays(self::FIXED_BILL_DAYS_AFTER_DUE)->toDateString(), $data->addDays(self::FIXED_BILL_DAYS_BEFORE_DUE)->toDateString()])
             ->get()
             ->sortBy(fn (FixedBillPayment $o) => abs($o->due_date->diffInDays($data)))

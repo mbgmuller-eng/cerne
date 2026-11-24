@@ -157,12 +157,21 @@ class DebtService
                 $this->reclassifyLinkedExpenses($divida);
             }
 
+            $this->syncFixedBill($divida);
+
             return $divida->refresh();
         });
     }
 
     public function delete(Debt $divida): void
     {
+        // A conta fixa da dívida deixa de gerar vencimento antes de a dívida sair (a ligação se desfaz pelo nullOnDelete).
+        try {
+            app(DebtFixedBillSync::class)->release($divida);
+        } catch (\Throwable $e) {
+            report($e);
+        }
+
         // As despesas já lançadas ficam (é dinheiro que saiu): só perdem a ligação com a parcela, pelo nullOnDelete.
         $divida->delete();
     }
@@ -259,6 +268,14 @@ class DebtService
     {
         $parcela->loadMissing('debt');
         $parcela->update(['status' => DebtInstallmentStatus::Open, 'paid_on' => null, 'paid_amount' => null, 'expense_id' => null]);
+
+        // O vencimento da conta fixa que espelhava este pagamento volta a ficar em aberto.
+        try {
+            app(DebtFixedBillSync::class)->reopen($parcela);
+        } catch (\Throwable $e) {
+            report($e);
+        }
+
         $this->refreshStatus($parcela->debt);
 
         return $parcela->refresh();
@@ -295,6 +312,7 @@ class DebtService
         }
 
         $parcela->update($campos);
+        $this->syncFixedBill($parcela->debt()->firstOrFail());
 
         return $parcela->refresh();
     }
@@ -444,6 +462,7 @@ class DebtService
             ]);
 
             $this->scaleLinkedGoal($divida, $fator);
+            $this->syncFixedBill($divida);
 
             return DebtAdjustment::create([
                 'debt_id' => $divida->id, 'member_id' => $divida->member_id, 'is_private' => $divida->is_private,
@@ -882,6 +901,8 @@ class DebtService
                 'bank_account_id' => $this->ownAccountId($d['bank_account_id'] ?? null),
             ]);
 
+            $this->syncFixedBill($divida);
+
             return $divida->refresh();
         });
     }
@@ -922,6 +943,7 @@ class DebtService
         $this->requireUnscheduled($divida);
 
         $divida->update(['status' => DebtStatus::PaidOff, 'current_balance' => '0.00', 'balance_updated_on' => now()]);
+        $this->syncFixedBill($divida);
 
         return $divida->refresh();
     }
@@ -1088,6 +1110,21 @@ class DebtService
     {
         $abertas = DebtInstallment::query()->where('debt_id', $divida->id)->where('status', DebtInstallmentStatus::Open)->exists();
         $divida->update(['status' => $abertas ? DebtStatus::Active : DebtStatus::PaidOff]);
+
+        $this->syncFixedBill($divida);
+    }
+
+    /**
+     * A conta fixa espelho da dívida (ver DebtFixedBillSync): nasce no cadastro, acompanha as mudanças e se encerra quando a dívida acaba. Uma falha
+     * aqui nunca derruba a operação da dívida: a rotina diária refaz a conta.
+     */
+    private function syncFixedBill(Debt $divida): void
+    {
+        try {
+            app(DebtFixedBillSync::class)->sync($divida);
+        } catch (\Throwable $e) {
+            report($e);
+        }
     }
 
     /**

@@ -300,6 +300,7 @@
                                 @if ($conta->recurrence !== RecurrenceType::Monthly) · {{ $conta->recurrence->label() }} @endif
                                 @if ($conta->is_variable) · valor variável @endif
                                 @if ($conta->creditCard) · no cartão {{ $conta->creditCard->displayName() }} @endif
+                                @if ($conta->isFromDebt()) · <a href="{{ route('debts.show', $conta->debt_id) }}" class="text-brand-800 hover:underline dark:text-brand-300" data-conta-de-divida>parcela da dívida</a> @endif
                             </p>
                         </div>
 
@@ -326,15 +327,18 @@
                                         @enderror
                                     </div>
                                 @else
-                                    <span class="text-sm tabular-nums text-slate-800 dark:text-slate-200">{{ Money::format($conta->amount) }}</span>
+                                    <span class="text-sm tabular-nums text-slate-800 dark:text-slate-200">{{ Money::format($pagamento->effectiveAmount()) }}</span>
                                 @endif
 
                                 <button wire:click="pay('{{ $pagamento->id }}')" class="btn-primary px-3 py-1.5">
                                     Pagar
                                 </button>
-                                <button wire:click="skip('{{ $pagamento->id }}')" class="text-sm text-slate-400 hover:text-slate-700 dark:hover:text-slate-300">
-                                    Pular
-                                </button>
+                                {{-- Parcela de dívida não se pula aqui: ela continuaria em aberto na dívida. Consórcio tem "pulada" na própria dívida. --}}
+                                @unless ($conta->isFromDebt())
+                                    <button wire:click="skip('{{ $pagamento->id }}')" class="text-sm text-slate-400 hover:text-slate-700 dark:hover:text-slate-300">
+                                        Pular
+                                    </button>
+                                @endunless
                             @else
                                 <span class="text-sm tabular-nums text-slate-800 dark:text-slate-200">{{ Money::format($pagamento->effectiveAmount()) }}</span>
                                 @if ($pagamento->paid_at)
@@ -352,8 +356,13 @@
                                         <x-nav-icon name="dots" class="h-4 w-4" />
                                     </button>
                                     <div x-show="open" x-transition x-cloak @click="open = false" class="absolute right-0 z-10 mt-1 w-32 overflow-hidden rounded-xl bg-white py-1 shadow-card ring-1 ring-brand-950/5 dark:bg-slate-800 dark:ring-white/10">
-                                        <button wire:click="editBill('{{ $conta->id }}')" type="button" class="block w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-700">Editar</button>
-                                        <button wire:click="confirmDeleteBill('{{ $conta->id }}')" type="button" class="block w-full px-3 py-2 text-left text-sm text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-500/10">Excluir</button>
+                                        @if ($conta->isFromDebt())
+                                            <a href="{{ route('debts.show', $conta->debt_id) }}" class="block w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-700">Ver dívida</a>
+                                            <button wire:click="confirmDeleteBill('{{ $conta->id }}')" type="button" class="block w-full px-3 py-2 text-left text-sm text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-500/10">Tirar da lista</button>
+                                        @else
+                                            <button wire:click="editBill('{{ $conta->id }}')" type="button" class="block w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-700">Editar</button>
+                                            <button wire:click="confirmDeleteBill('{{ $conta->id }}')" type="button" class="block w-full px-3 py-2 text-left text-sm text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-500/10">Excluir</button>
+                                        @endif
                                     </div>
                                 </div>
                             @endif

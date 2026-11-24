@@ -44,7 +44,7 @@
         ['upload', 'Importe e confira', 'Envie o extrato ou a fatura em PDF ou CSV. A inteligência artificial lê e sugere cada lançamento, e nada é gravado sem a sua revisão, linha por linha.'],
         ['bills', 'Contas fixas que não se perdem', 'Os vencimentos aparecem sozinhos, com aviso antes de vencer, baixa em um toque e conciliação com o extrato. A conta que está no cartão entra direto na fatura certa.'],
         ['users', 'Casal, com privacidade de verdade', 'Cada lançamento pode ser marcado como privado e some para o cônjuge, valendo igual para os dois. O que é conjunto aparece para ambos.'],
-        ['debt', 'Dívidas e consórcio', 'Parcelas ligadas às despesas, simulador de antecipação e de acordo, reajuste e contemplação do consórcio e o relatório para o Imposto de Renda.'],
+        ['debt', 'Dívidas e consórcio', 'Parcelas ligadas às despesas e entrando sozinhas em Contas fixas, simulador de antecipação e de acordo, reajuste e contemplação do consórcio e o relatório para o Imposto de Renda.'],
         ['invest', 'Investimentos completos', 'Preço médio, proventos, desdobramentos, desempenho, Imposto de Renda e moedas como BTC, ETH e USDT com cotação diária.'],
         ['target', 'Objetivos que se acompanham', 'Previsão a partir do quanto você guarda por mês, histórico de aportes e aviso quando o seu ritmo ficar abaixo do planejado.'],
         ['mic', 'Fale a despesa', 'Diga "gastei 45 reais de Uber" e o Cerne preenche o lançamento. Você confere e salva.'],

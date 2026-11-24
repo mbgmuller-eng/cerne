@@ -19,7 +19,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 #[Fillable([
     'profile_id', 'member_id', 'name', 'amount', 'due_day', 'recurrence', 'due_weekday',
     'due_month', 'bank_account_id', 'credit_card_id', 'necessity', 'category_id', 'subcategory_id',
-    'is_variable', 'is_active', 'notes', 'is_private',
+    'is_variable', 'is_active', 'notes', 'is_private', 'debt_id', 'auto_ended_at',
 ])]
 class FixedBill extends Model
 {
@@ -37,7 +37,20 @@ class FixedBill extends Model
             'is_variable' => 'boolean',
             'is_active' => 'boolean',
             'is_private' => 'boolean',
+            'auto_ended_at' => 'datetime',
         ];
+    }
+
+    /** A dívida que gera esta conta (nula nas contas cadastradas à mão). */
+    public function debt(): BelongsTo
+    {
+        return $this->belongsTo(Debt::class, 'debt_id');
+    }
+
+    /** Conta que espelha as parcelas de uma dívida: o valor, o vencimento e o pagamento seguem a parcela. */
+    public function isFromDebt(): bool
+    {
+        return $this->debt_id !== null;
     }
 
     public function creditCard(): BelongsTo

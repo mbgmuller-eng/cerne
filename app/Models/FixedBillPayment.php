@@ -20,8 +20,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * originou, e as telas sempre chegam aqui a partir dela.
  */
 #[Fillable([
-    'profile_id', 'fixed_bill_id', 'year', 'month', 'due_date',
-    'amount_paid', 'status', 'paid_at', 'expense_id', 'notes',
+    'profile_id', 'fixed_bill_id', 'debt_installment_id', 'year', 'month', 'due_date',
+    'amount_paid', 'expected_amount', 'status', 'paid_at', 'expense_id', 'notes',
 ])]
 class FixedBillPayment extends Model
 {
@@ -34,6 +34,7 @@ class FixedBillPayment extends Model
             'month' => 'integer',
             'due_date' => 'date',
             'amount_paid' => 'decimal:2',
+            'expected_amount' => 'decimal:2',
             'paid_at' => 'date',
             'status' => FixedBillPaymentStatus::class,
         ];
@@ -78,13 +79,19 @@ class FixedBillPayment extends Model
             ->whereDate('due_date', '<=', now()->addDays($dias)->toDateString());
     }
 
+    /** A parcela da dívida que este vencimento espelha (só nas contas fixas que nasceram de uma dívida). */
+    public function installment(): BelongsTo
+    {
+        return $this->belongsTo(DebtInstallment::class, 'debt_installment_id');
+    }
+
     /**
-     * Valor a considerar: o pago, se houver; senão o previsto na conta.
+     * Valor a considerar: o pago, se houver; senão o previsto deste vencimento (a parcela da dívida, que muda de mês a mês); senão o da conta.
      * Conta variável sem pagamento é só estimativa.
      */
     public function effectiveAmount(): string
     {
-        return $this->amount_paid ?? $this->fixedBill->amount;
+        return $this->amount_paid ?? $this->expected_amount ?? $this->fixedBill->amount;
     }
 
     public function isPaid(): bool

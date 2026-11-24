@@ -473,7 +473,7 @@ class CategorizationRulesIndex extends Component
             'expenseCategories' => $this->expenseFormCategories,
             'expenseSubcategories' => $this->expenseSubcategories,
             'incomeCategories' => IncomeCategory::query()->available()->get(),
-            'fixedBills' => FixedBill::query()->active()->orderBy('name')->get(),
+            'fixedBills' => FixedBill::query()->active()->whereNull('debt_id')->orderBy('name')->get(),
             'recurringIncomes' => RecurringIncome::query()->active()->orderBy('name')->get(),
             'expenseRuleConsequence' => $this->ruleConsequence('despesa'),
             'incomeRuleConsequence' => $this->ruleConsequence('receita'),

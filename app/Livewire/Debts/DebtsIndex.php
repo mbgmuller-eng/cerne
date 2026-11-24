@@ -363,17 +363,19 @@ class DebtsIndex extends Component
         $prazo = (int) $this->term;
         $jaPagas = max(0, (int) $this->paidBefore);
 
+        $contaFixa = $this->kind === 'debt' || $primeira === null ? [] : $this->fixedBillConsequence($primeira, $prazo, $jaPagas);
+
         return match ($this->kind) {
             'debt' => FormConsequence::openDebt($this->currentBalance !== '' ? $this->currentBalance : null, $this->parsedDate($this->balanceDate) ?? CarbonImmutable::today()),
-            'consortium' => $primeira === null ? [] : FormConsequence::consortium(
+            'consortium' => $primeira === null ? [] : [...FormConsequence::consortium(
                 $prazo,
                 $primeira,
                 $jaPagas,
                 count(preg_split('/[,;\s]+/', $this->skippedInstallments, -1, PREG_SPLIT_NO_EMPTY) ?: []),
                 $this->installmentAmount !== '' ? $this->installmentAmount : null,
                 $this->adjustmentIndex !== '' ? (int) $this->adjustmentFirstAfter : null,
-            ),
-            default => $primeira === null ? [] : FormConsequence::debtSchedule(
+            ), ...$contaFixa],
+            default => $primeira === null ? [] : [...FormConsequence::debtSchedule(
                 DebtAmortization::tryFrom($this->amortization) ?? DebtAmortization::Fixed,
                 $prazo,
                 $primeira,
@@ -383,8 +385,28 @@ class DebtsIndex extends Component
                 str_replace(',', '.', trim($this->rate)) !== '' ? str_replace(',', '.', trim($this->rate)) : null,
                 DebtRateBasis::tryFrom($this->rateBasis),
                 $this->monthlyFees !== '' ? $this->monthlyFees : '0',
-            ),
+            ), ...$contaFixa],
         };
+    }
+
+    /** Em Contas fixas: vincula a que já existe (mesmo teste da gravação) ou avisa que nasce uma, até a última parcela. */
+    private function fixedBillConsequence(CarbonImmutable $primeira, int $prazo, int $jaPagas): array
+    {
+        if ($prazo < 1 || $prazo > 480 || $jaPagas >= $prazo) {
+            return [];
+        }
+
+        $primeiraEmAberto = $primeira->addMonthsNoOverflow($jaPagas);
+        $ultima = $primeira->addMonthsNoOverflow($prazo - 1);
+        $existente = trim($this->name) === '' ? null : app(\App\Services\DebtFixedBillSync::class)->findCandidate(
+            app(\App\Support\ProfileContext::class)->profileId(),
+            trim($this->name),
+            trim($this->creditor) !== '' ? trim($this->creditor) : null,
+            $this->kind !== 'debt' && $this->installmentAmount !== '' ? Money::parse($this->installmentAmount) : null,
+            $primeiraEmAberto->day,
+        );
+
+        return FormConsequence::debtFixedBill($existente?->name, $primeiraEmAberto, $ultima);
     }
 
     private function parsedDate(string $texto): ?CarbonImmutable

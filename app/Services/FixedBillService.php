@@ -2,7 +2,9 @@
 
 namespace App\Services;
 
+use App\Enums\DebtInstallmentStatus;
 use App\Enums\FixedBillPaymentStatus;
+use App\Models\DebtInstallment;
 use App\Enums\Necessity;
 use App\Models\BankAccount;
 use App\Models\CreditCard;
@@ -127,6 +129,11 @@ class FixedBillService
      */
     private function generateOccurrencesFor(FixedBill $conta, int $year, int $month): int
     {
+        // Conta que nasceu de uma dívida: um vencimento por parcela em aberto do mês (a data e o valor são os da parcela, não os de uma recorrência).
+        if ($conta->isFromDebt()) {
+            return app(DebtFixedBillSync::class)->generateMonth($conta, $year, $month);
+        }
+
         $criados = 0;
 
         foreach ($conta->occurrencesInMonth($year, $month) as $vencimento) {
@@ -191,6 +198,11 @@ class FixedBillService
     ): FixedBillPayment {
         $bill = $payment->fixedBill;
 
+        // Conta de dívida: quem paga é a parcela (a despesa nasce lá, uma vez só); este vencimento só acompanha.
+        if ($bill->isFromDebt()) {
+            return $this->payDebtInstallment($payment, $amount, $paidAt, $userId);
+        }
+
         if ($bill->is_variable && $amount === null) {
             throw new \InvalidArgumentException(
                 'Conta de valor variável exige informar o valor pago.'
@@ -240,6 +252,30 @@ class FixedBillService
         });
     }
 
+    /**
+     * "Pagar" numa conta fixa que espelha uma dívida: paga a parcela (DebtService::pay: a despesa e o saldo da conta saem lá) e baixa o vencimento
+     * com a mesma despesa. Sem isto o mês seria pago duas vezes, uma pela conta fixa e outra pela dívida.
+     */
+    private function payDebtInstallment(FixedBillPayment $payment, ?string $amount, ?CarbonImmutable $paidAt, ?string $userId): FixedBillPayment
+    {
+        return DB::transaction(function () use ($payment, $amount, $paidAt, $userId): FixedBillPayment {
+            $parcela = $payment->debt_installment_id !== null
+                ? DebtInstallment::query()->lockForUpdate()->find($payment->debt_installment_id)
+                : null;
+
+            if ($parcela === null) {
+                throw new \InvalidArgumentException('A parcela desta conta fixa não existe mais. Abra a dívida para conferir.');
+            }
+
+            if ($parcela->status === DebtInstallmentStatus::Open) {
+                app(DebtService::class)->pay($parcela, $paidAt ?? CarbonImmutable::now(), $amount, null, $userId);
+                $parcela = $parcela->refresh();
+            }
+
+            return app(DebtFixedBillSync::class)->settle($payment->refresh(), $parcela);
+        });
+    }
+
     /** Pula o mês — conta que não veio, serviço cancelado no meio do ciclo. */
     public function skip(FixedBillPayment $payment, ?string $motivo = null): FixedBillPayment
     {
@@ -285,6 +321,8 @@ class FixedBillService
 
         FixedBillPayment::withoutProfileScope()
             ->where('status', FixedBillPaymentStatus::Pending)
+            // Parcela de dívida já tem o seu próprio aviso (DebtReminderService): sem isto a pessoa receberia dois por vencimento.
+            ->whereNull('debt_installment_id')
             ->whereDate('due_date', $alvo)
             ->with(['fixedBill' => fn ($q) => $q
                 ->withoutGlobalScope(ProfileScope::class)
