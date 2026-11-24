@@ -52,6 +52,27 @@ async function snap(page, visao, nome) {
     console.log('ok:', visao, nome);
 }
 
+// O formulário INTEIRO (a janela do cadastro, com o botão de salvar), mesmo o que a tela esconde atrás da rolagem da janela: o vídeo anima a janela
+// abrindo e rolando de verdade, de cima até o fim. Aumenta a altura da tela só para a captura, para a janela não precisar rolar por dentro.
+async function snapCard(page, visao, nome, vp) {
+    // Espera as requisições do Livewire acabarem (os campos atualizam o quadro "Ao salvar"): com uma no ar, o botão de salvar aparece apagado.
+    await page.waitForNetworkIdle({ idleTime: 800, timeout: 8000 }).catch(() => {});
+    await page.setViewport({ ...vp, height: 3200 });
+    await page.waitForNetworkIdle({ idleTime: 800, timeout: 8000 }).catch(() => {});
+    await wait(600);
+    await limpar(page);
+    await page.evaluate(() => document.activeElement && document.activeElement.blur());
+    const painel = await page.evaluateHandle(() => [...document.querySelectorAll('.fixed.inset-0 .card')].find((e) => e.getClientRects().length > 0) || null);
+    const el = painel.asElement();
+    if (!el) throw new Error('janela do formulário não encontrada');
+    const caixa = await el.boundingBox();
+    fs.mkdirSync(path.join(OUT, visao), { recursive: true });
+    await el.screenshot({ path: path.join(OUT, visao, `${nome}-card.jpg`), type: 'jpeg', quality: 92 });
+    await page.setViewport(vp);
+    console.log('ok:', visao, `${nome}-card`, Math.round(caixa.width), 'x', Math.round(caixa.height));
+    return { w: Math.round(caixa.width * 100) / 100, h: Math.round(caixa.height * 100) / 100 };
+}
+
 // Caixa (em px do CSS) de um botão pelo texto, para o destaque do vídeo.
 async function caixaDoBotao(page, texto) {
     return page.evaluate((t) => {
@@ -94,6 +115,63 @@ async function preencher(page, rotulo, valor) {
         await el.type(valor);
     }
     await wait(150);
+}
+
+// Escolhe a opção (pelo texto) do select ligado a um wire:model, em qualquer variação (.live, .blur...).
+async function selecionar(page, modelo, texto) {
+    const h = await page.evaluateHandle((m) => [...document.querySelectorAll('select')].find((e) => [...e.attributes].some((a) => a.name.startsWith('wire:model') && a.value === m)) || null, modelo);
+    const el = h.asElement();
+    if (!el) throw new Error(`select ${modelo} não encontrado`);
+    const v = await el.evaluate((e, t) => (([...e.options].find((o) => o.textContent.toLowerCase().includes(t.toLowerCase())) || {}).value), texto);
+    if (v === undefined) throw new Error(`opção "${texto}" não encontrada em ${modelo}`);
+    await el.select(v);
+    await page.waitForNetworkIdle({ idleTime: 600, timeout: 8000 }).catch(() => {});
+}
+
+// A revisão do extrato com a regra ligada a uma conta fixa: o primeiro item, a regra marcada, a conta escolhida e o quadro "Ao importar" (a janela inteira, tela alta).
+async function capturarRevisao(page, visao, vpTela) {
+    // No computador a revisão sai numa tela mais estreita (1100): no vídeo ela é encolhida para caber, e o texto fica maior.
+    const vp = visao === 'desktop' ? { ...vpTela, width: 1100, height: 900 } : vpTela;
+    await page.setViewport(vp);
+    await page.goto(`${BASE}/importar`, { waitUntil: 'networkidle0' });
+    await limpar(page);
+    await page.evaluate(() => {
+        const li = [...document.querySelectorAll('li')].find((e) => e.textContent.includes('extrato-outubro.pdf'));
+        [...(li ? li.querySelectorAll('button') : [])].find((b) => b.textContent.trim() === 'Revisar')?.click();
+    });
+    await page.waitForNetworkIdle({ idleTime: 800, timeout: 10000 }).catch(() => {});
+    await wait(800);
+    await selecionar(page, 'necessidadePorItem.0', 'Essencial');
+    await selecionar(page, 'categoriaPorItem.0', 'Habita');
+    const subs = await page.evaluate(() => {
+        const e = [...document.querySelectorAll('select')].find((x) => [...x.attributes].some((a) => a.name.startsWith('wire:model') && a.value === 'subcategoriaPorItem.0'));
+        return e ? [...e.options].map((o) => o.textContent.trim()).filter((t) => t && !/selecione/i.test(t)) : [];
+    });
+    if (subs.length) await selecionar(page, 'subcategoriaPorItem.0', subs.find((t) => /aluguel/i.test(t)) || subs[0]);
+    await page.evaluate(() => {
+        const c = [...document.querySelectorAll('input[type=checkbox]')].find((e) => [...e.attributes].some((a) => a.name.startsWith('wire:model') && a.value === 'criarRegraPorItem.0'));
+        c?.click();
+    });
+    await page.waitForNetworkIdle({ idleTime: 600, timeout: 8000 }).catch(() => {});
+    await selecionar(page, 'regraContaFixaPorItem.0', 'Aluguel');
+    await page.evaluate(() => document.activeElement && document.activeElement.blur());
+    await page.setViewport({ ...vp, height: 3200 });
+    await page.waitForNetworkIdle({ idleTime: 800, timeout: 8000 }).catch(() => {});
+    await wait(800);
+    await limpar(page);
+    const faixa = await page.evaluate(() => {
+        const topo = [...document.querySelectorAll('h1, h2, h3, p, div')].find((e) => /^Revisar Extrato banc/.test(e.textContent.trim()) && e.children.length < 4);
+        const fim = [...document.querySelectorAll('p, div, li')].filter((e) => /^Ao importar/.test(e.textContent.trim()) && e.textContent.length < 900).pop();
+        const b = fim ? fim.closest('[class*="rounded"]') || fim : null;
+        return { top: topo ? topo.getBoundingClientRect().top + window.scrollY - 24 : 0, bottom: b ? b.getBoundingClientRect().bottom + window.scrollY + 24 : 2000 };
+    });
+    // No computador, sem a barra lateral: o recorte fica só com a revisão, e o texto sai maior no vídeo.
+    const corte = visao === 'desktop' ? 268 : 0;
+    fs.mkdirSync(path.join(OUT, visao), { recursive: true });
+    await page.screenshot({ path: path.join(OUT, visao, 'revisao.jpg'), type: 'jpeg', quality: 92, clip: { x: corte, y: Math.max(0, faixa.top), width: vp.width - corte, height: Math.min(3100, faixa.bottom - faixa.top) } });
+    await page.setViewport(vpTela);
+    console.log('ok:', visao, 'revisao', Math.round(vp.width), 'x', Math.round(faixa.bottom - faixa.top));
+    return { w: vp.width - corte, h: Math.round(faixa.bottom - faixa.top) };
 }
 
 const PASSOS = [
@@ -145,7 +223,9 @@ const PASSOS = [
             await clicar(p, passo.botao);
             for (const [rotulo, valor] of passo.campos) await preencher(p, rotulo, valor);
             await snap(p, visao, `${passo.nome}-b`);
+            ((caixas[visao] ||= {}).cards ||= {})[passo.nome] = await snapCard(p, visao, passo.nome, vp);
         }
+        (caixas[visao] ||= {}).revisao = await capturarRevisao(p, visao, vp);
         for (const [url, nome] of [['/importar', 'importar'], ['/fluxo-de-caixa', 'fluxo'], ['/painel', 'painel']]) {
             await p.goto(`${BASE}${url}`, { waitUntil: 'networkidle0' });
             await snap(p, visao, nome);

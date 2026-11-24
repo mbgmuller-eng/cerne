@@ -617,6 +617,19 @@ class DocumentsIndex extends Component
      */
     public function updated(string $name): void
     {
+        // A lista inteira de uma vez (a primeira marcação, com a lista ainda vazia): cada item passa pelo mesmo caminho.
+        if ($name === 'criarRegraPorItem') {
+            foreach (array_keys($this->criarRegraPorItem) as $k) {
+                $this->prefillRegraPattern((int) $k);
+
+                if (($this->criarRegraPorItem[$k] ?? false) !== true) {
+                    $this->limparContaFixaDaRegra((int) $k);
+                }
+            }
+
+            return;
+        }
+
         if (str_starts_with($name, 'criarRegraPorItem.')) {
             $i = (int) substr($name, strlen('criarRegraPorItem.'));
             $this->prefillRegraPattern($i);
@@ -668,9 +681,23 @@ class DocumentsIndex extends Component
      * regra que já estivesse ligada a ela (CategorizationRuleMatcher::closestFixedBillPayment): a linha vem sugerida e a pessoa confirma ao importar.
      * Só vale em extrato e em despesa; o id vem do navegador e é conferido (conta ativa do perfil, que não seja de dívida: essa quem baixa é a parcela).
      */
-    public function updatedRegraContaFixaPorItem(mixed $valor, string $chave): void
+    public function updatedRegraContaFixaPorItem(mixed $valor, mixed $chave = null): void
     {
-        $i = (int) $chave;
+        // O navegador manda o campo de um item (valor, chave) ou, na primeira escolha de uma lista ainda vazia, a lista inteira (array, sem chave):
+        // os dois caminhos chegam ao mesmo lugar. Sem isto a primeira escolha dava erro 500 no navegador (o teste do Livewire manda só o campo).
+        if ($chave === null && is_array($valor)) {
+            foreach ($valor as $k => $v) {
+                $this->aplicarContaFixaDaRegra((int) $k, $v);
+            }
+
+            return;
+        }
+
+        $this->aplicarContaFixaDaRegra((int) $chave, $valor);
+    }
+
+    private function aplicarContaFixaDaRegra(int $i, mixed $valor): void
+    {
         $this->desfazerBaixaEscolhida($i);
 
         $id = is_string($valor) ? trim($valor) : '';

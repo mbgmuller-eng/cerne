@@ -188,6 +188,19 @@ class DocumentImportRuleFixedBillTest extends TestCase
         $this->assertSame('', $componente->get('regraContaFixaPorItem')[0]);
     }
 
+    public function test_a_primeira_escolha_pode_chegar_como_a_lista_inteira_e_nao_quebra(): void
+    {
+        // No navegador, com a lista ainda vazia, o Livewire manda o conjunto (array, sem chave) em vez do campo do item: dava erro 500 antes de tratar.
+        $componente = $this->preparar($this->extrato([$this->linhaDoAluguel()]));
+
+        $componente->set('regraContaFixaPorItem', [0 => $this->aluguel->id]);
+        $this->assertSame($this->vencimento->id, $componente->get('fixedBillPaymentPorItem')[0]);
+
+        $componente->set('criarRegraPorItem', [0 => false]);
+        $this->assertNull($componente->get('fixedBillPaymentPorItem')[0] ?? null);
+        $this->assertSame('', $componente->get('regraContaFixaPorItem')[0]);
+    }
+
     public function test_tirar_a_escolha_devolve_a_baixa_de_uma_regra_que_ja_existia(): void
     {
         $outra = FixedBill::factory()->for($this->perfil, 'profile')->create(['name' => 'Condomínio', 'amount' => '900.00', 'due_day' => 25, 'category_id' => $this->categoria->id]);
