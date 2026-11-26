@@ -33,7 +33,8 @@
                     Repetir o pedido de {{ $anterior->requested_on?->format('m/Y') ?? 'antes' }} ({{ $anterior->items->count() }} {{ $anterior->items->count() === 1 ? 'exame' : 'exames' }})
                 </button>
             @endif
-            <ul class="max-h-96 divide-y divide-slate-100 overflow-y-auto pr-1 dark:divide-white/10" data-lista-exames>
+            {{-- A folga dos lados (px-1) é necessária: a área com rolagem corta o que encosta na borda, e a caixa de marcação perdia o lado esquerdo. --}}
+            <ul class="max-h-96 divide-y divide-slate-100 overflow-y-auto px-1 dark:divide-white/10" data-lista-exames>
                 @foreach ($opcoes as $o)
                     @php $marcado = in_array(\App\Support\Health\ExamCatalog::normalize($o['name']), $marcados, true); @endphp
                     <li wire:key="opcao-{{ md5($o['name']) }}">
