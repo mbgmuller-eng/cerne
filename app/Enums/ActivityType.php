@@ -21,6 +21,7 @@ enum ActivityType: string
     case Cycling = 'cycling';
     case Pilates = 'pilates';
     case Dance = 'dance';
+    case Elliptical = 'elliptical';
     case Gym = 'gym';
     case Other = 'other';
 
@@ -39,6 +40,7 @@ enum ActivityType: string
             self::Cycling => 'Bicicleta',
             self::Pilates => 'Pilates',
             self::Dance => 'Dança',
+            self::Elliptical => 'Elíptico',
             self::Gym => 'Academia',
             self::Other => 'Outra',
         };
@@ -48,6 +50,12 @@ enum ActivityType: string
     public function isSport(): bool
     {
         return in_array($this, [self::Tennis, self::Padel, self::Football, self::Volleyball, self::Basketball, self::MartialArts], true);
+    }
+
+    /** Conta como atividade aeróbica no plano da semana. Nos esportes é uma aproximação, porque o jogo é intermitente. */
+    public function isAerobic(): bool
+    {
+        return $this->isSport() || in_array($this, [self::Walking, self::Running, self::Swimming, self::Cycling, self::Dance, self::Elliptical], true);
     }
 
     public function hasDistance(): bool

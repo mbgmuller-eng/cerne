@@ -15,7 +15,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  */
 #[Fillable([
     'profile_id', 'member_id', 'plan_id', 'workout_id', 'limitation_id', 'kind', 'exercise_id', 'replacement_exercise_id', 'snapshot',
-    'source_exercise_id', 'reverted_at',
+    'source_exercise_id', 'reverted_at', 'activity_plan_id',
 ])]
 class GymPlanAdjustment extends Model
 {
@@ -28,6 +28,9 @@ class GymPlanAdjustment extends Model
     public const ADDED = 'added';
 
     public const FEWER_SETS = 'fewer_sets';
+
+    /** Séries, repetições e descanso mudados pela atualização do programa (App\Services\Activities\ProgramUpdateService). */
+    public const REPS = 'reps';
 
     protected function casts(): array
     {

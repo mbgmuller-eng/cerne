@@ -25,6 +25,9 @@
     @foreach ($limitacoes as $l)
         <p class="sub">{{ $l->regionLabel() }}: {{ mb_strtolower($l->status->label()) }}.</p>
     @endforeach
+    @if ($cuidados->isNotEmpty())
+        <p class="sub">Problemas de saúde que pedem cuidado no exercício: {{ $cuidados->map(fn ($c) => $c->description.' ('.mb_strtolower($c->status->label()).')')->implode('; ') }}.</p>
+    @endif
 
     <h2>Minha semana habitual</h2>
     @foreach ($compromissos as $c)

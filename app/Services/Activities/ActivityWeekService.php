@@ -10,6 +10,7 @@ use App\Models\ActivityWeekMove;
 use App\Models\GymWorkout;
 use App\Models\RunningProgram;
 use App\Services\GymPlanService;
+use App\Support\Activities\PlanRules;
 use App\Support\Activities\RunningLadder;
 use Carbon\CarbonImmutable;
 use DomainException;
@@ -37,6 +38,7 @@ class ActivityWeekService
         private readonly ActivityService $activities,
         private readonly GymPlanService $plans,
         private readonly PlanReviewService $review,
+        private readonly WeekPlannerService $planner,
     ) {}
 
     public static function weekStart(CarbonImmutable $data): CarbonImmutable
@@ -79,7 +81,8 @@ class ActivityWeekService
             $itens = $itens
                 ->concat($this->plannedCommitments($compromissos, $inicio, $registros, $movidos))
                 ->concat($this->plannedGym($inicio, $hoje, $registros, $movidos, $treinos))
-                ->concat($this->plannedRunning($inicio, $registros, $movidos));
+                ->concat($this->plannedRunning($inicio, $registros, $movidos))
+                ->concat($this->plannedAerobic($inicio, $registros, $movidos));
         }
 
         $itens = $itens->sortBy([['weekday', 'asc'], ['order', 'asc'], ['name', 'asc']])->values();
@@ -302,6 +305,49 @@ class ActivityWeekService
                 'name' => $soCaminhada ? 'Caminhada' : 'Caminhada e trote', 'weekday' => $diaFinal,
                 'minutes' => RunningLadder::minutes($programa->step), 'effort' => self::RUN_EFFORT, 'movable' => true, 'running' => true,
                 'detail' => RunningLadder::describe($programa->step),
+            ]);
+        })->filter()->values();
+    }
+
+    /**
+     * O aeróbico do plano da semana, nos minutos do passo em que a progressão está.
+     *
+     * @param  Collection<int, ActivityRecord>  $registros
+     * @param  Collection<string, int>  $movidos
+     * @return Collection<int, array<string, mixed>>
+     */
+    private function plannedAerobic(CarbonImmutable $inicio, Collection $registros, Collection $movidos): Collection
+    {
+        $plano = $this->planner->active();
+
+        if ($plano === null || $inicio->lt(self::weekStart($plano->started_on->toImmutable()))) {
+            return collect();
+        }
+
+        $soltos = $registros->whereNull('planned_key')->where('status', ActivityRecordStatus::Done)->values();
+        $usados = [];
+
+        return collect($this->planner->sessionsFor($plano, $inicio))->map(function (array $s) use ($inicio, $plano, $registros, $movidos, $soltos, &$usados): ?array {
+            // A chave é pelo dia planejado (um aeróbico por dia): continua a mesma quando os minutos da semana mudam.
+            $chave = 'p:'.$plano->id.':'.$inicio->toDateString().':'.$s['weekday'];
+
+            if ($registros->contains('planned_key', $chave)) {
+                return null;
+            }
+
+            $dia = (int) $movidos->get($chave, $s['weekday']);
+            $cumprido = $soltos->first(fn (ActivityRecord $r) => ! isset($usados[$r->id]) && $r->activity === $s['type'] && $r->done_on->isSameDay($inicio->addDays($dia)));
+
+            if ($cumprido !== null) {
+                $usados[$cumprido->id] = true;
+
+                return null;
+            }
+
+            return $this->item([
+                'ref' => $chave, 'key' => $chave, 'type' => $s['type'], 'name' => $s['type']->label().($s['finisher'] ? ' no fim do treino' : ''),
+                'weekday' => $dia, 'minutes' => $s['minutes'], 'effort' => $plano->is_light ? PlanRules::LIGHT_EFFORT : PlanRules::AEROBIC_EFFORT,
+                'movable' => true, 'detail' => $plano->is_light ? 'Plano leve: em ritmo que deixe conversar.' : null,
             ]);
         })->filter()->values();
     }

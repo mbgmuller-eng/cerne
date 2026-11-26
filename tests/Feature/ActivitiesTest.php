@@ -49,11 +49,13 @@ use App\Services\Activities\ActivityService;
 use App\Services\Activities\ActivityWeekService;
 use App\Services\Activities\LimitationService;
 use App\Services\Activities\PlanReviewService;
+use App\Services\Activities\ReadinessService;
 use App\Services\Activities\RunningService;
 use App\Services\GymPlanService;
 use App\Services\GymWorkoutGenerator;
 use App\Services\HealthActivityService;
 use App\Services\HealthFollowupService;
+use App\Support\Activities\ReadinessQuestions;
 use App\Support\GymGeneratorInput;
 use App\Support\ProfileContext;
 use Carbon\CarbonImmutable;
@@ -630,6 +632,8 @@ class ActivitiesTest extends TestCase
 
     public function test_corrida_recomenda_aguardar_e_guarda_a_escolha_de_comecar_assim_mesmo(): void
     {
+        $this->prontidao();
+
         $this->limitacao();
         $servico = app(RunningService::class);
 
@@ -652,6 +656,8 @@ class ActivitiesTest extends TestCase
 
     public function test_a_semana_da_corrida_fecha_uma_vez_e_a_dor_maior_volta_um_passo(): void
     {
+        $this->prontidao();
+
         $servico = app(RunningService::class);
         $programa = $servico->start(2, 2, [1, 3], 1);
         $semanas = app(ActivityWeekService::class);
@@ -681,6 +687,8 @@ class ActivitiesTest extends TestCase
 
     public function test_a_tela_da_corrida_so_monta_com_a_escolha_marcada(): void
     {
+        $this->prontidao();
+
         $this->limitacao();
 
         Livewire::test(ActivityRunning::class)->assertSee('Recomendo aguardar')->assertDontSee('Montar programa')
@@ -689,6 +697,8 @@ class ActivitiesTest extends TestCase
 
     public function test_tirar_a_conta_leva_tudo_junto(): void
     {
+        $this->prontidao();
+
         $this->rotinaDaAna();
         $this->limitacao();
         app(PlanReviewService::class)->apply([]);
@@ -704,6 +714,12 @@ class ActivitiesTest extends TestCase
     }
 
     // --- Apoio ----------------------------------------------------------------------------------
+
+    /** As perguntas de prontidão em dia, sem nenhum "sim": é a condição para um programa progredir. */
+    private function prontidao(): void
+    {
+        app(ReadinessService::class)->save(array_fill_keys(array_keys(ReadinessQuestions::ALL), 'no'), null, null, null);
+    }
 
     private function consultorDaAna(): User
     {

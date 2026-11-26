@@ -112,15 +112,15 @@
                             <p class="text-sm font-semibold text-slate-900 dark:text-white">{{ $l->regionLabel() }}</p>
                             <span class="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-700 dark:bg-white/10 dark:text-slate-200">{{ $l->status->label() }}</span>
                         </div>
-                        <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Acompanhamento: {{ $l->followup?->title }}</p>
+                        <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">{{ $l->followup ? 'Acompanhamento: '.$l->followup->title : 'Na Ficha de Saúde' }}</p>
                         @if ($l->avoidLoads() !== []) <p class="text-sm text-slate-700 dark:text-slate-300">Evitar: {{ implode(', ', array_map(fn ($c) => mb_strtolower($c->label()), $l->avoidLoads())) }}.</p> @endif
-                        <a href="{{ route('health.followups.show', $l->followup_id) }}" wire:navigate class="mt-1 inline-block text-xs font-medium text-saude-800 underline dark:text-saude-200">Abrir no acompanhamento</a>
+                        <a href="{{ $l->followup_id ? route('health.followups.show', $l->followup_id) : route('health.card.index') }}" wire:navigate class="mt-1 inline-block text-xs font-medium text-saude-800 underline dark:text-saude-200">{{ $l->followup_id ? 'Abrir no acompanhamento' : 'Abrir na ficha' }}</a>
                     </div>
                 @empty
-                    <p class="text-sm text-slate-500 dark:text-slate-400">Nenhuma limitação salva. Ela é registrada dentro de um acompanhamento, na Saúde.</p>
+                    <p class="text-sm text-slate-500 dark:text-slate-400">Nenhuma limitação salva. Ela é registrada na Ficha de Saúde ou dentro de um acompanhamento.</p>
                 @endforelse
                 <div class="flex flex-wrap gap-2">
-                    <a href="{{ route('health.followups.index') }}" wire:navigate class="btn-secondary px-3 py-1.5 text-sm">Registrar uma limitação</a>
+                    <a href="{{ route('health.card.index') }}" wire:navigate class="btn-secondary px-3 py-1.5 text-sm">Registrar na ficha</a>
                     @if ($pendentes > 0)
                         <a href="{{ route('health.activities.review') }}" wire:navigate class="btn-primary px-3 py-1.5 text-sm">Revisar treino ({{ $pendentes }})</a>
                     @endif

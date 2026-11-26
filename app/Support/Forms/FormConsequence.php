@@ -5,6 +5,9 @@ namespace App\Support\Forms;
 use App\Enums\DebtAmortization;
 use App\Enums\DebtRateBasis;
 use App\Models\CreditCard;
+use App\Services\Activities\ActivityWeekService;
+use App\Support\Activities\PlanRules;
+use App\Support\Activities\ReadinessQuestions;
 use App\Support\Debts\DebtScheduleCalculator;
 use App\Support\Money;
 use Carbon\CarbonImmutable;
@@ -720,6 +723,74 @@ final class FormConsequence
             'Avança um passo só com a semana completa e sem aumento de dor.',
             $mesmoAssim ? 'O Cerne guarda que você escolheu começar mesmo com a recomendação de aguardar.' : null,
         ]));
+    }
+
+    /**
+     * @param  ?string  $liberacao  'yes', 'no' ou nulo; só vale quando há algum "sim"
+     * @return list<string>
+     */
+    public static function readiness(bool $algumSim, ?string $liberacao): array
+    {
+        return [
+            'Só você vê as respostas. Elas valem por '.ReadinessQuestions::VALID_MONTHS.' meses, ou até um problema de saúde que pede cuidado no exercício mudar.',
+            match (true) {
+                ! $algumSim => 'Sem nenhum "sim", o plano da semana e a corrida podem progredir.',
+                $liberacao === 'yes' => 'Com a liberação que você informou, o plano e a corrida podem progredir. O Cerne não confere a liberação.',
+                $liberacao === 'no' => 'Sem liberação médica, o plano fica leve e sem aumento, e o programa de corrida não começa nem avança.',
+                default => 'Como há um "sim", informe se você já tem liberação médica.',
+            },
+        ];
+    }
+
+    /**
+     * O que a atualização do programa vai fazer, com os números da proposta (App\Services\Activities\WeekPlannerService::proposal).
+     *
+     * @param  array<string, mixed>  $proposta
+     * @return list<string>
+     */
+    public static function weekPlan(array $proposta, int $treinosAjustados, int $pausas, bool $substitui): array
+    {
+        $dias = fn (array $d) => mb_strtolower(implode(', ', array_map(fn (int $i) => ActivityWeekService::DAYS[$i], $d)));
+        $primeira = $proposta['progression'][0]['minutes'];
+
+        return array_values(array_filter([
+            $proposta['layout']['strength'] !== [] ? 'Musculação em: '.$dias($proposta['layout']['strength']).'. Esses passam a ser os dias da academia no seu perfil.' : null,
+            $proposta['layout']['aerobic'] !== [] ? 'Dias de aeróbico: '.$dias($proposta['layout']['aerobic']).'.' : null,
+            'Primeira semana com '.$primeira.' minutos de aeróbico, contando o esporte ('.$proposta['baseline']['sport'].' min).',
+            $proposta['light'] ? 'Plano leve: os minutos não aumentam.' : 'Os minutos só aumentam depois de uma semana com ao menos '.PlanRules::ADHERENCE_PERCENT.'% do aeróbico feito.',
+            $treinosAjustados > 0 ? 'Séries, repetições e descanso mudam em '.$treinosAjustados.($treinosAjustados === 1 ? ' treino' : ' treinos').'. Os exercícios e o histórico ficam.' : 'Os exercícios, as séries e o histórico ficam como estão.',
+            $pausas > 0 ? $pausas.($pausas === 1 ? ' exercício fica pausado' : ' exercícios ficam pausados').' por causa das limitações.' : null,
+            $substitui ? 'Substitui o plano em vigor. O que já foi pausado continua pausado.' : null,
+            'Você pode desfazer depois.',
+        ]));
+    }
+
+    /** @return list<string> */
+    public static function healthCondition(bool $cuidado): array
+    {
+        return array_values(array_filter([
+            'Entra na Ficha de Saúde e é visto por quem vê a ficha. Enquanto não for "Resolvido", aparece no QR de emergência.',
+            $cuidado ? 'O Cerne pede para refazer as perguntas de prontidão antes de montar ou avançar um plano de atividades.' : null,
+        ]));
+    }
+
+    /** @return list<string> */
+    public static function measurement(bool $compartilhado, bool $noQr): array
+    {
+        return array_values(array_filter([
+            'A medida entra no histórico e atualiza o IMC. O Cerne não manda aviso sobre o peso.',
+            $compartilhado ? 'Quem vê a Ficha de Saúde vê esta medida, porque o compartilhamento está ligado.' : null,
+            $noQr ? 'O QR de emergência passa a mostrar a medida mais recente, com a data.' : null,
+        ]));
+    }
+
+    /** @return list<string> */
+    public static function weightGoal(): array
+    {
+        return [
+            'A meta aparece no gráfico e o Cerne mostra quanto falta. Só você vê.',
+            'Ele não promete prazo: o resultado depende também da alimentação, que o Cerne ainda não acompanha.',
+        ];
     }
 
     /** Lançamento de outro mês que o exibido na tela: não vai aparecer onde a pessoa está olhando. */

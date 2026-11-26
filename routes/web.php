@@ -128,6 +128,9 @@ Route::post('/convite-pessoa/{token}', [\App\Http\Controllers\Auth\AcceptCarePer
 // HealthCardService::emergencyPayload().
 Route::get('/saude/emergencia/{token}', [HealthEmergencyController::class, 'show'])->middleware('throttle:30,1')->name('health.emergency.show');
 
+// Revisão das regras de atividade física por um profissional convidado: sem login, por um link que expira e se revoga, sem dado de pessoa.
+Route::get('/revisao-das-regras/{token}', \App\Livewire\Rules\RuleReviewPage::class)->middleware('throttle:30,1')->name('rules.review');
+
 // Relato do navegador sobre a política de conteúdo em observação (ver SecurityHeaders): o navegador chama sem login nem CSRF.
 Route::post('/csp-report', [\App\Http\Controllers\CspReportController::class, 'store'])->middleware('throttle:60,1')->name('csp.report');
 
@@ -267,6 +270,8 @@ Route::middleware(['auth', 'verified', 'termos', 'dois-passos', 'cuidado'])->gro
         Route::get('/saude/atividades/folha.pdf', \App\Http\Controllers\ActivitySheetPdfController::class)->name('health.activities.sheet');
         Route::get('/saude/atividades/corrida', \App\Livewire\Activities\ActivityRunning::class)->name('health.activities.running');
         Route::get('/saude/atividades/evolucao', \App\Livewire\Activities\ActivityProgress::class)->name('health.activities.progress');
+        Route::get('/saude/atividades/prontidao', \App\Livewire\Activities\ActivityReadinessPage::class)->name('health.activities.readiness');
+        Route::get('/saude/atividades/plano', \App\Livewire\Activities\ActivityPlanPage::class)->name('health.activities.plan');
         Route::get('/saude/academia', GymHome::class)->name('health.gym.index');
         Route::get('/saude/academia/plano', GymPlanEditor::class)->name('health.gym.plan');
         Route::get('/saude/academia/treino-automatico', GymPlanGenerator::class)->name('health.gym.generate');
@@ -335,5 +340,6 @@ Route::middleware(['auth', 'verified', 'termos', 'dois-passos', 'cuidado'])->gro
         Route::get('/admin/erros', \App\Livewire\Admin\AdminErrors::class)->name('admin.errors');
         Route::get('/admin/acessos', \App\Livewire\Admin\AdminAccessLog::class)->name('admin.access-log');
         Route::get('/admin/incidentes', \App\Livewire\Admin\AdminIncidents::class)->name('admin.incidents');
+        Route::get('/admin/regras', \App\Livewire\Admin\AdminRules::class)->name('admin.rules');
     });
 });

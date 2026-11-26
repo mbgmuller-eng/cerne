@@ -11,8 +11,8 @@
 
     @if ($limitacoes->isEmpty())
         <div class="card space-y-2 p-5" data-sem-limitacao>
-            <p class="text-sm text-slate-600 dark:text-slate-300">Para registrar as respostas, salve antes a limitação dentro de um acompanhamento, na Saúde.</p>
-            <a href="{{ route('health.followups.index') }}" wire:navigate class="btn-primary inline-flex px-3 py-1.5 text-sm">Abrir acompanhamentos</a>
+            <p class="text-sm text-slate-600 dark:text-slate-300">Para registrar as respostas, salve antes a limitação na Ficha de Saúde ou em um acompanhamento.</p>
+            <a href="{{ route('health.card.index') }}" wire:navigate class="btn-primary inline-flex px-3 py-1.5 text-sm">Abrir a ficha</a>
         </div>
     @else
         <form wire:submit="save" class="space-y-4">
@@ -23,7 +23,7 @@
                         <label class="{{ $campo }}">A consulta foi sobre</label>
                         <select wire:model.live="limitationId" class="select mt-1.5 w-full">
                             @foreach ($limitacoes as $l)
-                                <option value="{{ $l->id }}">{{ $l->regionLabel() }} · {{ $l->followup?->title }}</option>
+                                <option value="{{ $l->id }}">{{ $l->regionLabel() }} · {{ $l->followup?->title ?? 'na ficha' }}</option>
                             @endforeach
                         </select>
                     </div>

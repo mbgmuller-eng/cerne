@@ -32,6 +32,8 @@ use App\Models\LeadSuggestionDismissal;
 use App\Models\PartnerInvite;
 use App\Models\ProfessionalInvite;
 use App\Models\TutorialProgress;
+use App\Models\RuleReview;
+use App\Models\RuleReviewer;
 use App\Models\PolicyCommission;
 use App\Models\CarePersonInvite;
 use App\Models\ProfileCaregiver;
@@ -110,6 +112,8 @@ class TenancyCoverageTest extends TestCase
         LeadActivity::class => 'segue o Lead — nunca consultada fora do escopo de um lead_id já resolvido',
         LeadAlertDigest::class => 'registro do resumo diário de leads já enviado a um profissional (consultant_id): só sustenta o índice único (profissional, dia), nunca é consultado por perfil',
         TutorialProgress::class => 'o que a pessoa já viu dos tutoriais (user_id): preferência da conta, vale em qualquer perfil em que ela entre, e sustenta o índice único (usuário, tela)',
+        RuleReviewer::class => 'profissional de educação física convidado pelo administrador para revisar as regras de atividades: não é cliente, não tem perfil e a tela dele não lê dado de ninguém',
+        RuleReview::class => 'parecer do revisor sobre uma regra do código (reviewer_id): fala da regra, nunca de uma pessoa; só o revisor do link e o administrador leem',
         LeadSuggestionDismissal::class => 'sugestão de venda cruzada que o profissional dispensou (consultant_id): só sustenta o índice único (profissional, chave), nunca é consultada por perfil',
         LeadQuote::class => 'cotação de um Lead — sem profile_id (o contato ainda não é cliente); só é lida a partir de um lead já resolvido por consultant_id, mesmo raciocínio de LeadActivity',
         LeadAttachment::class => 'arquivo de um Lead — sem profile_id; o controlador confere lead.consultant_id antes de abrir (LeadAttachmentController) e o serviço só mexe nos de um lead já resolvido',

@@ -22,7 +22,7 @@
                 <p class="text-sm text-slate-700 dark:text-slate-300">
                     <span class="font-semibold">{{ $l->regionLabel() }}</span> · {{ mb_strtolower($l->status->label()) }}
                     @if ($l->avoidLoads() !== []) · evitar {{ implode(', ', array_map(fn ($c) => mb_strtolower($c->label()), $l->avoidLoads())) }} @endif
-                    · <a href="{{ route('health.followups.show', $l->followup_id) }}" wire:navigate class="text-saude-800 underline dark:text-saude-200">abrir</a>
+                    · <a href="{{ $l->followup_id ? route('health.followups.show', $l->followup_id) : route('health.card.index') }}" wire:navigate class="text-saude-800 underline dark:text-saude-200">abrir</a>
                 </p>
             @endforeach
             @if ($sugestoes['limitations']->contains(fn ($l) => $l->status === LimitationStatus::Investigating))
@@ -155,7 +155,7 @@
                 @foreach ($ajustes as $a)
                     <li class="py-1.5" wire:key="aj-{{ $a->id }}">
                         {{ $a->created_at->format('d/m/Y') }} · {{ $a->workout?->name }}:
-                        {{ match ($a->kind) { 'paused' => 'pausado '.$a->exercise?->name, 'swapped' => $a->exercise?->name.' trocado por '.$a->replacement?->name, 'added' => 'entrou '.$a->exercise?->name, default => 'uma série a menos em '.$a->exercise?->name } }}{{ $a->reverted_at ? ' (já resolvido)' : '' }}
+                        {{ match ($a->kind) { 'paused' => 'pausado '.$a->exercise?->name, 'swapped' => $a->exercise?->name.' trocado por '.$a->replacement?->name, 'added' => 'entrou '.$a->exercise?->name, 'reps' => 'séries e repetições de '.$a->exercise?->name.' ajustadas', default =>'uma série a menos em '.$a->exercise?->name } }}{{ $a->reverted_at ? ' (já resolvido)' : '' }}
                     </li>
                 @endforeach
             </ul>

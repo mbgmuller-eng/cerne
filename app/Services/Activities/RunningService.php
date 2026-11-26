@@ -18,12 +18,14 @@ use Illuminate\Support\Facades\DB;
 /**
  * O programa de caminhada e corrida. Avança só com a semana completa e sem aumento de dor; falta repete o passo; dor maior volta um. Com uma
  * limitação que recomende aguardar, o Cerne diz isso, e se a pessoa escolher começar assim mesmo a escolha fica registrada.
+ *
+ * As perguntas de prontidão vêm antes e não têm "montar assim mesmo": com algum "sim" e sem liberação médica, o programa não começa nem avança.
  */
 class RunningService
 {
     public const OUTCOMES = ['advance' => 'Avançar um passo', 'repeat' => 'Repetir o passo', 'back' => 'Voltar um passo'];
 
-    public function __construct(private readonly PlanReviewService $review) {}
+    public function __construct(private readonly PlanReviewService $review, private readonly ReadinessService $readiness) {}
 
     public function active(): ?RunningProgram
     {
@@ -62,6 +64,10 @@ class RunningService
 
         if (count($dias) !== $vezes) {
             throw new DomainException('Escolha '.$vezes.' dias da semana, um para cada sessão.');
+        }
+
+        if (($porta = $this->readiness->gate()) !== null) {
+            throw new DomainException($porta);
         }
 
         $bloqueio = $this->block();
@@ -140,6 +146,10 @@ class RunningService
             default => ['advance', 'Semana completa, sem aumento de dor.'],
         };
 
+        if ($sugestao === 'advance' && ($porta = $this->readiness->gate()) !== null) {
+            [$sugestao, $motivo] = ['repeat', $porta];
+        }
+
         return ['week_start' => $semana, 'done' => $feitas, 'expected' => $programa->times_per_week, 'pain' => $dor === null ? null : (int) $dor, 'suggestion' => $sugestao, 'reason' => $motivo];
     }
 
@@ -150,6 +160,10 @@ class RunningService
 
         if ($semana === null || ! isset(self::OUTCOMES[$resultado])) {
             throw new DomainException('Não há semana para fechar agora.');
+        }
+
+        if ($resultado === 'advance' && ($porta = $this->readiness->gate()) !== null) {
+            throw new DomainException($porta);
         }
 
         $antes = $programa->step;

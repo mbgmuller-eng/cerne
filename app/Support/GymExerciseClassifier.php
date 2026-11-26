@@ -57,6 +57,12 @@ final class GymExerciseClassifier
         'lower_back' => ['levantamento terra', 'terra', 'stiff', 'good morning', 'remada curvada', 'hiperextensao', 'bom dia', 'agachamento livre', 'agachamento frontal', 'cavalinho', 't-bar', 'kettlebell swing'],
     ];
 
+    /** As listas por região, para a revisão das regras por um profissional (App\Support\Rules\RuleBook). */
+    public static function regionKeywords(): array
+    {
+        return self::RESTRICTED;
+    }
+
     /** Nome sem acento, em minúscula: a base de toda comparação. */
     public static function normalize(string $texto): string
     {

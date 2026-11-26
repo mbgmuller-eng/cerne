@@ -4,6 +4,7 @@
 @php
     $abas = [
         ['health.activities.index', 'Minha semana', ['health.activities.index']],
+        ['health.activities.plan', 'Plano da semana', ['health.activities.plan', 'health.activities.readiness']],
         ['health.activities.log', 'Registrar', ['health.activities.log']],
         ['health.activities.review', 'Revisar treino', ['health.activities.review', 'health.activities.consultation']],
         ['health.gym.index', 'Academia', ['health.gym.*']],

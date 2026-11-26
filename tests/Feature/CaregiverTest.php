@@ -56,6 +56,8 @@ class CaregiverTest extends TestCase
         // Médicos e profissionais: só os que atendem a pessoa acompanhada (decisão do dono em 2026-11-26).
         'HealthProfessional', 'HealthProfessionalLink',
         'PhysicalLimitation',
+        // As medidas: na pessoa acompanhada sempre; em perfil comum só quando a própria pessoa ligou o compartilhamento (HealthMeasurementScope).
+        'HealthMeasurement',
     ];
 
     protected function setUp(): void

@@ -12,12 +12,21 @@
 
     <p class="text-xs text-slate-400">É uma orientação geral, não a prescrição de um profissional. Com dor, lesão ou condição de saúde, converse antes com um médico ou profissional de educação física.</p>
 
+    <x-rule-status key="running" />
+
+    @if ($prontidao)
+        <div class="rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:bg-amber-500/10 dark:text-amber-300" data-prontidao>
+            <p>{{ $prontidao }}{{ $programa ? ' Até lá, o programa não avança.' : '' }}</p>
+            <a href="{{ route('health.activities.readiness') }}" wire:navigate class="btn-secondary mt-2 inline-flex px-3 py-1.5 text-sm">Abrir as perguntas de prontidão</a>
+        </div>
+    @endif
+
     @if ($bloqueio)
         <div class="rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:bg-amber-500/10 dark:text-amber-300" data-recomenda-aguardar>
             <p>{{ $bloqueio }}</p>
             @if ($programa?->chose_despite_limitation_at)
                 <p class="mt-1 font-medium">Você escolheu começar assim mesmo em {{ $programa->chose_despite_limitation_at->format('d/m/Y') }}.</p>
-            @elseif (! $programa)
+            @elseif (! $programa && ! $prontidao)
                 <label class="mt-2 flex items-start gap-2 font-medium"><input type="checkbox" wire:model.live="anyway" class="mt-0.5 h-4 w-4 rounded border-slate-300"> Montar mesmo assim. O Cerne guarda que a escolha foi minha.</label>
             @endif
         </div>
@@ -26,7 +35,7 @@
     @error('form') <p class="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-800 dark:bg-red-500/10 dark:text-red-300" data-form-error>{{ $message }}</p> @enderror
 
     @if (! $programa)
-        @if (! $bloqueio || $anyway)
+        @if (! $prontidao && (! $bloqueio || $anyway))
             <form wire:submit="start" class="card max-w-2xl space-y-4 p-5">
                 <div>
                     <p class="{{ $campo }}">Quanto trote confortável, sem dor, você faz hoje?</p>

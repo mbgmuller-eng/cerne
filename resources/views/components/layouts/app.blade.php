@@ -295,6 +295,7 @@
                 ['admin.errors', 'Erros', 'alert', $errosAbertos > 0 ? $errosAbertos : null, 'erro'],
                 ['admin.access-log', 'Acessos', 'lock', null, null],
                 ['admin.incidents', 'Incidentes', 'shield', null, null],
+                ['admin.rules', 'Revisão das regras', 'dumbbell', null, null],
             ],
         ];
         $gavetaSecoes[] = [
@@ -703,6 +704,10 @@
                     <a href="{{ route('admin.incidents') }}" title="Incidentes" @class(['nav-item', 'nav-item-active' => request()->routeIs('admin.incidents')])>
                         <x-nav-icon name="shield" />
                         <span class="lateral-texto">Incidentes</span>
+                    </a>
+                    <a href="{{ route('admin.rules') }}" title="Revisão das regras" @class(['nav-item', 'nav-item-active' => request()->routeIs('admin.rules')])>
+                        <x-nav-icon name="dumbbell" />
+                        <span class="lateral-texto">Revisão das regras</span>
                     </a>
                 </div>
                 </div>

@@ -253,6 +253,11 @@ class PlanReviewService
         $saida = [];
 
         foreach ($orientadas as $limitacao) {
+            // Limitação sem acompanhamento não tem programa de onde vir exercício indicado.
+            if ($limitacao->followup_id === null) {
+                continue;
+            }
+
             $atividades = HealthActivity::query()->where('followup_id', $limitacao->followup_id)->where('member_id', $limitacao->member_id)
                 ->where('is_active', true)->with('exercises')->orderBy('created_at')->get();
 
@@ -322,11 +327,21 @@ class PlanReviewService
             $posicoes = GymWorkoutExercise::query()->whereIn('workout_id', $plano->workouts()->select('id'))->pluck('position', 'id')->all();
 
             foreach ($s['restores'] as $chave => $r) {
+                // "skip": fica para depois, sem encerrar a sugestão.
+                if (($decisoes[$chave]['action'] ?? null) === 'skip') {
+                    continue;
+                }
+
                 $feito['restored'] += $this->applyRestore($r['adjustment_id'], ($decisoes[$chave]['action'] ?? $r['default']) === 'restore') ? 1 : 0;
             }
 
             foreach ($s['items'] as $chave => $sugestao) {
                 $acao = $decisoes[$chave]['action'] ?? $sugestao['default'];
+
+                if ($acao === 'skip') {
+                    continue;
+                }
+
                 $acao = in_array($acao, $sugestao['actions'], true) ? $acao : $sugestao['default'];
                 $item = GymWorkoutExercise::query()->with('exercise')->find($sugestao['item_id']);
 
@@ -399,6 +414,12 @@ class PlanReviewService
 
             return $feito;
         });
+    }
+
+    /** Devolve um ajuste ao que era (usado também ao desfazer a atualização do programa). */
+    public function revert(string $ajusteId): bool
+    {
+        return $this->applyRestore($ajusteId, true);
     }
 
     private function applyRestore(string $ajusteId, bool $voltar): bool

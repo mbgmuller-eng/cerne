@@ -5,7 +5,7 @@
     <div>
         <h1 class="font-display text-3xl font-semibold tracking-tight text-slate-900 dark:text-white">Ficha de Saúde</h1>
         <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
-            Tipo sanguíneo, alergias, doenças e remédios — @if ($emPessoaAcompanhada) visível para quem cuida desta pessoa. @else visível para você e seu cônjuge. @endif Consultor e corretor não têm acesso.
+            Tipo sanguíneo, alergias, problemas de saúde, limitações, medidas e remédios. @if ($emPessoaAcompanhada) Visível para quem cuida desta pessoa. @else Visível para você e seu cônjuge, menos o peso e as medidas, que começam só com cada um. @endif Consultor e corretor não têm acesso.
         </p>
     </div>
 
@@ -48,27 +48,52 @@
                     </form>
                 </div>
 
-                {{-- Doenças / comorbidades --}}
-                <div>
-                    <p class="eyebrow">Doenças e comorbidades</p>
+                {{-- Problemas de saúde --}}
+                <div data-problemas>
+                    <div class="flex items-center justify-between gap-2">
+                        <p class="eyebrow">Problemas de saúde</p>
+                        <button type="button" data-write wire:click="newCondition('{{ $membro->id }}')" class="btn-ghost px-2 py-1 text-xs">+ Problema</button>
+                    </div>
                     @if ($conditions->isEmpty())
-                        <p class="mt-2 text-xs text-slate-400">Nenhuma registrada.</p>
+                        <p class="mt-2 text-xs text-slate-400">Nenhum registrado.</p>
                     @else
-                        <ul class="mt-2 space-y-1">
-                            @foreach ($conditions as $condicao)
-                                <li class="flex items-center justify-between gap-2 text-sm" wire:key="co-{{ $condicao->id }}">
-                                    <span class="text-slate-700 dark:text-slate-300">{{ $condicao->description }} <x-registered-by :model="$condicao" /></span>
-                                    <button type="button" data-write wire:click="removeCondition('{{ $condicao->id }}')" class="text-xs text-slate-400 hover:text-red-700 dark:hover:text-red-400">remover</button>
+                        <ul class="mt-2 divide-y divide-slate-100 dark:divide-white/10">
+                            @foreach ($conditions->sortBy(fn ($c) => $c->isCurrent() ? 0 : 1) as $condicao)
+                                <li class="py-2" wire:key="co-{{ $condicao->id }}">
+                                    <div class="flex items-start justify-between gap-2 text-sm">
+                                        <span class="min-w-0 break-words text-slate-700 dark:text-slate-300">{{ $condicao->description }} <x-registered-by :model="$condicao" /></span>
+                                        <span @class(['shrink-0 rounded-full px-2 py-0.5 text-xs font-medium', 'bg-amber-100 text-amber-900 dark:bg-amber-500/15 dark:text-amber-300' => $condicao->status->value === 'investigating', 'bg-slate-100 text-slate-600 dark:bg-white/10 dark:text-slate-300' => $condicao->status->value !== 'investigating'])>{{ $condicao->status->label() }}</span>
+                                    </div>
+                                    <p class="text-xs text-slate-400">{{ \App\Support\Health\HealthOrigins::labelOf($condicao) }}{{ $condicao->since_year ? ' · desde '.$condicao->since_year : '' }}{{ $condicao->exercise_care ? ' · pede cuidado no exercício' : '' }}</p>
+                                    <div data-write class="mt-0.5 flex gap-3">
+                                        <button type="button" wire:click="editCondition('{{ $condicao->id }}')" class="text-xs text-slate-500 underline dark:text-slate-400">editar</button>
+                                        <button type="button" wire:click="removeCondition('{{ $condicao->id }}')" wire:confirm="Excluir este problema da ficha?" class="text-xs text-slate-400 hover:text-red-700 dark:hover:text-red-400">remover</button>
+                                    </div>
                                 </li>
                             @endforeach
                         </ul>
                     @endif
-                    <form data-write wire:submit="addCondition('{{ $membro->id }}')" class="mt-2 flex gap-2">
-                        <input type="text" wire:model="newConditionText.{{ $membro->id }}" class="input" placeholder="Ex.: Hipertensão" maxlength="160">
-                        <button type="submit" class="btn-secondary shrink-0 px-3 text-xs">Adicionar</button>
-                    </form>
+
+                    @if ($conditionMemberId === $membro->id)
+                        <form data-write wire:submit="saveCondition" class="mt-2 space-y-3 rounded-xl border border-dashed border-slate-200 p-3 dark:border-white/10">
+                            <div><label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Problema</label><input type="text" wire:model="condText" class="input mt-1.5" maxlength="160" placeholder="Como o médico falou"></div>
+                            <div class="grid gap-3 sm:grid-cols-2">
+                                <div><label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Situação</label><select wire:model="condStatus" class="select mt-1.5 w-full">@foreach ($situacoes as $v => $r)<option value="{{ $v }}">{{ $r }}</option>@endforeach</select></div>
+                                <div><label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Desde que ano (opcional)</label><input type="text" inputmode="numeric" wire:model="condSince" class="input mt-1.5" maxlength="4"></div>
+                            </div>
+                            <div><label class="block text-xs font-medium text-slate-500 dark:text-slate-400">De onde vem</label><select wire:model="condOrigin" class="select mt-1.5 w-full">@foreach ($origens as $v => $r)<option value="{{ $v }}">{{ $r }}</option>@endforeach</select><p class="mt-1 text-xs text-slate-400">O que é do passado não precisa de consulta nem exame.</p></div>
+                            <label class="flex items-start gap-2 text-sm text-slate-700 dark:text-slate-300"><input type="checkbox" wire:model.live="condCare" class="mt-0.5 h-4 w-4 rounded border-slate-300"> <span>Pede cuidado no exercício<span class="block text-xs text-slate-400">Quem marca é a pessoa. O Cerne não deduz isso pelo nome do problema.</span></span></label>
+                            <x-form-consequence :lines="$consequenciaProblema" />
+                            <x-form-errors />
+                            <div class="flex gap-3"><button type="submit" class="btn-primary px-3 py-1.5 text-sm">{{ $editingConditionId ? 'Salvar alterações' : 'Salvar na ficha' }}</button><button type="button" wire:click="closeCondition" class="text-xs text-slate-400">Cancelar</button></div>
+                        </form>
+                    @endif
                 </div>
             </div>
+
+            <livewire:health.limitation-panel :member-id="$membro->id" :new-from="$limitationFor === $membro->id ? $limitationFrom : null" :key="'limitacoes-ficha-'.$membro->id" />
+
+            <livewire:health.measurements-panel :member-id="$membro->id" :key="'medidas-'.$membro->id" />
 
             {{-- Remédios --}}
             <div>
@@ -154,7 +179,7 @@
                 <div class="min-w-0">
                     <p class="text-xs font-medium text-slate-700 dark:text-slate-300">QR Code de emergência</p>
                     <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-                        Sem login: mostra tipo sanguíneo, alergias, doenças, remédios em uso e contatos.
+                        Sem login: mostra tipo sanguíneo, alergias, problemas de saúde, remédios em uso e contatos. Peso, altura e limitações, só se você ligar.
                     </p>
                     <p x-show="erro" x-cloak x-text="erro" class="mt-1 text-xs text-red-700 dark:text-red-400"></p>
                     <p x-show="mensagem" x-cloak x-text="mensagem" class="mt-1 text-xs text-saude-800 dark:text-saude-200"></p>

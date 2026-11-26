@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Enums\PlatformModule;
+use App\Models\HealthCondition;
 use App\Services\Activities\ActivityService;
 use App\Services\Activities\ActivityWeekService;
 use App\Services\Activities\PlanReviewService;
@@ -41,6 +42,8 @@ class ActivitySheetPdfController extends Controller
             'dias' => ActivityWeekService::DAYS,
             'treinos' => $plano?->workouts()->with('workoutExercises.exercise')->get() ?? collect(),
             'limitacoes' => $revisao->considered(),
+            // Só os da própria pessoa (o casal vê os dois na Saúde) e só os que ela marcou que pedem cuidado no exercício.
+            'cuidados' => HealthCondition::query()->where('member_id', $contexto->memberId())->where('exercise_care', true)->where('status', '!=', 'resolved')->get(),
             'geradoEm' => now(),
         ]);
 

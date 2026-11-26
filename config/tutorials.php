@@ -244,14 +244,13 @@ return [
 
         'health.card.index' => [
             'title' => 'Ficha de saúde',
-            'summary' => 'Tipo sanguíneo, alergias, doenças, remédios e o QR Code de emergência.',
+            'summary' => 'Medidas, problemas de saúde, limitações, remédios e o QR Code de emergência.',
             'steps' => [
-                'Escolha o tipo sanguíneo: ele é salvo na hora.',
-                'Adicione alergias e doenças. O botão “remover” age na hora, sem pedir confirmação.',
+                'Registre peso, altura e cintura. Começam só para você; compartilhar e mostrar no QR é escolha sua.',
+                'Anote alergias, problemas de saúde e limitações, inclusive as do passado.',
                 'Use “+ Remédio” para registrar dose, horário e motivo. Remédio não é excluído, apenas suspenso, e o histórico fica guardado.',
-                'O QR Code de emergência abre uma página sem login, com tipo sanguíneo, alergias, doenças, remédios em uso e contatos.',
-                'Use “Compartilhar link” ou “Baixar imagem” para levar o QR Code com você.',
-                '“Gerar novo código” invalida o QR Code que já foi impresso ou compartilhado.',
+                'O QR Code de emergência abre sem login, com tipo sanguíneo, alergias, problemas, remédios e contatos.',
+                'Leve o QR Code com “Compartilhar link” ou “Baixar imagem”. “Gerar novo código” invalida o anterior.',
             ],
             'tip' => 'Em casal, a ficha é visível para os dois. Consultor e corretor não têm acesso à saúde.',
         ],
@@ -400,11 +399,36 @@ return [
             ],
         ],
 
+        'health.activities.plan' => [
+            'title' => 'Plano da semana',
+            'summary' => 'Musculação, aeróbico e descanso montados a partir do que você já faz.',
+            'steps' => [
+                'Responda antes às perguntas de prontidão. Sem liberação médica, o plano fica leve.',
+                'Escolha o objetivo, os dias em que pode se exercitar e os tipos de aeróbico.',
+                'Confira a semana proposta e o que muda no treino. Os exercícios e o histórico ficam.',
+                'Aplique. Os minutos só aumentam depois de uma semana cumprida.',
+                '“Desfazer atualização” devolve as séries, os dias e o que foi pausado.',
+            ],
+            'tip' => 'É orientação geral, não prescrição. Só você vê estes dados.',
+        ],
+
+        'health.activities.readiness' => [
+            'title' => 'Prontidão',
+            'summary' => 'Sete perguntas antes de montar um plano ou começar a correr.',
+            'steps' => [
+                'Responda sim ou não a cada pergunta, com sinceridade.',
+                'Com algum sim, informe se já tem liberação médica, de quem e de quando.',
+                'Sem a liberação, o plano fica leve e a corrida não começa.',
+                'As respostas valem por 12 meses, ou até a sua saúde mudar.',
+            ],
+            'tip' => 'É uma triagem simples e não substitui uma avaliação médica.',
+        ],
+
         'health.activities.running' => [
             'title' => 'Caminhada e corrida',
             'summary' => 'Um programa que começa do que você consegue hoje e avança semana a semana.',
             'steps' => [
-                'Responda quanto trote você faz hoje, quantas vezes por semana e em quais dias.',
+                'Com as perguntas de prontidão em dia, informe quanto trote faz hoje, as vezes e os dias.',
                 'Confirme cada sessão em Minha semana, com esforço e dor.',
                 'No fim da semana, o Cerne sugere avançar, repetir ou voltar um passo, e você escolhe.',
                 'Com uma limitação que recomende aguardar, o Cerne avisa antes de começar.',

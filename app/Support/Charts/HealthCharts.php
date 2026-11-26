@@ -123,6 +123,63 @@ final class HealthCharts
         return $svg.'</svg>';
     }
 
+    /**
+     * Histórico de peso: os pontos são as pesagens e a linha é a tendência (média das 3 últimas). A faixa pelo IMC vai sombreada e a meta, se
+     * houver, tracejada. Um eixo só, em quilos.
+     *
+     * @param  list<array{label: string, value: float, trend: float}>  $pontos
+     * @param  array{0: float, 1: float}|null  $faixa
+     */
+    public static function weight(array $pontos, ?array $faixa, ?float $meta, string $titulo): string
+    {
+        if ($pontos === []) {
+            return '';
+        }
+
+        $pesos = array_column($pontos, 'value');
+        // A faixa entra na escala só até perto dos pesos: uma faixa muito longe achataria a linha.
+        $baixo = floor(min(min($pesos), $meta ?? min($pesos), $faixa !== null ? max($faixa[1], min($pesos) - 12) : min($pesos)) - 1);
+        $alto = ceil(max(max($pesos), $meta ?? 0) + 1);
+        [$largura, $altura, $esquerda, $base, $topo] = [640, 220, 40, 26, 14];
+        $y = fn (float $v) => round($topo + ($altura - $topo - $base) * (1 - ($v - $baixo) / max(1, $alto - $baixo)), 1);
+        $passo = ($largura - $esquerda - 20) / max(1, count($pontos) - 1);
+        $x = fn (int $i) => round(count($pontos) === 1 ? $largura / 2 : $esquerda + $passo * $i, 1);
+        $kg = fn (float $v) => number_format($v, 1, ',', '');
+
+        $svg = '<svg viewBox="0 0 '.$largura.' '.$altura.'" width="100%" role="img" aria-label="'.self::esc($titulo).'" xmlns="http://www.w3.org/2000/svg" font-size="11">';
+        $intervalo = max(2, (int) round(($alto - $baixo) / 4));
+
+        for ($v = (int) (ceil($baixo / $intervalo) * $intervalo); $v <= $alto; $v += $intervalo) {
+            $svg .= '<line x1="'.$esquerda.'" x2="'.($largura - 4).'" y1="'.$y($v).'" y2="'.$y($v).'" stroke="var(--chart-grid, #e1e0d9)"/><text x="'.($esquerda - 6).'" y="'.($y($v) + 4).'" text-anchor="end" fill="var(--chart-muted, #898781)">'.$v.'</text>';
+        }
+
+        if ($faixa !== null && $faixa[1] > $baixo && $faixa[0] < $alto) {
+            $cima = $y(min($faixa[1], $alto));
+            $svg .= '<rect x="'.$esquerda.'" y="'.$cima.'" width="'.($largura - $esquerda - 4).'" height="'.max(0, $y(max($faixa[0], $baixo)) - $cima).'" fill="var(--chart-grid, #e1e0d9)" fill-opacity="0.55"><title>Faixa pelo IMC</title></rect>'
+                .'<text x="'.($largura - 8).'" y="'.($cima + 13).'" text-anchor="end" fill="var(--chart-muted, #898781)">faixa pelo IMC</text>';
+        }
+
+        if ($meta !== null) {
+            $svg .= '<line x1="'.$esquerda.'" x2="'.($largura - 4).'" y1="'.$y($meta).'" y2="'.$y($meta).'" stroke="var(--chart-3, #1baf7a)" stroke-width="2" stroke-dasharray="6 4"/><text x="'.($esquerda + 4).'" y="'.($y($meta) - 5).'" fill="var(--chart-muted, #898781)">minha meta '.$kg($meta).' kg</text>';
+        }
+
+        if (count($pontos) > 1) {
+            $svg .= '<polyline points="'.implode(' ', array_map(fn (int $i) => $x($i).','.$y($pontos[$i]['trend']), array_keys($pontos))).'" fill="none" stroke="var(--chart-1, #2a78d6)" stroke-width="2.5"/>';
+        }
+
+        $cada = max(1, (int) ceil(count($pontos) / 6));
+
+        foreach ($pontos as $i => $p) {
+            $svg .= '<circle cx="'.$x($i).'" cy="'.$y($p['value']).'" r="3.5" fill="var(--chart-muted, #898781)"><title>'.self::esc($p['label'].': '.$kg($p['value']).' kg').'</title></circle>';
+
+            if (($i % $cada === 0 && count($pontos) - 1 - $i >= $cada) || $i === count($pontos) - 1) {
+                $svg .= '<text x="'.min($largura - 22, max($esquerda + 12, $x($i))).'" y="'.($altura - 8).'" text-anchor="middle" fill="var(--chart-muted, #898781)">'.self::esc($p['label']).'</text>';
+            }
+        }
+
+        return $svg.'</svg>';
+    }
+
     private static function open(string $titulo): string
     {
         return '<svg viewBox="0 0 '.self::W.' '.self::H.'" width="100%" role="img" aria-label="'.self::esc($titulo).'" xmlns="http://www.w3.org/2000/svg" font-size="11">';

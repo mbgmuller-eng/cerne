@@ -10,6 +10,13 @@
             <p class="text-xs font-medium text-slate-500 dark:text-slate-400">Tipo sanguíneo</p>
             <p class="mt-0.5 text-slate-800 dark:text-slate-200">{{ $card->blood_type ?: '—' }}</p>
         </div>
+        @if ($weight || $height)
+            <div data-qr-medidas>
+                <p class="text-xs font-medium text-slate-500 dark:text-slate-400">Peso e altura</p>
+                <p class="mt-0.5 text-slate-800 dark:text-slate-200">{{ collect([$weight ? \App\Support\Health\BodyMass::format($weight->weight()).' kg' : null, $height ? $height.' cm' : null])->filter()->implode(' · ') }}</p>
+                @if ($weight) <p class="text-xs text-slate-400">Peso informado em {{ $weight->measured_on->format('d/m/Y') }}</p> @endif
+            </div>
+        @endif
     </div>
 
     <div class="mt-5">
@@ -32,11 +39,22 @@
         @else
             <ul class="mt-1 space-y-0.5 text-sm text-slate-800 dark:text-slate-200">
                 @foreach ($conditions as $condicao)
-                    <li>{{ $condicao->description }}</li>
+                    <li>{{ $condicao->description }}@if (in_array($condicao->status->value, ['investigating', 'controlled'], true)) <span class="text-xs text-slate-400">{{ mb_strtolower($condicao->status->label()) }}</span>@endif</li>
                 @endforeach
             </ul>
         @endif
     </div>
+
+    @if ($limitations->isNotEmpty())
+        <div class="mt-5" data-qr-limitacoes>
+            <p class="text-xs font-medium text-slate-500 dark:text-slate-400">Limitações físicas</p>
+            <ul class="mt-1 space-y-0.5 text-sm text-slate-800 dark:text-slate-200">
+                @foreach ($limitations as $limitacao)
+                    <li>{{ $limitacao->regionLabel() }} <span class="text-xs text-slate-400">{{ mb_strtolower($limitacao->status->label()) }}</span></li>
+                @endforeach
+            </ul>
+        </div>
+    @endif
 
     <div class="mt-5">
         <p class="text-xs font-medium text-slate-500 dark:text-slate-400">Remédios em uso</p>

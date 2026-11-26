@@ -193,6 +193,9 @@
                                     <p class="mt-0.5 text-xs text-slate-400">{{ $consulta->statusBy ? 'Confirmado por '.$consulta->statusBy->name : 'Confirmado' }} em {{ $consulta->status_at->format('d/m/Y') }}</p>
                                 @endif
                                 <p class="mt-0.5"><x-registered-by :model="$consulta" /></p>
+                                @if ($status === \App\Enums\HealthAppointmentStatus::Done)
+                                    <x-health.add-to-card class="mt-1" :member="$consulta->member_id" :origin="'appointment:'.$consulta->id" />
+                                @endif
 
                                 @if ($pendente)
                                     <div class="mt-2 flex flex-wrap items-center gap-2" data-write>

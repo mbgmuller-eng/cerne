@@ -164,10 +164,17 @@
 
     <livewire:health.health-program-panel :followup-id="$acompanhamento->id" :key="'programa-'.$acompanhamento->id" />
 
+    @if ($podeEscrever)
+        <div class="space-y-1">
+            <p class="text-sm text-slate-600 dark:text-slate-300">O que ficou deste acompanhamento pode entrar na Ficha de Saúde.</p>
+            <x-health.add-to-card :member="$acompanhamento->member_id" :origin="'followup:'.$acompanhamento->id" />
+        </div>
+    @endif
+
     <div data-write class="flex flex-wrap items-center gap-3 text-xs">
         <button type="button" wire:click="open('edit')" class="text-slate-500 hover:underline dark:text-slate-400">Editar nome e data</button>
         @if ($confirmingDelete)
-            <span class="text-slate-500 dark:text-slate-400">Anotações, pedidos sem data e o programa saem junto.</span>
+            <span class="text-slate-500 dark:text-slate-400">Anotações, pedidos sem data e o programa saem junto. O que está na Ficha de Saúde continua.</span>
             <button type="button" wire:click="delete" class="font-medium text-red-700 hover:underline dark:text-red-400">Excluir mesmo</button>
             <button type="button" wire:click="$set('confirmingDelete', false)" class="text-slate-400">Não</button>
         @else

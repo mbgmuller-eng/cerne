@@ -4,6 +4,12 @@ Para um fisioterapeuta ou profissional de educação física. O Cerne **não ava
 avisa para conferir com um profissional. Mesmo assim, as listas e os passos abaixo foram escritos pela equipe e ainda **não foram revisados por um
 profissional**.
 
+**A revisão agora pode ser feita dentro do Cerne** (desde a Ficha ampliada e o plano da semana): o administrador convida o profissional em
+`/admin/regras`, e ele recebe um link, sem login e sem ver dado de ninguém. Lá estão as regras lidas do próprio código (`app/Support/Rules/RuleBook.php`),
+inclusive as que este documento não cobre: perguntas de prontidão, plano da semana, séries e repetições para perder peso, IMC e avisos de encaixe.
+Este documento continua útil como apoio para a conversa. Pedido de ajuste vira mudança no código, e a aprovação de uma regra cai sozinha quando o
+conteúdo dela muda.
+
 ## 1. Como o Cerne marca um exercício
 
 Quando a pessoa registra uma limitação, ela escolhe o que evitar. O Cerne compara essas escolhas com **palavras no nome do exercício**. Ele não

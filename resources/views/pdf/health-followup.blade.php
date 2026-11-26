@@ -102,7 +102,7 @@
     <h2>Ficha de saúde</h2>
     <table>
         <tr><td class="tipo">Alergias</td><td>{{ $alergias->pluck('description')->implode('; ') ?: 'Nenhuma registrada' }}</td></tr>
-        <tr><td class="tipo">Doenças</td><td>{{ $doencas->pluck('description')->implode('; ') ?: 'Nenhuma registrada' }}</td></tr>
+        <tr><td class="tipo">Problemas de saúde</td><td>{{ $doencas->map(fn ($c) => $c->description.' ('.mb_strtolower($c->status->label()).($c->since_year ? ', desde '.$c->since_year : '').')')->implode('; ') ?: 'Nenhum registrado' }}</td></tr>
         <tr><td class="tipo">Remédios em uso</td><td>@forelse ($remedios as $r)<div>{{ implode(' · ', array_filter([$r->name, $r->dose, $r->schedule])) }}</div>@empty Nenhum registrado @endforelse</td></tr>
     </table>
 

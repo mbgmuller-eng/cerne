@@ -2,8 +2,12 @@
 
 namespace App\Livewire\Health;
 
+use App\Enums\HealthConditionStatus;
 use App\Livewire\Concerns\RequiresActiveProfile;
 use App\Livewire\Concerns\RequiresPersonalHealth;
+use App\Support\Forms\FormConsequence;
+use App\Support\Health\HealthOrigins;
+use Illuminate\Validation\Rule;
 use App\Models\HealthAllergy;
 use App\Models\HealthCondition;
 use App\Models\HealthMedication;
@@ -34,8 +38,25 @@ class HealthCardIndex extends Component
     /** @var array<string, string> */
     public array $newAllergyText = [];
 
-    /** @var array<string, string> */
-    public array $newConditionText = [];
+    /** O formulário de problema aberto: de quem é e, na edição, qual. */
+    public ?string $conditionMemberId = null;
+
+    public ?string $editingConditionId = null;
+
+    public string $condText = '';
+
+    public string $condStatus = 'active';
+
+    public string $condSince = '';
+
+    public string $condOrigin = 'past';
+
+    public bool $condCare = false;
+
+    /** Veio de uma consulta ou de um exame para registrar uma limitação: o painel da pessoa abre o formulário. */
+    public ?string $limitationFor = null;
+
+    public ?string $limitationFrom = null;
 
     public bool $showMedicationForm = false;
     public ?string $medicationMemberId = null;
@@ -59,6 +80,93 @@ class HealthCardIndex extends Component
         foreach ($this->membros() as $membro) {
             $this->bloodTypeDrafts[$membro->id] = app(HealthCardService::class)->cardFor($membro)->blood_type ?? '';
         }
+
+        $this->openFromLink();
+    }
+
+    /**
+     * "Adicionar à ficha" de uma consulta, de um exame ou de um acompanhamento: abre o formulário já com a origem. Nada é gravado sem a
+     * pessoa salvar, e um exame nunca vira problema de saúde sozinho.
+     */
+    private function openFromLink(): void
+    {
+        $novo = request()->query('novo');
+        $pessoa = request()->query('pessoa');
+        $origem = request()->query('origem');
+
+        if (! is_string($novo) || ! is_string($pessoa) || ! in_array($novo, ['problema', 'limitacao'], true)) {
+            return;
+        }
+
+        $membro = ProfileMember::query()->visibleHere()->find($pessoa);
+
+        if ($membro === null || ! app(ProfileContext::class)->canWriteAsCaregiver($membro->id)) {
+            return;
+        }
+
+        $origem = is_string($origem) && array_key_exists($origem, HealthOrigins::options($membro->id)) ? $origem : HealthOrigins::PAST;
+
+        if ($novo === 'limitacao') {
+            [$this->limitationFor, $this->limitationFrom] = [$membro->id, $origem];
+
+            return;
+        }
+
+        $this->newCondition($membro->id);
+        $this->condOrigin = $origem;
+    }
+
+    public function newCondition(string $memberId): void
+    {
+        $this->resetErrorBag();
+        $this->reset('editingConditionId', 'condText', 'condStatus', 'condSince', 'condOrigin', 'condCare');
+        $this->conditionMemberId = $this->membroOuFalha($memberId)->id;
+    }
+
+    public function editCondition(string $conditionId): void
+    {
+        $c = HealthCondition::query()->findOrFail($conditionId);
+        $this->newCondition($c->member_id);
+        $this->editingConditionId = $c->id;
+        $this->condText = (string) $c->description;
+        $this->condStatus = $c->status->value;
+        $this->condSince = (string) $c->since_year;
+        $this->condOrigin = HealthOrigins::valueOf($c);
+        $this->condCare = $c->exercise_care;
+    }
+
+    public function closeCondition(): void
+    {
+        $this->reset('conditionMemberId', 'editingConditionId');
+        $this->resetErrorBag();
+    }
+
+    public function saveCondition(HealthCardService $service): void
+    {
+        $this->validate([
+            'condText' => ['required', 'string', 'max:160'],
+            'condStatus' => ['required', Rule::in(HealthConditionStatus::values())],
+            'condSince' => ['nullable', 'integer', 'between:1900,'.now()->year],
+            'condOrigin' => ['required', 'string', 'max:60'],
+        ], attributes: ['condText' => 'problema', 'condStatus' => 'situação', 'condSince' => 'ano', 'condOrigin' => 'origem']);
+
+        $membro = $this->membroOuFalha($this->conditionMemberId);
+        $dados = [
+            'status' => $this->condStatus,
+            'since_year' => $this->condSince !== '' ? (int) $this->condSince : null,
+            'exercise_care' => $this->condCare,
+        ] + HealthOrigins::columns($this->condOrigin, $membro->id);
+
+        if ($this->editingConditionId !== null) {
+            $service->updateCondition(
+                HealthCondition::query()->where('member_id', $membro->id)->findOrFail($this->editingConditionId),
+                ['description' => trim($this->condText)] + $dados,
+            );
+        } else {
+            $service->addCondition($membro, $this->condText, $this->autor(), $dados);
+        }
+
+        $this->closeCondition();
     }
 
     public function updatedBloodTypeDrafts(string $valor, string $memberId): void
@@ -81,17 +189,6 @@ class HealthCardIndex extends Component
     public function removeAllergy(string $allergyId, HealthCardService $service): void
     {
         $service->removeAllergy(HealthAllergy::query()->findOrFail($allergyId));
-    }
-
-    public function addCondition(string $memberId, HealthCardService $service): void
-    {
-        $texto = trim($this->newConditionText[$memberId] ?? '');
-        if ($texto === '') {
-            return;
-        }
-
-        $service->addCondition($this->membroOuFalha($memberId), $texto, $this->autor());
-        $this->newConditionText[$memberId] = '';
     }
 
     public function removeCondition(string $conditionId, HealthCardService $service): void
@@ -207,6 +304,9 @@ class HealthCardIndex extends Component
         return view('livewire.health.health-card-index', [
             'campoProfissional' => $this->showMedicationForm ? $this->professionalField((string) $this->medicationMemberId, $this->medPrescriber) : null,
             'fichas' => $fichas,
+            'situacoes' => HealthConditionStatus::options(),
+            'origens' => $this->conditionMemberId !== null ? HealthOrigins::options($this->conditionMemberId) : [],
+            'consequenciaProblema' => $this->conditionMemberId !== null ? FormConsequence::healthCondition($this->condCare) : [],
             'editingExisting' => $this->editingMedicationId !== null,
             'emPessoaAcompanhada' => app(ProfileContext::class)->isCaregiver() || app(ProfileContext::class)->profile()?->isCare(),
         ]);

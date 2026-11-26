@@ -1,13 +1,13 @@
 @php $campo = 'block text-xs font-medium text-slate-500 dark:text-slate-400'; @endphp
 
-<section class="card min-w-0 space-y-3 p-5" data-limitacoes>
+<section @class(['min-w-0 space-y-3', 'card p-5' => ! $naFicha]) data-limitacoes>
     <div class="flex flex-wrap items-center justify-between gap-2">
         <p class="eyebrow">Limitações físicas</p>
         <button type="button" data-write wire:click="create" class="btn-secondary px-3 py-1.5 text-xs">+ Limitação</button>
     </div>
 
     @if ($limitacoes->isEmpty() && ! $open)
-        <p class="text-xs text-slate-400">Se este problema limita o que dá para fazer, registre aqui a região e o que evitar. Os programas de atividades passam a levar em conta.</p>
+        <p class="text-xs text-slate-400">{{ $naFicha ? 'Nenhuma registrada. Vale também o que vem do passado, sem consulta nem exame.' : 'Se este problema limita o que dá para fazer, registre aqui a região e o que evitar. Os programas de atividades passam a levar em conta.' }}</p>
     @endif
 
     @foreach ($limitacoes as $l)
@@ -19,6 +19,7 @@
             @if ($l->avoidLoads() !== []) <p class="mt-1 text-sm text-slate-700 dark:text-slate-300">Evitar: {{ implode(', ', array_map(fn ($c) => mb_strtolower($c->label()), $l->avoidLoads())) }}.</p> @endif
             @if ($l->guidance) <p class="mt-1 whitespace-pre-line text-sm text-slate-600 dark:text-slate-300">{{ $l->guidance }}</p> @endif
             @if ($l->professional || $l->informed_on) <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">{{ $l->professional }}@if ($l->professional && $l->informed_on) · @endif{{ $l->informed_on?->format('d/m/Y') }}</p> @endif
+            @if ($naFicha) <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">{{ \App\Support\Health\HealthOrigins::labelOf($l) }}@if ($l->since_year) · desde {{ $l->since_year }}@endif</p> @elseif ($l->since_year) <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Desde {{ $l->since_year }}</p> @endif
             @if ($l->runningAnswer()) <p class="text-xs text-slate-500 dark:text-slate-400">Corrida: {{ $l->runningAnswer() === 'yes' ? 'pode' : 'ainda não' }}.</p> @endif
             <button type="button" data-write wire:click="edit('{{ $l->id }}')" class="mt-1 text-xs text-slate-500 underline dark:text-slate-400">editar</button>
         </div>
@@ -39,6 +40,12 @@
                 </div>
                 <p class="mt-1 text-xs text-slate-400">Vem marcado um ponto de partida por precaução. Ajuste: o que o profissional orientar é o que vale.</p>
             </fieldset>
+            <div class="grid gap-3 sm:grid-cols-2">
+                @if ($naFicha)
+                    <div wire:key="origem-da-limitacao"><label class="{{ $campo }}">De onde vem</label><select wire:model="origin" class="select mt-1.5 w-full">@foreach ($origens as $v => $r)<option value="{{ $v }}">{{ $r }}</option>@endforeach</select><p class="mt-1 text-xs text-slate-400">O que é do passado não precisa de consulta nem exame.</p></div>
+                @endif
+                <div><label class="{{ $campo }}">Desde que ano (opcional)</label><input type="text" inputmode="numeric" wire:model="sinceYear" class="input mt-1.5" maxlength="4"></div>
+            </div>
             <div><label class="{{ $campo }}">Orientação recebida (opcional)</label><textarea wire:model="guidance" rows="2" class="input mt-1.5" maxlength="2000"></textarea></div>
             <div class="grid gap-3 sm:grid-cols-2">
                 @if ($campoProfissional)

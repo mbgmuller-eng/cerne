@@ -169,9 +169,13 @@
                             @endif
                             <button type="button" data-write wire:click="deleteReport('{{ $laudo->id }}')" wire:confirm="Excluir este resultado? O PDF continua nos Documentos." class="text-slate-400 hover:text-red-700">excluir resultado</button>
                         </p>
+                        @if ($podeEscrever)
+                            <x-health.add-to-card class="mt-1" :member="$pedido->member_id" :origin="'exam:'.$laudo->id" />
+                        @endif
                     </li>
                 @endforeach
             </ul>
+            <p class="text-xs text-slate-400">O Cerne não cria problema de saúde a partir de um exame: você registra na ficha o que o médico disse.</p>
         @endif
     </section>
 

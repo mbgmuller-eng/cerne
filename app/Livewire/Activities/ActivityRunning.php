@@ -4,6 +4,7 @@ namespace App\Livewire\Activities;
 
 use App\Livewire\Activities\Concerns\ActivityScreen;
 use App\Services\Activities\ActivityWeekService;
+use App\Services\Activities\ReadinessService;
 use App\Services\Activities\RunningService;
 use App\Support\Activities\RunningLadder;
 use App\Support\Forms\FormConsequence;
@@ -118,9 +119,11 @@ class ActivityRunning extends Component
         $programa = $running->active();
         $dias = ActivityWeekService::DAYS;
         $bloqueio = $running->block();
+        $prontidao = app(ReadinessService::class)->gate();
 
         return view('livewire.activities.activity-running', [
             'programa' => $programa,
+            'prontidao' => $prontidao,
             'bloqueio' => $bloqueio,
             'passos' => RunningLadder::all(),
             'testes' => RunningLadder::TESTS,
@@ -129,7 +132,7 @@ class ActivityRunning extends Component
             'semanaAtual' => $programa !== null ? $running->weekSummary($programa, ActivityWeekService::weekStart(CarbonImmutable::today())) : null,
             'resultados' => RunningService::OUTCOMES,
             'historico' => $programa !== null ? $programa->weeks()->limit(8)->get() : collect(),
-            'consequencia' => $programa === null && ($bloqueio === null || $this->anyway)
+            'consequencia' => $programa === null && $prontidao === null && ($bloqueio === null || $this->anyway)
                 ? FormConsequence::runningStart(RunningLadder::describe(RunningLadder::startFor($this->test)), array_map(fn ($d) => $dias[(int) $d] ?? '', collect($this->weekdays)->sort()->values()->all()), $bloqueio !== null)
                 : [],
         ]);

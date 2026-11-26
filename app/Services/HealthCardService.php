@@ -57,13 +57,20 @@ class HealthCardService
         $allergy->delete();
     }
 
-    public function addCondition(ProfileMember $member, string $description, ?ProfileMember $autor): HealthCondition
+    /** @param  array<string, mixed>  $extra  status, since_year, exercise_care e as colunas de origem (ver HealthOrigins) */
+    public function addCondition(ProfileMember $member, string $description, ?ProfileMember $autor, array $extra = []): HealthCondition
     {
-        return HealthCondition::create([
+        return HealthCondition::create($extra + [
             'member_id' => $member->id,
             'description' => trim($description),
             'created_by_member_id' => $autor?->id,
         ]);
+    }
+
+    /** @param  array<string, mixed>  $dados */
+    public function updateCondition(HealthCondition $condition, array $dados): void
+    {
+        $condition->update($dados);
     }
 
     public function removeCondition(HealthCondition $condition): void
@@ -124,11 +131,23 @@ class HealthCardService
             return null;
         }
 
+        // Peso e altura só vão ao QR se a pessoa escolheu, e sempre com a data da pesagem: um peso antigo pode enganar quem atende.
+        $medidas = $card->qr_measurements
+            ? \App\Models\HealthMeasurement::query()->withoutGlobalScopes()->where('member_id', $membro->id)->orderBy('measured_on')->orderBy('created_at')->get()
+            : collect();
+
         return [
             'member' => $membro,
             'card' => $card,
+            'weight' => $medidas->last(fn (\App\Models\HealthMeasurement $m) => $m->weight() !== null),
+            'height' => $medidas->last(fn (\App\Models\HealthMeasurement $m) => $m->height() !== null)?->height(),
+            'limitations' => $card->qr_limitations
+                ? \App\Models\PhysicalLimitation::query()->withoutGlobalScopes()->where('member_id', $membro->id)->orderBy('created_at')->get()->filter(fn (\App\Models\PhysicalLimitation $l) => $l->isActive())->values()
+                : collect(),
             'allergies' => HealthAllergy::query()->withoutGlobalScopes()->where('member_id', $membro->id)->orderBy('created_at')->get(),
-            'conditions' => HealthCondition::query()->withoutGlobalScopes()->where('member_id', $membro->id)->orderBy('created_at')->get(),
+            // Problema resolvido não aparece como atual para quem atende uma emergência.
+            'conditions' => HealthCondition::query()->withoutGlobalScopes()->where('member_id', $membro->id)->orderBy('created_at')->get()
+                ->filter(fn (HealthCondition $c) => $c->isCurrent())->values(),
             'medications' => HealthMedication::query()->withoutGlobalScopes()->where('member_id', $membro->id)->where('is_active', true)->get()->sortBy(fn (HealthMedication $m) => mb_strtolower((string) $m->name))->values(),
             'contacts' => ProfileMember::withoutGlobalScopes()
                 ->where('profile_id', $membro->profile_id)

@@ -35,12 +35,16 @@
                         Só o texto transcrito chega ao Cerne, que o envia à Anthropic (seção 3) para sugerir descrição, valor e categoria. Nada é lançado sem a sua confirmação. Base legal: execução do contrato.
                     </p>
                     <p>
-                        <strong>Saúde (dado pessoal sensível):</strong> ficha de saúde (tipo sanguíneo, alergias, condições, medicamentos), agenda de consultas e exames, itens de cuidado, check-ups e rotinas preventivas,
+                        <strong>Saúde (dado pessoal sensível):</strong> ficha de saúde (tipo sanguíneo, alergias, problemas de saúde com a situação, desde quando e de onde veio a informação, medicamentos, peso, altura e cintura com histórico), agenda de consultas e exames, itens de cuidado, check-ups e rotinas preventivas,
                         pedidos de exame, resultados de exames (valores, unidades, faixas de referência e conclusões de laudos), acompanhamentos de um problema de saúde (nome do problema, situação, anotações, nota de dor e documentos ligados), programa de atividades (orientação recebida, o que evitar,
-                        exercícios que você cadastra, presenças e nota de dor), limitações físicas (região do corpo, situação, o que evitar, orientação recebida, profissional e o que ele respondeu sobre exercícios, esportes e corrida),
+                        exercícios que você cadastra, presenças e nota de dor), limitações físicas, inclusive as do passado (região do corpo, situação, desde quando, o que evitar, orientação recebida, profissional e o que ele respondeu sobre exercícios, esportes e corrida),
                         a lista dos seus médicos e profissionais, o diário e os programas de atividades físicas e os treinos de academia.
                         Só são tratados com o seu <strong>consentimento específico e destacado</strong>, pedido antes de você abrir a área de Saúde. Base legal: consentimento (LGPD, art. 11, I).
                         Você pode revogá-lo a qualquer momento em Minha conta.
+                    </p>
+                    <p>
+                        <strong>Medidas do corpo (dado de saúde):</strong> o peso, a altura e a cintura que você registrar, com a data. O Cerne calcula o índice de massa corporal (IMC) e mostra a faixa de peso de referência para a sua altura, pela tabela do IMC. É uma triagem, não é diagnóstico: não separa músculo de gordura, usa outra faixa a partir dos 60 anos, não vale na gravidez e não é calculada antes dos 18 anos.
+                        Se quiser, você define uma meta de peso para acompanhar, que só você vê. <strong>As medidas começam visíveis só para você.</strong> Você pode ligar, separadamente, o compartilhamento com quem vê a sua ficha, a exibição do peso e da altura (com a data) no QR de emergência e a exibição das limitações físicas ativas nesse QR. As três opções vêm desligadas, e o Cerne não manda aviso sobre o peso. Base legal: consentimento (LGPD, art. 11, I).
                     </p>
                     <p>
                         <strong>Leitura de laudo (opcional):</strong> quando você envia o PDF de um laudo para leitura, o arquivo vai à Anthropic (seção 3), que devolve os resultados. O laudo pode trazer o seu nome, documentos e outros dados.
@@ -63,6 +67,10 @@
                         A folha em PDF para levar à consulta só é gerada quando você pede. Ela traz o seu nome, as limitações consideradas (região e situação), os seus objetivos, a sua semana habitual e os exercícios do treino atual, e quem receber o arquivo vê o que está nele.
                     </p>
                     <p>
+                        <strong>Prontidão e plano da semana (dado de saúde):</strong> as suas respostas a perguntas sobre coração, pressão, dor no peito, tontura, falta de ar, remédios, ossos e articulações, se você tem liberação médica e, tendo, quem liberou e quando; o objetivo, os dias e os tipos de aeróbico do plano, os minutos planejados e o que a atualização mudou no seu treino. Só você vê. Servem para decidir se o plano e o programa de corrida podem progredir e para montar a sua semana.
+                        O Cerne guarda o que você informa e não confere a liberação. Com alguma resposta afirmativa e sem liberação, o plano fica leve, sem aumento, e o programa de corrida não começa nem avança: você muda isso atualizando as respostas. O plano é montado por regras fixas, sem inteligência artificial, não é prescrição, e nada muda no seu treino sem a sua aprovação. Você pode desfazer a atualização. Base legal: consentimento (LGPD, art. 11, I).
+                    </p>
+                    <p>
                         <strong>Médicos e profissionais:</strong> a lista guarda o que você escolher informar sobre cada um (nome, especialidade, registro profissional, local, endereço, telefone e observações) e quem ele atende, para você usar de novo em consultas, exames e acompanhamentos.
                         Nada é enviado a eles. São dados informados por você; o profissional pode pedir a correção ou a eliminação dos dados dele ao encarregado indicado na seção 1. Base legal: consentimento (LGPD, art. 11, I) quanto ao que revela sobre a sua saúde e legítimo interesse quanto aos dados de contato do profissional.
                     </p>
@@ -74,6 +82,9 @@
                     <p>
                         <strong>Dados de quem é convidado:</strong> quando você convida alguém para acompanhar uma pessoa, ou para acompanhar você, guardamos o nome e o e-mail que você informou. Servem para enviar o convite
                         e para identificar o acesso na lista de quem acompanha. Base legal: execução do contrato.
+                    </p>
+                    <p>
+                        <strong>Profissional que revisa as regras de atividades:</strong> um profissional de educação física convidado por nós revisa as regras que o Cerne usa. Dele guardamos o nome, o registro profissional (CREF), o e-mail informado no convite, os pareceres e a data do último acesso. O nome, o registro e a data aparecem no app junto das regras que ele aprovar. Ele acessa por um link, vê apenas as regras e o catálogo de exercícios do Cerne e <strong>não vê dado de nenhum usuário</strong>. Base legal: execução do que foi combinado com ele.
                     </p>
                     <p><strong>Relação com consultor ou corretor:</strong> quando você vincula um profissional, ele passa a ver os dados financeiros e de seguros combinados com você. Dados de saúde nunca são visíveis a consultores ou corretores.</p>
                     <p><strong>Registros técnicos:</strong> endereço de IP, tipo de navegador e erros do sistema, usados para segurança e para corrigir falhas. O registro de erros não guarda os seus dados financeiros. Base legal: legítimo interesse (segurança e melhoria do serviço). O uso de cookies está na seção 12.</p>
@@ -99,7 +110,7 @@
                 <h2 class="{{ $h2 }}">4. Quem da equipe do Cerne pode ver os seus dados</h2>
                 <p class="mt-2">
                     O acesso da equipe a uma conta acontece só para dar suporte, com um motivo escrito, e cada acesso fica registrado (quem, quando e por quê). Você pode ver esses acessos na cópia dos seus dados.
-                    Os campos mais sensíveis ficam cifrados no banco de dados: CPF/CNPJ, telefone, agência e número de conta, anotações, nome do segurado, os textos da ficha, da agenda de saúde, dos check-ups, dos pedidos e resultados de exames, dos acompanhamentos, do programa de atividades, das limitações físicas e da lista de médicos e profissionais, os seus objetivos de atividade, o nome das atividades que você criar e as observações do diário, os textos dos avisos e os dados lidos dos documentos que você importa.
+                    Os campos mais sensíveis ficam cifrados no banco de dados: CPF/CNPJ, telefone, agência e número de conta, anotações, nome do segurado, os textos da ficha, as medidas do corpo, a meta de peso, as respostas de prontidão e quem deu a liberação, os textos da agenda de saúde, dos check-ups, dos pedidos e resultados de exames, dos acompanhamentos, do programa de atividades, das limitações físicas e da lista de médicos e profissionais, os seus objetivos de atividade, o nome das atividades que você criar e as observações do diário, os textos dos avisos e os dados lidos dos documentos que você importa.
                 </p>
             </section>
 
@@ -146,7 +157,8 @@
                 </p>
                 <p class="mt-2">
                     Na saúde, a marca de privado dos lançamentos não se aplica: a ficha, a agenda, os itens de cuidado, os check-ups, os pedidos e resultados de exames, os acompanhamentos, o programa de atividades e as limitações físicas de cada um são vistos pelos dois, e a lista de médicos e profissionais mostra a cada um os que atendem qualquer um dos dois.
-                    Os treinos de academia (exercícios, cargas, séries e histórico), o perfil e o diário de atividades, o programa de caminhada e corrida e as mudanças feitas no treino são só de quem os registrou. Se você ligar uma fase da sua academia a um acompanhamento, quem vê o acompanhamento vê a presença do treino, e não as cargas nem as séries.
+                    <strong>Peso, altura e cintura são a exceção:</strong> cada um vê as suas medidas, e o outro só as vê se a pessoa ligar o compartilhamento.
+                    Os treinos de academia (exercícios, cargas, séries e histórico), o perfil e o diário de atividades, a meta de peso, as respostas de prontidão, o plano da semana, o programa de caminhada e corrida e as mudanças feitas no treino são só de quem os registrou. Se você ligar uma fase da sua academia a um acompanhamento, quem vê o acompanhamento vê a presença do treino, e não as cargas nem as séries.
                     Os lembretes de consultas, de itens de cuidado e de check-ups vão para os dois, desde que cada um tenha dado o consentimento de saúde.
                 </p>
             </section>
@@ -161,7 +173,7 @@
                     </p>
                     <p>
                         <strong>O que o cuidador vê.</strong> O cuidador é alguém que o responsável convida e que entra com a própria conta, sem precisar de assinatura nem de perfil financeiro. Ele vê apenas os dados de saúde da pessoa
-                        (ficha, agenda de consultas e exames, itens de cuidado, check-ups, pedidos e resultados de exames, acompanhamentos, programa de atividades, limitações físicas e os médicos e profissionais que a atendem) e os documentos que o responsável liberar, além dos documentos que o próprio cuidador cadastrar. Ele <strong>nunca</strong> vê finanças, seguros, treinos de academia, diário de atividades ou qualquer outra área
+                        (ficha, com as medidas do corpo, agenda de consultas e exames, itens de cuidado, check-ups, pedidos e resultados de exames, acompanhamentos, programa de atividades, limitações físicas e os médicos e profissionais que a atendem) e os documentos que o responsável liberar, além dos documentos que o próprio cuidador cadastrar. Ele <strong>nunca</strong> vê finanças, seguros, treinos de academia, diário de atividades ou qualquer outra área
                         do responsável. Consultores e corretores, mesmo vinculados ao responsável, também nunca abrem o espaço da pessoa acompanhada.
                     </p>
                     <p>
@@ -191,7 +203,7 @@
                 <div class="mt-2 space-y-3">
                     <p>
                         Em qualquer perfil, você pode convidar alguém (um filho, um irmão, um cuidador) para acompanhar a <strong>sua própria</strong> saúde, as <strong>suas próprias</strong> finanças ou as duas coisas. Isso não exige assinatura, nem de quem convida nem de quem aceita.
-                        Na saúde, a pessoa convidada vê a sua ficha, a sua agenda, os seus itens de cuidado, check-ups, pedidos e resultados de exames, acompanhamentos, programa de atividades, limitações físicas, os médicos e profissionais que atendem você e os documentos de saúde que forem seus, com acesso de leitura ou de edição, como você escolher, e vale o consentimento de saúde que você deu para si mesmo. Os seus treinos de academia, o seu diário de atividades e o seu programa de caminhada e corrida não entram.
+                        Na saúde, a pessoa convidada vê a sua ficha, a sua agenda, os seus itens de cuidado, check-ups, pedidos e resultados de exames, acompanhamentos, programa de atividades, limitações físicas, os médicos e profissionais que atendem você e os documentos de saúde que forem seus, com acesso de leitura ou de edição, como você escolher, e vale o consentimento de saúde que você deu para si mesmo. As suas medidas do corpo só entram se você ligar o compartilhamento. Os seus treinos de academia, o seu diário de atividades, a sua meta de peso, as respostas de prontidão, o plano da semana e o seu programa de caminhada e corrida não entram.
                     </p>
                     <p>
                         <strong>Finanças são sempre somente leitura.</strong> Quem acompanha as suas finanças vê contas, cartões, lançamentos, contas a vencer e atrasadas, investimentos, dívidas, seguros e metas, e não altera nada.
@@ -245,7 +257,7 @@
                     e o assistente apenas consulta. Ela pode errar, por isso confira os valores. Você pode pedir a revisão de um tratamento automatizado ao encarregado indicado na seção 1.
                 </p>
                 <p class="mt-2">
-                    Na área de Atividades não há inteligência artificial: as sugestões sobre o treino, os avisos de encaixe, a carga da semana e os passos de caminhada e corrida são regras fixas calculadas no próprio Cerne, e nada muda no seu treino sem a sua aprovação.
+                    Na área de Atividades e nas medidas do corpo não há inteligência artificial: o IMC e a faixa de referência, a prontidão, o plano da semana, as sugestões sobre o treino, os avisos de encaixe, a carga da semana e os passos de caminhada e corrida são regras fixas calculadas no próprio Cerne, e nada muda no seu treino sem a sua aprovação. A única restrição automática é a da prontidão (seção 2), que impede o plano e a corrida de progredir sem liberação médica: você pode atualizar as respostas ou pedir a revisão ao encarregado.
                 </p>
             </section>
 

@@ -217,7 +217,7 @@ continua). Regras que não se quebram:
 
 ### Privacidade e LGPD
 
-Texto da política em `/privacidade` (versão `terms_version` e `health_consent_version` de 2026-11-28; o aviso de rascunho saiu da política e dos Termos de Uso por decisão do dono, **mas o texto ainda não passou por advogado**), plano de incidente em `INCIDENTES.md`. **Política e recurso andam juntos: quem passa a mandar dado a um terceiro novo (nova leitura por IA, novo operador) atualiza as seções 2, 3 e 13 da política e sobe a versão.** Regras que não se quebram:
+Texto da política em `/privacidade` (versão `terms_version` e `health_consent_version` de 2026-11-29; o aviso de rascunho saiu da política e dos Termos de Uso por decisão do dono, **mas o texto ainda não passou por advogado**), plano de incidente em `INCIDENTES.md`. **Política e recurso andam juntos: quem passa a mandar dado a um terceiro novo (nova leitura por IA, novo operador) atualiza as seções 2, 3 e 13 da política e sobe a versão.** Regras que não se quebram:
 
 - **Aceite versionado** (`config cerne.legal.terms_version`, `RequiresCurrentTerms`, grupo `termos` de toda rota autenticada): mudar o texto dos Termos ou da
   Política exige subir a versão, e todo mundo aceita de novo no próximo acesso. Todo caminho que cria conta grava `terms_accepted_at` **e** `terms_version`.
@@ -693,6 +693,44 @@ Decisões do dono em 2026-11-26. Regras que não se quebram:
 - **Corrida**: regras fixas (`RunningLadder`, `RunningService`); com limitação que recomende aguardar, só começa com "Montar mesmo assim", e a escolha fica registrada
   (`chose_despite_limitation_at`). A semana fecha uma vez (índice único `program_id + week_start`), com a confirmação da pessoa.
 - **Ainda não feito**: leitura por IA da folha do médico (decisão: segundo momento) e integração com relógios e apps (a API do Strava não serve: 7 dias de cache e só o próprio atleta).
+
+### Ficha de Saúde ampliada: medidas, problemas e limitações
+
+`HealthMeasurement` (peso, altura, cintura; `MeasurementsPanel`), `HealthCondition` com situação e origem, `PhysicalLimitation` também pela ficha. Testes: `HealthRecordPlannerTest`.
+Decisões do dono em 2026-11-26. Regras:
+
+- **Medida é mais fechada que o resto da ficha** (`HealthMeasurementScope`): cada um vê as suas; cônjuge e quem acompanha só se a PRÓPRIA pessoa ligar `health_cards.share_measurements`
+  (na pessoa acompanhada, quem cuida vê). Consultor nunca. Só a própria pessoa grava, apaga e muda o que mostra (o model recusa os outros). Cifrada: conta no PHP.
+- **QR de emergência**: peso e altura (com a data) e limitações ativas são opções separadas, **desligadas por padrão**; problema resolvido não aparece.
+- **IMC é triagem** (`BodyMass`): faixa de adultos, outra a partir dos 60, nada antes dos 18; a tela mostra a faixa de peso para a altura ("Pela tabela do IMC...") e não diagnostica.
+  **Meta de peso** é opcional, só da própria pessoa (mora no `ActivityProfile`), recusada abaixo da faixa e para quem já está abaixo dela. Sem aviso sobre peso.
+- **Problema e limitação guardam a origem** (`HealthOrigins`: acompanhamento, consulta, exame ou passado), conferida na MESMA pessoa. "Adicionar à ficha" só abre o formulário: um
+  exame nunca cria problema sozinho. Excluir o acompanhamento não apaga problema nem limitação (são fatos sobre a pessoa); a limitação sem acompanhamento não tem programa, e ao registrar
+  a consulta com exercícios nasce um acompanhamento "Limitação: {região}".
+- "Pede cuidado no exercício" é marcado pela pessoa (o Cerne não deduz pelo nome) e faz as respostas de prontidão vencerem.
+
+### Prontidão, plano da semana e "Atualizar meu programa"
+
+`ReadinessService`, `WeekPlannerService`, `ProgramUpdateService`, telas `/saude/atividades/prontidao` e `/saude/atividades/plano`. Tudo `IsPersonalHealthData`. Regras:
+
+- **Prontidão vem antes do plano e da corrida.** Algum "sim" recomenda liberação médica; sem ela o plano é **leve** (sem aumento, sem mudar séries) e a corrida **não começa nem avança**,
+  sem "montar assim mesmo" (essa escolha continua valendo só para o aviso de limitação). Vence em 12 meses ou quando um problema com "pede cuidado" muda. O Cerne não confere a liberação.
+- **Parte do que foi FEITO** (média das 4 semanas encerradas no diário; sem diário, o perfil). Alvo e progressão em `PlanRules` (OMS 150 a 300; +15 min por semana; a cada 4ª, 20% a menos;
+  teto 300; quem já passa não aumenta). **A progressão anda pelo que foi feito** (semana com 80% ou mais), nunca pelo calendário. Os minutos de cada semana são calculados, não gravados.
+- Dia de esporte e dia do programa de corrida não recebem aeróbico e os minutos deles contam; sobra ao menos um dia livre; pernas fogem da véspera do esporte. Corrida não é tipo do plano.
+- **O previsto "p:{plano}:{semana}:{dia}" não é gravado** (mesma regra da semana): vira registro no "Fiz".
+- **Atualizar mantém os exercícios e o histórico.** Aplica só o aprovado: dias da academia, séries/repetições/descanso do objetivo perder peso (pela MESMA regra do treino automático,
+  nunca no que o profissional indicou) e pausas por limitação (`PlanReviewService`, ação `skip` para o que não foi marcado). Tudo vira `gym_plan_adjustments` com `activity_plan_id`
+  (kind `reps` para séries) e **desfazer** devolve ao que era antes da PRIMEIRA atualização. Refazer o plano nunca solta o que foi pausado.
+
+### Revisão das regras por um profissional de educação física
+
+`RuleBook` monta as regras **do próprio código** (versão = impressão digital do conteúdo); `RuleReviewService`, `/admin/regras` (administrador, nunca em "Entrar como") e
+`/revisao-das-regras/{token}` (sem login, link de 60 dias, banco guarda só o hash, revogar corta na hora, **nenhum dado de usuário**, só o catálogo padrão).
+
+- `<x-rule-status key="...">` diz nas telas se a versão ATUAL foi aprovada (vale o último parecer enviado). **Mudou a regra no código, a aprovação cai sozinha.**
+- **Não há editor de regra no app**: pedido de ajuste vira mudança no código e publicação. Regra nova de atividade que o app passe a usar **entra no `RuleBook`**.
+- `RuleReviewer` e `RuleReview` estão em `EXEMPT` do `TenancyCoverageTest`.
 
 ### Calendário (Saúde e agenda do profissional)
 
