@@ -207,6 +207,26 @@ final class ExamCatalog
         return $indice[self::normalize($texto)] ?? null;
     }
 
+    /** A área de um exame do catálogo (pelo nome ou por um nome alternativo); nulo para o que a pessoa digitou. */
+    public static function categoryOf(string $nome): ?string
+    {
+        $oficial = self::examFor($nome);
+
+        if ($oficial === null) {
+            return null;
+        }
+
+        foreach (self::EXAMS as $tipo => $lista) {
+            foreach ($lista as [$exame]) {
+                if ($exame === $oficial) {
+                    return $tipo;
+                }
+            }
+        }
+
+        return null;
+    }
+
     public static function isConsultation(string $nome): bool
     {
         return str_starts_with(self::normalize($nome), 'consulta') || str_starts_with(self::normalize($nome), 'retorno');

@@ -19,6 +19,30 @@
 
     @include('livewire.health.exams.partials.open-readings', ['leituras' => $leituras, 'variasPessoas' => false])
 
+    @if ($separacao && $podeEscrever)
+        <section class="space-y-3 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-200" data-separar>
+            <p class="font-medium">Este pedido tem exames de {{ count($separacao['groups']) }} áreas.</p>
+            @if (! $splitting)
+                <button type="button" wire:click="$set('splitting', true)" class="btn-secondary px-3 py-1.5 text-xs">Separar por área</button>
+            @else
+                <ul class="space-y-2">
+                    @foreach ($separacao['groups'] as $area => $doGrupo)
+                        <li>
+                            <strong>{{ $area === $separacao['primary'] ? $pedido->title : $areas[$area][1] }}</strong>
+                            ({{ $areas[$area][0] }}, {{ $doGrupo->count() }}{{ $area === $separacao['primary'] ? ', continua neste pedido' : ', pedido novo' }}):
+                            {{ $doGrupo->pluck('name')->implode(', ') }}
+                        </li>
+                    @endforeach
+                </ul>
+                <x-form-consequence :lines="\App\Support\Forms\FormConsequence::examSplit(count($separacao['groups']))" />
+                <div class="flex flex-wrap items-center gap-3">
+                    <button type="button" wire:click="split" class="btn-primary px-3 py-1.5 text-sm">Confirmar separação</button>
+                    <button type="button" wire:click="$set('splitting', false)" class="text-xs underline">Cancelar</button>
+                </div>
+            @endif
+        </section>
+    @endif
+
     <section class="card min-w-0 space-y-4 p-5">
         <div class="flex flex-wrap items-center justify-between gap-2">
             <p class="eyebrow">Exames pedidos</p>
@@ -169,10 +193,7 @@
                     <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Nome do pedido</label>
                     <input type="text" wire:model="title" class="input mt-1.5">
                 </div>
-                <div>
-                    <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Quem pediu (opcional)</label>
-                    <input type="text" wire:model="requestedBy" class="input mt-1.5">
-                </div>
+                <x-health.professional-field model="requestedBy" label="Quem pediu (opcional)" :field="$campoProfissional" />
             </div>
             <div>
                 <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Observações do pedido</label>

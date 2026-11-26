@@ -63,6 +63,7 @@ class HealthExamResultService
                 'performed_on' => $data,
                 'lab' => $this->blankToNull($dados['lab'] ?? null),
                 'doctor' => $this->blankToNull($dados['doctor'] ?? null),
+                'professional_id' => $dados['professional_id'] ?? null,
                 'exam_name' => $tipo === HealthExamReport::KIND_TEXT ? $exame : null,
                 'conclusion' => $this->blankToNull($dados['conclusion'] ?? null),
                 'highlight' => $this->blankToNull($dados['highlight'] ?? null),

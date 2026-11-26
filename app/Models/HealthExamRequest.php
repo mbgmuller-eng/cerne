@@ -17,7 +17,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * Um pedido do médico ("Exames de sangue", "Avaliação cardiológica"), com a lista de exames em HealthExamItem. Cada item marca a própria data e
  * recebe o próprio resultado. A coluna `appointment_id` é de quando o pedido era um exame só e não é mais lida (ver a migração dos itens).
  */
-#[Fillable(['profile_id', 'member_id', 'kind', 'category', 'title', 'requested_on', 'requested_by', 'notes', 'routine_id', 'followup_id', 'created_by_member_id', 'created_by_user_id', 'changed_by_user_id'])]
+#[Fillable(['professional_id', 'profile_id', 'member_id', 'kind', 'category', 'title', 'requested_on', 'requested_by', 'notes', 'routine_id', 'followup_id', 'created_by_member_id', 'created_by_user_id', 'changed_by_user_id'])]
 class HealthExamRequest extends Model
 {
     use BelongsToProfile, HasActorUser, HasUuids, IsCoupleHealthData;

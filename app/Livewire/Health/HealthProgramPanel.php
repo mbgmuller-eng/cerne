@@ -26,7 +26,7 @@ use Livewire\Component;
  */
 class HealthProgramPanel extends Component
 {
-    use RequiresPersonalHealth;
+    use \App\Livewire\Health\Concerns\PicksHealthProfessional, RequiresPersonalHealth;
 
     #[Locked]
     public string $followupId = '';
@@ -89,6 +89,7 @@ class HealthProgramPanel extends Component
             $this->guidedBy = (string) $a->guided_by;
             $this->guidedOn = $a->guided_on?->toDateString() ?? '';
             $this->avoid = (string) $a->avoid;
+            $this->resetProfessional($a->professional_id, (string) $a->guided_by === '');
         }
 
         if ($this->panel === 'activity') {
@@ -121,8 +122,22 @@ class HealthProgramPanel extends Component
             'avoid' => ['nullable', 'string', 'max:1000'],
         ], attributes: ['guidedBy' => 'quem orientou', 'guidedOn' => 'data da orientação', 'avoid' => 'o que evitar']);
 
-        $service->saveProgram($this->followup(), ['guided_by' => $this->guidedBy, 'guided_on' => $this->guidedOn, 'avoid' => $this->avoid]);
+        $acompanhamento = $this->followup();
+        $service->saveProgram($acompanhamento, [
+            'guided_by' => $this->guidedBy, 'guided_on' => $this->guidedOn, 'avoid' => $this->avoid,
+            'professional_id' => $this->resolveProfessional($acompanhamento->member_id, $this->guidedBy),
+        ]);
         $this->panel = '';
+    }
+
+    protected function professionalPersonId(): string
+    {
+        return $this->followup()->member_id;
+    }
+
+    protected function applyProfessional(\App\Models\HealthProfessional $profissional): void
+    {
+        $this->guidedBy = $profissional->name;
     }
 
     public function saveActivity(HealthActivityService $service): void
@@ -243,6 +258,7 @@ class HealthProgramPanel extends Component
         $rotulo = fn (array $s) => $s['week']->format('d/m');
 
         return view('livewire.health.health-program-panel', [
+            'campoProfissional' => $this->panel === 'program' ? $this->professionalField($acompanhamento->member_id, $this->guidedBy) : null,
             'acompanhamento' => $acompanhamento,
             'atividades' => $atividades,
             'escolhida' => $escolhida,

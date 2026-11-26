@@ -30,7 +30,7 @@ use Livewire\Component;
 #[Layout('components.layouts.app')]
 class HealthAppointmentIndex extends Component
 {
-    use HasCalendar, RequiresActiveProfile, RequiresPersonalHealth;
+    use \App\Livewire\Health\Concerns\PicksHealthProfessional, HasCalendar, RequiresActiveProfile, RequiresPersonalHealth;
 
     public bool $showForm = false;
     public ?string $editingId = null;
@@ -65,6 +65,26 @@ class HealthAppointmentIndex extends Component
         $this->redirectOrAbortWithoutProfile();
         $this->abortUnlessHealthParticipant();
         $this->openFromLink();
+        $this->openWithProfessional();
+    }
+
+    /** Veio de "Marcar consulta" na ficha de um profissional: o formulário abre com ele escolhido. */
+    private function openWithProfessional(): void
+    {
+        $id = request()->query('profissional');
+        $profissional = is_string($id) && $id !== '' ? app(\App\Services\HealthProfessionalService::class)->visible()->firstWhere('id', $id) : null;
+
+        if ($profissional === null) {
+            return;
+        }
+
+        $this->newAppointment();
+
+        if (! $profissional->links->contains('member_id', $this->memberId)) {
+            $this->memberId = $profissional->links->first()->member_id;
+        }
+
+        $this->pickProfessional($profissional->id);
     }
 
     /** Veio de "+ Consulta" num check-up ou num acompanhamento: o formulário já abre ligado a ele. */
@@ -88,6 +108,25 @@ class HealthAppointmentIndex extends Component
     {
         $this->routineId = '';
         $this->followupId = '';
+        $this->professionalId = '';
+    }
+
+    protected function professionalPersonId(): string
+    {
+        return $this->editingId !== null ? HealthAppointment::query()->findOrFail($this->editingId)->member_id : (string) $this->memberId;
+    }
+
+    /** O cadastro preenche o que ele tem; o que a ficha não tem fica como a pessoa digitou. O telefone só entra se couber no formato da consulta. */
+    protected function applyProfessional(\App\Models\HealthProfessional $profissional): void
+    {
+        $this->professionalName = $profissional->name;
+        $this->specialty = $profissional->specialty !== null ? mb_substr($profissional->specialty, 0, 80) : $this->specialty;
+        $this->location = $profissional->place !== null ? mb_substr($profissional->place, 0, 160) : $this->location;
+        $this->address = $profissional->address ?? $this->address;
+
+        if (preg_match('/^[\d\s().+\-]{8,30}$/', (string) $profissional->phone) === 1) {
+            $this->phone = (string) $profissional->phone;
+        }
     }
 
     // -----------------------------------------------------------------
@@ -242,6 +281,7 @@ class HealthAppointmentIndex extends Component
         $this->notes = (string) $consulta->notes;
         $this->routineId = (string) $consulta->routine_id;
         $this->followupId = $this->followupAtOpen = (string) $consulta->followups()->first()?->id;
+        $this->resetProfessional($consulta->professional_id, (string) $consulta->professional_name === '');
         $this->showForm = true;
     }
 
@@ -298,10 +338,18 @@ class HealthAppointmentIndex extends Component
         $rotina = $this->routineId !== '' ? \App\Models\HealthRoutine::query()->where('member_id', $pessoa)->findOrFail($this->routineId) : null;
         $acompanhamento = $this->followupId !== '' ? \App\Models\HealthFollowup::query()->where('member_id', $pessoa)->findOrFail($this->followupId) : null;
 
+        $profissional = $consulta ? $this->resolveProfessional((string) $pessoa, $this->professionalName, [
+            'specialty' => $this->specialty, 'place' => $this->location, 'address' => $this->address, 'phone' => $this->phone,
+        ]) : null;
+
         if ($this->editingId !== null) {
             $gravada = $service->update(HealthAppointment::query()->findOrFail($this->editingId), $dados);
         } else {
             $gravada = $service->create($this->membroOuFalha($this->memberId), $dados, $this->autor());
+        }
+
+        if ($gravada->professional_id !== $profissional) {
+            $gravada->update(['professional_id' => $profissional]);
         }
 
         $this->ligar($gravada, $rotina, $acompanhamento);
@@ -396,6 +444,7 @@ class HealthAppointmentIndex extends Component
             'upcoming' => HealthAppointment::query()->where('profile_id', $profileId)->upcoming()->with(['member', 'createdByUser', 'escort', 'routine', 'followups'])->get(),
             'past' => HealthAppointment::query()->where('profile_id', $profileId)->past()->with(['member', 'createdByUser', 'statusBy', 'routine', 'followups'])->get(),
             'pedidosSemData' => \App\Models\HealthExamRequest::query()->open()->with(['member', 'items.appointment'])->orderBy('requested_on')->get(),
+            'campoProfissional' => $this->showForm && $this->kind === 'consultation' ? $this->professionalField((string) $this->memberId, $this->professionalName) : null,
             'rotinasDaPessoa' => $this->showForm && $this->memberId ? \App\Models\HealthRoutine::query()->where('member_id', $this->memberId)->get() : collect(),
             'acompanhamentosDaPessoa' => $this->showForm && $this->memberId ? \App\Models\HealthFollowup::query()->where('member_id', $this->memberId)->orderByDesc('started_on')->get() : collect(),
             'editingExisting' => $this->editingId !== null,
@@ -453,6 +502,7 @@ class HealthAppointmentIndex extends Component
             'bookedByName', 'bookedWithName', 'scheduledDate', 'scheduledTime', 'notes', 'routineId', 'followupId', 'followupAtOpen',
         );
         $this->kind = 'consultation';
+        $this->resetProfessional();
         $this->resetErrorBag();
     }
 }

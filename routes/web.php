@@ -281,6 +281,7 @@ Route::middleware(['auth', 'verified', 'termos', 'dois-passos', 'cuidado'])->gro
         Route::get('/saude/acompanhamentos', \App\Livewire\Health\HealthFollowupIndex::class)->name('health.followups.index');
         Route::get('/saude/acompanhamentos/{followup}', \App\Livewire\Health\HealthFollowupShow::class)->name('health.followups.show');
         Route::get('/saude/acompanhamentos/{followup}/resumo.pdf', \App\Http\Controllers\HealthFollowupPdfController::class)->name('health.followups.pdf');
+        Route::get('/saude/profissionais', \App\Livewire\Health\HealthProfessionalIndex::class)->name('health.professionals.index');
         // Pedidos de exame e resultados. Os caminhos fixos vêm antes de {pedido}.
         Route::get('/saude/exames', \App\Livewire\Health\Exams\HealthExamIndex::class)->name('health.exams.index');
         Route::get('/saude/exames/novo', \App\Livewire\Health\Exams\HealthExamBuilder::class)->name('health.exams.create');

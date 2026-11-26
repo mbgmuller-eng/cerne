@@ -20,10 +20,7 @@
     @if ($panel === 'program')
         <form wire:submit="saveProgram" class="space-y-3 rounded-xl border border-dashed border-slate-200 p-3 dark:border-white/10">
             <div class="grid gap-3 sm:grid-cols-[minmax(0,1fr)_12rem]">
-                <div>
-                    <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Quem orientou</label>
-                    <input type="text" wire:model="guidedBy" class="input mt-1.5" placeholder="Ex.: Fisioterapeuta Marina">
-                </div>
+                <x-health.professional-field model="guidedBy" label="Quem orientou" :field="$campoProfissional" placeholder="Ex.: Fisioterapeuta Marina" maxlength="160" />
                 <div>
                     <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Quando</label>
                     <input type="date" wire:model="guidedOn" class="input mt-1.5">

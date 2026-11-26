@@ -53,6 +53,8 @@ class CaregiverTest extends TestCase
         'HealthActivity', 'HealthActivityExercise', 'HealthActivitySession', 'HealthExamRequest', 'HealthFollowup', 'HealthFollowupNote', 'HealthRoutine',
         // Exames: lista do pedido, resultados e leitura do laudo. Decisão do dono em 2026-11-26: os mesmos que veem a Agenda.
         'HealthExamItem', 'HealthExamReading', 'HealthExamReport', 'HealthExamValue',
+        // Médicos e profissionais: só os que atendem a pessoa acompanhada (decisão do dono em 2026-11-26).
+        'HealthProfessional', 'HealthProfessionalLink',
     ];
 
     protected function setUp(): void

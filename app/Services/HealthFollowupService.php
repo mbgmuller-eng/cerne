@@ -65,6 +65,7 @@ class HealthFollowupService
     {
         $acompanhamento->update([
             'guided_by' => $this->blankToNull($dados['guided_by'] ?? null),
+            'professional_id' => $dados['professional_id'] ?? null,
             'guided_on' => ($dados['guided_on'] ?? null) ?: null,
             'avoid' => $this->blankToNull($dados['avoid'] ?? null),
         ]);

@@ -648,6 +648,8 @@ Telas em `/saude/exames` (`App\Livewire\Health\Exams`), serviços `HealthExamSer
 
 - **O pedido tem uma lista** (`HealthExamItem`): cada item tem detalhe, data e resultado próprios. Vários itens podem ir para o MESMO compromisso (`appointment_id` não é único); compromisso cancelado, não realizado ou apagado
   devolve os itens para "falta agendar". A situação é calculada (`HealthExamItem::status`, escopo `pending`), nunca gravada. `health_exam_requests.appointment_id` ficou da versão de um exame só e não é mais lido (a migração copiou cada pedido antigo para um item).
+- **Um pedido por área** (decisão do dono em 2026-11-26, depois de ver tudo cair em "Exames de sangue"): a área é de CADA exame (a do catálogo; para o digitado, a da aba ou a que a pessoa escolher), a aba aberta nunca decide a área do pedido, e salvar usa `HealthExamService::createByArea` (médico, data, check-up e acompanhamento em comum; nome e observações por área).
+  Pedido misturado de antes tem "Separar por área" (`splitPreview`/`splitByArea`, com prévia): datas e resultados ficam; o laudo vai junto quando todos os exames dele foram para o pedido novo.
 - **O Cerne não sugere exame**: nada vem marcado. A lista é código (`ExamCatalog`), com os nomes alternativos e os marcadores; o que a pessoa digitou volta a aparecer porque sai dos itens antigos (nomes cifrados, filtro em PHP).
 - **Resultado** é um `HealthExamReport`: de valores (`HealthExamValue`) ou de conclusão (copiada como está no laudo). A comparação junta o mesmo marcador entre laboratórios por `ExamCatalog::markerKey` (nome INTEIRO normalizado, nunca pedaço); é montada em PHP porque tudo é cifrado.
 - **Destaque conservador** (`ReferenceRange`): só quando a referência IMPRESSA NAQUELE laudo é uma faixa simples ("70 a 99", "menor que 130"). Várias faixas, texto ou valor não numérico: sem destaque. O Cerne nunca interpreta nem diagnostica. Unidade diferente fica fora do gráfico, com o motivo.
@@ -655,6 +657,15 @@ Telas em `/saude/exames` (`App\Livewire\Health\Exams`), serviços `HealthExamSer
   descartar apaga; nunca revisado sai em 90 dias (`DataRetentionService`). Teto por perfil e por dia (`cerne.ai.exam_reads_per_day`, falha e descarte contam). A instrução manda tratar o documento como dado e não copiar dados que identificam o paciente. A tela avisa, antes do envio, que o arquivo vai à Anthropic.
   Sem `ANTHROPIC_API_KEY` o envio é recusado (digita-se à mão). Falha na leitura deixa digitar, e o PDF vai junto ao salvar. Mensagem técnica fica no acompanhamento de erros.
 - **Mesma visibilidade da Agenda** (`IsCoupleHealthData` nos quatro models novos), inclusive pessoa acompanhada (rotas no `RestrictCareContext`). O arquivo não passa pela trava do model: `HealthExamReadingService::request/confirm` barram quem só lê ANTES de gravar.
+
+### Médicos e profissionais (Saúde)
+
+`HealthProfessional` + `HealthProfessionalLink` (quem ele atende), `HealthProfessionalService`, tela `/saude/profissionais`. Teste: `HealthProfessionalsTest`. Regras:
+
+- **Quem vê é decidido pela ligação**: `HealthProfessionalScope` só devolve quem atende alguém que quem olha enxerga (a ligação passa pelo `CoupleHealthScope`): o casal vê os dos dois, quem acompanha uma pessoa vê só os dela e não vê os outros vínculos, consultor nunca. **Editar mexe só nas ligações visíveis**; as escondidas ficam. Vale a regra de sempre do acompanhante: edição só apaga o que ele registrou.
+- **O registro guarda o NOME como foi escrito**; `professional_id` (consulta, pedido, laudo, programa, remédio) só o liga à ficha. Mudar ou apagar a ficha não reescreve registro.
+- **Nada é guardado sozinho**: o campo (`<x-health.professional-field>` + trait `PicksHealthProfessional`, um por tela) reaproveita pelo nome e só cria com "Guardar este profissional" marcado. No laudo começa **desmarcado** (quem assina raramente é o médico da pessoa); em registro que já tinha nome, também. Os "nomes que você já digitou" são sugestão; guardar liga os registros com exatamente aquele nome das pessoas atendidas (atualização sem eventos: não avisa ninguém).
+- Nomes cifrados: busca, ordem (fixos primeiro) e comparação em PHP. Escolher um profissional vindo do navegador é conferido entre os da pessoa do formulário (404).
 
 ### Calendário (Saúde e agenda do profissional)
 

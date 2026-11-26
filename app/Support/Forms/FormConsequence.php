@@ -319,16 +319,46 @@ final class FormConsequence
         ]));
     }
 
-    /** @return list<string> */
-    public static function examOrder(int $quantos): array
+    /**
+     * @param  array<string, int>  $porArea  rótulo da área => quantos exames
+     * @return list<string>
+     */
+    public static function examOrder(array $porArea): array
     {
+        $quantos = array_sum($porArea);
+
         if ($quantos === 0) {
             return [];
         }
 
+        $linhas = [];
+
+        if (count($porArea) > 1) {
+            $partes = array_map(fn (string $area, int $n) => "{$area} ({$n})", array_keys($porArea), array_values($porArea));
+            $linhas[] = 'Serão criados '.count($porArea).' pedidos, um para cada área: '.implode(', ', $partes).'.';
+        }
+
+        $linhas[] = ($quantos === 1 ? 'O exame fica' : "Os {$quantos} exames ficam").' em "falta agendar". Nada vai para a Agenda de Saúde até você marcar a data.';
+        $linhas[] = 'Quem vê a Agenda de Saúde desta pessoa vê '.(count($porArea) > 1 ? 'os pedidos' : 'o pedido').'. O consultor não vê.';
+
+        return $linhas;
+    }
+
+    /** @return list<string> */
+    public static function healthProfessional(bool $editando): array
+    {
+        return array_values(array_filter([
+            'O profissional aparece nas consultas e nos pedidos das pessoas marcadas. Quem vê a Agenda de Saúde delas vê o cadastro. O consultor não vê.',
+            $editando ? 'Consultas e pedidos antigos ficam como foram registrados.' : 'Registros já escritos com este mesmo nome passam a aparecer no histórico dele.',
+        ]));
+    }
+
+    /** @return list<string> */
+    public static function examSplit(int $areas): array
+    {
         return [
-            ($quantos === 1 ? 'O exame fica' : "Os {$quantos} exames ficam").' em "falta agendar". Nada vai para a Agenda de Saúde até você marcar a data.',
-            'Quem vê a Agenda de Saúde desta pessoa vê o pedido. O consultor não vê.',
+            "Ficam {$areas} pedidos, com o mesmo médico, data, check-up e acompanhamento.",
+            'Datas marcadas e resultados continuam como estão. As observações ficam no pedido original.',
         ];
     }
 

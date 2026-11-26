@@ -11,7 +11,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable([
+#[Fillable(['professional_id', 
     'profile_id', 'member_id', 'name', 'dose', 'schedule', 'reason', 'prescriber',
     'started_on', 'ended_on', 'is_active', 'created_by_member_id', 'created_by_user_id',
 ])]

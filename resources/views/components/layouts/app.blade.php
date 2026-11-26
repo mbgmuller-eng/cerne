@@ -51,6 +51,7 @@
         ['health.routines.index', 'Check-ups e rotinas', 'Check-ups', 'heart'],
         ['health.followups.index', 'Acompanhamentos', 'Acompanhar', 'contact'],
         ['health.exams.index', 'Exames', 'Exames', 'bills'],
+        ['health.professionals.index', 'Médicos e profissionais', 'Médicos', 'users'],
         ['health.care.index', 'Cuidados e itens', 'Cuidados', 'tag'],
     ];
 
@@ -90,6 +91,7 @@
                 ['health.routines.index', 'Check-ups e rotinas', 'Check-ups', 'heart'],
                 ['health.followups.index', 'Acompanhamentos', 'Acompanhar', 'contact'],
                 ['health.exams.index', 'Exames', 'Exames', 'bills'],
+                ['health.professionals.index', 'Médicos e profissionais', 'Médicos', 'users'],
                 ['health.care.index', 'Cuidados e itens', 'Cuidados', 'tag'],
                 $itemPessoas,
             ]] : null,

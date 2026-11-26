@@ -17,7 +17,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * Acompanhamento de um problema de saúde: a linha do tempo de consultas, exames, documentos e anotações, e o programa de atividades que um
  * profissional orientou. A ligação com os compromissos da Agenda é muitos para muitos (a consulta do check-up pode abrir um problema).
  */
-#[Fillable(['profile_id', 'member_id', 'title', 'status', 'started_on', 'resolved_on', 'guided_by', 'guided_on', 'avoid', 'created_by_member_id', 'created_by_user_id', 'changed_by_user_id'])]
+#[Fillable(['professional_id', 'profile_id', 'member_id', 'title', 'status', 'started_on', 'resolved_on', 'guided_by', 'guided_on', 'avoid', 'created_by_member_id', 'created_by_user_id', 'changed_by_user_id'])]
 class HealthFollowup extends Model
 {
     use BelongsToProfile, HasActorUser, HasUuids, IsCoupleHealthData;

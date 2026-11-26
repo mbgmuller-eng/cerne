@@ -341,6 +341,18 @@ return [
             'tip' => 'O Cerne não interpreta resultado. Leve ao médico o PDF do acompanhamento ou os laudos.',
         ],
 
+        'health.professionals.index' => [
+            'title' => 'Médicos e profissionais',
+            'summary' => 'Quem atende ou já atendeu, para usar de novo em consultas e pedidos.',
+            'steps' => [
+                'Use “+ Novo profissional” ou, ao digitar um nome em uma consulta ou pedido, marque “Guardar este profissional”.',
+                'Marque quem ele atende: é isso que define em quais formulários ele aparece e quem o vê.',
+                'Marque como fixo quem acompanha você sempre, para ficar no topo das listas.',
+                'Na ficha, veja o histórico e marque uma consulta ou um pedido de exames direto dali.',
+            ],
+            'tip' => 'Nomes que você já tinha digitado aparecem como sugestão. Nada é guardado sem você pedir.',
+        ],
+
         'health.gym.index' => [
             'title' => 'Academia',
             'summary' => 'Seu plano de treino, o próximo treino e as últimas sessões. Só você vê estes dados.',

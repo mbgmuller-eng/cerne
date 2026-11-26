@@ -26,7 +26,7 @@ class HealthExamService
     public const MAX_ITEMS = 60;
 
     /**
-     * @param  array{title: string, category?: ?string, requested_by?: ?string, requested_on?: ?string, notes?: ?string, items: list<array{name: string, detail?: ?string}>}  $dados
+     * @param  array{title: string, category?: ?string, requested_by?: ?string, professional_id?: ?string, requested_on?: ?string, notes?: ?string, items: list<array{name: string, detail?: ?string}>}  $dados
      */
     public function createOrder(ProfileMember $membro, array $dados, ?HealthRoutine $rotina, ?HealthFollowup $acompanhamento, ?ProfileMember $autor): HealthExamRequest
     {
@@ -55,6 +55,7 @@ class HealthExamService
                 'title' => $titulo,
                 'requested_on' => ($dados['requested_on'] ?? null) ?: CarbonImmutable::today(),
                 'requested_by' => $this->blankToNull($dados['requested_by'] ?? null),
+                'professional_id' => $dados['professional_id'] ?? null,
                 'notes' => $this->blankToNull($dados['notes'] ?? null),
                 'routine_id' => $rotina?->id,
                 'followup_id' => $acompanhamento?->id,
@@ -69,7 +70,7 @@ class HealthExamService
         });
     }
 
-    /** @param  array{title: string, requested_by?: ?string, notes?: ?string}  $dados */
+    /** @param  array{title: string, requested_by?: ?string, professional_id?: ?string, notes?: ?string}  $dados */
     public function updateOrder(HealthExamRequest $pedido, array $dados): void
     {
         if (trim($dados['title']) === '') {
@@ -79,6 +80,7 @@ class HealthExamService
         $pedido->update([
             'title' => trim($dados['title']),
             'requested_by' => $this->blankToNull($dados['requested_by'] ?? null),
+            'professional_id' => $dados['professional_id'] ?? null,
             'notes' => $this->blankToNull($dados['notes'] ?? null),
         ]);
     }
@@ -153,6 +155,131 @@ class HealthExamService
 
             return $consulta;
         });
+    }
+
+    /**
+     * Um pedido por área, criados de uma vez: o que é comum (quem pediu, data, check-up, acompanhamento) vale para todos; nome e observações são de
+     * cada um. Tudo ou nada.
+     *
+     * @param  array{requested_on?: ?string, requested_by?: ?string, professional_id?: ?string}  $comum
+     * @param  array<string, array{title: string, notes?: ?string, items: list<array{name: string, detail?: ?string}>}>  $areas  área => pedido
+     * @return Collection<int, HealthExamRequest>
+     */
+    public function createByArea(ProfileMember $membro, array $comum, array $areas, ?HealthRoutine $rotina, ?HealthFollowup $acompanhamento, ?ProfileMember $autor): Collection
+    {
+        if ($areas === []) {
+            throw new InvalidArgumentException('Marque pelo menos um exame.');
+        }
+
+        return DB::transaction(fn (): Collection => collect(array_keys(ExamCatalog::CATEGORIES))
+            ->filter(fn (string $area) => isset($areas[$area]))
+            ->map(fn (string $area) => $this->createOrder($membro, $comum + $areas[$area] + ['category' => $area], $rotina, $acompanhamento, $autor))
+            ->values());
+    }
+
+    /**
+     * Como um pedido com exames de áreas diferentes ficaria separado. O exame digitado (fora do catálogo) fica na área principal. A principal é a do
+     * nome do pedido ("Exames de sangue") e, se o nome não disser, a que tem mais exames. Menos de duas áreas: nada a separar.
+     *
+     * @return array{primary: string, groups: array<string, Collection<int, HealthExamItem>>}|null
+     */
+    public function splitPreview(HealthExamRequest $pedido): ?array
+    {
+        $itens = $pedido->items()->get();
+        $conhecidos = $itens->groupBy(fn (HealthExamItem $i) => (string) ExamCatalog::categoryOf($i->name))->forget('');
+
+        if ($conhecidos->count() < 2) {
+            return null;
+        }
+
+        $peloNome = collect(ExamCatalog::CATEGORIES)->search(fn (array $c) => ExamCatalog::normalize($c[1]) === ExamCatalog::normalize($pedido->title));
+        $principal = is_string($peloNome) && $conhecidos->has($peloNome) ? $peloNome : (string) $conhecidos->sortByDesc(fn (Collection $g) => $g->count())->keys()->first();
+        $grupos = [];
+
+        foreach (array_keys(ExamCatalog::CATEGORIES) as $area) {
+            $doGrupo = $itens->filter(fn (HealthExamItem $i) => (ExamCatalog::categoryOf($i->name) ?? $principal) === $area)->values();
+
+            if ($doGrupo->isNotEmpty()) {
+                $grupos[$area] = $doGrupo;
+            }
+        }
+
+        return ['primary' => $principal, 'groups' => $grupos];
+    }
+
+    /**
+     * Separa um pedido misturado em um por área. O original fica com a área principal; os outros nascem com os mesmos dados comuns. Datas e
+     * resultados não mudam: o item só troca de pedido, e o laudo cujos exames foram todos para um pedido novo vai junto.
+     *
+     * @return Collection<int, HealthExamRequest> o original e os novos
+     */
+    public function splitByArea(HealthExamRequest $pedido): Collection
+    {
+        $previa = $this->splitPreview($pedido) ?? throw new InvalidArgumentException('Os exames deste pedido já são de uma área só.');
+
+        return DB::transaction(function () use ($pedido, $previa): Collection {
+            $pedidos = collect([$pedido]);
+            $destino = [];
+
+            foreach ($previa['groups'] as $area => $itens) {
+                if ($area === $previa['primary']) {
+                    $pedido->update(['category' => $area, 'kind' => $this->kindFor($itens->pluck('name')->all())]);
+
+                    continue;
+                }
+
+                $novo = HealthExamRequest::create([
+                    'member_id' => $pedido->member_id,
+                    'kind' => $this->kindFor($itens->pluck('name')->all()),
+                    'category' => $area,
+                    'title' => ExamCatalog::CATEGORIES[$area][1],
+                    'requested_on' => $pedido->requested_on,
+                    'requested_by' => $pedido->requested_by,
+                    'professional_id' => $pedido->professional_id,
+                    'routine_id' => $pedido->routine_id,
+                    'followup_id' => $pedido->followup_id,
+                    'created_by_member_id' => $pedido->created_by_member_id,
+                ]);
+
+                foreach ($itens as $item) {
+                    $item->update(['request_id' => $novo->id]);
+                    $destino[$item->id] = $novo->id;
+                }
+
+                $pedidos->push($novo);
+            }
+
+            foreach ($pedido->reports()->get() as $laudo) {
+                $itensDoLaudo = HealthExamItem::query()->where('report_id', $laudo->id)->get();
+                $para = $itensDoLaudo->map(fn (HealthExamItem $i) => $destino[$i->id] ?? $pedido->id)->unique();
+
+                if ($para->count() === 1 && $para->first() !== $pedido->id) {
+                    $laudo->update(['request_id' => $para->first()]);
+                }
+            }
+
+            return $pedidos;
+        });
+    }
+
+    /**
+     * A área em que a pessoa pôs cada exame digitado antes, pela área do pedido mais recente em que ele apareceu.
+     *
+     * @return array<string, string> nome normalizado => área
+     */
+    public function customAreas(string $membroId): array
+    {
+        $areas = [];
+
+        foreach (HealthExamItem::query()->where('member_id', $membroId)->with('request')->latest()->limit(300)->get() as $item) {
+            $area = $item->request?->category;
+
+            if ($area !== null && ExamCatalog::examFor($item->name) === null) {
+                $areas[ExamCatalog::normalize($item->name)] ??= $area;
+            }
+        }
+
+        return $areas;
     }
 
     /** O pedido anterior da mesma pessoa e do mesmo tipo, para repetir a lista no check-up seguinte. */

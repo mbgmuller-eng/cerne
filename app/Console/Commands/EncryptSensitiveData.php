@@ -37,6 +37,7 @@ class EncryptSensitiveData extends Command
         'health_exam_reports' => ['lab', 'doctor', 'exam_name', 'conclusion', 'highlight'],
         'health_exam_values' => ['name', 'value', 'unit', 'reference'],
         'health_exam_readings' => ['original_filename', 'summary'],
+        'health_professionals' => ['name', 'specialty', 'registry', 'place', 'address', 'phone', 'notes'],
         'health_activities' => ['name'],
         'health_activity_exercises' => ['name', 'dose', 'note'],
         'health_activity_sessions' => ['note'],

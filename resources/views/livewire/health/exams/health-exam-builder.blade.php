@@ -54,24 +54,13 @@
         </section>
 
         <section class="card min-w-0 space-y-3 p-5">
-            <p class="eyebrow">O pedido</p>
-            <div>
-                <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Nome do pedido</label>
-                <input type="text" wire:model.blur="title" class="input mt-1.5">
-            </div>
-            <div class="grid gap-3 sm:grid-cols-[10rem_minmax(0,1fr)]">
+            <p class="eyebrow">O pedido do médico</p>
+            <div class="grid gap-3 sm:grid-cols-[10rem_minmax(0,1fr)] sm:items-start">
                 <div>
                     <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Pedido em</label>
                     <input type="date" wire:model="requestedOn" class="input mt-1.5">
                 </div>
-                <div>
-                    <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Quem pediu (opcional)</label>
-                    <input type="text" wire:model="requestedBy" class="input mt-1.5">
-                </div>
-            </div>
-            <div>
-                <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Observações do pedido</label>
-                <textarea wire:model="notes" rows="2" class="input mt-1.5" placeholder="Ex.: jejum de 12 horas"></textarea>
+                <x-health.professional-field model="requestedBy" label="Quem pediu (opcional)" :field="$campoProfissional" />
             </div>
             @if ($rotinas->isNotEmpty() || $acompanhamentos->isNotEmpty())
                 <div class="grid gap-3 sm:grid-cols-2">
@@ -100,23 +89,51 @@
             @if ($selected === [])
                 <p class="text-xs text-slate-400">Nenhum exame marcado.</p>
             @else
-                <ul class="space-y-3" data-marcados>
-                    @foreach ($selected as $i => $s)
-                        <li class="rounded-xl border border-slate-100 p-3 dark:border-white/10" wire:key="marcado-{{ md5($s['name']) }}">
-                            <div class="flex items-start justify-between gap-3">
-                                <span class="min-w-0 text-sm font-medium text-slate-800 dark:text-slate-200">{{ $s['name'] }}</span>
-                                <button type="button" wire:click="remove({{ $i }})" class="shrink-0 text-xs text-slate-400 hover:text-red-700">remover</button>
+                <div class="space-y-4" data-marcados>
+                    {{-- Um bloco por área: cada um vira um pedido, com nome e observações próprios. --}}
+                    @foreach ($porArea as $area => $doGrupo)
+                        <div class="space-y-3 rounded-xl border border-saude-200 p-3 dark:border-saude-800" wire:key="area-{{ $area }}" data-area="{{ $area }}">
+                            <p class="text-sm font-semibold text-slate-900 dark:text-white">{{ $categorias[$area][0] }} ({{ count($doGrupo) }})</p>
+                            <div>
+                                <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Nome do pedido</label>
+                                <input type="text" wire:model="titles.{{ $area }}" class="input mt-1.5">
                             </div>
-                            <label class="mt-2 block text-xs font-medium text-slate-500 dark:text-slate-400">Detalhe do pedido (opcional)</label>
-                            <input type="text" wire:model="selected.{{ $i }}.detail" class="input mt-1.5" placeholder="Ex.: região, lado, com contraste">
-                        </li>
+                            <div>
+                                <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Observações do pedido (opcional)</label>
+                                <textarea wire:model="notes.{{ $area }}" rows="2" class="input mt-1.5" placeholder="{{ $area === 'blood' ? 'Ex.: jejum de 12 horas' : 'Ex.: levar os exames anteriores' }}"></textarea>
+                            </div>
+                            <ul class="space-y-3">
+                                @foreach ($doGrupo as $i => $s)
+                                    <li class="rounded-xl border border-slate-100 p-3 dark:border-white/10" wire:key="marcado-{{ md5($s['name']) }}">
+                                        <div class="flex items-start justify-between gap-3">
+                                            <span class="min-w-0 text-sm font-medium text-slate-800 dark:text-slate-200">{{ $s['name'] }}</span>
+                                            <button type="button" wire:click="remove({{ $i }})" class="shrink-0 text-xs text-slate-400 hover:text-red-700">remover</button>
+                                        </div>
+                                        <div class="mt-2 grid gap-2 sm:grid-cols-[minmax(0,1fr)_11rem]">
+                                            <div>
+                                                <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Detalhe do pedido (opcional)</label>
+                                                <input type="text" wire:model="selected.{{ $i }}.detail" class="input mt-1.5" placeholder="Ex.: região, lado, com contraste">
+                                            </div>
+                                            <div>
+                                                <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Área</label>
+                                                <select wire:model.live="selected.{{ $i }}.category" class="select mt-1.5 w-full">
+                                                    @foreach ($categorias as $chave => [$rotulo])
+                                                        <option value="{{ $chave }}">{{ $rotulo }}</option>
+                                                    @endforeach
+                                                </select>
+                                            </div>
+                                        </div>
+                                    </li>
+                                @endforeach
+                            </ul>
+                        </div>
                     @endforeach
-                </ul>
+                </div>
             @endif
 
             <x-form-consequence :lines="$consequencia" />
             <x-form-errors />
-            <button type="submit" class="btn-primary px-4 py-2 text-sm">Guardar pedido</button>
+            <button type="submit" class="btn-primary px-4 py-2 text-sm">{{ count($porArea) > 1 ? 'Guardar '.count($porArea).' pedidos' : 'Guardar pedido' }}</button>
         </section>
     </form>
 </div>

@@ -25,7 +25,7 @@ use Livewire\Component;
 #[Layout('components.layouts.app')]
 class HealthExamResultForm extends Component
 {
-    use FindsExamPeople, RequiresActiveProfile, RequiresPersonalHealth;
+    use FindsExamPeople, \App\Livewire\Health\Concerns\PicksHealthProfessional, RequiresActiveProfile, RequiresPersonalHealth;
 
     #[Locked]
     public ?string $readingId = null;
@@ -65,6 +65,8 @@ class HealthExamResultForm extends Component
     {
         $this->redirectOrAbortWithoutProfile();
         $this->abortUnlessHealthParticipant();
+        // Quem assina um laudo (um radiologista, por exemplo) raramente é o médico da pessoa: só guarda se ela marcar.
+        $this->resetProfessional(null, false);
 
         if ($leitura !== null) {
             $registro = HealthExamReading::query()->findOrFail($leitura);
@@ -125,10 +127,14 @@ class HealthExamResultForm extends Component
 
         try {
             if ($this->readingId !== null) {
-                $leitor->confirm(HealthExamReading::query()->findOrFail($this->readingId), $dados, $itens, $this->author());
+                $leitura = HealthExamReading::query()->findOrFail($this->readingId);
+                $dados['professional_id'] = $this->resolveProfessional($leitura->member_id, $this->doctor);
+                $leitor->confirm($leitura, $dados, $itens, $this->author());
             } else {
                 $pedido = $this->pedidoId !== null ? HealthExamRequest::query()->findOrFail($this->pedidoId) : null;
-                $resultados->save($this->personOrFail($pedido?->member_id ?? $this->memberId), $pedido, $dados, $itens, $this->author());
+                $membro = $this->personOrFail($pedido?->member_id ?? $this->memberId);
+                $dados['professional_id'] = $this->resolveProfessional($membro->id, $this->doctor);
+                $resultados->save($membro, $pedido, $dados, $itens, $this->author());
             }
         } catch (InvalidArgumentException $e) {
             $this->addError('form', $e->getMessage());
@@ -165,6 +171,7 @@ class HealthExamResultForm extends Component
         $marcados = count(array_filter($this->values, fn (array $v) => (bool) $v['on'] && trim((string) $v['name']) !== '' && trim((string) $v['value']) !== ''));
 
         return view('livewire.health.exams.health-exam-result-form', [
+            'campoProfissional' => $this->professionalField($this->memberId, $this->doctor),
             'leitura' => $leitura,
             'pedido' => $pedido,
             'esperando' => $leitura !== null && $leitura->isOpen() && in_array($leitura->status, [ProcessingStatus::Pending, ProcessingStatus::Processing], true),
@@ -175,6 +182,16 @@ class HealthExamResultForm extends Component
             'itensAbertos' => $pedido?->items->whereNull('report_id')->values() ?? collect(),
             'consequencia' => FormConsequence::examResult($this->kind, $marcados, count($this->itemIds), $leitura !== null, $pedido !== null),
         ]);
+    }
+
+    protected function professionalPersonId(): string
+    {
+        return $this->memberId;
+    }
+
+    protected function applyProfessional(\App\Models\HealthProfessional $profissional): void
+    {
+        $this->doctor = $profissional->name;
     }
 
     /** @param  array<string, mixed>  $resumo */

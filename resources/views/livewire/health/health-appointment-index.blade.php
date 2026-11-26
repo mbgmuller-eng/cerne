@@ -245,10 +245,14 @@
                     @error('kind') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
                 </div>
                 @if ($kind === 'consultation')
-                    <div>
-                        <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Profissional</label>
-                        <input type="text" wire:model="professionalName" class="input mt-1.5" placeholder="Ex.: Dr. João Silva" maxlength="120">
+                    <div wire:key="profissional-da-consulta">
+                        @if ($campoProfissional)
+                            <x-health.professional-field model="professionalName" label="Profissional" :field="$campoProfissional" placeholder="Ex.: Dr. João Silva" />
+                        @endif
                         @error('professionalName') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
+                        @if ($professionalId !== '')
+                            <p class="mt-1 text-xs text-slate-400">Dados preenchidos pelo cadastro. Você pode mudar só nesta consulta.</p>
+                        @endif
                     </div>
                     <div>
                         <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Especialidade</label>

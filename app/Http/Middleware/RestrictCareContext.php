@@ -25,7 +25,7 @@ class RestrictCareContext
         'care.*',
         'health.card.index', 'health.qrcode.show', 'health.appointments.index', 'health.care.index', 'health.appointments.ics', 'health.care.ics',
         'health.routines.index', 'health.followups.index', 'health.followups.show', 'health.followups.pdf',
-        'health.exams.index', 'health.exams.create', 'health.exams.results', 'health.exams.manual', 'health.exams.reading', 'health.exams.show',
+        'health.professionals.index', 'health.exams.index','health.exams.create', 'health.exams.results', 'health.exams.manual', 'health.exams.reading', 'health.exams.show',
         'documents.vault.index', 'documents.vault.file',
         'health.consent', 'health.consent.store', 'health.consent.revoke',
         'legal.*', 'logout', 'theme.update', 'push.subscribe', 'privacy.export.download', 'admin.impersonate.stop',

@@ -26,7 +26,7 @@ use Livewire\Component;
 #[Layout('components.layouts.app')]
 class HealthCardIndex extends Component
 {
-    use RequiresActiveProfile, RequiresPersonalHealth;
+    use \App\Livewire\Health\Concerns\PicksHealthProfessional, RequiresActiveProfile, RequiresPersonalHealth;
 
     /** @var array<string, string> tipo sanguíneo em edição, por member_id */
     public array $bloodTypeDrafts = [];
@@ -126,6 +126,7 @@ class HealthCardIndex extends Component
         $this->medSchedule = (string) $medicamento->schedule;
         $this->medReason = (string) $medicamento->reason;
         $this->medPrescriber = (string) $medicamento->prescriber;
+        $this->resetProfessional($medicamento->professional_id, false);
         $this->medStartedOn = $medicamento->started_on?->toDateString() ?? '';
         $this->medActive = $medicamento->is_active;
         $this->showMedicationForm = true;
@@ -159,11 +160,15 @@ class HealthCardIndex extends Component
         ];
 
         if ($this->editingMedicationId !== null) {
+            $medicamento = HealthMedication::query()->findOrFail($this->editingMedicationId);
             $dados['is_active'] = $this->medActive;
-            $service->updateMedication(HealthMedication::query()->findOrFail($this->editingMedicationId), $dados, $this->autor());
+            $dados['professional_id'] = $this->resolveProfessional($medicamento->member_id, $this->medPrescriber);
+            $service->updateMedication($medicamento, $dados, $this->autor());
         } else {
+            $membro = $this->membroOuFalha($this->medicationMemberId);
             $dados['started_on'] = $this->medStartedOn !== '' ? $this->medStartedOn : null;
-            $service->addMedication($this->membroOuFalha($this->medicationMemberId), $dados, $this->autor());
+            $dados['professional_id'] = $this->resolveProfessional($membro->id, $this->medPrescriber);
+            $service->addMedication($membro, $dados, $this->autor());
         }
 
         $this->showMedicationForm = false;
@@ -200,6 +205,7 @@ class HealthCardIndex extends Component
         });
 
         return view('livewire.health.health-card-index', [
+            'campoProfissional' => $this->showMedicationForm ? $this->professionalField((string) $this->medicationMemberId, $this->medPrescriber) : null,
             'fichas' => $fichas,
             'editingExisting' => $this->editingMedicationId !== null,
             'emPessoaAcompanhada' => app(ProfileContext::class)->isCaregiver() || app(ProfileContext::class)->profile()?->isCare(),
@@ -236,6 +242,17 @@ class HealthCardIndex extends Component
             'medSchedule', 'medReason', 'medPrescriber', 'medStartedOn', 'medActive',
         );
         $this->medActive = true;
+        $this->resetProfessional();
         $this->resetErrorBag();
+    }
+
+    protected function professionalPersonId(): string
+    {
+        return (string) $this->medicationMemberId;
+    }
+
+    protected function applyProfessional(\App\Models\HealthProfessional $profissional): void
+    {
+        $this->medPrescriber = $profissional->name;
     }
 }

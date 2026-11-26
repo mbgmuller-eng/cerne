@@ -23,7 +23,10 @@ use Livewire\Component;
 #[Layout('components.layouts.app')]
 class HealthExamShow extends Component
 {
-    use FindsExamPeople, RequiresActiveProfile, RequiresPersonalHealth;
+    use FindsExamPeople, \App\Livewire\Health\Concerns\PicksHealthProfessional, RequiresActiveProfile, RequiresPersonalHealth;
+
+    /** A prévia de "Separar por área" está aberta. */
+    public bool $splitting = false;
 
     #[Locked]
     public string $pedidoId = '';
@@ -76,7 +79,33 @@ class HealthExamShow extends Component
             $this->title = $pedido->title;
             $this->requestedBy = (string) $pedido->requested_by;
             $this->notes = (string) $pedido->notes;
+            $this->resetProfessional($pedido->professional_id, (string) $pedido->requested_by === '');
         }
+    }
+
+    public function split(HealthExamService $service): void
+    {
+        try {
+            $pedidos = $service->splitByArea($this->order());
+        } catch (InvalidArgumentException $e) {
+            $this->addError('selected', $e->getMessage());
+            $this->splitting = false;
+
+            return;
+        }
+
+        session()->flash('status', 'Separado em '.$pedidos->count().' pedidos: '.$pedidos->map->title->implode(', ').'.');
+        $this->redirect(route('health.exams.index'), navigate: true);
+    }
+
+    protected function professionalPersonId(): string
+    {
+        return $this->order()->member_id;
+    }
+
+    protected function applyProfessional(\App\Models\HealthProfessional $profissional): void
+    {
+        $this->requestedBy = $profissional->name;
     }
 
     public function startScheduling(): void
@@ -152,7 +181,11 @@ class HealthExamShow extends Component
             'notes' => ['nullable', 'string', 'max:2000'],
         ], attributes: ['title' => 'nome do pedido', 'requestedBy' => 'quem pediu', 'notes' => 'observações']);
 
-        $service->updateOrder($this->order(), ['title' => $this->title, 'requested_by' => $this->requestedBy, 'notes' => $this->notes]);
+        $pedido = $this->order();
+        $service->updateOrder($pedido, [
+            'title' => $this->title, 'requested_by' => $this->requestedBy, 'notes' => $this->notes,
+            'professional_id' => $this->resolveProfessional($pedido->member_id, $this->requestedBy),
+        ]);
         $this->panel = '';
     }
 
@@ -175,6 +208,9 @@ class HealthExamShow extends Component
         $escolhidos = $pedido->items->whereIn('id', $this->selected)->filter(fn (HealthExamItem $i) => $i->status() === HealthExamItemStatus::Pending);
 
         return view('livewire.health.exams.health-exam-show', [
+            'separacao' => app(HealthExamService::class)->splitPreview($pedido),
+            'areas' => ExamCatalog::CATEGORIES,
+            'campoProfissional' => $this->panel === 'edit' ? $this->professionalField($pedido->member_id, $this->requestedBy) : null,
             'pedido' => $pedido,
             'leituras' => HealthExamReading::query()->where('request_id', $pedido->id)->where('source_path', '!=', '')->with('member')->latest()->get(),
             'podeEscrever' => $this->canWriteFor($pedido->member_id),

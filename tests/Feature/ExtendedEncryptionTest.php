@@ -78,6 +78,12 @@ class ExtendedEncryptionTest extends TestCase
         $resultados->save($membro, null, ['kind' => 'values', 'performed_on' => '2026-01-14', 'values' => [['name' => 'Marcador sigiloso', 'value' => 'sigiloso', 'unit' => 'sigiloso', 'reference' => 'sigiloso']]], [], null);
         \App\Models\HealthExamReading::create(['member_id' => $membro->id, 'request_id' => $pedido->id, 'status' => \App\Enums\ProcessingStatus::Completed, 'source_path' => 'x', 'original_filename' => 'laudo-sigiloso.pdf', 'summary' => ['conclusion' => 'sigiloso']]);
 
+        app(\App\Services\HealthProfessionalService::class)->save(null, ['name' => 'Profissional sigiloso', 'specialty' => 'sigiloso', 'registry' => 'sigiloso', 'place' => 'sigiloso', 'address' => 'sigiloso', 'phone' => 'sigiloso', 'notes' => 'sigiloso'], [$membro->id], null);
+        $this->assertStringNotContainsStringIgnoringCase('sigilos', json_encode(DB::table('health_professionals')->get()));
+        foreach (\App\Console\Commands\EncryptSensitiveData::COLUMNS['health_professionals'] as $coluna) {
+            $this->assertNotNull(DB::table('health_professionals')->value($coluna), $coluna);
+        }
+
         // Há mais de uma linha em algumas tabelas e nem toda coluna é preenchida em todas: cada coluna precisa aparecer preenchida em alguma
         // linha, e em nenhuma o texto pode estar à vista.
         foreach (['health_routines', 'health_followups', 'health_followup_notes', 'health_exam_requests', 'health_exam_items', 'health_exam_reports', 'health_exam_values', 'health_exam_readings', 'health_activities', 'health_activity_exercises', 'health_activity_sessions'] as $tabela) {

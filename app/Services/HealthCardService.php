@@ -158,6 +158,7 @@ class HealthCardService
             'schedule' => $this->blankToNull($dados['schedule'] ?? null),
             'reason' => $this->blankToNull($dados['reason'] ?? null),
             'prescriber' => $this->blankToNull($dados['prescriber'] ?? null),
+            'professional_id' => $dados['professional_id'] ?? null,
             'started_on' => $dados['started_on'] ?? null,
             'is_active' => true,
             'created_by_member_id' => $autor?->id,
@@ -190,6 +191,7 @@ class HealthCardService
             'schedule' => array_key_exists('schedule', $dados) ? $this->blankToNull($dados['schedule']) : $medicamento->schedule,
             'reason' => array_key_exists('reason', $dados) ? $this->blankToNull($dados['reason']) : $medicamento->reason,
             'prescriber' => array_key_exists('prescriber', $dados) ? $this->blankToNull($dados['prescriber']) : $medicamento->prescriber,
+            'professional_id' => array_key_exists('professional_id', $dados) ? $dados['professional_id'] : $medicamento->professional_id,
             'ended_on' => array_key_exists('ended_on', $dados) ? $dados['ended_on'] : $medicamento->ended_on,
             'is_active' => $novoAtivo,
         ]);

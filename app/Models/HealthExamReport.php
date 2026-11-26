@@ -13,7 +13,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /** Um laudo guardado: de valores (cada um com a referência impressa nele) ou de conclusão, copiada como está no papel. */
-#[Fillable(['profile_id', 'member_id', 'request_id', 'kind', 'performed_on', 'lab', 'doctor', 'exam_name', 'conclusion', 'highlight', 'document_id', 'created_by_member_id', 'created_by_user_id', 'changed_by_user_id'])]
+#[Fillable(['professional_id', 'profile_id', 'member_id', 'request_id', 'kind', 'performed_on', 'lab', 'doctor', 'exam_name', 'conclusion', 'highlight', 'document_id', 'created_by_member_id', 'created_by_user_id', 'changed_by_user_id'])]
 class HealthExamReport extends Model
 {
     use BelongsToProfile, HasActorUser, HasUuids, IsCoupleHealthData;

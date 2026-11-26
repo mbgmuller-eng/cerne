@@ -216,8 +216,9 @@
                     @error('medReason') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
                 </div>
                 <div>
-                    <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Médico que prescreveu (opcional)</label>
-                    <input type="text" wire:model="medPrescriber" class="input mt-1.5" placeholder="Ex.: Dr. Souza — cardiologista">
+                    @if ($campoProfissional)
+                        <x-health.professional-field model="medPrescriber" label="Médico que prescreveu (opcional)" :field="$campoProfissional" />
+                    @endif
                     @error('medPrescriber') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
                 </div>
 

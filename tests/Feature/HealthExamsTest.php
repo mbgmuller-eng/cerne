@@ -511,9 +511,9 @@ class HealthExamsTest extends TestCase
     public function test_montar_o_pedido_pela_tela_sem_nada_marcado_de_partida(): void
     {
         Livewire::test(HealthExamBuilder::class)
-            ->assertSet('selected', [])->assertSet('title', 'Exames de sangue')->assertSee('Hemograma completo')
+            ->assertSet('selected', [])->assertSee('Hemograma completo')
             ->call('save')->assertHasErrors('selected')
-            ->call('chooseCategory', 'cardio')->assertSet('title', 'Avaliação cardiológica')
+            ->call('chooseCategory', 'cardio')
             ->call('toggle', 'Ecodopplercardiograma transtorácico')
             ->set('search', 'esteira')->assertSee('Teste ergométrico computadorizado')->call('toggle', 'Teste ergométrico computadorizado')
             ->set('search', 'Exame raro')->call('addTyped')
@@ -528,7 +528,87 @@ class HealthExamsTest extends TestCase
 
         Livewire::test(HealthExamBuilder::class)->call('chooseCategory', 'cardio')->assertSee('Repetir o pedido de 11/2026 (3 exames)')
             ->call('repeatPrevious')->assertCount('selected', 3);
-        Livewire::test(HealthExamBuilder::class)->call('chooseCategory', 'other')->assertSee('Exame raro');
+        // O digitado na aba Cardiologia volta a aparecer nela, não em "Outros".
+        Livewire::test(HealthExamBuilder::class)->call('chooseCategory', 'cardio')->assertSee('Exame raro')
+            ->call('chooseCategory', 'other')->assertDontSee('Exame raro');
+    }
+
+    public function test_exames_de_areas_diferentes_viram_um_pedido_para_cada_area(): void
+    {
+        $rotina = app(HealthRoutineService::class)->create($this->membroAna, ['name' => 'Check-up geral', 'interval_months' => 12], null);
+
+        Livewire::test(HealthExamBuilder::class)
+            ->call('toggle', 'TSH')->call('toggle', 'Perfil lipídico')
+            ->call('chooseCategory', 'cardio')->call('toggle', 'Teste ergométrico computadorizado')
+            // Achado pela busca a partir de outra aba: vai para a área dele, não para a da aba aberta.
+            ->set('search', 'glicemia')->call('toggle', 'Glicemia de jejum')->set('search', '')
+            ->set('requestedBy', 'Dr. Exemplo')->set('routineId', $rotina->id)
+            ->set('notes.blood', 'Jejum de 12 horas')->set('notes.cardio', 'Levar exames antigos')
+            ->assertSee('Serão criados 2 pedidos')->assertSee('Sangue (3), Cardiologia (1)')->assertSee('Guardar 2 pedidos')
+            ->call('save')->assertHasNoErrors()->assertRedirect(route('health.exams.index'));
+
+        $pedidos = HealthExamRequest::query()->with('items')->get()->keyBy('category');
+        $this->assertSame(['blood', 'cardio'], $pedidos->keys()->sort()->values()->all());
+        $this->assertSame('Exames de sangue', $pedidos['blood']->title);
+        $this->assertSame(['TSH', 'Perfil lipídico', 'Glicemia de jejum'], $pedidos['blood']->items->pluck('name')->all());
+        $this->assertSame('Avaliação cardiológica', $pedidos['cardio']->title);
+        $this->assertSame(['Jejum de 12 horas', 'Levar exames antigos'], [$pedidos['blood']->notes, $pedidos['cardio']->notes]);
+
+        foreach ($pedidos as $p) {
+            $this->assertSame(['Dr. Exemplo', $rotina->id], [$p->requested_by, $p->routine_id]);
+        }
+
+        // Cada aba repete só a sua área.
+        Livewire::test(HealthExamBuilder::class)->assertSee('Repetir o pedido de 11/2026 (3 exames)')->call('chooseCategory', 'cardio')->assertSee('Repetir o pedido de 11/2026 (1 exame)');
+    }
+
+    public function test_trocar_a_area_de_um_exame_marcado_muda_o_pedido_em_que_ele_cai(): void
+    {
+        Livewire::test(HealthExamBuilder::class)
+            ->set('search', 'Exame sem área')->call('addTyped')->set('search', '')
+            ->set('selected.0.category', 'imaging')
+            ->assertSet('titles.imaging', 'Exames de imagem')
+            ->call('save')->assertHasNoErrors();
+
+        $this->assertSame('imaging', HealthExamRequest::query()->sole()->category);
+    }
+
+    public function test_pedido_misturado_pode_ser_separado_mantendo_datas_e_resultados(): void
+    {
+        $rotina = app(HealthRoutineService::class)->create($this->membroAna, ['name' => 'Check-up geral', 'interval_months' => 12], null);
+        $servico = app(HealthExamService::class);
+        // Como ficou antes: nome da primeira área e tipo da última aba aberta.
+        $pedido = $servico->createOrder($this->membroAna, ['title' => 'Exames de sangue', 'category' => 'cardio', 'notes' => 'Jejum', 'requested_by' => 'Dr. Exemplo', 'items' => [
+            ['name' => 'TSH'], ['name' => 'Ureia'], ['name' => 'Exame digitado'], ['name' => 'Teste ergométrico computadorizado'], ['name' => 'Doppler de carótidas e vertebrais'], ['name' => 'Eletrocardiograma (ECG)'],
+        ]], $rotina, null, null);
+        $itens = $pedido->items()->get()->keyBy(fn (HealthExamItem $i) => $i->name);
+        $consulta = $servico->schedule($pedido, [$itens['Teste ergométrico computadorizado']->id], '2026-12-03 08:00', null, null);
+        $laudo = app(HealthExamResultService::class)->save($this->membroAna, $pedido, ['kind' => 'report', 'performed_on' => '2026-11-20', 'exam_name' => 'ECG', 'conclusion' => 'Normal.'], [$itens['Eletrocardiograma (ECG)']->id], null);
+
+        $previa = $servico->splitPreview($pedido);
+        $this->assertSame('blood', $previa['primary'], 'vale o nome do pedido, mesmo com empate na contagem');
+        $this->assertSame(['TSH', 'Ureia', 'Exame digitado'], $previa['groups']['blood']->pluck('name')->all(), 'o digitado fica na área principal');
+
+        Livewire::test(HealthExamShow::class, ['pedido' => $pedido->id])
+            ->assertSee('Este pedido tem exames de 2 áreas')->assertDontSee('Confirmar separação')
+            ->set('splitting', true)->assertSee('Avaliação cardiológica')->assertSee('pedido novo')
+            ->call('split')->assertRedirect(route('health.exams.index'));
+
+        $this->assertSame(2, HealthExamRequest::query()->count());
+        $original = $pedido->fresh();
+        $cardio = HealthExamRequest::query()->where('id', '!=', $pedido->id)->sole();
+        $this->assertSame(['blood', 'Exames de sangue', 'Jejum'], [$original->category, $original->title, $original->notes]);
+        $this->assertSame(['cardio', 'Avaliação cardiológica', null], [$cardio->category, $cardio->title, $cardio->notes]);
+        $this->assertSame(['Dr. Exemplo', $rotina->id], [$cardio->requested_by, $cardio->routine_id]);
+        $this->assertSame(3, $original->items()->count());
+        $this->assertSame($consulta->id, $itens['Teste ergométrico computadorizado']->fresh()->appointment_id);
+        $this->assertSame($cardio->id, $laudo->fresh()->request_id);
+        $this->assertSame($laudo->id, $itens['Eletrocardiograma (ECG)']->fresh()->report_id);
+
+        $this->assertNull($servico->splitPreview($original));
+        $this->assertNull($servico->splitPreview($cardio));
+        $this->expectException(InvalidArgumentException::class);
+        $servico->splitByArea($original);
     }
 
     public function test_tela_do_pedido_marca_datas_e_recusa_item_de_outro_pedido(): void

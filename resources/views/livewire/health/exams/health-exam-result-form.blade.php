@@ -55,10 +55,7 @@
                         <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Laboratório ou clínica (opcional)</label>
                         <input type="text" wire:model="lab" class="input mt-1.5">
                     </div>
-                    <div>
-                        <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Médico do laudo (opcional)</label>
-                        <input type="text" wire:model="doctor" class="input mt-1.5">
-                    </div>
+                    <x-health.professional-field model="doctor" label="Médico do laudo (opcional)" :field="$campoProfissional" maxlength="160" />
                 </div>
             </section>
 
