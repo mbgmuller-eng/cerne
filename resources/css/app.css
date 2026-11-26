@@ -254,8 +254,10 @@ html.menu-recolhido [data-lateral] .nav-item-chrome {
     padding-right: 0;
 }
 
-/* O título da seção vira uma linha fina que separa os grupos (o texto some, a linha fica). */
+/* O título da seção vira uma linha fina que separa os grupos (o texto some, a linha fica). Como é um botão de abrir e fechar, aqui ele não clica. */
 html.menu-recolhido [data-lateral] .lateral-titulo {
+    display: block;
+    pointer-events: none;
     height: 1px;
     margin: 0.75rem 0.5rem 0.5rem;
     padding: 0;

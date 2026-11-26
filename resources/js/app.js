@@ -444,6 +444,78 @@ document.addEventListener('alpine:init', () => {
 });
 
 /*
+ * Áreas do menu lateral (desktop) que a pessoa abre e fecha: a lista das fechadas fica no navegador ("cerne.menu.secoes"). Entrar em uma tela
+ * de uma área fechada mostra a área nesta tela, sem mudar a escolha; fechar de novo no título fecha. O desenho das regras mora no <head>
+ * (window.cerneSecoes), para valer antes do primeiro desenho.
+ */
+(function () {
+    if (!window.cerneSecoes) {
+        return;
+    }
+
+    let fechadas = window.cerneSecoes.ler();
+    let abertaNestaTela = null;
+
+    function desenhar() {
+        window.cerneSecoes.estilo(fechadas, abertaNestaTela);
+        document.querySelectorAll('[data-alternar-secao]').forEach((botao) => {
+            const chave = botao.dataset.alternarSecao;
+            botao.setAttribute('aria-expanded', fechadas.includes(chave) && chave !== abertaNestaTela ? 'false' : 'true');
+        });
+    }
+
+    function aoTrocarDeTela() {
+        const guardadas = window.cerneSecoes.ler();
+        // Sem armazenamento (janela privada) a lista lida vem vazia: fica o que foi escolhido nesta visita.
+        fechadas = guardadas.length > 0 || podeGuardar() ? guardadas : fechadas;
+        abertaNestaTela = document.querySelector('[data-lateral] [data-secao][data-ativa]')?.dataset.secao ?? null;
+        desenhar();
+    }
+
+    function podeGuardar() {
+        try {
+            window.localStorage.getItem('cerne.menu.secoes');
+
+            return true;
+        } catch (e) {
+            return false;
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', aoTrocarDeTela);
+    document.addEventListener('livewire:navigated', aoTrocarDeTela);
+
+    document.addEventListener('click', (evento) => {
+        const botao = evento.target.closest('[data-alternar-secao]');
+
+        // Com a barra em trilha de ícones o título é só uma linha divisória: não fecha nada.
+        if (!botao || document.documentElement.classList.contains('menu-recolhido')) {
+            return;
+        }
+
+        const chave = botao.dataset.alternarSecao;
+        const visivel = !fechadas.includes(chave) || chave === abertaNestaTela;
+        fechadas = fechadas.filter((k) => k !== chave);
+
+        if (visivel) {
+            fechadas.push(chave);
+        }
+
+        if (chave === abertaNestaTela) {
+            abertaNestaTela = null;
+        }
+
+        desenhar();
+
+        try {
+            window.localStorage.setItem('cerne.menu.secoes', JSON.stringify(fechadas));
+        } catch (e) {
+            // Sem armazenamento: vale só nesta visita, sem erro.
+        }
+    });
+})();
+
+/*
  * Menu lateral recolhido (só no desktop): preferência deste navegador em localStorage ("cerne.menu"). O <head> já aplica a classe antes do
  * primeiro desenho; aqui ela é reaplicada a cada navegação interna (o wire:navigate refaz a tag <html> e levaria a classe embora, como já
  * acontecia com o tema) e o botão alterna e grava.

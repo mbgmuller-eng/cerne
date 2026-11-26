@@ -74,6 +74,64 @@ class SidebarMenuTest extends TestCase
         self::assertStringContainsString('lateral-texto', $lateral);
     }
 
+    public function test_cada_area_do_menu_abre_e_fecha_e_a_da_tela_atual_vem_marcada(): void
+    {
+        $this->cliente();
+
+        $html = $this->get(route('debts.index'))->assertOk()->getContent();
+        $lateral = $this->barraLateral($html);
+
+        foreach (['perfil-financas', 'perfil-seguros', 'perfil-documentos', 'perfil-saude'] as $chave) {
+            self::assertSame(1, substr_count($lateral, 'data-alternar-secao="'.$chave.'"'), $chave);
+            self::assertStringContainsString('data-secao="'.$chave.'"', $lateral);
+        }
+        self::assertSame(4, substr_count($lateral, 'data-secao-itens'));
+        // Só a área da tela de agora é marcada como ativa.
+        self::assertMatchesRegularExpression('/data-secao="perfil-financas"\s+data-ativa/', $lateral);
+        self::assertSame(1, preg_match_all('/data-secao="[a-z-]+"\s+data-ativa/', $lateral));
+
+        // As escolhas guardadas valem antes do primeiro desenho, sabendo qual é a área da tela.
+        $script = strpos($html, 'cerne.menu.secoes');
+        self::assertNotFalse($script);
+        self::assertLessThan(strpos($html, '<body'), $script);
+        self::assertStringContainsString('window.cerneSecoes.estilo(window.cerneSecoes.ler(), "perfil-financas")', $html);
+    }
+
+    public function test_telas_de_dentro_marcam_a_area_certa_e_documentos_nao_se_confunde_com_importar(): void
+    {
+        $this->cliente();
+
+        foreach ([
+            'health.exams.create' => 'perfil-saude',
+            'health.appointments.index' => 'perfil-saude',
+            'documents.vault.index' => 'perfil-documentos',
+            'documents.index' => 'perfil-financas',
+            'insurance.index' => 'perfil-seguros',
+        ] as $rota => $esperada) {
+            $html = $this->get(route($rota))->assertOk()->getContent();
+            self::assertStringContainsString('window.cerneSecoes.ler(), "'.$esperada.'")', $html, $rota);
+        }
+
+        // Minha conta não é de área nenhuma: nada é reaberto.
+        self::assertStringContainsString('window.cerneSecoes.ler(), null)', $this->get(route('my-account'))->assertOk()->getContent());
+    }
+
+    public function test_consultor_e_administrador_tambem_abrem_e_fecham_as_areas(): void
+    {
+        $consultor = User::factory()->consultant()->create();
+        $lateral = $this->barraLateral($this->actingAs($consultor)->get(route('consultant.portfolio'))->assertOk()->getContent());
+        foreach (['pro-consultoria', 'pro-seguros', 'pro-gestao'] as $chave) {
+            self::assertStringContainsString('data-alternar-secao="'.$chave.'"', $lateral);
+        }
+        self::assertMatchesRegularExpression('/data-secao="pro-consultoria"\s+data-ativa/', $lateral);
+
+        $admin = User::factory()->consultant()->create(['is_platform_admin' => true]);
+        $html = $this->actingAs($admin)->get(route('admin.banks'))->assertOk()->getContent();
+        $lateral = $this->barraLateral($html);
+        self::assertStringContainsString('data-alternar-secao="admin-plataforma"', $lateral);
+        self::assertMatchesRegularExpression('/data-secao="admin-cadastros"\s+data-ativa/', $lateral);
+    }
+
     public function test_o_estado_recolhido_e_aplicado_antes_do_primeiro_desenho(): void
     {
         $this->cliente();

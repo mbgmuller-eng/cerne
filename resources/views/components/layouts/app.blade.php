@@ -305,6 +305,32 @@
         ];
     }
 
+    // Áreas do menu lateral do computador, que a pessoa abre e fecha. A área da tela de agora aparece aberta mesmo que esteja fechada (sem
+    // mudar a escolha guardada). Cada barra tem as próprias chaves: fechar "Seguros" no perfil não fecha o "Seguros" do painel do profissional.
+    $chaveDaSecao = fn (string $barra, string $nome) => $barra.'-'.\Illuminate\Support\Str::slug($nome);
+    // Vale para as telas de dentro de cada item (o detalhe de uma dívida é Finanças). "Importar" é exato: o prefixo dele também é o dos Documentos.
+    $secaoTemATelaAtual = fn (array $itens) => collect($itens)->contains(fn (array $i) => request()->routeIs(
+        $i[0], $i[0] === 'documents.index' ? $i[0] : \Illuminate\Support\Str::replaceEnd('.index', '.*', $i[0]),
+    ));
+    $chaveSecaoAtiva = null;
+    if ($dentroDoPerfil) {
+        foreach ($navSections as $secao) {
+            if ($secaoTemATelaAtual($secao['items'])) {
+                $chaveSecaoAtiva = $chaveDaSecao('perfil', $secao['label']);
+                break;
+            }
+        }
+    } elseif ($areaConsultor) {
+        foreach ([...$secoesProfissional, ...($secaoPlataforma ? [$secaoPlataforma] : [])] as $secao) {
+            if (collect($secao['items'])->contains(fn (array $i) => request()->routeIs($i[0]))) {
+                $chaveSecaoAtiva = $chaveDaSecao('pro', $secao['label']);
+                break;
+            }
+        }
+    } elseif ($areaAdmin) {
+        $chaveSecaoAtiva = request()->routeIs(...array_column($cadastrosAdmin, 0)) ? 'admin-cadastros' : 'admin-plataforma';
+    }
+
     // Preferência de tema da CONTA, não do navegador — ver
     // App\Enums\ThemePreference e resources/js/app.js.
     $theme = $user?->theme ?? \App\Enums\ThemePreference::System;
@@ -335,6 +361,25 @@
                 if (localStorage.getItem('cerne.menu') === 'recolhido') document.documentElement.classList.add('menu-recolhido');
             } catch (e) {}
         })();
+    </script>
+    {{-- Áreas fechadas do menu lateral: também antes do primeiro desenho. Um <style> com uma regra por área fechada (o resources/js/app.js o reescreve). --}}
+    <script>
+        window.cerneSecoes = {
+            ler: function () {
+                try {
+                    var v = JSON.parse(localStorage.getItem('cerne.menu.secoes') || '[]');
+                    return Array.isArray(v) ? v.filter(function (k) { return /^[a-z0-9-]+$/.test(k); }) : [];
+                } catch (e) { return []; }
+            },
+            estilo: function (fechadas, aberta) {
+                var s = document.getElementById('cerne-secoes') || document.head.appendChild(Object.assign(document.createElement('style'), { id: 'cerne-secoes' }));
+                s.textContent = fechadas.filter(function (k) { return k !== aberta; }).map(function (k) {
+                    var alvo = 'html:not(.menu-recolhido) [data-lateral] [data-secao="' + k + '"]';
+                    return alvo + ' > [data-secao-itens]{display:none}' + alvo + ' .lateral-seta{transform:rotate(-90deg)}';
+                }).join('');
+            }
+        };
+        window.cerneSecoes.estilo(window.cerneSecoes.ler(), @json($chaveSecaoAtiva));
     </script>
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="csrf-token" content="{{ csrf_token() }}">
@@ -404,22 +449,24 @@
 
             <nav class="flex-1 space-y-0.5 overflow-y-auto px-3">
                 @foreach ($navSections as $secao)
-                    <div @class(['lateral-secao', 'pt-4' => ! $loop->first])>
-                        <p @class(['lateral-titulo px-3 pb-1 text-[10px] font-semibold tracking-wide uppercase', $secao['tint']])>
-                            {{ $secao['label'] }}
+                    @php $chave = $chaveDaSecao('perfil', $secao['label']); @endphp
+                    <div @class(['lateral-secao', 'pt-4' => ! $loop->first]) data-secao="{{ $chave }}" @if ($chave === $chaveSecaoAtiva) data-ativa @endif>
+                        <x-lateral-titulo :chave="$chave" :rotulo="$secao['label']" :class="$secao['tint']">
                             @if ($secao['emBreve'] ?? false)
                                 <span class="ml-1 rounded bg-white/10 px-1.5 py-0.5 text-[9px] font-normal tracking-normal text-white/50 normal-case">em breve</span>
                             @endif
-                        </p>
-                        @foreach ($secao['items'] as [$route, $label, $curto, $icone])
-                            @if (isset($secao['cadastrosDe']) && $loop->index === $secao['cadastrosDe'])
-                                <p class="lateral-titulo px-3 pt-4 pb-1 text-[10px] font-semibold tracking-wide text-white/40 uppercase">Cadastros e regras</p>
-                            @endif
-                            <a href="{{ route($route) }}" title="{{ $label }}" @class(['nav-item-chrome', 'nav-item-chrome-active '.$corAtivoEscuroDesktop => request()->routeIs($route)])>
-                                <x-nav-icon :name="$icone" />
-                                <span class="lateral-texto">{{ $label }}</span>
-                            </a>
-                        @endforeach
+                        </x-lateral-titulo>
+                        <div class="mt-1 space-y-0.5" data-secao-itens>
+                            @foreach ($secao['items'] as [$route, $label, $curto, $icone])
+                                @if (isset($secao['cadastrosDe']) && $loop->index === $secao['cadastrosDe'])
+                                    <p class="lateral-titulo px-3 pt-4 pb-1 text-[10px] font-semibold tracking-wide text-white/40 uppercase">Cadastros e regras</p>
+                                @endif
+                                <a href="{{ route($route) }}" title="{{ $label }}" @class(['nav-item-chrome', 'nav-item-chrome-active '.$corAtivoEscuroDesktop => request()->routeIs($route)])>
+                                    <x-nav-icon :name="$icone" />
+                                    <span class="lateral-texto">{{ $label }}</span>
+                                </a>
+                            @endforeach
+                        </div>
                     </div>
                 @endforeach
 
@@ -532,9 +579,10 @@
 
             <nav class="flex flex-1 flex-col overflow-y-auto px-3">
                 @foreach ($secoesProfissional as $secao)
-                    <div @class(['lateral-secao', 'pt-5' => ! $loop->first])>
-                        <p class="lateral-titulo px-3 pb-1 text-[10px] font-semibold tracking-wide text-slate-400 uppercase dark:text-slate-500">{{ $secao['label'] }}</p>
-                        <div class="space-y-0.5">
+                    @php $chave = $chaveDaSecao('pro', $secao['label']); @endphp
+                    <div @class(['lateral-secao', 'pt-5' => ! $loop->first]) data-secao="{{ $chave }}" @if ($chave === $chaveSecaoAtiva) data-ativa @endif>
+                        <x-lateral-titulo :chave="$chave" :rotulo="$secao['label']" class="text-slate-400 dark:text-slate-500" />
+                        <div class="mt-1 space-y-0.5" data-secao-itens>
                             @foreach ($secao['items'] as [$route, $label, $curto, $icone])
                                 <a href="{{ route($route) }}" title="{{ $label }}" @class(['nav-item', 'nav-item-active' => request()->routeIs($route)])>
                                     <x-nav-icon :name="$icone" />
@@ -547,15 +595,18 @@
 
                 {{-- Só a conta de administrador: separado dos grupos e no fim. --}}
                 @if ($secaoPlataforma)
+                    @php $chave = $chaveDaSecao('pro', $secaoPlataforma['label']); @endphp
                     <div class="mt-auto pt-6">
-                        <div class="border-t border-brand-950/5 pt-4 dark:border-white/10">
-                            <p class="lateral-titulo px-3 pb-1 text-[10px] font-semibold tracking-wide text-slate-400 uppercase dark:text-slate-500">{{ $secaoPlataforma['label'] }}</p>
-                            @foreach ($secaoPlataforma['items'] as [$route, $label, $curto, $icone])
-                                <a href="{{ route($route) }}" title="{{ $label }}" class="nav-item">
-                                    <x-nav-icon :name="$icone" />
-                                    <span class="lateral-texto">{{ $label }}</span>
-                                </a>
-                            @endforeach
+                        <div class="border-t border-brand-950/5 pt-4 dark:border-white/10" data-secao="{{ $chave }}" @if ($chave === $chaveSecaoAtiva) data-ativa @endif>
+                            <x-lateral-titulo :chave="$chave" :rotulo="$secaoPlataforma['label']" class="text-slate-400 dark:text-slate-500" />
+                            <div class="mt-1 space-y-0.5" data-secao-itens>
+                                @foreach ($secaoPlataforma['items'] as [$route, $label, $curto, $icone])
+                                    <a href="{{ route($route) }}" title="{{ $label }}" class="nav-item">
+                                        <x-nav-icon :name="$icone" />
+                                        <span class="lateral-texto">{{ $label }}</span>
+                                    </a>
+                                @endforeach
+                            </div>
                         </div>
                     </div>
                 @endif
@@ -630,8 +681,9 @@
                     </a>
                 @endif
 
-                <p class="lateral-titulo px-3 pb-1 text-[10px] font-semibold tracking-wide text-slate-400 uppercase dark:text-slate-500">Plataforma</p>
-                <div class="space-y-0.5">
+                <div data-secao="admin-plataforma" @if ($chaveSecaoAtiva === 'admin-plataforma') data-ativa @endif>
+                <x-lateral-titulo chave="admin-plataforma" rotulo="Plataforma" class="text-slate-400 dark:text-slate-500" />
+                <div class="mt-1 space-y-0.5" data-secao-itens>
                     <a href="{{ route('admin.users') }}" title="Contas e perfis" @class(['nav-item', 'nav-item-active' => request()->routeIs('admin.users')])>
                         <x-nav-icon name="admin" />
                         <span class="lateral-texto">Contas e perfis</span>
@@ -652,9 +704,11 @@
                         <span class="lateral-texto">Incidentes</span>
                     </a>
                 </div>
+                </div>
 
-                <p class="mt-5 lateral-titulo px-3 pb-1 text-[10px] font-semibold tracking-wide text-slate-400 uppercase dark:text-slate-500">Cadastros</p>
-                <div class="space-y-0.5">
+                <div class="mt-5" data-secao="admin-cadastros" @if ($chaveSecaoAtiva === 'admin-cadastros') data-ativa @endif>
+                <x-lateral-titulo chave="admin-cadastros" rotulo="Cadastros" class="text-slate-400 dark:text-slate-500" />
+                <div class="mt-1 space-y-0.5" data-secao-itens>
                     @foreach ($cadastrosAdmin as [$route, $label, $curto, $icone, $pendentes])
                         <a href="{{ route($route) }}" title="{{ $label }}" @class(['nav-item', 'nav-item-active' => request()->routeIs($route)])>
                             <x-nav-icon :name="$icone" />
@@ -664,6 +718,7 @@
                             @endif
                         </a>
                     @endforeach
+                </div>
                 </div>
             </nav>
 
