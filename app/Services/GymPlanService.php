@@ -2,6 +2,8 @@
 
 namespace App\Services;
 
+use App\Enums\ActivityRecordStatus;
+use App\Enums\ActivityType;
 use App\Enums\GymEquipmentAccess;
 use App\Enums\GymGoal;
 use App\Enums\GymLevel;
@@ -9,6 +11,7 @@ use App\Enums\GymMeasureType;
 use App\Enums\GymMuscleGroup;
 use App\Enums\GymSeason;
 use App\Enums\GymSport;
+use App\Models\ActivityRecord;
 use App\Models\GymEquipment;
 use App\Models\GymExercise;
 use App\Models\GymExerciseCatalog;
@@ -247,7 +250,8 @@ class GymPlanService
     /**
      * Próximo treino da rotação: o seguinte ao do último treino CONCLUÍDO,
      * voltando ao primeiro depois do último. Sem nenhum concluído, o
-     * primeiro.
+     * primeiro. Concluído é a sessão registrada na Academia OU o "Fiz" de um
+     * treino previsto em Minha semana, para quem não anota as séries.
      */
     public function nextWorkout(GymPlan $plan): ?GymWorkout
     {
@@ -263,13 +267,43 @@ class GymPlanService
             ->latest('finished_at')
             ->first();
 
-        if ($ultima === null) {
+        $ultimoId = $ultima?->workout_id;
+        $marcado = $this->lastConfirmedInWeek($treinos->pluck('id')->all());
+
+        // No mesmo dia vale a sessão: o "Fiz" que ganha a sessão do dia deixa de ser solto (ver syncGymSessions).
+        if ($marcado !== null && ($ultima === null || $marcado['date'] > $ultima->performed_on->toDateString())) {
+            $ultimoId = $marcado['workout_id'];
+        }
+
+        if ($ultimoId === null) {
             return $treinos->first();
         }
 
-        $indice = $treinos->search(fn (GymWorkout $t) => $t->id === $ultima->workout_id);
+        $indice = $treinos->search(fn (GymWorkout $t) => $t->id === $ultimoId);
 
         return $treinos[(($indice === false ? -1 : $indice) + 1) % $treinos->count()];
+    }
+
+    /**
+     * O último treino desta fase que a pessoa disse ter feito em Minha semana, sem sessão registrada. A chave do previsto
+     * (`g:semana:vaga:treino`) diz qual era o treino.
+     *
+     * @param  list<string>  $treinoIds
+     * @return array{workout_id: string, date: string}|null
+     */
+    private function lastConfirmedInWeek(array $treinoIds): ?array
+    {
+        $registro = ActivityRecord::query()
+            ->where('activity', ActivityType::Gym->value)
+            ->where('status', ActivityRecordStatus::Done->value)
+            ->whereNull('gym_session_id')
+            ->where('planned_key', 'like', 'g:%')
+            ->orderByDesc('done_on')->orderByDesc('created_at')
+            ->limit(20)
+            ->get()
+            ->first(fn (ActivityRecord $r) => in_array(explode(':', (string) $r->planned_key)[3] ?? '', $treinoIds, true));
+
+        return $registro === null ? null : ['workout_id' => explode(':', (string) $registro->planned_key)[3], 'date' => $registro->done_on->toDateString()];
     }
 
     /**

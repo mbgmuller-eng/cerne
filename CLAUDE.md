@@ -686,6 +686,8 @@ Decisões do dono em 2026-11-26. Regras que não se quebram:
 - **O treino automático** lê as limitações (`GymGeneratorInput::blocks`), mostra "Encontrado na sua Saúde" e **não grava** isso nas regiões da fase: liberada a limitação, deixa de valer.
 - **Semana**: o previsto (compromisso fixo `c:`, vaga da academia `g:` nos dias preferidos, corrida `k:`) **não é gravado**; vira linha em `activity_records` com `planned_key` (índice único)
   quando a pessoa diz "Fiz" ou "não fiz"; mudar de dia grava só `activity_week_moves`. Semana passada mostra só o diário. Referência de item vinda do navegador é procurada de novo na semana (404).
+- **O "Fiz" da semana avança o rodízio** (`GymPlanService::nextWorkout` vale o último treino feito: sessão registrada ou previsto `g:` confirmado; no mesmo dia vale a sessão), para quem não
+  anota as séries. "Não fiz" não avança. Sem isso os dias seguintes repetiam o Treino A.
 - **Treino terminado na Academia** entra no diário uma vez (`syncGymSessions`, índice único `member_id + gym_session_id`); se já havia um "Fiz" do mesmo dia, a sessão se liga a ele.
 - **Carga = minutos × esforço**; alerta acima de 30% da média de 4 semanas (precisa de 2 semanas com dado). A tela diz que é sinal e que não prevê lesão. **O Cerne avisa e não move nada.**
 - **Corrida**: regras fixas (`RunningLadder`, `RunningService`); com limitação que recomende aguardar, só começa com "Montar mesmo assim", e a escolha fica registrada

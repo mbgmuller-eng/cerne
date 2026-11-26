@@ -89,7 +89,7 @@ const scrollToText = (texto) => (page) => page.evaluate((t) => {
         });
         await wait(1500);
     });
-    await shoot(client, '/saude/academia', 'saude');
+    await shoot(client, '/saude/atividades', 'saude');
     await shoot(client, '/saude/agenda', 'saude-agenda');
     await shoot(client, '/saude/ficha', 'saude-ficha');
     await shoot(client, '/acompanhamento', 'acompanhamento');

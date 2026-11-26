@@ -150,6 +150,40 @@ class ActivitiesTest extends TestCase
         $this->assertSame(1, $this->semana()['items']->where('name', 'Academia: Treino C')->where('status', 'planned')->count());
     }
 
+    public function test_o_fiz_da_semana_avanca_o_rodizio_mesmo_sem_registrar_series(): void
+    {
+        $this->rotinaDaAna();
+        $semanas = app(ActivityWeekService::class);
+        $inicio = CarbonImmutable::parse('2026-11-23');
+        $academia = fn () => $this->semana()['items']->filter(fn (array $i) => $i['workout_id'] !== null)->pluck('name')->values()->all();
+
+        $semanas->confirm($inicio, $this->item('Academia: Treino A')['ref'], 55, 6, null);
+        $this->assertSame(['Academia: Treino A', 'Academia: Treino B', 'Academia: Treino C'], $academia());
+
+        $semanas->confirm($inicio, $this->item('Academia: Treino B')['ref'], 55, 7, null);
+        $this->assertSame(['Academia: Treino A', 'Academia: Treino B', 'Academia: Treino C'], $academia());
+        // A Academia sugere o mesmo próximo treino que a semana.
+        $planos = app(GymPlanService::class);
+        $this->assertSame('Treino C', $planos->nextWorkout($planos->activePlan())->name);
+        // A semana seguinte continua o rodízio: depois do C vem o A.
+        $this->assertSame(['Academia: Treino A', 'Academia: Treino B', 'Academia: Treino C'], $semanas->week($inicio->addWeek())['items']->filter(fn (array $i) => $i['workout_id'] !== null)->pluck('name')->values()->all());
+
+        // Um treino registrado série por série depois disso volta a mandar no rodízio.
+        $this->travelTo(CarbonImmutable::parse('2026-11-27 20:00'));
+        $treinoA = GymWorkout::query()->where('name', 'Treino A')->firstOrFail();
+        GymSession::create(['workout_id' => $treinoA->id, 'performed_on' => '2026-11-27', 'started_at' => '2026-11-27 18:00', 'finished_at' => '2026-11-27 19:00']);
+        $this->assertSame('Treino B', $planos->nextWorkout($planos->activePlan())->name);
+    }
+
+    public function test_nao_fiz_nao_avanca_o_rodizio(): void
+    {
+        $this->rotinaDaAna();
+        app(ActivityWeekService::class)->skip(CarbonImmutable::parse('2026-11-23'), $this->item('Academia: Treino A')['ref']);
+
+        // O treino que não foi feito é o próximo da fila.
+        $this->assertSame(1, $this->semana()['items']->where('name', 'Academia: Treino A')->where('status', 'planned')->count());
+    }
+
     public function test_mudar_o_dia_vale_para_a_semana_e_avisa_pernas_na_vespera_do_esporte(): void
     {
         $this->rotinaDaAna();
