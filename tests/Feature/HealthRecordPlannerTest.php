@@ -22,6 +22,8 @@ use App\Livewire\Rules\RuleReviewPage;
 use App\Models\ActivityPlan;
 use App\Models\ConsultantClient;
 use App\Models\FinancialProfile;
+use App\Models\HealthAppointment;
+use App\Models\HealthExamReport;
 use App\Models\GymPlanAdjustment;
 use App\Models\GymWorkout;
 use App\Models\GymWorkoutExercise;
@@ -245,6 +247,22 @@ class HealthRecordPlannerTest extends TestCase
 
         $this->assertNull($ligada->fresh()->followup_id);
         $this->assertSame(2, PhysicalLimitation::query()->count());
+    }
+
+    public function test_limitacao_guarda_desde_quando_e_a_origem_de_consulta_ou_exame(): void
+    {
+        $consulta = HealthAppointment::create(['member_id' => $this->membroAna->id, 'kind' => 'consultation', 'title' => 'Ortopedista', 'scheduled_at' => '2026-11-10 10:00', 'status' => 'done']);
+        $laudo = HealthExamReport::create(['member_id' => $this->membroAna->id, 'performed_on' => '2026-11-12', 'kind' => 'conclusion', 'exam_name' => 'Ressonância', 'conclusion' => 'Texto do laudo']);
+
+        foreach (['appointment:'.$consulta->id => ['appointment_id', $consulta->id], 'exam:'.$laudo->id => ['exam_report_id', $laudo->id]] as $origem => [$coluna, $id]) {
+            Livewire::test(LimitationPanel::class, ['memberId' => $this->membroAna->id, 'newFrom' => $origem])
+                ->set('region', 'knee')->set('status', 'guided')->set('sinceYear', '2022')
+                ->call('save')->assertHasNoErrors();
+
+            $limitacao = PhysicalLimitation::query()->whereNotNull($coluna)->sole();
+            $this->assertSame($id, $limitacao->{$coluna});
+            $this->assertSame(2022, (int) $limitacao->since_year);
+        }
     }
 
     // --- Prontidão ------------------------------------------------------------------------------

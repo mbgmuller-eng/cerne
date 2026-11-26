@@ -811,12 +811,16 @@ de regressão para isso — não "modernize" o login para Livewire.
 php artisan test
 ```
 
-Cerca de 1600 testes (rodam em uns 10 minutos; no Windows, rode em segundo plano).
+Cerca de 3200 testes (rodam em uns 25 minutos; no Windows, rode em segundo plano).
 **Verde é obrigatório**, não desejável. Se algo ficou vermelho, o conserto é o código
 novo — não o teste. Para iterar, filtre: `php artisan test --filter=NomeDoTeste`.
 
 Os testes usam o MySQL local (`cerne_test`). Se `php artisan test` falhar com
 "connection refused", o servidor local caiu: suba o `mysqld` antes.
+
+**Campo novo em model entra no `#[Fillable]`.** Fora do ambiente local, atribuir em massa um campo não declarado é descartado **sem aviso** (já se perdeu assim o "desde quando"
+e a origem de uma limitação, com a suíte verde). Por isso o `Tests\TestCase` liga `Model::preventSilentlyDiscardingAttributes`: não desligue, e o teste de um campo novo
+**confere o que foi gravado**.
 
 Ao mexer em model, rota ou listagem, confira que ainda passam:
 `TenancyIsolationTest`, `TenancyCoverageTest`, `MemberPrivacyTest`,

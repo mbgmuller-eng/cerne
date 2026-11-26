@@ -16,12 +16,13 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
- * Uma limitação física, dentro de um acompanhamento: a região, a situação, o que evitar e o que o profissional disse. Mesma visibilidade da
- * Agenda de Saúde. Os programas de atividades da pessoa leem daqui; o que eles mudam por causa dela fica com eles e é só dela.
+ * Uma limitação física: a região, a situação, o que evitar e o que o profissional disse. Pode estar em um acompanhamento, vir de uma consulta ou
+ * de um exame, ou ser do passado. Mesma visibilidade da Agenda de Saúde. Os programas de atividades da pessoa leem daqui; o que eles mudam por
+ * causa dela fica com eles e é só dela.
  */
 #[Fillable([
-    'profile_id', 'member_id', 'followup_id', 'region', 'status', 'avoid', 'guidance', 'professional', 'professional_id', 'informed_on', 'answers',
-    'created_by_member_id', 'created_by_user_id', 'changed_by_user_id',
+    'profile_id', 'member_id', 'followup_id', 'appointment_id', 'exam_report_id', 'since_year', 'region', 'status', 'avoid', 'guidance',
+    'professional', 'professional_id', 'informed_on', 'answers', 'created_by_member_id', 'created_by_user_id', 'changed_by_user_id',
 ])]
 class PhysicalLimitation extends Model
 {

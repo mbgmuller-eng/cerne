@@ -34,7 +34,7 @@
             'CNH, passaporte, certificados, apólices e exames, com a validade de cada um e controle de quem vê. O seu consultor ou corretor só enxerga o que você autorizar.', 'bg-documentos-800'],
         ['saude-agenda', 'Agenda de saúde', 'saude-agenda', 'Agenda de consultas e exames com lembretes', 'Consultas e exames, sem esquecer',
             'Consultas e exames com quem atende, onde fica e como chegar, lembrete um dia antes e atalho para o Google Agenda ou arquivo de calendário. Cada pessoa da família na sua cor.', 'bg-saude-800'],
-        ['saude-ficha', 'Ficha de saúde', 'saude-ficha', 'Ficha de saúde com QR Code de emergência', 'O essencial, à mão em uma emergência',
+        ['saude-ficha', 'Ficha de saúde', 'saude-ficha', 'Ficha de saúde com problemas, limitações físicas, peso e IMC', 'O essencial, à mão em uma emergência',
             'Tipo sanguíneo, alergias, problemas de saúde, limitações e remédios, com peso e IMC em um histórico só seu, mais um QR Code: quem ler vê o que importa em uma emergência, sem precisar de login.', 'bg-saude-800'],
         ['saude', 'Atividades', 'saude', 'Semana de atividades no Cerne, com academia, tênis e caminhada', 'Sua semana de atividades',
             'Esportes, academia, caminhada e corrida na mesma semana. Monte o treino ou gere um automático pelo seu objetivo, registre o que fez e acompanhe a carga e a evolução. Se houver uma limitação na sua Saúde, o Cerne sugere o que pausar, e você decide. O plano da semana junta musculação, aeróbico e descanso a partir do que você já faz. Só você vê as suas atividades.', 'bg-saude-800'],
@@ -213,7 +213,7 @@
             </div>
 
             <div class="space-y-4">
-                <x-screenshot-frame src="{{ $marketingImage('saude-ficha') }}" alt="Ficha de saúde com QR Code de emergência" />
+                <x-screenshot-frame src="{{ $marketingImage('saude-ficha') }}" alt="Ficha de saúde com problemas, limitações físicas, peso e IMC" />
                 <p class="text-xs text-slate-500 dark:text-slate-400">A saúde só é tratada com o seu consentimento específico, pedido antes de você abrir a área, e você pode revogá-lo quando quiser.</p>
             </div>
         </div>
