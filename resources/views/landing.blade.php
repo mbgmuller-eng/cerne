@@ -36,8 +36,8 @@
             'Consultas e exames com quem atende, onde fica e como chegar, lembrete um dia antes e atalho para o Google Agenda ou arquivo de calendário. Cada pessoa da família na sua cor.', 'bg-saude-800'],
         ['saude-ficha', 'Ficha de saúde', 'saude-ficha', 'Ficha de saúde com QR Code de emergência', 'O essencial, à mão em uma emergência',
             'Tipo sanguíneo, alergias, doenças e remédios com histórico, mais um QR Code: quem ler vê o que importa em uma emergência, sem precisar de login.', 'bg-saude-800'],
-        ['saude', 'Academia', 'saude', 'Treino de academia acompanhado no Cerne', 'Treino com histórico',
-            'Monte o seu treino ou gere um automático pelo seu objetivo, registre as séries, acompanhe a evolução em gráficos e baixe o relatório em PDF. Só você vê.', 'bg-saude-800'],
+        ['saude', 'Atividades', 'saude', 'Treino de academia acompanhado no Cerne', 'Sua semana de atividades',
+            'Esportes, academia, caminhada e corrida na mesma semana. Monte o treino ou gere um automático pelo seu objetivo, registre o que fez e acompanhe a carga e a evolução. Se houver uma limitação na sua Saúde, o Cerne sugere o que pausar, e você decide. Só você vê as suas atividades.', 'bg-saude-800'],
     ];
 
     $recursos = [
@@ -155,7 +155,7 @@
                 ['bg-brand-800', 'Finanças', ['Fluxo de caixa, contas fixas e cartões', 'Regra de orçamento do mês', 'Investimentos, proventos e moedas', 'Dívidas, financiamentos e consórcios', 'Objetivos com previsão e histórico', 'Importação de extrato e fatura com IA']],
                 ['bg-seguros-800', 'Seguros', ['Apólices por tipo, pessoa e seguradora', 'Importação da apólice em PDF', 'Datas importantes e renovação', 'Acompanhamento com seu corretor']],
                 ['bg-documentos-800', 'Documentos', ['CNH, passaporte, certificados e exames', 'Pastas do seu jeito', 'Validade registrada em cada documento', 'Visibilidade por categoria']],
-                ['bg-saude-800', 'Saúde', ['Ficha de saúde com QR de emergência', 'Agenda de consultas com lembrete', 'Check-ups e acompanhamento de cada problema', 'Pedidos de exame com resultados para comparar, com leitura do laudo em PDF', 'Seus médicos e profissionais guardados para a próxima consulta', 'Programa de atividades com presença e nota de dor', 'Treino de academia com histórico e PDF', 'Itens de cuidado com data de troca', 'Cuidado de pais e familiares']],
+                ['bg-saude-800', 'Saúde', ['Ficha de saúde com QR de emergência', 'Agenda de consultas com lembrete', 'Check-ups e acompanhamento de cada problema', 'Pedidos de exame com resultados para comparar, com leitura do laudo em PDF', 'Seus médicos e profissionais guardados para a próxima consulta', 'Programa de atividades com presença e nota de dor', 'Atividades e esportes na sua semana, com programa de caminhada e corrida', 'Treino de academia com histórico e PDF','Itens de cuidado com data de troca', 'Cuidado de pais e familiares']],
             ] as [$cor, $nome, $itens])
                 <div class="card overflow-hidden">
                     <div class="h-1.5 {{ $cor }}"></div>

@@ -41,6 +41,10 @@ class EncryptSensitiveData extends Command
         'health_activities' => ['name'],
         'health_activity_exercises' => ['name', 'dose', 'note'],
         'health_activity_sessions' => ['note'],
+        'activity_profiles' => ['goals'],
+        'activity_commitments' => ['custom_name'],
+        'activity_records' => ['custom_name', 'note'],
+        'physical_limitations' => ['region', 'avoid', 'guidance', 'professional', 'answers'],
 
         // Segunda leva (revisão de segurança 2026-11): telefone, conta bancária, notas, textos do acompanhamento e as listas lidas por IA
         // (JSON guardado como texto cifrado, ver SensitiveArray). Mantenha igual a database/migrations/*widen_more_sensitive_columns*.

@@ -42,6 +42,14 @@
         </table>
     @endif
 
+    @if ($limitacoes->isNotEmpty())
+        <h2>Limitações físicas</h2>
+        @foreach ($limitacoes as $l)
+            <p><span class="nome">{{ $l->regionLabel() }}</span> · {{ mb_strtolower($l->status->label()) }}@if ($l->avoidLoads() !== []) · evitar {{ implode(', ', array_map(fn ($c) => mb_strtolower($c->label()), $l->avoidLoads())) }}@endif</p>
+            @if ($l->guidance)<div class="texto">{{ $l->guidance }}</div>@endif
+        @endforeach
+    @endif
+
     @if ($atividades->isNotEmpty() || $acompanhamento->guided_by || $acompanhamento->avoid)
         <h2>Programa de atividades</h2>
         @if ($acompanhamento->guided_by || $acompanhamento->guided_on)

@@ -85,7 +85,7 @@
             $indiceAtivo = null;
             foreach ($secoes as $i => $sec) {
                 foreach ($sec['items'] as $item) {
-                    if (request()->routeIs($item[0])) {
+                    if (request()->routeIs(...\App\Support\MenuRoutes::activePatterns($item[0]))) {
                         $indiceAtivo = $i;
                         break 2;
                     }
@@ -109,7 +109,7 @@
                         href="{{ route($rota) }}"
                         @class([
                             $escuro ? 'nav-item-chrome' : 'nav-item',
-                            ($escuro ? 'nav-item-chrome-active '.$corAtivo : 'nav-item-active') => request()->routeIs($rota),
+                            ($escuro ? 'nav-item-chrome-active '.$corAtivo : 'nav-item-active') => request()->routeIs(...\App\Support\MenuRoutes::activePatterns($rota)),
                         ])
                     >
                         <x-nav-icon :name="$icone" />

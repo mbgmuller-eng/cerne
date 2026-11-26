@@ -1,21 +1,12 @@
 <div class="space-y-6">
 
-    <div class="flex flex-wrap items-end justify-between gap-3">
-        <div>
-            <h1 class="font-display text-3xl font-semibold tracking-tight text-slate-900 dark:text-white">Academia</h1>
-            <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                {{ $plan ? $plan->name.($plan->started_on ? ' · desde '.$plan->started_on->format('d/m/Y') : '') : 'Seu plano de treino.' }}
-                Só você vê estes dados.
-            </p>
-        </div>
-        <div class="flex flex-wrap gap-2">
-            <a href="{{ route('health.gym.progress') }}" wire:navigate class="btn-secondary">Evolução</a>
-            <a href="{{ route('health.gym.generate') }}" wire:navigate class="btn-secondary">Treino automático</a>
-            <a href="{{ route('health.gym.plan') }}" wire:navigate class="btn-secondary">
-                {{ $plan ? 'Editar plano' : 'Montar plano' }}
-            </a>
-        </div>
-    </div>
+    <x-activity-header title="Academia" :subtitle="$plan ? $plan->name.($plan->started_on ? ' · desde '.$plan->started_on->format('d/m/Y') : '') : 'Seu plano de treino.'">
+        <a href="{{ route('health.gym.progress') }}" wire:navigate class="btn-secondary">Evolução</a>
+        <a href="{{ route('health.gym.generate') }}" wire:navigate class="btn-secondary">Treino automático</a>
+        <a href="{{ route('health.gym.plan') }}" wire:navigate class="btn-secondary">
+            {{ $plan ? 'Editar plano' : 'Montar plano' }}
+        </a>
+    </x-activity-header>
 
     {{-- Há quanto tempo está na fase e se já é hora de trocar (prazo por objetivo, estagnação e adesão). --}}
     @if ($phase && $phase['status'] !== 'ok')

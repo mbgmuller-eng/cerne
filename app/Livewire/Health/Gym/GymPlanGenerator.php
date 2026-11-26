@@ -13,6 +13,8 @@ use App\Livewire\Concerns\RequiresActiveProfile;
 use App\Livewire\Concerns\RequiresModule;
 use App\Livewire\Concerns\RequiresPersonalHealth;
 use App\Models\GymPlan;
+use App\Services\Activities\ActivityService;
+use App\Services\Activities\PlanReviewService;
 use App\Services\GymPhaseReviewService;
 use App\Services\GymPlanService;
 use App\Services\GymReportService;
@@ -62,6 +64,9 @@ class GymPlanGenerator extends Component
     /** @var list<string> */
     public array $restrictions = [];
 
+    /** Levar em conta as limitações salvas na Saúde (o padrão vem do perfil de atividades). */
+    public bool $considerLimitations = true;
+
     /** Em relação à fase anterior: variar os exercícios, manter os que evoluíram ou não se importar. */
     public string $variety = 'vary';
 
@@ -89,6 +94,8 @@ class GymPlanGenerator extends Component
         $this->abortUnlessPersonalHealthOwner();
         // O treino automático termina na Academia, que é do módulo Saúde: sem a assinatura, nem monta.
         $this->abortUnlessModuleEntitled(PlatformModule::Saude);
+
+        $this->considerLimitations = (bool) app(ActivityService::class)->profile()->consider_limitations;
 
         $plano = $plans->activePlan();
 
@@ -274,6 +281,7 @@ class GymPlanGenerator extends Component
             'esportes' => GymSport::cases(),
             'temporadas' => GymSeason::cases(),
             'plano' => $plano,
+            'limitacoesDaSaude' => app(PlanReviewService::class)->generatorLimits()['summary'],
             'temPlanoAtivo' => $plano !== null,
             'revisao' => $this->step === 'review' && $plano !== null ? $this->reviewData($plano, $reviews, $reports) : null,
             'swapLinha' => $linha,
@@ -322,6 +330,7 @@ class GymPlanGenerator extends Component
     private function input(GymPlanService $plans): GymGeneratorInput
     {
         [$evitar, $manter] = $this->previousPhaseNames($plans);
+        $limites = $this->considerLimitations ? app(PlanReviewService::class)->generatorLimits() : ['restrictions' => [], 'avoid' => [], 'exclude' => []];
 
         return new GymGeneratorInput(
             GymGoal::from($this->goal),
@@ -336,6 +345,9 @@ class GymPlanGenerator extends Component
             $this->focus === 'sport' ? GymSport::tryFrom($this->sport) : null,
             $this->focus === 'sport' ? $this->sportDays : 0,
             $this->focus === 'sport' ? GymSeason::tryFrom($this->season) : null,
+            $limites['restrictions'],
+            $limites['avoid'],
+            $limites['exclude'],
         );
     }
 

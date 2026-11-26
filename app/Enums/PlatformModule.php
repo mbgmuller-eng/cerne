@@ -35,7 +35,7 @@ enum PlatformModule: string
             self::Financas => 'fluxo de caixa, contas fixas, cartões, dívidas, investimentos, objetivos e regra de orçamento',
             self::Seguros => 'apólices, vencimentos e renovações',
             self::Documentos => 'CNH, passaporte, apólices e exames em um cofre com controle de acesso',
-            self::Saude => 'ficha de saúde com QR de emergência, agenda de consultas, academia e cuidado de familiares',
+            self::Saude => 'ficha de saúde com QR de emergência, agenda de consultas, atividades e academia e cuidado de familiares',
         };
     }
 }

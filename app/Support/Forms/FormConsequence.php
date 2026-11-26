@@ -619,6 +619,109 @@ final class FormConsequence
         return $linhas;
     }
 
+    /** @return list<string> */
+    public static function activityRecord(string $nome, int $minutos, ?int $esforco, bool $nestaSemana): array
+    {
+        if ($minutos < 1) {
+            return [];
+        }
+
+        return [
+            $nome.' entra no diário'.($esforco !== null ? ' com carga '.($minutos * $esforco).' (minutos × esforço)' : '. Sem o esforço, não entra na conta da carga').'.',
+            $nestaSemana ? 'Como é desta semana, aparece em Minha semana.' : 'É de outra semana: aparece naquela semana e na Evolução.',
+        ];
+    }
+
+    /** @return list<string> */
+    public static function activityBatch(string $nome, int $quantos, int $minutos, ?int $esforco): array
+    {
+        if ($quantos < 1) {
+            return ['Nenhum dia marcado.'];
+        }
+
+        return [
+            ($quantos === 1 ? 'Entra 1 registro' : "Entram {$quantos} registros").' de '.mb_strtolower($nome).', com '.$minutos.' min'.($esforco !== null ? ' e esforço '.$esforco : '').'.',
+            'Dá para corrigir cada um depois.',
+        ];
+    }
+
+    /** @return list<string> */
+    public static function activityCommitment(bool $fixo, ?string $dia, int $vezes): array
+    {
+        return [
+            $fixo
+                ? 'Aparece em Minha semana toda '.mb_strtolower((string) $dia).' como previsto. Você confirma quando fizer.'
+                : 'Minha semana passa a mostrar quantas vezes já houve, em relação a '.$vezes.' por semana. Nada é marcado em um dia certo.',
+        ];
+    }
+
+    /**
+     * @param  list<string>  $dias  nomes dos dias preferidos da academia
+     * @return list<string>
+     */
+    public static function activityProfile(array $dias, bool $considerar): array
+    {
+        return [
+            $dias === [] ? 'Sem dias preferidos, a academia não aparece como prevista em Minha semana.' : 'Os treinos da fase ativa vão, na ordem do rodízio, para: '.mb_strtolower(implode(', ', $dias)).'. Na semana você muda o dia quando quiser.',
+            $considerar ? 'Os programas levam em conta as limitações salvas na sua Saúde. Nada muda no treino sem a sua aprovação.' : 'Os programas deixam de considerar as limitações salvas na Saúde, inclusive os avisos.',
+        ];
+    }
+
+    /** @return list<string> */
+    public static function physicalLimitation(bool $propria): array
+    {
+        return array_values(array_filter([
+            'Quem vê a Agenda de Saúde desta pessoa vê a limitação. O consultor não vê.',
+            $propria ? 'Os seus programas de atividades passam a levá-la em conta, com sugestões para você aprovar. O treino não muda sozinho.' : null,
+        ]));
+    }
+
+    /**
+     * @param  array{pause: int, swap: int, keep: int, restore: int, add: int}  $n
+     * @return list<string>
+     */
+    public static function planReview(array $n): array
+    {
+        $partes = array_filter([
+            $n['pause'] ? $n['pause'].($n['pause'] === 1 ? ' exercício sai do treino e fica guardado para voltar' : ' exercícios saem do treino e ficam guardados para voltar') : null,
+            $n['swap'] ? $n['swap'].' '.($n['swap'] === 1 ? 'é trocado' : 'são trocados') : null,
+            $n['keep'] ? $n['keep'].' '.($n['keep'] === 1 ? 'continua' : 'continuam').' como está, por escolha sua' : null,
+            $n['restore'] ? $n['restore'].' '.($n['restore'] === 1 ? 'volta' : 'voltam').' ao treino' : null,
+            $n['add'] ? $n['add'].' '.($n['add'] === 1 ? 'exercício indicado entra' : 'exercícios indicados entram') : null,
+        ]);
+
+        if ($partes === []) {
+            return [];
+        }
+
+        return [ucfirst(implode('; ', $partes)).'.', 'A fase continua a mesma e o histórico dos treinos não muda.'];
+    }
+
+    /** @return list<string> */
+    public static function consultation(int $marcas, int $exercicios): array
+    {
+        return array_values(array_filter([
+            'A limitação passa para "Com orientação".',
+            $marcas > 0 ? 'As '.$marcas.' marcações valem na revisão do treino.' : null,
+            $exercicios > 0 ? ($exercicios === 1 ? 'O exercício indicado vai' : 'Os '.$exercicios.' exercícios indicados vão').' para o programa do acompanhamento, visível a quem vê a Agenda de Saúde.' : null,
+            'O treino não muda sozinho: você aprova na revisão.',
+        ]));
+    }
+
+    /**
+     * @param  list<string>  $dias
+     * @return list<string>
+     */
+    public static function runningStart(string $passo, array $dias, bool $mesmoAssim): array
+    {
+        return array_values(array_filter([
+            'O programa começa em: '.$passo.', depois de 5 min de caminhada.',
+            $dias !== [] ? 'As sessões aparecem em Minha semana: '.mb_strtolower(implode(', ', $dias)).'.' : null,
+            'Avança um passo só com a semana completa e sem aumento de dor.',
+            $mesmoAssim ? 'O Cerne guarda que você escolheu começar mesmo com a recomendação de aguardar.' : null,
+        ]));
+    }
+
     /** Lançamento de outro mês que o exibido na tela: não vai aparecer onde a pessoa está olhando. */
     public static function otherMonth(CarbonImmutable $data, int $anoExibido, int $mesExibido): ?string
     {

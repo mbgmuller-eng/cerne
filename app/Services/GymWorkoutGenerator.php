@@ -219,7 +219,7 @@ class GymWorkoutGenerator
             ->filter(fn (GymExerciseCatalog $c) => ! C::isNeverAuto($c->name, $in->sport?->unlocks() ?? [])
                 && $this->fitsLevel($c, $in->level)
                 && C::fitsAccess($c->name, $c->equipment_hint, $in->access)
-                && ! C::hitsRestriction($c->name, $in->restrictions)
+                && ! $in->blocks($c->name)
                 && ($incluirCardio ? true : ($c->muscle_group->value !== 'cardio' && ! C::isConditioning($c->name))))
             ->map(fn (GymExerciseCatalog $c) => [
                 'id' => $c->id, 'name' => $c->name, 'norm' => C::normalize($c->name), 'group' => $c->muscle_group->value, 'label' => $c->muscle_group->label(),
@@ -240,7 +240,7 @@ class GymWorkoutGenerator
                 && ! str_contains(C::normalize($c->name), 'salto vertical') && ! str_contains(C::normalize($c->name), 'jump rope')
                 && C::fitsLevel($c->name, $in->level)
                 && C::fitsAccess($c->name, $c->equipment_hint, $in->access)
-                && ! C::hitsRestriction($c->name, $in->restrictions)
+                && ! $in->blocks($c->name)
                 && ! str_contains(C::normalize($c->name), 'hiit'))
             ->map(fn (GymExerciseCatalog $c) => [
                 'id' => $c->id, 'name' => $c->name, 'group' => 'cardio', 'label' => $c->muscle_group->label(), 'equipment' => $c->equipment_hint,

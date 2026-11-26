@@ -258,6 +258,15 @@ Route::middleware(['auth', 'verified', 'termos', 'dois-passos', 'cuidado'])->gro
         // Saúde pessoal: só o dono abre (RequiresPersonalHealth) — consultor
         // e corretor levam 403 mesmo com o cliente aberto — e só depois do consentimento específico (RequiresHealthConsent).
         Route::middleware('consentimento-saude')->group(function (): void {
+        // Atividades: a semana, o diário, a revisão do treino por limitação e a corrida. Só do dono, como a Academia.
+        Route::get('/saude/atividades', \App\Livewire\Activities\ActivityWeek::class)->name('health.activities.index');
+        Route::get('/saude/atividades/registrar', \App\Livewire\Activities\ActivityLog::class)->name('health.activities.log');
+        Route::get('/saude/atividades/perfil', \App\Livewire\Activities\ActivityProfilePage::class)->name('health.activities.profile');
+        Route::get('/saude/atividades/revisar', \App\Livewire\Activities\ActivityReview::class)->name('health.activities.review');
+        Route::get('/saude/atividades/folha', \App\Livewire\Activities\ActivityConsultation::class)->name('health.activities.consultation');
+        Route::get('/saude/atividades/folha.pdf', \App\Http\Controllers\ActivitySheetPdfController::class)->name('health.activities.sheet');
+        Route::get('/saude/atividades/corrida', \App\Livewire\Activities\ActivityRunning::class)->name('health.activities.running');
+        Route::get('/saude/atividades/evolucao', \App\Livewire\Activities\ActivityProgress::class)->name('health.activities.progress');
         Route::get('/saude/academia', GymHome::class)->name('health.gym.index');
         Route::get('/saude/academia/plano', GymPlanEditor::class)->name('health.gym.plan');
         Route::get('/saude/academia/treino-automatico', GymPlanGenerator::class)->name('health.gym.generate');

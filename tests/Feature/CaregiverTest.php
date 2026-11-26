@@ -55,6 +55,7 @@ class CaregiverTest extends TestCase
         'HealthExamItem', 'HealthExamReading', 'HealthExamReport', 'HealthExamValue',
         // Médicos e profissionais: só os que atendem a pessoa acompanhada (decisão do dono em 2026-11-26).
         'HealthProfessional', 'HealthProfessionalLink',
+        'PhysicalLimitation',
     ];
 
     protected function setUp(): void

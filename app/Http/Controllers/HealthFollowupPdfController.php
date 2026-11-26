@@ -31,6 +31,7 @@ class HealthFollowupPdfController extends Controller
         $pdf = Pdf::loadView('pdf.health-followup', [
             'acompanhamento' => $acompanhamento,
             'linhas' => $servico->timeline($acompanhamento),
+            'limitacoes' => \App\Models\PhysicalLimitation::query()->where('followup_id', $acompanhamento->id)->orderBy('created_at')->get(),
             'atividades' => $acompanhamento->activities()->with('exercises')
                 ->withCount(['sessions as presencas' => fn ($q) => $q->where('attended', true), 'sessions as faltas' => fn ($q) => $q->where('attended', false)])
                 ->withAvg(['sessions as dor_media' => fn ($q) => $q->where('attended', true)], 'pain')

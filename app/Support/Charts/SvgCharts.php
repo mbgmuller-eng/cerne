@@ -77,7 +77,7 @@ final class SvgCharts
      * @param  list<string>  $rotulos
      * @param  list<array{0: string, 1: list<string|float|int>, 2: string}>  $series
      */
-    public static function colunasEmpilhadas(array $rotulos, array $series, ChartPalette $p, int $largura = 640, int $altura = 260, string $descricao = ''): string
+    public static function colunasEmpilhadas(array $rotulos, array $series, ChartPalette $p, int $largura = 640, int $altura = 260, string $descricao = '', ?callable $formatar = null): string
     {
         $n = count($rotulos);
         $svg = self::abre($largura, $altura, $descricao ?: 'Colunas empilhadas');
@@ -94,7 +94,7 @@ final class SvgCharts
         $esq = 54;
         $topo = 10;
         $base = $altura - 26;
-        $svg .= self::grade($p, $largura, $esq, $topo, $base, $teto, $passo);
+        $svg .= self::grade($p, $largura, $esq, $topo, $base, $teto, $passo, $formatar);
 
         $slot = ($largura - $esq - 8) / $n;
         $larg = max(8, min(44, $slot * 0.62));
@@ -110,7 +110,7 @@ final class SvgCharts
                 }
                 $h = ($base - $topo) * $v / $teto;
                 $y -= $h;
-                $svg .= '<rect x="'.self::n($x).'" y="'.self::n($y).'" width="'.self::n($larg).'" height="'.self::n($h).'" fill="'.$s[2].'" stroke="'.$p->surface.'" stroke-width="1.5"><title>'.self::esc($rotulo.' · '.$s[0].': '.Money::format($s[1][$i])).'</title></rect>';
+                $svg .= '<rect x="'.self::n($x).'" y="'.self::n($y).'" width="'.self::n($larg).'" height="'.self::n($h).'" fill="'.$s[2].'" stroke="'.$p->surface.'" stroke-width="1.5"><title>'.self::esc($rotulo.' · '.$s[0].': '.($formatar !== null ? $formatar((float) $s[1][$i]) : Money::format($s[1][$i]))).'</title></rect>';
             }
 
             $svg .= '<text x="'.self::n($x + $larg / 2).'" y="'.($altura - 8).'" text-anchor="middle" font-size="10.5" fill="'.$p->muted.'">'.self::esc($rotulo).'</text>';
@@ -282,13 +282,13 @@ final class SvgCharts
         return [$passo * 4, $passo];
     }
 
-    private static function grade(ChartPalette $p, int $largura, int $esq, int $topo, int $base, float $teto, float $passo): string
+    private static function grade(ChartPalette $p, int $largura, int $esq, int $topo, int $base, float $teto, float $passo, ?callable $formatar = null): string
     {
         $svg = '';
         for ($v = 0.0; $v <= $teto + 0.001; $v += $passo) {
             $y = $base - ($base - $topo) * $v / $teto;
             $svg .= '<line x1="'.$esq.'" y1="'.self::n($y).'" x2="'.($largura - 4).'" y2="'.self::n($y).'" stroke="'.($v == 0 ? $p->axis : $p->grid).'" stroke-width="1"/>';
-            $svg .= '<text x="'.($esq - 8).'" y="'.self::n($y + 3.5).'" text-anchor="end" font-size="10.5" fill="'.$p->muted.'">'.self::esc(self::rotuloEixo($v)).'</text>';
+            $svg .= '<text x="'.($esq - 8).'" y="'.self::n($y + 3.5).'" text-anchor="end" font-size="10.5" fill="'.$p->muted.'">'.self::esc($formatar !== null ? $formatar($v) : self::rotuloEixo($v)).'</text>';
         }
 
         return $svg;

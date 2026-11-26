@@ -45,7 +45,7 @@
     ];
 
     $navSaude = [
-        ['health.gym.index', 'Academia', 'Academia', 'dumbbell'],
+        ['health.activities.index', 'Atividades', 'Atividades', 'dumbbell'],
         ['health.card.index', 'Ficha de Saúde', 'Ficha', 'heart'],
         ['health.appointments.index', 'Agenda de Saúde', 'Agenda', 'calendar'],
         ['health.routines.index', 'Check-ups e rotinas', 'Check-ups', 'heart'],
@@ -311,6 +311,7 @@
     // Vale para as telas de dentro de cada item (o detalhe de uma dívida é Finanças). "Importar" é exato: o prefixo dele também é o dos Documentos.
     $secaoTemATelaAtual = fn (array $itens) => collect($itens)->contains(fn (array $i) => request()->routeIs(
         $i[0], $i[0] === 'documents.index' ? $i[0] : \Illuminate\Support\Str::replaceEnd('.index', '.*', $i[0]),
+        ...\App\Support\MenuRoutes::activePatterns($i[0]),
     ));
     $chaveSecaoAtiva = null;
     if ($dentroDoPerfil) {
@@ -461,7 +462,7 @@
                                 @if (isset($secao['cadastrosDe']) && $loop->index === $secao['cadastrosDe'])
                                     <p class="lateral-titulo px-3 pt-4 pb-1 text-[10px] font-semibold tracking-wide text-white/40 uppercase">Cadastros e regras</p>
                                 @endif
-                                <a href="{{ route($route) }}" title="{{ $label }}" @class(['nav-item-chrome', 'nav-item-chrome-active '.$corAtivoEscuroDesktop => request()->routeIs($route)])>
+                                <a href="{{ route($route) }}" title="{{ $label }}" @class(['nav-item-chrome', 'nav-item-chrome-active '.$corAtivoEscuroDesktop => request()->routeIs(...\App\Support\MenuRoutes::activePatterns($route))])>
                                     <x-nav-icon :name="$icone" />
                                     <span class="lateral-texto">{{ $label }}</span>
                                 </a>

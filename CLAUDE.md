@@ -217,7 +217,7 @@ continua). Regras que não se quebram:
 
 ### Privacidade e LGPD
 
-Texto da política em `/privacidade` (versão `terms_version` e `health_consent_version` de 2026-11-27; o aviso de rascunho saiu da política e dos Termos de Uso por decisão do dono, **mas o texto ainda não passou por advogado**), plano de incidente em `INCIDENTES.md`. **Política e recurso andam juntos: quem passa a mandar dado a um terceiro novo (nova leitura por IA, novo operador) atualiza as seções 2, 3 e 13 da política e sobe a versão.** Regras que não se quebram:
+Texto da política em `/privacidade` (versão `terms_version` e `health_consent_version` de 2026-11-28; o aviso de rascunho saiu da política e dos Termos de Uso por decisão do dono, **mas o texto ainda não passou por advogado**), plano de incidente em `INCIDENTES.md`. **Política e recurso andam juntos: quem passa a mandar dado a um terceiro novo (nova leitura por IA, novo operador) atualiza as seções 2, 3 e 13 da política e sobe a versão.** Regras que não se quebram:
 
 - **Aceite versionado** (`config cerne.legal.terms_version`, `RequiresCurrentTerms`, grupo `termos` de toda rota autenticada): mudar o texto dos Termos ou da
   Política exige subir a versão, e todo mundo aceita de novo no próximo acesso. Todo caminho que cria conta grava `terms_accepted_at` **e** `terms_version`.
@@ -668,6 +668,29 @@ Telas em `/saude/exames` (`App\Livewire\Health\Exams`), serviços `HealthExamSer
 - **O registro guarda o NOME como foi escrito**; `professional_id` (consulta, pedido, laudo, programa, remédio) só o liga à ficha. Mudar ou apagar a ficha não reescreve registro.
 - **Nada é guardado sozinho**: o campo (`<x-health.professional-field>` + trait `PicksHealthProfessional`, um por tela) reaproveita pelo nome e só cria com "Guardar este profissional" marcado. No laudo começa **desmarcado** (quem assina raramente é o médico da pessoa); em registro que já tinha nome, também. Os "nomes que você já digitou" são sugestão; guardar liga os registros com exatamente aquele nome das pessoas atendidas (atualização sem eventos: não avisa ninguém).
 - Nomes cifrados: busca, ordem (fixos primeiro) e comparação em PHP. Escolher um profissional vindo do navegador é conferido entre os da pessoa do formulário (404).
+
+### Atividades (a antiga "Academia" no menu), limitações e corrida
+
+Telas em `/saude/atividades*` (`App\Livewire\Activities\*`, `App\Services\Activities\*`); a Academia segue em `/saude/academia`, como uma aba da área. Testes: `ActivitiesTest`.
+Decisões do dono em 2026-11-26. Regras que não se quebram:
+
+- **Atividades e programas são só do dono** (`IsPersonalHealthData`: diário, compromissos, perfil, marcas, ajustes e corrida). **A limitação física** (`PhysicalLimitation`, dentro de um
+  acompanhamento, painel `LimitationPanel`) tem a **visibilidade da Agenda de Saúde** (`IsCoupleHealthData`, inclusive cuidador). O que cita exercício do treino nunca vai para tabela da Agenda.
+  Os programas só leem as limitações da PRÓPRIA pessoa (`PlanReviewService::ownLimitations`), mesmo que ela veja a do cônjuge.
+- **O Cerne TIRA ou ADAPTA por precaução; só ACRESCENTA o que um profissional indicou.** Em investigação a revisão só oferece pausar ou manter; trocar aparece com a limitação "Com
+  orientação"; acrescentar usa os exercícios digitados no **programa do acompanhamento** (a folha da consulta grava lá, na atividade "Exercícios orientados"). Não crie segunda lista.
+- **Nada muda sem a pessoa aplicar**, e a recusa desfaz tudo (transação). **Pausar retira o item do treino** e guarda como ele estava em `gym_plan_adjustments` (nenhuma tela precisa saber de
+  "pausado"; o histórico sai das séries). Devolver segue a ordem das posições de ANTES da revisão. Treino em andamento segura a revisão.
+- **As marcações vêm do NOME do exercício** (`MovementLoad`, e as três regiões de `GymExerciseClassifier`) e a tela diz isso. **As listas, a sugestão por região e os passos da corrida ainda não
+  foram revisados por um profissional** (`docs/revisao-profissional-atividades.md`; mudou lá, mude o documento junto).
+- **O treino automático** lê as limitações (`GymGeneratorInput::blocks`), mostra "Encontrado na sua Saúde" e **não grava** isso nas regiões da fase: liberada a limitação, deixa de valer.
+- **Semana**: o previsto (compromisso fixo `c:`, vaga da academia `g:` nos dias preferidos, corrida `k:`) **não é gravado**; vira linha em `activity_records` com `planned_key` (índice único)
+  quando a pessoa diz "Fiz" ou "não fiz"; mudar de dia grava só `activity_week_moves`. Semana passada mostra só o diário. Referência de item vinda do navegador é procurada de novo na semana (404).
+- **Treino terminado na Academia** entra no diário uma vez (`syncGymSessions`, índice único `member_id + gym_session_id`); se já havia um "Fiz" do mesmo dia, a sessão se liga a ele.
+- **Carga = minutos × esforço**; alerta acima de 30% da média de 4 semanas (precisa de 2 semanas com dado). A tela diz que é sinal e que não prevê lesão. **O Cerne avisa e não move nada.**
+- **Corrida**: regras fixas (`RunningLadder`, `RunningService`); com limitação que recomende aguardar, só começa com "Montar mesmo assim", e a escolha fica registrada
+  (`chose_despite_limitation_at`). A semana fecha uma vez (índice único `program_id + week_start`), com a confirmação da pessoa.
+- **Ainda não feito**: leitura por IA da folha do médico (decisão: segundo momento) e integração com relógios e apps (a API do Strava não serve: 7 dias de cache e só o próprio atleta).
 
 ### Calendário (Saúde e agenda do profissional)
 

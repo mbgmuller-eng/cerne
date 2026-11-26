@@ -72,7 +72,7 @@ class MobileMenuTest extends TestCase
 
         $posicao = 0;
         foreach (['Finanças', 'Visão geral', 'Fluxo de caixa', 'Contas fixas', 'Dívidas', 'Investimentos', 'Objetivos', 'Importar', 'Cadastros e regras', 'Contas &amp; Cartões', 'Regras de categorização', 'Regra de orçamento',
-            'Seguros', 'Apólices', 'Documentos', 'Meus documentos', 'Saúde', 'Academia', 'Ficha de Saúde', 'Agenda de Saúde', 'Cuidados e itens', 'Minha conta', 'Sair'] as $texto) {
+            'Seguros', 'Apólices', 'Documentos', 'Meus documentos', 'Saúde', 'Atividades', 'Ficha de Saúde', 'Agenda de Saúde', 'Cuidados e itens', 'Minha conta', 'Sair'] as $texto) {
             $achou = strpos($menu, $texto, $posicao);
             self::assertNotFalse($achou, "'{$texto}' não aparece (ou está fora de ordem) no menu do celular.");
             $posicao = $achou;

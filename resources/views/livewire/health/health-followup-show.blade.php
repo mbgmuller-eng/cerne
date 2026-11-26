@@ -160,6 +160,8 @@
         @endif
     </section>
 
+    <livewire:health.limitation-panel :followup-id="$acompanhamento->id" :key="'limitacoes-'.$acompanhamento->id" />
+
     <livewire:health.health-program-panel :followup-id="$acompanhamento->id" :key="'programa-'.$acompanhamento->id" />
 
     <div data-write class="flex flex-wrap items-center gap-3 text-xs">

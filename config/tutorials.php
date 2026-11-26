@@ -353,6 +353,65 @@ return [
             'tip' => 'Nomes que você já tinha digitado aparecem como sugestão. Nada é guardado sem você pedir.',
         ],
 
+        'health.activities.index' => [
+            'title' => 'Minha semana',
+            'summary' => 'O que está previsto e o que você já fez: esportes, academia e corrida em um só lugar.',
+            'steps' => [
+                'Em “Meu perfil”, conte o que você já faz e os dias preferidos da academia. A semana é montada a partir disso.',
+                'Toque em “Fiz” para informar duração, esforço e dor, ou em “não fiz”.',
+                'Mude um item de dia quando precisar. Vale só para aquela semana.',
+                'A carga é minutos vezes esforço. O Cerne avisa quando a semana passa bastante da sua média.',
+                'Os avisos de encaixe cuidam das pernas antes do esporte, do descanso e dos dias de corrida.',
+            ],
+            'tip' => 'O Cerne avisa e sugere, mas não move nada sozinho. Só você vê estes dados.',
+        ],
+
+        'health.activities.log' => [
+            'title' => 'Registrar atividade',
+            'summary' => 'Lance uma atividade ou vários dias de uma vez.',
+            'steps' => [
+                'Escolha o tipo. Em “Outra”, escreva o nome que quiser.',
+                'Informe duração e esforço de 0 a 10. Distância, batimento e dor são opcionais.',
+                'Para vários dias, escolha o período e os dias da semana, toque em “Ver os dias” e desmarque os que não aconteceram.',
+                'Os treinos terminados na Academia entram sozinhos.',
+            ],
+        ],
+
+        'health.activities.review' => [
+            'title' => 'Revisar o treino',
+            'summary' => 'O que as limitações salvas na Saúde pedem do treino atual, para você decidir.',
+            'steps' => [
+                'Em investigação, o Cerne só sugere pausar. Depois da orientação, passa a oferecer trocas.',
+                'Os exercícios indicados vêm do programa do acompanhamento. Marque em quais treinos entram.',
+                'Confira o quadro “Ao salvar” e toque em “Aplicar no treino”. Nada muda antes disso.',
+                'O que foi pausado fica guardado e volta a ser oferecido quando a limitação for liberada.',
+            ],
+            'tip' => 'As marcações vêm do nome do exercício. São precaução, não avaliação: confira com o profissional.',
+        ],
+
+        'health.activities.consultation' => [
+            'title' => 'Folha para o profissional',
+            'summary' => 'Leve as suas atividades à consulta e registre aqui o que ouvir.',
+            'steps' => [
+                'Antes da consulta, baixe a folha em PDF com a sua semana e os exercícios do treino.',
+                'Depois, marque o que pode, adaptar ou evitar, e o que foi dito sobre corrida e esportes.',
+                'Escreva os exercícios indicados como o profissional passou.',
+                'Confira as sugestões na revisão do treino antes de aplicar.',
+            ],
+        ],
+
+        'health.activities.running' => [
+            'title' => 'Caminhada e corrida',
+            'summary' => 'Um programa que começa do que você consegue hoje e avança semana a semana.',
+            'steps' => [
+                'Responda quanto trote você faz hoje, quantas vezes por semana e em quais dias.',
+                'Confirme cada sessão em Minha semana, com esforço e dor.',
+                'No fim da semana, o Cerne sugere avançar, repetir ou voltar um passo, e você escolhe.',
+                'Com uma limitação que recomende aguardar, o Cerne avisa antes de começar.',
+            ],
+            'tip' => 'É orientação geral, não prescrição. Com dor ou condição de saúde, converse com um profissional.',
+        ],
+
         'health.gym.index' => [
             'title' => 'Academia',
             'summary' => 'Seu plano de treino, o próximo treino e as últimas sessões. Só você vê estes dados.',
