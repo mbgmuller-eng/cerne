@@ -16,6 +16,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 #[Fillable([
     'profile_id', 'member_id', 'kind', 'title', 'professional_name', 'specialty', 'location', 'address', 'phone',
     'booked_by_name', 'booked_with_name', 'scheduled_at', 'notes', 'created_by_member_id', 'created_by_user_id', 'escort_user_id', 'status', 'status_at', 'status_by_user_id',
+    'routine_id',
 ])]
 class HealthAppointment extends Model
 {
@@ -23,6 +24,37 @@ class HealthAppointment extends Model
 
     /** Nasce agendada (o banco já tem o padrão, mas o model recém-criado precisa saber sem ser relido). */
     protected $attributes = ['status' => 'scheduled'];
+
+    protected static function booted(): void
+    {
+        // A próxima data do check-up sai da última consulta REALIZADA ligada a ele: confirmar, remarcar, ligar ou apagar um compromisso refaz a conta.
+        static::saved(function (self $consulta): void {
+            if ($consulta->wasChanged(['routine_id', 'status', 'scheduled_at']) || ($consulta->wasRecentlyCreated && $consulta->routine_id !== null)) {
+                // Dentro de `saved` o original ainda é o anterior: a rotina de onde o compromisso saiu também é refeita.
+                app(\App\Services\HealthRoutineService::class)->refreshMany([$consulta->routine_id, $consulta->getOriginal('routine_id')]);
+            }
+        });
+        static::deleted(function (self $consulta): void {
+            app(\App\Services\HealthRoutineService::class)->refreshMany([$consulta->routine_id]);
+        });
+    }
+
+    /** A rotina preventiva (check-up) a que este compromisso pertence. */
+    public function routine(): BelongsTo
+    {
+        return $this->belongsTo(HealthRoutine::class, 'routine_id');
+    }
+
+    /** Os acompanhamentos (problemas) em que este compromisso aparece. */
+    public function followups(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    {
+        return $this->belongsToMany(HealthFollowup::class, 'health_followup_appointment', 'appointment_id', 'followup_id');
+    }
+
+    public function documents(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(Document::class, 'health_appointment_id');
+    }
 
     protected function casts(): array
     {

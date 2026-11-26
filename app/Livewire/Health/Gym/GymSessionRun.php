@@ -178,6 +178,24 @@ class GymSessionRun extends Component
             return;
         }
 
+        // Fase ligada a um acompanhamento de saúde: a presença entra lá, e a pessoa vai direto informar a nota de dor. Uma falha aqui não desfaz o
+        // treino que acabou de ser encerrado.
+        try {
+            $presencas = app(\App\Services\HealthActivityService::class)->recordGymSession($this->session()->refresh());
+        } catch (\Throwable $e) {
+            report($e);
+            $presencas = collect();
+        }
+
+        if ($presencas->isNotEmpty() && auth()->user()->hasCurrentHealthConsent()) {
+            $presenca = $presencas->first();
+            $presenca->loadMissing('activity');
+
+            $this->redirect(route('health.followups.show', ['followup' => $presenca->activity->followup_id, 'presenca' => $presenca->id]), navigate: true);
+
+            return;
+        }
+
         $this->redirect(route('health.gym.index'), navigate: true);
     }
 

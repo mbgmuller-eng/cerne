@@ -49,6 +49,8 @@ class CaregiverTest extends TestCase
     /** Os únicos models que o cuidador enxerga. Mudar esta lista é uma decisão de privacidade: revise antes. */
     private const CAREGIVER_VISIBLE = [
         'HealthAllergy', 'HealthAppointment', 'HealthCard', 'HealthCareItem', 'HealthCondition', 'HealthMedication', 'HealthMedicationChange', 'Document',
+        // Check-ups, acompanhamentos e programa de atividades: decisão do dono em 2026-11-26, valem para quem ele acompanha como a Agenda.
+        'HealthActivity', 'HealthActivityExercise', 'HealthActivitySession', 'HealthExamRequest', 'HealthFollowup', 'HealthFollowupNote', 'HealthRoutine',
     ];
 
     protected function setUp(): void

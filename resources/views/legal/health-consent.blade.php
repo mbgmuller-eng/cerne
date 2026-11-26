@@ -2,14 +2,15 @@
     <h1 class="font-display text-2xl font-semibold text-slate-900 dark:text-white">Seus dados de saúde</h1>
     <p class="mt-2 text-sm text-slate-600 dark:text-slate-300">
         A área de Saúde guarda informações que a lei considera <strong>sensíveis</strong>: ficha de saúde (tipo sanguíneo, alergias, condições, remédios), agenda de
-        consultas e exames, itens de cuidado e treinos de academia. Por isso pedimos o seu consentimento específico para tratá-los.
+        consultas e exames, itens de cuidado, check-ups e rotinas preventivas, exames pedidos ainda sem data, acompanhamentos de um problema de saúde (anotações, nota de dor e documentos ligados), programa de atividades
+        (exercícios que você cadastra, presenças e nota de dor) e treinos de academia. Por isso pedimos o seu consentimento específico para tratá-los.
     </p>
 
     <ul class="mt-4 space-y-2 text-sm text-slate-600 dark:text-slate-300">
-        <li><strong>Para quê:</strong> só para você usar a área de Saúde e receber os avisos que você ligou (consulta, troca de item, revisão do treino).</li>
-        <li><strong>Quem vê:</strong> você e, na ficha e na agenda, a pessoa do seu casal que divide o perfil. Se você convidar alguém para acompanhar a sua saúde, essa pessoa também vê, com o acesso que você escolher e só até você encerrá-lo. Consultor e corretor <strong>nunca</strong> veem.</li>
+        <li><strong>Para quê:</strong> só para você usar a área de Saúde e receber os avisos que você ligou (consulta, check-up, troca de item, revisão do treino).</li>
+        <li><strong>Quem vê:</strong> você e a pessoa do seu casal que divide o perfil, que vê a ficha, a agenda, os itens de cuidado, os check-ups, os acompanhamentos e o programa de atividades. Os treinos de academia são só seus. Se você convidar alguém para acompanhar a sua saúde, essa pessoa também vê, com o acesso que você escolher e só até você encerrá-lo. Consultor e corretor <strong>nunca</strong> veem.</li>
         <li><strong>QR Code de emergência:</strong> só existe se você o gerar, e quem o escaneia vê o que você escolheu mostrar. Você pode trocá-lo quando quiser.</li>
-        <li><strong>Como guardamos:</strong> os textos da ficha e da agenda ficam cifrados no banco.</li>
+        <li><strong>Como guardamos:</strong> os textos da ficha, da agenda, dos check-ups, dos acompanhamentos e do programa de atividades ficam cifrados no banco.</li>
         <li><strong>Seus direitos:</strong> você pode revogar este consentimento a qualquer momento em Minha conta (a área de Saúde fecha e os avisos param),
             baixar seus dados e apagar a conta, o que apaga também os dados de saúde.</li>
     </ul>

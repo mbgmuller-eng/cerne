@@ -55,6 +55,35 @@ class ExtendedEncryptionTest extends TestCase
         $this->assertSame('conta do salário', $lida->notes);
     }
 
+    public function test_check_up_acompanhamento_e_programa_de_atividades_ficam_cifrados(): void
+    {
+        [, $perfil] = $this->entrar();
+        $membro = ProfileMember::query()->where('profile_id', $perfil->id)->sole();
+
+        $rotina = app(\App\Services\HealthRoutineService::class)->create($membro, ['name' => 'Rotina sigilosa', 'interval_months' => 12], null);
+        $servico = app(\App\Services\HealthFollowupService::class);
+        $acompanhamento = $servico->create($membro, ['title' => 'Problema sigiloso', 'status' => 'treating', 'started_on' => '2026-01-10'], null);
+        $servico->saveProgram($acompanhamento, ['guided_by' => 'Profissional sigiloso', 'avoid' => 'Movimento sigiloso']);
+        $servico->addNote($acompanhamento, '2026-01-11', 'Anotação sigilosa', 4, null);
+        $servico->requestExam($membro, ['title' => 'Exame sigiloso', 'requested_by' => 'Médico sigiloso'], $rotina, $acompanhamento, null);
+        $programa = app(\App\Services\HealthActivityService::class);
+        $atividade = $programa->create($acompanhamento, ['kind' => 'physio', 'name' => 'Atividade sigilosa', 'per_week' => 2], null);
+        $programa->addExercise($atividade, 'Exercício sigiloso', 'sigiloso', 'sigiloso', 'Observação sigilosa', null);
+        $programa->registerSession($atividade, '2026-01-12', true, 3, 'Presença sigilosa', null);
+
+        foreach (['health_routines', 'health_followups', 'health_followup_notes', 'health_exam_requests', 'health_activities', 'health_activity_exercises', 'health_activity_sessions'] as $tabela) {
+            $colunas = \App\Console\Commands\EncryptSensitiveData::COLUMNS[$tabela];
+            $linha = DB::table($tabela)->first();
+
+            foreach ($colunas as $coluna) {
+                $this->assertNotNull($linha->{$coluna}, "{$tabela}.{$coluna}");
+                $this->assertStringNotContainsStringIgnoringCase('sigilos', (string) $linha->{$coluna}, "{$tabela}.{$coluna}");
+            }
+        }
+
+        $this->assertSame('Problema sigiloso', \App\Models\HealthFollowup::query()->sole()->title);
+    }
+
     public function test_notas_e_nome_do_segurado_ficam_cifrados(): void
     {
         [, $perfil] = $this->entrar();

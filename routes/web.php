@@ -221,7 +221,7 @@ Route::middleware(['auth', 'verified', 'termos', 'dois-passos', 'cuidado'])->gro
     Route::post('/pessoas/sair', [\App\Http\Controllers\CareSwitchController::class, 'leave'])->name('care.exit');
     Route::post('/pessoas/{profile}/abrir', [\App\Http\Controllers\CareSwitchController::class, 'open'])->name('care.open');
     // Link dos avisos (e-mail e push): escolhe a pessoa e vai direto à agenda ou aos cuidados dela. Só escolhe o contexto, depois de autorizar.
-    Route::get('/pessoas/{profile}/ir/{destino}', [\App\Http\Controllers\CareSwitchController::class, 'goto'])->whereIn('destino', ['agenda', 'cuidados', 'financas'])->name('care.goto');
+    Route::get('/pessoas/{profile}/ir/{destino}', [\App\Http\Controllers\CareSwitchController::class, 'goto'])->whereIn('destino', ['agenda', 'cuidados', 'financas', 'rotinas'])->name('care.goto');
 
     Route::middleware('assinatura')->group(function (): void {
         Route::get('/painel', Dashboard::class)->name('dashboard');
@@ -276,6 +276,11 @@ Route::middleware(['auth', 'verified', 'termos', 'dois-passos', 'cuidado'])->gro
         Route::get('/saude/ficha/{memberId}/qrcode', [HealthQrCodeController::class, 'show'])->name('health.qrcode.show');
         Route::get('/saude/agenda', HealthAppointmentIndex::class)->name('health.appointments.index');
         Route::get('/saude/cuidados', HealthCareItemIndex::class)->name('health.care.index');
+        // Check-ups, acompanhamentos e programa de atividades: mesma visibilidade da Agenda de Saúde.
+        Route::get('/saude/check-ups', \App\Livewire\Health\HealthRoutineIndex::class)->name('health.routines.index');
+        Route::get('/saude/acompanhamentos', \App\Livewire\Health\HealthFollowupIndex::class)->name('health.followups.index');
+        Route::get('/saude/acompanhamentos/{followup}', \App\Livewire\Health\HealthFollowupShow::class)->name('health.followups.show');
+        Route::get('/saude/acompanhamentos/{followup}/resumo.pdf', \App\Http\Controllers\HealthFollowupPdfController::class)->name('health.followups.pdf');
         // Evento para a agenda da pessoa (.ics); mesma restrição das telas de onde sai.
         Route::get('/saude/agenda/{appointment}/evento.ics', [HealthCalendarController::class, 'appointment'])->name('health.appointments.ics');
         Route::get('/saude/cuidados/{item}/evento.ics', [HealthCalendarController::class, 'careItem'])->name('health.care.ics');

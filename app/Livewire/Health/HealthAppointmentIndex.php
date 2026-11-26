@@ -49,12 +49,45 @@ class HealthAppointmentIndex extends Component
     public string $scheduledTime = '';
     public string $notes = '';
 
+    /** Check-up ou rotina a que o compromisso pertence (vazio = nenhum). */
+    public string $routineId = '';
+
+    /** Acompanhamento em que ele aparece; ao editar, vem o primeiro ligado, e trocar a escolha troca só esse. */
+    public string $followupId = '';
+
+    #[\Livewire\Attributes\Locked]
+    public string $followupAtOpen = '';
+
     public bool $showColors = false;
 
     public function mount(): void
     {
         $this->redirectOrAbortWithoutProfile();
         $this->abortUnlessHealthParticipant();
+        $this->openFromLink();
+    }
+
+    /** Veio de "+ Consulta" num check-up ou num acompanhamento: o formulário já abre ligado a ele. */
+    private function openFromLink(): void
+    {
+        $rotina = ($id = request()->query('rotina')) && is_string($id) ? \App\Models\HealthRoutine::query()->find($id) : null;
+        $acompanhamento = ($id = request()->query('acompanhamento')) && is_string($id) ? \App\Models\HealthFollowup::query()->find($id) : null;
+
+        if ($rotina === null && $acompanhamento === null) {
+            return;
+        }
+
+        $this->newAppointment();
+        $this->memberId = $rotina?->member_id ?? $acompanhamento->member_id;
+        $this->routineId = (string) $rotina?->id;
+        $this->followupId = (string) $acompanhamento?->id;
+    }
+
+    /** Rotina e acompanhamento são de uma pessoa: trocar a pessoa solta a escolha. */
+    public function updatedMemberId(): void
+    {
+        $this->routineId = '';
+        $this->followupId = '';
     }
 
     // -----------------------------------------------------------------
@@ -207,6 +240,8 @@ class HealthAppointmentIndex extends Component
         $this->scheduledDate = $consulta->scheduled_at->toDateString();
         $this->scheduledTime = $consulta->scheduled_at->format('H:i');
         $this->notes = (string) $consulta->notes;
+        $this->routineId = (string) $consulta->routine_id;
+        $this->followupId = $this->followupAtOpen = (string) $consulta->followups()->first()?->id;
         $this->showForm = true;
     }
 
@@ -258,13 +293,44 @@ class HealthAppointmentIndex extends Component
             'scheduled_at' => "{$this->scheduledDate} {$this->scheduledTime}",
             'notes' => $this->notes,
         ];
+        // Os ids vêm do navegador: só valem os da própria pessoa do compromisso (e que quem olha enxerga). Conferidos ANTES de gravar.
+        $pessoa = $this->editingId !== null ? HealthAppointment::query()->findOrFail($this->editingId)->member_id : $this->memberId;
+        $rotina = $this->routineId !== '' ? \App\Models\HealthRoutine::query()->where('member_id', $pessoa)->findOrFail($this->routineId) : null;
+        $acompanhamento = $this->followupId !== '' ? \App\Models\HealthFollowup::query()->where('member_id', $pessoa)->findOrFail($this->followupId) : null;
+
         if ($this->editingId !== null) {
-            $service->update(HealthAppointment::query()->findOrFail($this->editingId), $dados);
+            $gravada = $service->update(HealthAppointment::query()->findOrFail($this->editingId), $dados);
         } else {
-            $service->create($this->membroOuFalha($this->memberId), $dados, $this->autor());
+            $gravada = $service->create($this->membroOuFalha($this->memberId), $dados, $this->autor());
         }
 
+        $this->ligar($gravada, $rotina, $acompanhamento);
+
         $this->showForm = false;
+    }
+
+    private function ligar(HealthAppointment $consulta, ?\App\Models\HealthRoutine $rotina, ?\App\Models\HealthFollowup $acompanhamento): void
+    {
+        if ($consulta->routine_id !== $rotina?->id) {
+            $consulta->update(['routine_id' => $rotina?->id]);
+        }
+
+        if ($this->followupAtOpen === (string) $acompanhamento?->id) {
+            return;
+        }
+
+        $servico = app(\App\Services\HealthFollowupService::class);
+
+        if ($this->followupAtOpen !== '') {
+            $anterior = \App\Models\HealthFollowup::query()->find($this->followupAtOpen);
+            if ($anterior !== null) {
+                $servico->detachAppointment($anterior, $consulta->id);
+            }
+        }
+
+        if ($acompanhamento !== null) {
+            $servico->attachAppointment($acompanhamento, $consulta);
+        }
     }
 
     /** Confirma o que aconteceu: realizada, não realizada, cancelada, ou volta para agendada (corrige um engano). */
@@ -327,8 +393,11 @@ class HealthAppointmentIndex extends Component
             'coresDosMembros' => $membros->mapWithKeys(fn (ProfileMember $m) => [$m->id => $m->calendarColor()])->all(),
             'paleta' => MemberPalette::COLORS,
             'calendario' => $this->calendarData(),
-            'upcoming' => HealthAppointment::query()->where('profile_id', $profileId)->upcoming()->with(['member', 'createdByUser', 'escort'])->get(),
-            'past' => HealthAppointment::query()->where('profile_id', $profileId)->past()->with(['member', 'createdByUser', 'statusBy'])->get(),
+            'upcoming' => HealthAppointment::query()->where('profile_id', $profileId)->upcoming()->with(['member', 'createdByUser', 'escort', 'routine', 'followups'])->get(),
+            'past' => HealthAppointment::query()->where('profile_id', $profileId)->past()->with(['member', 'createdByUser', 'statusBy', 'routine', 'followups'])->get(),
+            'pedidosSemData' => \App\Models\HealthExamRequest::query()->open()->with('member')->orderBy('requested_on')->get(),
+            'rotinasDaPessoa' => $this->showForm && $this->memberId ? \App\Models\HealthRoutine::query()->where('member_id', $this->memberId)->get() : collect(),
+            'acompanhamentosDaPessoa' => $this->showForm && $this->memberId ? \App\Models\HealthFollowup::query()->where('member_id', $this->memberId)->orderByDesc('started_on')->get() : collect(),
             'editingExisting' => $this->editingId !== null,
             'emPessoaAcompanhada' => app(ProfileContext::class)->isCaregiver() || app(ProfileContext::class)->profile()?->isCare(),
             // Quem pode ser escolhido para levar cada pessoa: na pessoa acompanhada, o dono, os cuidadores e ela; em perfil comum, ela, o cônjuge e os
@@ -381,7 +450,7 @@ class HealthAppointmentIndex extends Component
     {
         $this->reset(
             'editingId', 'memberId', 'kind', 'title', 'professionalName', 'specialty', 'location', 'address', 'phone',
-            'bookedByName', 'bookedWithName', 'scheduledDate', 'scheduledTime', 'notes',
+            'bookedByName', 'bookedWithName', 'scheduledDate', 'scheduledTime', 'notes', 'routineId', 'followupId', 'followupAtOpen',
         );
         $this->kind = 'consultation';
         $this->resetErrorBag();

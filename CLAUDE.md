@@ -128,6 +128,7 @@ Todas idempotentes (regra 4). O cron da Hostinger chama `schedule:run` a cada mi
 | `cotacoes-moedas` | 03:00 | cotação de USDT, BTC e ETH em reais (CoinGecko, depois Binance, depois AwesomeAPI) e novo valor em reais dos investimentos nessas moedas (`CurrencyRateService`; índice único `currency_rates(currency, rate_date)`) |
 | `snapshots` | dia 1, 03:30 | foto mensal dos investimentos |
 | `agenda-saude`, `cuidados-saude` | 03:35 | avisos de saúde |
+| `rotinas-saude` | 03:37 | avisa o check-up ou rotina que vence em 60 dias ou hoje, sem compromisso marcado (`HealthRoutineService::notifyDue`) |
 | cobrança (`lembrete-pix`, `pix-automatico-*`, `nota-fiscal-pendentes`, `lembrete-fim-do-teste`, `aviso-acesso-encerrando`) | 03:35 a 04:00 | assinatura e Asaas |
 | `acompanhamento-roteiro` | 06:30 | reavalia os itens automáticos do passo a passo dos clientes com vínculo ativo (só grava o que mudou de estado) |
 | `acompanhamento-lembretes` | 07:45 | lembrete de reunião no dia seguinte e de tarefa que vence amanhã ou venceu (só com vínculo ativo; índice único em `engagement_reminders`) |
@@ -216,7 +217,7 @@ continua). Regras que não se quebram:
 
 ### Privacidade e LGPD
 
-Texto da política em `/privacidade` (versão `terms_version` de 2026-11-20; o aviso de rascunho saiu da política e dos Termos de Uso por decisão do dono, **mas o texto ainda não passou por advogado**), plano de incidente em `INCIDENTES.md`. **Política e recurso andam juntos: quem passa a mandar dado a um terceiro novo (nova leitura por IA, novo operador) atualiza as seções 2, 3 e 13 da política e sobe a versão.** Regras que não se quebram:
+Texto da política em `/privacidade` (versão `terms_version` e `health_consent_version` de 2026-11-26; o aviso de rascunho saiu da política e dos Termos de Uso por decisão do dono, **mas o texto ainda não passou por advogado**), plano de incidente em `INCIDENTES.md`. **Política e recurso andam juntos: quem passa a mandar dado a um terceiro novo (nova leitura por IA, novo operador) atualiza as seções 2, 3 e 13 da política e sobe a versão.** Regras que não se quebram:
 
 - **Aceite versionado** (`config cerne.legal.terms_version`, `RequiresCurrentTerms`, grupo `termos` de toda rota autenticada): mudar o texto dos Termos ou da
   Política exige subir a versão, e todo mundo aceita de novo no próximo acesso. Todo caminho que cria conta grava `terms_accepted_at` **e** `terms_version`.
@@ -620,6 +621,26 @@ A pessoa (ou o consultor) define quanto da RECEITA do mês vai para cada área e
 - **Aviso mensal** (`BudgetGapNotifier`, rotina `regra-de-orcamento`): a partir do dia 20, uma vez por pessoa por mês, só com receita no mês e a meta de investimento ainda não batida; idempotente por `ReminderLedger` (`budget_rule` + perfil + `gap_AAAA-MM`). O teste executa o fechamento de `routes/console.php` de ponta a ponta (um nome de classe errado ali já derrubou outra rotina por dias sem teste ver).
 - **Divisão do balde de objetivos** (`GoalAllocationService`): o item `goals` recebe o que sobra do grupo depois do consórcio; o serviço reparte entre os objetivos da pessoa. `priority`: do mais prioritário ao menos, cada um recebe o necessário por mês (`Goal::monthlyNeeded`) até o dinheiro acabar; `proportional`: pela proporção do necessário, sem passar dele. A sobra vai por igual para os objetivos SEM data-alvo (os centavos no último); sem eles, fica como sobra. Alcançado, conquistado e ligado a consórcio (parcela fixa) ficam de fora. **Só sugere**: "Aplicar nos objetivos" refaz a conta no servidor (nunca lê valor do navegador) e grava em `installment_amount` o que a pessoa pode editar (`apply`), com o quadro "Ao salvar".
 - **Editor** (`EditsBudgetStructure` + `partials/editor`): o rascunho (`$draft`) é a estrutura em edição, limites de 8 grupos e 10 itens, erros de validação AO VIVO no quadro (o botão salvar só grava com regra válida) e prévia "Ao salvar" com a receita do mês. Modelos prontos em `BudgetStructure::presets` (Cerne 50/20/30 e Clássico 50/30/20, ambos com os três terços).
+
+### Check-ups, acompanhamentos e programa de atividades (Saúde)
+
+Três peças: rotina preventiva (`HealthRoutine`, `/saude/check-ups`), acompanhamento de um problema (`HealthFollowup`, `/saude/acompanhamentos`, com `HealthFollowupNote`, `HealthExamRequest` e a ligação
+`health_followup_appointment`) e o programa de atividades dele (`HealthActivity`, `HealthActivityExercise`, `HealthActivitySession`; componente `HealthProgramPanel`). Teste: `HealthFollowupsTest`. Regras:
+
+- **Mesma visibilidade da Agenda de Saúde** (decisão do dono em 2026-11-26): `IsCoupleHealthData` nos sete models (casal e quem acompanha a pessoa; consultor e corretor nunca), inclusive o programa, os exercícios, as presenças
+  e a dor. Vale também dentro da pessoa acompanhada (as quatro rotas estão no `RestrictCareContext` e no grupo `consentimento-saude`). A tabela de ligação e o envio de arquivo não passam pela trava de escrita do model:
+  `HealthFollowupService::assertCanWrite` barra quem só lê.
+- **Nada de uma pessoa se liga à outra**, e todo id vindo do navegador é resolvido sob o escopo e dentro da pessoa ou do acompanhamento aberto (na Agenda, a conferência é ANTES de gravar a consulta).
+- **Um compromisso pode estar num check-up E num acompanhamento** (`health_appointments.routine_id` + pivô). Excluir rotina ou acompanhamento não apaga consulta nem documento.
+- **Próxima data do check-up** = o mais recente entre a "última vez" informada à mão e a última consulta REALIZADA ligada, mais o intervalo; gravada em `next_due_on` e refeita pelos eventos do `HealthAppointment`.
+  O aviso (`rotinas-saude`, 03:37) sai 60 dias antes e no dia, não sai se já há compromisso futuro ligado, e tem o público do lembrete de consulta da Agenda. O histórico por ciclo mostra feito, em andamento, em aberto ou não registrado.
+- **Exame pedido sem data** (`HealthExamRequest`) não está na Agenda até alguém marcar; marcar cria a consulta pelo `HealthAppointmentService` (lembretes e avisos de sempre) já ligada à rotina e ao acompanhamento.
+- **Documento ligado continua nos Documentos** com a visibilidade dele: ligar não abre nada a ninguém.
+- **O Cerne não escolhe exercício para um problema de saúde**: os exercícios são digitados à mão, a partir do que o profissional orientou. Presença exige nota de dor (0 a 10); falta não tem nota. Os gráficos (sessões e dor média por semana, separados) somam todas as atividades, em SQL.
+- **Ligação com a Academia** é opcional e só com fase da própria pessoa: terminar um treino dela grava a presença uma vez (índice único `health_activity_sessions(activity_id, gym_session_id)`) e leva à tela para informar a dor.
+  Cargas, séries e histórico da Academia continuam só do dono (o cônjuge vê o programa, não a fase).
+- **PDF "para o médico"** (`HealthFollowupPdfController`): só o que quem pede enxerga, mais a Ficha de Saúde; o nome do arquivo não leva o nome do problema.
+- Textos cifrados (lista em `EncryptSensitiveData::COLUMNS`). Fora do escopo, por decisão: leitura de laudo por IA.
 
 ### Calendário (Saúde e agenda do profissional)
 

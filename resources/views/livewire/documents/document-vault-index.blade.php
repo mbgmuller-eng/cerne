@@ -113,6 +113,10 @@
                                 @if ($documento->expires_on)
                                     · <span class="{{ $documento->expires_on->isPast() ? 'text-red-700 dark:text-red-400' : '' }}">vence {{ $documento->expires_on->format('d/m/Y') }}</span>
                                 @endif
+                                {{-- O acompanhamento só vem para quem vê a saúde: para o profissional o escopo devolve nada. --}}
+                                @if ($documento->health_followup_id && $documento->healthFollowup)
+                                    · <a href="{{ route('health.followups.show', $documento->health_followup_id) }}" class="underline" data-do-acompanhamento>{{ $documento->healthFollowup->title }}</a>
+                                @endif
                             </p>
                             <p x-show="erro" x-cloak x-text="erro" class="mt-1 text-xs text-red-700 dark:text-red-400"></p>
                         </div>

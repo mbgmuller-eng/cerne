@@ -48,6 +48,8 @@
         ['health.gym.index', 'Academia', 'Academia', 'dumbbell'],
         ['health.card.index', 'Ficha de Saúde', 'Ficha', 'heart'],
         ['health.appointments.index', 'Agenda de Saúde', 'Agenda', 'calendar'],
+        ['health.routines.index', 'Check-ups e rotinas', 'Check-ups', 'heart'],
+        ['health.followups.index', 'Acompanhamentos', 'Acompanhar', 'contact'],
         ['health.care.index', 'Cuidados e itens', 'Cuidados', 'tag'],
     ];
 
@@ -84,6 +86,8 @@
             $comSaude ? ['label' => 'Saúde', 'items' => [
                 ['health.card.index', 'Ficha de Saúde', 'Ficha', 'heart'],
                 ['health.appointments.index', 'Agenda de Saúde', 'Agenda', 'calendar'],
+                ['health.routines.index', 'Check-ups e rotinas', 'Check-ups', 'heart'],
+                ['health.followups.index', 'Acompanhamentos', 'Acompanhar', 'contact'],
                 ['health.care.index', 'Cuidados e itens', 'Cuidados', 'tag'],
                 $itemPessoas,
             ]] : null,

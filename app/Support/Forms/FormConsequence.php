@@ -291,6 +291,55 @@ final class FormConsequence
     }
 
     /**
+     * Rotina preventiva: quando fica a próxima data (a mesma conta de HealthRoutineService: última vez mais o intervalo) e o que o Cerne passa a fazer.
+     *
+     * @return list<string>
+     */
+    public static function healthRoutine(int $meses, ?CarbonImmutable $ultimaVez): array
+    {
+        if ($meses < 1) {
+            return [];
+        }
+
+        $linhas = $ultimaVez !== null
+            ? ['A próxima fica para '.$ultimaVez->addMonthsNoOverflow($meses)->format('d/m/Y').'. Avisamos 60 dias antes e no dia, se não houver compromisso marcado.']
+            : ['Sem a última vez, a rotina fica "Sem registro" até você ligar uma consulta realizada. Aí a próxima data é calculada.'];
+
+        $linhas[] = 'O histórico passa a mostrar se foi feito em cada ciclo.';
+
+        return $linhas;
+    }
+
+    /** @return list<string> */
+    public static function healthFollowup(bool $comConsulta): array
+    {
+        return array_values(array_filter([
+            $comConsulta ? 'A consulta escolhida entra na linha do tempo, sem ser copiada.' : null,
+            'Quem vê a Agenda de Saúde desta pessoa vê o acompanhamento. O consultor não vê.',
+        ]));
+    }
+
+    /** @return list<string> */
+    public static function healthRequest(): array
+    {
+        return ['O pedido fica guardado como "falta agendar". Ele só entra na Agenda de Saúde quando você marcar a data.'];
+    }
+
+    /** @return list<string> */
+    public static function healthSchedule(): array
+    {
+        return ['Entra na Agenda de Saúde, com o lembrete um dia antes, e continua ligado ao check-up ou ao acompanhamento.'];
+    }
+
+    /** @return list<string> */
+    public static function healthSession(bool $presente): array
+    {
+        return $presente
+            ? ['A presença entra na contagem da semana, e a nota de dor entra no gráfico do programa.']
+            : ['A falta fica registrada, sem nota de dor, e não conta como sessão feita.'];
+    }
+
+    /**
      * A conta fixa que a dívida ganha em Contas fixas (ver DebtFixedBillSync): vinculada à que já existe ou criada, e até quando. Sem parcela em
      * aberto (tudo já pago) não há o que listar.
      *

@@ -18,6 +18,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 #[Fillable([
     'profile_id', 'member_id', 'folder_id', 'category', 'insurance_policy_id', 'title', 'original_filename',
     'storage_path', 'mime_type', 'size_bytes', 'expires_on', 'visible_to_professional', 'shared_with_caregivers', 'created_by_member_id', 'created_by_user_id',
+    'health_appointment_id', 'health_followup_id',
 ])]
 class Document extends Model
 {
@@ -47,6 +48,12 @@ class Document extends Model
     public function insurancePolicy(): BelongsTo
     {
         return $this->belongsTo(InsurancePolicy::class);
+    }
+
+    /** O acompanhamento de saúde a que o documento foi ligado (vazio para quem não vê a saúde: o escopo devolve nada). */
+    public function healthFollowup(): BelongsTo
+    {
+        return $this->belongsTo(HealthFollowup::class, 'health_followup_id');
     }
 
     public function createdBy(): BelongsTo

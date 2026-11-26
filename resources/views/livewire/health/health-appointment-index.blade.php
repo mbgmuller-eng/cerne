@@ -67,6 +67,23 @@
         </section>
     @endif
 
+    {{-- Exames pedidos que ainda não têm data: a Agenda só guarda o que tem dia e hora, então eles ficam avisados aqui. --}}
+    @if ($pedidosSemData->isNotEmpty())
+        <section class="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-200" data-pedidos-sem-data>
+            <p class="font-medium">{{ $pedidosSemData->count() === 1 ? '1 pedido ainda sem data' : $pedidosSemData->count().' pedidos ainda sem data' }}</p>
+            <ul class="mt-1 space-y-0.5">
+                @foreach ($pedidosSemData as $p)
+                    <li>
+                        {{ $p->member->name }} · {{ $p->title }}
+                        @if ($p->followup_id) <a href="{{ route('health.followups.show', $p->followup_id) }}" class="font-medium underline">marcar data</a>
+                        @elseif ($p->routine_id) <a href="{{ route('health.routines.index', ['rotina' => $p->routine_id]) }}" class="font-medium underline">marcar data</a>
+                        @endif
+                    </li>
+                @endforeach
+            </ul>
+        </section>
+    @endif
+
     @php
         $aguardando = $past->filter(fn ($c) => $c->awaitsConfirmation())->count();
     @endphp
@@ -103,6 +120,7 @@
                                 <span class="ml-1 rounded-full bg-saude-200/40 px-2 py-0.5 text-[10px] font-medium text-saude-800 dark:bg-saude-800/30 dark:text-saude-200">{{ $consulta->kind->label() }}</span>
                                 <span class="ml-1 rounded-full bg-saude-800 px-2 py-0.5 text-[10px] font-medium text-white dark:bg-saude-200 dark:text-saude-950">Agendada</span>
                             </p>
+                            @include('livewire.health.partials.appointment-links', ['consulta' => $consulta])
                             <p class="mt-0.5 flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
                                 @if ($ehCasal)<span class="inline-block h-2 w-2 shrink-0 rounded-full" style="background-color: {{ $coresDosMembros[$consulta->member_id] ?? '#2563EB' }}"></span>@endif
                                 <span>{{ $consulta->member->name }} · {{ $consulta->scheduled_at->format('d/m/Y \à\s H:i') }}</span>
@@ -171,6 +189,7 @@
                                     @if ($ehCasal)<span class="inline-block h-2 w-2 shrink-0 rounded-full" style="background-color: {{ $coresDosMembros[$consulta->member_id] ?? '#2563EB' }}"></span>@endif
                                     <span>{{ $consulta->member->name }} · {{ $consulta->scheduled_at->format('d/m/Y') }}</span>
                                 </p>
+                                @include('livewire.health.partials.appointment-links', ['consulta' => $consulta])
                                 <x-appointment-details :consulta="$consulta" />
                                 @if ($status !== \App\Enums\HealthAppointmentStatus::Scheduled && $consulta->status_at)
                                     <p class="mt-0.5 text-xs text-slate-400">{{ $consulta->statusBy ? 'Confirmado por '.$consulta->statusBy->name : 'Confirmado' }} em {{ $consulta->status_at->format('d/m/Y') }}</p>
@@ -212,7 +231,7 @@
             <div class="grid gap-4 @sm:grid-cols-2 *:min-w-0">
                 <div>
                     <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Pessoa</label>
-                    <select wire:model="memberId" class="select mt-1.5 w-full">
+                    <select wire:model.live="memberId" class="select mt-1.5 w-full">
                         @foreach ($membros as $membro)
                             <option value="{{ $membro->id }}">{{ $membro->name }}</option>
                         @endforeach
@@ -295,6 +314,31 @@
                     <textarea wire:model="notes" class="input mt-1.5" rows="2" placeholder="Antes: levar exames anteriores. Depois: o que aconteceu, resultado, próximos passos."></textarea>
                     @error('notes') <p class="mt-1 text-xs text-red-700 dark:text-red-400">{{ $message }}</p> @enderror
                 </div>
+
+                @if ($rotinasDaPessoa->isNotEmpty())
+                    <div wire:key="campo-rotina">
+                        <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Check-up ou rotina (opcional)</label>
+                        <select wire:model="routineId" class="select mt-1.5 w-full">
+                            <option value="">Nenhum</option>
+                            @foreach ($rotinasDaPessoa as $r)
+                                <option value="{{ $r->id }}">{{ $r->name }}</option>
+                            @endforeach
+                        </select>
+                        <p class="mt-1 text-xs text-slate-400">Conta no ciclo da rotina quando for realizada.</p>
+                    </div>
+                @endif
+                @if ($acompanhamentosDaPessoa->isNotEmpty())
+                    <div wire:key="campo-acompanhamento">
+                        <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Acompanhamento (opcional)</label>
+                        <select wire:model="followupId" class="select mt-1.5 w-full">
+                            <option value="">Nenhum</option>
+                            @foreach ($acompanhamentosDaPessoa as $a)
+                                <option value="{{ $a->id }}">{{ $a->title }}</option>
+                            @endforeach
+                        </select>
+                        <p class="mt-1 text-xs text-slate-400">Entra na linha do tempo do problema.</p>
+                    </div>
+                @endif
             </div>
 
             <button type="submit" class="btn-primary w-full">Salvar</button>

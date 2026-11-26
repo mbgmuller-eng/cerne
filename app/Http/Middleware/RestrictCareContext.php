@@ -24,6 +24,7 @@ class RestrictCareContext
     private const ALLOWED = [
         'care.*',
         'health.card.index', 'health.qrcode.show', 'health.appointments.index', 'health.care.index', 'health.appointments.ics', 'health.care.ics',
+        'health.routines.index', 'health.followups.index', 'health.followups.show', 'health.followups.pdf',
         'documents.vault.index', 'documents.vault.file',
         'health.consent', 'health.consent.store', 'health.consent.revoke',
         'legal.*', 'logout', 'theme.update', 'push.subscribe', 'privacy.export.download', 'admin.impersonate.stop',

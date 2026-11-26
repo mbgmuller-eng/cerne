@@ -281,6 +281,30 @@ return [
             'tip' => '“Feito hoje” usa sempre a data de hoje. Se a troca foi em outro dia, corrija a data em “Editar”. Remédios de uso contínuo ficam na Ficha de saúde.',
         ],
 
+        'health.routines.index' => [
+            'title' => 'Check-ups e rotinas',
+            'summary' => 'O que repetir de tempos em tempos, se está em dia e o histórico de cada ciclo.',
+            'steps' => [
+                'Use “+ Nova rotina” e diga de quanto em quanto tempo se repete, como check-up geral todo ano.',
+                'Ligue à rotina as consultas e os exames, daqui ou na Agenda de Saúde. A próxima data sai da última consulta realizada.',
+                'Exame pedido sem data fica em “Pedidos sem data” até você marcar.',
+                'O histórico mostra cada ciclo: feito, em andamento ou não registrado.',
+            ],
+            'tip' => 'Avisamos 60 dias antes e no dia, a não ser que já exista um compromisso marcado ligado à rotina.',
+        ],
+
+        'health.followups.index' => [
+            'title' => 'Acompanhamentos',
+            'summary' => 'Um problema de saúde por vez, com consultas, exames, documentos, anotações e atividades.',
+            'steps' => [
+                'Use “+ Novo” ou abra a partir de uma consulta da Agenda. A consulta continua no check-up, se estiver em um.',
+                'Na linha do tempo, acrescente consultas, exames pedidos, documentos e anotações com nota de dor.',
+                'No programa de atividades, registre o que o profissional orientou, os exercícios e as presenças.',
+                'Use “PDF para o médico” para levar o resumo a outro profissional.',
+            ],
+            'tip' => 'Quem vê a Agenda de Saúde da pessoa vê o acompanhamento. Cargas e séries da Academia continuam só suas, e o consultor não vê nada.',
+        ],
+
         'health.gym.index' => [
             'title' => 'Academia',
             'summary' => 'Seu plano de treino, o próximo treino e as últimas sessões. Só você vê estes dados.',

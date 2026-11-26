@@ -74,6 +74,11 @@ final class NotificationPresenter
                 'message' => self::juntar($titulo, isset($d['member_name']) ? 'para '.$d['member_name'] : null, ($d['days_left'] ?? 0) <= 0 ? 'é hoje' : 'é amanhã'),
                 'url' => route('health.care.index'),
             ],
+            'health_routine_due' => [
+                'heading' => 'Check-up e rotinas',
+                'message' => self::juntar($titulo, isset($d['member_name']) ? 'para '.$d['member_name'] : null, ($d['days_left'] ?? 0) <= 0 ? 'vence hoje' : 'vence em '.self::dia($d['due_on'] ?? null)),
+                'url' => route('health.routines.index'),
+            ],
             'lead_follow_up_digest' => [
                 'heading' => 'Leads que pedem atenção',
                 'message' => implode('; ', \App\Notifications\LeadFollowUpDigest::linesFor((int) ($d['quotes_expiring'] ?? 0), (int) ($d['stale_leads'] ?? 0), (int) ($d['overdue_actions'] ?? 0))) ?: null,

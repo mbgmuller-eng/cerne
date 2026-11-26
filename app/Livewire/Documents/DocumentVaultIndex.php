@@ -271,7 +271,7 @@ class DocumentVaultIndex extends Component
             'subpastas' => $visiveis->where('parent_id', $p->id)->count(),
         ]);
 
-        $documentos = Document::query()->with('member', 'insurancePolicy', 'folder', 'createdByUser')
+        $documentos = Document::query()->with('member', 'insurancePolicy', 'folder', 'createdByUser', 'healthFollowup')
             ->when(! $this->verTodos, fn ($q) => $q->where('folder_id', $atual?->id))
             ->latest()->get();
 

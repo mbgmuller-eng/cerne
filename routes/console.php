@@ -127,6 +127,13 @@ Schedule::call(function (): void {
     logger()->info('Cuidados de saúde', ['notificados' => $notificados]);
 })->dailyAt('03:36')->name('cuidados-saude')->withoutOverlapping();
 
+// Check-ups e rotinas preventivas: avisa 60 dias antes e no dia em que a próxima data vence (quem já tem compromisso marcado não recebe).
+Schedule::call(function (): void {
+    $notificados = app(\App\Services\HealthRoutineService::class)->notifyDue();
+
+    logger()->info('Rotinas de saúde', ['notificados' => $notificados]);
+})->dailyAt('03:37')->name('rotinas-saude')->withoutOverlapping();
+
 // Assinatura por Pix: sem débito automático, avisa 3 dias antes do
 // vencimento (fim do teste grátis ou qualquer ciclo seguinte — é o mesmo
 // problema se repetindo todo mês).

@@ -35,13 +35,19 @@
                         Só o texto transcrito chega ao Cerne, que o envia à Anthropic (seção 3) para sugerir descrição, valor e categoria. Nada é lançado sem a sua confirmação. Base legal: execução do contrato.
                     </p>
                     <p>
-                        <strong>Saúde (dado pessoal sensível):</strong> ficha de saúde (tipo sanguíneo, alergias, condições, medicamentos), agenda de consultas e exames, itens de cuidado e treinos de academia.
+                        <strong>Saúde (dado pessoal sensível):</strong> ficha de saúde (tipo sanguíneo, alergias, condições, medicamentos), agenda de consultas e exames, itens de cuidado, check-ups e rotinas preventivas,
+                        exames pedidos ainda sem data, acompanhamentos de um problema de saúde (nome do problema, situação, anotações, nota de dor e documentos ligados), programa de atividades (orientação recebida, o que evitar,
+                        exercícios que você cadastra, presenças e nota de dor) e treinos de academia.
                         Só são tratados com o seu <strong>consentimento específico e destacado</strong>, pedido antes de você abrir a área de Saúde. Base legal: consentimento (LGPD, art. 11, I).
                         Você pode revogá-lo a qualquer momento em Minha conta.
                     </p>
                     <p>
+                        Os acompanhamentos e o programa de atividades servem para você organizar o que um profissional orientou: o Cerne não faz diagnóstico e não escolhe exercício para um problema de saúde.
+                        Ligar um documento a uma consulta ou a um acompanhamento não muda quem pode vê-lo. O resumo em PDF para o médico só é gerado quando você pede, e quem receber o arquivo vê o que está nele.
+                    </p>
+                    <p>
                         <strong>Pessoa acompanhada (dado pessoal sensível de terceiro):</strong> quem cuida de um familiar ou de outra pessoa pode cadastrá-la no Cerne para guardar a saúde e os documentos dela
-                        (nome, ficha de saúde, consultas e exames, itens de cuidado e os documentos que forem liberados). Essa pessoa pode não ter conta no Cerne. Base legal: consentimento dela ou,
+                        (nome, ficha de saúde, consultas e exames, itens de cuidado, check-ups, acompanhamentos, programa de atividades e os documentos que forem liberados). Essa pessoa pode não ter conta no Cerne. Base legal: consentimento dela ou,
                         quando ela não puder decidir sozinha, o de seu representante legal, conforme a seção 8.
                     </p>
                     <p>
@@ -72,7 +78,7 @@
                 <h2 class="{{ $h2 }}">4. Quem da equipe do Cerne pode ver os seus dados</h2>
                 <p class="mt-2">
                     O acesso da equipe a uma conta acontece só para dar suporte, com um motivo escrito, e cada acesso fica registrado (quem, quando e por quê). Você pode ver esses acessos na cópia dos seus dados.
-                    Os campos mais sensíveis ficam cifrados no banco de dados: CPF/CNPJ, telefone, agência e número de conta, anotações, nome do segurado, o conteúdo da ficha e da agenda de saúde, os textos dos avisos e os dados lidos dos documentos que você importa.
+                    Os campos mais sensíveis ficam cifrados no banco de dados: CPF/CNPJ, telefone, agência e número de conta, anotações, nome do segurado, os textos da ficha, da agenda de saúde, dos check-ups, dos acompanhamentos e do programa de atividades, os textos dos avisos e os dados lidos dos documentos que você importa.
                 </p>
             </section>
 
@@ -116,6 +122,11 @@
                     Em um perfil de casal, cada lançamento pode ser marcado como privado e então só quem o criou o vê. A regra vale igual para os dois.
                     O titular do perfil é quem o mantém: se o titular excluir a conta, o perfil compartilhado é apagado junto, e o app avisa isso antes de confirmar.
                 </p>
+                <p class="mt-2">
+                    Na saúde, a marca de privado dos lançamentos não se aplica: a ficha, a agenda, os itens de cuidado, os check-ups, os acompanhamentos e o programa de atividades de cada um são vistos pelos dois.
+                    Os treinos de academia (exercícios, cargas, séries e histórico) são só de quem os registrou. Se você ligar uma fase da sua academia a um acompanhamento, quem vê o acompanhamento vê a presença do treino, e não as cargas nem as séries.
+                    Os lembretes de consultas, de itens de cuidado e de check-ups vão para os dois, desde que cada um tenha dado o consentimento de saúde.
+                </p>
             </section>
 
             <section>
@@ -128,7 +139,7 @@
                     </p>
                     <p>
                         <strong>O que o cuidador vê.</strong> O cuidador é alguém que o responsável convida e que entra com a própria conta, sem precisar de assinatura nem de perfil financeiro. Ele vê apenas os dados de saúde da pessoa
-                        (ficha, agenda de consultas e exames e itens de cuidado) e os documentos que o responsável liberar, além dos documentos que o próprio cuidador cadastrar. Ele <strong>nunca</strong> vê finanças, seguros, treinos ou qualquer outra área
+                        (ficha, agenda de consultas e exames, itens de cuidado, check-ups, acompanhamentos e programa de atividades) e os documentos que o responsável liberar, além dos documentos que o próprio cuidador cadastrar. Ele <strong>nunca</strong> vê finanças, seguros, treinos de academia ou qualquer outra área
                         do responsável. Consultores e corretores, mesmo vinculados ao responsável, também nunca abrem o espaço da pessoa acompanhada.
                     </p>
                     <p>
@@ -136,8 +147,8 @@
                         Cada registro mostra quem o fez (&ldquo;registrado por&rdquo;), para que todos saibam a origem da informação. Só o responsável convida, muda o nível, encerra o acesso e exclui a pessoa; o acesso encerrado deixa de valer imediatamente.
                     </p>
                     <p>
-                        <strong>Avisos.</strong> Os lembretes de consultas e exames, as mudanças nelas (agendada, remarcada, cancelada, realizada ou não, e quem vai levar) e as trocas de itens de cuidado são enviados ao responsável e aos cuidadores que ligaram esse tipo de aviso,
-                        e à própria pessoa quando ela tem conta. Cada cuidador liga e desliga os avisos de consultas e os de itens separadamente. Quem fez a mudança não recebe o próprio aviso. Quando alguém se oferece para levar a pessoa a uma consulta, o nome dessa pessoa aparece para os participantes.
+                        <strong>Avisos.</strong> Os lembretes de consultas e exames, as mudanças nelas (agendada, remarcada, cancelada, realizada ou não, e quem vai levar), os check-ups e rotinas que estão vencendo e as trocas de itens de cuidado são enviados ao responsável e aos cuidadores que ligaram esse tipo de aviso,
+                        e à própria pessoa quando ela tem conta. Cada cuidador liga e desliga os avisos de consultas e os de itens separadamente; os de check-up seguem a escolha dos avisos de consultas. Quem fez a mudança não recebe o próprio aviso. Quando alguém se oferece para levar a pessoa a uma consulta, o nome dessa pessoa aparece para os participantes.
                     </p>
                     <p>
                         <strong>Quando a própria pessoa tem conta.</strong> O responsável pode convidá-la para entrar com o login dela. Os dados já cadastrados continuam no mesmo lugar, e o consentimento passa a ser dela. A partir daí ela pode ver quem tem acesso, encerrar o acesso de cada cuidador,
@@ -158,7 +169,7 @@
                 <div class="mt-2 space-y-3">
                     <p>
                         Em qualquer perfil, você pode convidar alguém (um filho, um irmão, um cuidador) para acompanhar a <strong>sua própria</strong> saúde, as <strong>suas próprias</strong> finanças ou as duas coisas. Isso não exige assinatura, nem de quem convida nem de quem aceita.
-                        Na saúde, a pessoa convidada vê a sua ficha, a sua agenda e os documentos de saúde que forem seus, com acesso de leitura ou de edição, como você escolher, e vale o consentimento de saúde que você deu para si mesmo.
+                        Na saúde, a pessoa convidada vê a sua ficha, a sua agenda, os seus itens de cuidado, check-ups, acompanhamentos e programa de atividades e os documentos de saúde que forem seus, com acesso de leitura ou de edição, como você escolher, e vale o consentimento de saúde que você deu para si mesmo. Os seus treinos de academia não entram.
                     </p>
                     <p>
                         <strong>Finanças são sempre somente leitura.</strong> Quem acompanha as suas finanças vê contas, cartões, lançamentos, contas a vencer e atrasadas, investimentos, dívidas, seguros e metas, e não altera nada.
@@ -169,7 +180,7 @@
                         Só você convida, muda o que a pessoa acompanha e encerra o acesso; o titular do perfil e o seu cônjuge não podem mexer nisso.
                     </p>
                     <p>
-                        <strong>Avisos.</strong> Quem acompanha recebe, conforme o que escolher ligar, os lembretes das suas consultas, o aviso de conta ou fatura que vence ou está atrasada, um resumo semanal das finanças e, se você combinar um limite de valor, o aviso de um gasto que chegue a esse limite.
+                        <strong>Avisos.</strong> Quem acompanha recebe, conforme o que escolher ligar, os lembretes das suas consultas e dos seus check-ups, o aviso de conta ou fatura que vence ou está atrasada, um resumo semanal das finanças e, se você combinar um limite de valor, o aviso de um gasto que chegue a esse limite.
                         Os avisos seguem a mesma regra do que a pessoa enxerga: nada que seja privado, e só o que é de quem ela acompanha. Quando um familiar se oferece para levar você a uma consulta, o nome dele aparece para quem acompanha a sua saúde.
                     </p>
                     <p>

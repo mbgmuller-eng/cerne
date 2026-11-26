@@ -71,6 +71,10 @@ class UserDataExporter
                     $ligacoes = DB::table('goal_investment')->whereIn('goal_id', \App\Models\Goal::query()->select('id'))->get(['goal_id', 'investment_id'])->map(fn ($l) => (array) $l)->all();
                     $this->addJson($zip, $pasta.'/objetivos-investimentos.json', $ligacoes, $temporarios);
 
+                    // O mesmo para os compromissos de cada acompanhamento de saúde que ESTA pessoa enxerga.
+                    $compromissos = DB::table('health_followup_appointment')->whereIn('followup_id', \App\Models\HealthFollowup::query()->select('id'))->get(['followup_id', 'appointment_id'])->map(fn ($l) => (array) $l)->all();
+                    $this->addJson($zip, $pasta.'/acompanhamentos-compromissos.json', $compromissos, $temporarios);
+
                     $this->addVaultFiles($zip, $pasta, $perfil, $bytesArquivos, $faltou);
                 } finally {
                     $this->context->clear();
