@@ -165,7 +165,7 @@ class HealthRoutineService
             $inicio = $ancora->addMonthsNoOverflow($i * $tamanho);
             $noCiclo = $consultas->filter(fn (HealthAppointment $c) => $indice(CarbonImmutable::instance($c->scheduled_at)) === $i);
             $manual = $rotina->last_done_on !== null && $indice(CarbonImmutable::parse($rotina->last_done_on->toDateString())) === $i;
-            $abertos = $i === $atual ? $pedidos->whereNull('appointment_id')->count() : 0;
+            $abertos = $i === $atual ? $pedidos->count() : 0;
             $agendados = $noCiclo->where('status', HealthAppointmentStatus::Scheduled)->count();
             $realizados = $noCiclo->where('status', HealthAppointmentStatus::Done)->count();
 

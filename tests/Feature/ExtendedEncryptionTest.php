@@ -71,17 +71,29 @@ class ExtendedEncryptionTest extends TestCase
         $programa->addExercise($atividade, 'Exercício sigiloso', 'sigiloso', 'sigiloso', 'Observação sigilosa', null);
         $programa->registerSession($atividade, '2026-01-12', true, 3, 'Presença sigilosa', null);
 
-        foreach (['health_routines', 'health_followups', 'health_followup_notes', 'health_exam_requests', 'health_activities', 'health_activity_exercises', 'health_activity_sessions'] as $tabela) {
-            $colunas = \App\Console\Commands\EncryptSensitiveData::COLUMNS[$tabela];
-            $linha = DB::table($tabela)->first();
+        $exames = app(\App\Services\HealthExamService::class);
+        $pedido = $exames->createOrder($membro, ['title' => 'Pedido sigiloso', 'requested_by' => 'Médico sigiloso', 'notes' => 'Observação sigilosa', 'items' => [['name' => 'Item sigiloso', 'detail' => 'Detalhe sigiloso']]], null, null, null);
+        $resultados = app(\App\Services\HealthExamResultService::class);
+        $resultados->save($membro, null, ['kind' => 'report', 'performed_on' => '2026-01-13', 'lab' => 'Local sigiloso', 'doctor' => 'Médico sigiloso', 'exam_name' => 'Exame sigiloso', 'conclusion' => 'Conclusão sigilosa', 'highlight' => 'Destaque sigiloso'], [], null);
+        $resultados->save($membro, null, ['kind' => 'values', 'performed_on' => '2026-01-14', 'values' => [['name' => 'Marcador sigiloso', 'value' => 'sigiloso', 'unit' => 'sigiloso', 'reference' => 'sigiloso']]], [], null);
+        \App\Models\HealthExamReading::create(['member_id' => $membro->id, 'request_id' => $pedido->id, 'status' => \App\Enums\ProcessingStatus::Completed, 'source_path' => 'x', 'original_filename' => 'laudo-sigiloso.pdf', 'summary' => ['conclusion' => 'sigiloso']]);
 
-            foreach ($colunas as $coluna) {
-                $this->assertNotNull($linha->{$coluna}, "{$tabela}.{$coluna}");
-                $this->assertStringNotContainsStringIgnoringCase('sigilos', (string) $linha->{$coluna}, "{$tabela}.{$coluna}");
+        // Há mais de uma linha em algumas tabelas e nem toda coluna é preenchida em todas: cada coluna precisa aparecer preenchida em alguma
+        // linha, e em nenhuma o texto pode estar à vista.
+        foreach (['health_routines', 'health_followups', 'health_followup_notes', 'health_exam_requests', 'health_exam_items', 'health_exam_reports', 'health_exam_values', 'health_exam_readings', 'health_activities', 'health_activity_exercises', 'health_activity_sessions'] as $tabela) {
+            $linhas = DB::table($tabela)->get();
+
+            foreach (\App\Console\Commands\EncryptSensitiveData::COLUMNS[$tabela] as $coluna) {
+                $this->assertNotEmpty($linhas->pluck($coluna)->filter()->all(), "{$tabela}.{$coluna}");
+
+                foreach ($linhas->pluck($coluna)->filter() as $gravado) {
+                    $this->assertStringNotContainsStringIgnoringCase('sigilos', (string) $gravado, "{$tabela}.{$coluna}");
+                }
             }
         }
 
         $this->assertSame('Problema sigiloso', \App\Models\HealthFollowup::query()->sole()->title);
+        $this->assertSame('Conclusão sigilosa', \App\Models\HealthExamReport::query()->where('kind', 'report')->sole()->conclusion);
     }
 
     public function test_notas_e_nome_do_segurado_ficam_cifrados(): void

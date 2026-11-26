@@ -36,10 +36,15 @@
                     </p>
                     <p>
                         <strong>Saúde (dado pessoal sensível):</strong> ficha de saúde (tipo sanguíneo, alergias, condições, medicamentos), agenda de consultas e exames, itens de cuidado, check-ups e rotinas preventivas,
-                        exames pedidos ainda sem data, acompanhamentos de um problema de saúde (nome do problema, situação, anotações, nota de dor e documentos ligados), programa de atividades (orientação recebida, o que evitar,
+                        pedidos de exame, resultados de exames (valores, unidades, faixas de referência e conclusões de laudos), acompanhamentos de um problema de saúde (nome do problema, situação, anotações, nota de dor e documentos ligados), programa de atividades (orientação recebida, o que evitar,
                         exercícios que você cadastra, presenças e nota de dor) e treinos de academia.
                         Só são tratados com o seu <strong>consentimento específico e destacado</strong>, pedido antes de você abrir a área de Saúde. Base legal: consentimento (LGPD, art. 11, I).
                         Você pode revogá-lo a qualquer momento em Minha conta.
+                    </p>
+                    <p>
+                        <strong>Leitura de laudo (opcional):</strong> quando você envia o PDF de um laudo para leitura, o arquivo vai à Anthropic (seção 3), que devolve os resultados. O laudo pode trazer o seu nome, documentos e outros dados.
+                        A leitura é instruída a não copiar para o resultado os dados que identificam o paciente. Nada é guardado como resultado sem a sua revisão, e você pode digitar os resultados à mão sem enviar arquivo algum.
+                        O Cerne destaca o valor que ficou fora da referência impressa no laudo: ele não interpreta o resultado nem faz diagnóstico. Base legal: consentimento (LGPD, art. 11, I).
                     </p>
                     <p>
                         Os acompanhamentos e o programa de atividades servem para você organizar o que um profissional orientou: o Cerne não faz diagnóstico e não escolhe exercício para um problema de saúde.
@@ -47,7 +52,7 @@
                     </p>
                     <p>
                         <strong>Pessoa acompanhada (dado pessoal sensível de terceiro):</strong> quem cuida de um familiar ou de outra pessoa pode cadastrá-la no Cerne para guardar a saúde e os documentos dela
-                        (nome, ficha de saúde, consultas e exames, itens de cuidado, check-ups, acompanhamentos, programa de atividades e os documentos que forem liberados). Essa pessoa pode não ter conta no Cerne. Base legal: consentimento dela ou,
+                        (nome, ficha de saúde, consultas e exames, itens de cuidado, check-ups, pedidos e resultados de exames, acompanhamentos, programa de atividades e os documentos que forem liberados). Essa pessoa pode não ter conta no Cerne. Base legal: consentimento dela ou,
                         quando ela não puder decidir sozinha, o de seu representante legal, conforme a seção 8.
                     </p>
                     <p>
@@ -63,7 +68,7 @@
                 <h2 class="{{ $h2 }}">3. Com quem compartilhamos</h2>
                 <ul class="mt-2 list-disc space-y-2 pl-5">
                     <li><strong>Processadora de pagamentos (Asaas):</strong> cobrança, Pix e emissão de nota fiscal.</li>
-                    <li><strong>Inteligência artificial (Anthropic):</strong> quando você envia um arquivo para importação (PDF ou CSV de extrato ou fatura, extrato de consórcio, apólice ou relatório de outro aplicativo) ou fala um gasto, o conteúdo é enviado à Anthropic para ler e devolver os dados. Consultores e corretores que enviam a simulação em PDF de um possível cliente usam o mesmo serviço. Isso envolve transferência internacional (Estados Unidos). O resultado nunca vira lançamento sem a sua confirmação na tela (seção 13).</li>
+                    <li><strong>Inteligência artificial (Anthropic):</strong> quando você envia um arquivo para importação (PDF ou CSV de extrato ou fatura, extrato de consórcio, apólice ou relatório de outro aplicativo), envia o PDF de um laudo de exame para leitura na Saúde (dado de saúde) ou fala um gasto, o conteúdo é enviado à Anthropic para ler e devolver os dados. Consultores e corretores que enviam a simulação em PDF de um possível cliente usam o mesmo serviço. Isso envolve transferência internacional (Estados Unidos). O resultado nunca vira lançamento nem resultado de exame sem a sua confirmação na tela (seção 13).</li>
                     <li><strong>Assistente de conversa (recurso opcional, &ldquo;Pergunte ao Cerne&rdquo;):</strong> quando estiver disponível na sua conta e você fizer uma pergunta, enviamos à Anthropic a pergunta e os números que ele precisar consultar para responder (como totais do mês, saldos, vencimentos e objetivos), somente do que você enxerga no perfil aberto. A conversa não fica gravada no Cerne, e o assistente só consulta: não lança, não paga e não altera nada.</li>
                     <li><strong>Envio de e-mails e notificações:</strong> o provedor de e-mail e os serviços de notificação dos fabricantes do navegador (como Google, Apple, Mozilla e Microsoft), que recebem o aviso para entregá-lo no seu aparelho. Isso pode envolver transferência internacional.</li>
                     <li><strong>Hospedagem:</strong> o provedor onde o Cerne roda guarda os dados em nosso nome.</li>
@@ -78,7 +83,7 @@
                 <h2 class="{{ $h2 }}">4. Quem da equipe do Cerne pode ver os seus dados</h2>
                 <p class="mt-2">
                     O acesso da equipe a uma conta acontece só para dar suporte, com um motivo escrito, e cada acesso fica registrado (quem, quando e por quê). Você pode ver esses acessos na cópia dos seus dados.
-                    Os campos mais sensíveis ficam cifrados no banco de dados: CPF/CNPJ, telefone, agência e número de conta, anotações, nome do segurado, os textos da ficha, da agenda de saúde, dos check-ups, dos acompanhamentos e do programa de atividades, os textos dos avisos e os dados lidos dos documentos que você importa.
+                    Os campos mais sensíveis ficam cifrados no banco de dados: CPF/CNPJ, telefone, agência e número de conta, anotações, nome do segurado, os textos da ficha, da agenda de saúde, dos check-ups, dos pedidos e resultados de exames, dos acompanhamentos e do programa de atividades, os textos dos avisos e os dados lidos dos documentos que você importa.
                 </p>
             </section>
 
@@ -88,6 +93,7 @@
                     <li><strong>Enquanto a conta existir:</strong> os dados que você cadastra ficam guardados para o app funcionar.</li>
                     <li><strong>Ao excluir a conta:</strong> todos os dados e arquivos ligados a ela são apagados, e a assinatura é cancelada. Ficam apenas as informações que a lei manda guardar (por exemplo, as de cobrança e nota fiscal, pelo prazo fiscal) e um registro sem dados pessoais de que a exclusão aconteceu.</li>
                     <li><strong>PDFs enviados para importação:</strong> o arquivo original é apagado {{ $c['source_pdf_days'] }} dias depois de a importação ser confirmada, descartada ou falhar. Os lançamentos que você confirmou continuam na sua conta.</li>
+                    <li><strong>Laudos enviados para leitura:</strong> o PDF espera a sua revisão. Ao salvar, ele vai para os seus Documentos e fica enquanto você o mantiver; ao descartar, é apagado. Se você não fizer nem uma coisa nem outra, é apagado, com o que foi lido, em {{ $c['source_pdf_days'] }} dias.</li>
                     <li><strong>Pessoa acompanhada:</strong> os dados dela ficam guardados enquanto o espaço dela existir. Se a assinatura do responsável deixar de estar em vigor, o acesso fica suspenso para todos e os dados continuam guardados. Excluir a pessoa, ou a conta do responsável, apaga os dados e os arquivos dela. Quando um cuidador exclui a própria conta, ele apenas perde o acesso: os registros que fez permanecem no espaço da pessoa, sem o nome dele.</li>
                     <li><strong>Cópia dos seus dados:</strong> o arquivo para baixar fica disponível por 7 dias e depois é apagado.</li>
                     <li><strong>Contatos perdidos (para consultores e corretores):</strong> os anexos saem do servidor 12 meses depois de o contato ser marcado como perdido.</li>
@@ -123,7 +129,7 @@
                     O titular do perfil é quem o mantém: se o titular excluir a conta, o perfil compartilhado é apagado junto, e o app avisa isso antes de confirmar.
                 </p>
                 <p class="mt-2">
-                    Na saúde, a marca de privado dos lançamentos não se aplica: a ficha, a agenda, os itens de cuidado, os check-ups, os acompanhamentos e o programa de atividades de cada um são vistos pelos dois.
+                    Na saúde, a marca de privado dos lançamentos não se aplica: a ficha, a agenda, os itens de cuidado, os check-ups, os pedidos e resultados de exames, os acompanhamentos e o programa de atividades de cada um são vistos pelos dois.
                     Os treinos de academia (exercícios, cargas, séries e histórico) são só de quem os registrou. Se você ligar uma fase da sua academia a um acompanhamento, quem vê o acompanhamento vê a presença do treino, e não as cargas nem as séries.
                     Os lembretes de consultas, de itens de cuidado e de check-ups vão para os dois, desde que cada um tenha dado o consentimento de saúde.
                 </p>
@@ -139,11 +145,11 @@
                     </p>
                     <p>
                         <strong>O que o cuidador vê.</strong> O cuidador é alguém que o responsável convida e que entra com a própria conta, sem precisar de assinatura nem de perfil financeiro. Ele vê apenas os dados de saúde da pessoa
-                        (ficha, agenda de consultas e exames, itens de cuidado, check-ups, acompanhamentos e programa de atividades) e os documentos que o responsável liberar, além dos documentos que o próprio cuidador cadastrar. Ele <strong>nunca</strong> vê finanças, seguros, treinos de academia ou qualquer outra área
+                        (ficha, agenda de consultas e exames, itens de cuidado, check-ups, pedidos e resultados de exames, acompanhamentos e programa de atividades) e os documentos que o responsável liberar, além dos documentos que o próprio cuidador cadastrar. Ele <strong>nunca</strong> vê finanças, seguros, treinos de academia ou qualquer outra área
                         do responsável. Consultores e corretores, mesmo vinculados ao responsável, também nunca abrem o espaço da pessoa acompanhada.
                     </p>
                     <p>
-                        <strong>Leitura ou edição.</strong> O responsável escolhe, para cada cuidador, se o acesso é só de leitura ou também de edição. Quem só lê não altera nada. Quem edita cria e altera registros, mas só apaga o que ele mesmo registrou.
+                        <strong>Leitura ou edição.</strong> O responsável escolhe, para cada cuidador, se o acesso é só de leitura ou também de edição. Quem só lê não altera nada. Quem edita cria e altera registros, mas só apaga o que ele mesmo registrou. Quem edita também pode enviar um laudo da pessoa para leitura por inteligência artificial (seção 13) e só deve fazer isso com a autorização dela ou do representante legal.
                         Cada registro mostra quem o fez (&ldquo;registrado por&rdquo;), para que todos saibam a origem da informação. Só o responsável convida, muda o nível, encerra o acesso e exclui a pessoa; o acesso encerrado deixa de valer imediatamente.
                     </p>
                     <p>
@@ -169,7 +175,7 @@
                 <div class="mt-2 space-y-3">
                     <p>
                         Em qualquer perfil, você pode convidar alguém (um filho, um irmão, um cuidador) para acompanhar a <strong>sua própria</strong> saúde, as <strong>suas próprias</strong> finanças ou as duas coisas. Isso não exige assinatura, nem de quem convida nem de quem aceita.
-                        Na saúde, a pessoa convidada vê a sua ficha, a sua agenda, os seus itens de cuidado, check-ups, acompanhamentos e programa de atividades e os documentos de saúde que forem seus, com acesso de leitura ou de edição, como você escolher, e vale o consentimento de saúde que você deu para si mesmo. Os seus treinos de academia não entram.
+                        Na saúde, a pessoa convidada vê a sua ficha, a sua agenda, os seus itens de cuidado, check-ups, pedidos e resultados de exames, acompanhamentos e programa de atividades e os documentos de saúde que forem seus, com acesso de leitura ou de edição, como você escolher, e vale o consentimento de saúde que você deu para si mesmo. Os seus treinos de academia não entram.
                     </p>
                     <p>
                         <strong>Finanças são sempre somente leitura.</strong> Quem acompanha as suas finanças vê contas, cartões, lançamentos, contas a vencer e atrasadas, investimentos, dívidas, seguros e metas, e não altera nada.
@@ -218,8 +224,8 @@
             <section>
                 <h2 class="{{ $h2 }}">13. Inteligência artificial e decisões automatizadas</h2>
                 <p class="mt-2">
-                    O Cerne usa inteligência artificial (Anthropic) para ler documentos, sugerir a categoria de um gasto falado e, quando o recurso estiver disponível, responder perguntas no assistente de conversa.
-                    Nenhuma decisão que afete os seus direitos é tomada apenas por esse tratamento automatizado: o que a inteligência artificial lê ou sugere só vira lançamento, baixa ou cadastro depois da sua confirmação na tela,
+                    O Cerne usa inteligência artificial (Anthropic) para ler documentos e laudos de exames, sugerir a categoria de um gasto falado e, quando o recurso estiver disponível, responder perguntas no assistente de conversa.
+                    Nenhuma decisão que afete os seus direitos é tomada apenas por esse tratamento automatizado: o que a inteligência artificial lê ou sugere só vira lançamento, baixa, cadastro ou resultado de exame depois da sua confirmação na tela,
                     e o assistente apenas consulta. Ela pode errar, por isso confira os valores. Você pode pedir a revisão de um tratamento automatizado ao encarregado indicado na seção 1.
                 </p>
             </section>

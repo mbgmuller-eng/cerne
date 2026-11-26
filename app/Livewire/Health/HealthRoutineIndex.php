@@ -2,21 +2,17 @@
 
 namespace App\Livewire\Health;
 
-use App\Enums\HealthAppointmentKind;
 use App\Livewire\Concerns\RequiresActiveProfile;
 use App\Livewire\Concerns\RequiresPersonalHealth;
 use App\Models\HealthAppointment;
-use App\Models\HealthExamRequest;
 use App\Models\HealthRoutine;
 use App\Models\ProfileMember;
-use App\Services\HealthFollowupService;
 use App\Services\HealthRoutineService;
 use App\Support\Forms\FormConsequence;
 use App\Support\ProfileContext;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\Rule;
-use InvalidArgumentException;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -39,15 +35,6 @@ class HealthRoutineIndex extends Component
     public string $name = '';
     public string $interval = '12';
     public string $lastDoneOn = '';
-
-    public bool $showRequest = false;
-    public string $requestKind = 'exam';
-    public string $requestTitle = '';
-    public string $requestBy = '';
-
-    public ?string $schedulingId = null;
-    public string $scheduleDate = '';
-    public string $scheduleTime = '';
 
     public string $linkAppointmentId = '';
     public ?string $confirmingDeleteId = null;
@@ -113,60 +100,6 @@ class HealthRoutineIndex extends Component
         session()->flash('status', 'Rotina excluída. As consultas e os exames continuam na Agenda.');
     }
 
-    public function openRequest(): void
-    {
-        $this->resetPanels();
-        $this->reset('requestKind', 'requestTitle', 'requestBy');
-        $this->showRequest = true;
-    }
-
-    public function saveRequest(HealthFollowupService $service): void
-    {
-        $this->validate([
-            'requestKind' => ['required', Rule::enum(HealthAppointmentKind::class)],
-            'requestTitle' => ['required', 'string', 'max:120'],
-            'requestBy' => ['nullable', 'string', 'max:120'],
-        ], attributes: ['requestKind' => 'tipo', 'requestTitle' => 'o que foi pedido', 'requestBy' => 'quem pediu']);
-
-        $rotina = $this->selected();
-        abort_if($rotina === null, 404);
-
-        $service->requestExam($this->membroOuFalha($rotina->member_id), ['kind' => $this->requestKind, 'title' => $this->requestTitle, 'requested_by' => $this->requestBy], $rotina, null, $this->autor());
-
-        $this->showRequest = false;
-    }
-
-    public function startScheduling(string $requestId): void
-    {
-        $this->resetPanels();
-        $this->schedulingId = HealthExamRequest::query()->findOrFail($requestId)->id;
-        $this->reset('scheduleDate', 'scheduleTime');
-    }
-
-    public function schedule(HealthFollowupService $service): void
-    {
-        $this->validate([
-            'scheduleDate' => ['required', 'date'],
-            'scheduleTime' => ['required', 'date_format:H:i'],
-        ], attributes: ['scheduleDate' => 'data', 'scheduleTime' => 'hora']);
-
-        try {
-            $service->scheduleRequest(HealthExamRequest::query()->findOrFail($this->schedulingId), "{$this->scheduleDate} {$this->scheduleTime}", $this->autor());
-        } catch (InvalidArgumentException $e) {
-            $this->addError('scheduleDate', $e->getMessage());
-
-            return;
-        }
-
-        $this->schedulingId = null;
-        session()->flash('status', 'Marcado na Agenda de Saúde.');
-    }
-
-    public function deleteRequest(string $requestId, HealthFollowupService $service): void
-    {
-        $service->deleteRequest(HealthExamRequest::query()->findOrFail($requestId));
-    }
-
     public function linkAppointment(HealthRoutineService $service): void
     {
         $rotina = $this->selected();
@@ -193,7 +126,7 @@ class HealthRoutineIndex extends Component
         $escolhida = $rotinas->firstWhere('id', $this->selectedId) ?? $rotinas->first();
 
         $consultas = $escolhida !== null ? $escolhida->appointments()->orderByDesc('scheduled_at')->get() : collect();
-        $pedidos = $escolhida !== null ? $escolhida->requests()->open()->orderBy('requested_on')->get() : collect();
+        $pedidos = $escolhida !== null ? $escolhida->requests()->open()->with('items.appointment')->orderBy('requested_on')->get() : collect();
 
         return view('livewire.health.health-routine-index', [
             'rotinas' => $rotinas,
@@ -203,6 +136,8 @@ class HealthRoutineIndex extends Component
             'ciclos' => $escolhida !== null ? $service->cycles($escolhida, $consultas, $pedidos) : [],
             'consultas' => $consultas,
             'pedidos' => $pedidos,
+            // Os que já não esperam data (os que esperam aparecem acima, em destaque).
+            'outrosPedidos' => $escolhida !== null ? $escolhida->requests()->whereNotIn('id', $pedidos->pluck('id'))->with('items')->orderByDesc('requested_on')->get() : collect(),
             'ligaveis' => $escolhida !== null
                 ? HealthAppointment::query()->where('member_id', $escolhida->member_id)->whereNull('routine_id')->where('scheduled_at', '>=', now()->subYears(3))->orderByDesc('scheduled_at')->limit(60)->get()
                 : collect(),
@@ -234,8 +169,6 @@ class HealthRoutineIndex extends Component
     private function resetPanels(): void
     {
         $this->showForm = false;
-        $this->showRequest = false;
-        $this->schedulingId = null;
         $this->confirmingDeleteId = null;
         $this->resetErrorBag();
     }

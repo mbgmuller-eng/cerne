@@ -472,12 +472,14 @@ class HealthFollowupsTest extends TestCase
             ->assertSee('A próxima fica para 05/03/2027')
             ->call('save')->assertHasNoErrors()
             ->assertSee('Check-up geral')
-            ->call('openRequest')->set('requestTitle', 'Hemograma')->call('saveRequest')->assertHasNoErrors()
-            ->assertSee('Hemograma');
+            ->assertSee('+ Pedido de exames');
 
         $rotina = HealthRoutine::query()->sole();
         $this->assertSame('2027-03-05', $rotina->next_due_on->toDateString());
+
+        app(HealthFollowupService::class)->requestExam($this->membroAna, ['title' => 'Hemograma'], $rotina, null, null);
         $this->assertSame($rotina->id, HealthExamRequest::query()->sole()->routine_id);
+        Livewire::test(HealthRoutineIndex::class)->assertSee('Falta agendar: Hemograma')->assertSee('Abrir pedido');
     }
 
     public function test_acompanhamento_pela_tela_com_anotacao_envio_de_documento_e_programa(): void

@@ -37,7 +37,7 @@ class CareSwitchController extends Controller
 
         return redirect()->route(match ($destino) {
             'cuidados' => 'health.care.index',
-            'rotinas' => 'health.routines.index',
+            'rotinas' => 'health.routines.index', 'exames' => 'health.exams.index',
             'financas' => 'family.index',
             default => 'health.appointments.index',
         });

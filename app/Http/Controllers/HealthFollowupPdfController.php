@@ -4,6 +4,9 @@ namespace App\Http\Controllers;
 
 use App\Models\HealthAllergy;
 use App\Models\HealthCondition;
+use App\Models\HealthExamReport;
+use App\Services\HealthExamResultService;
+use App\Support\Health\ExamCatalog;
 use App\Models\HealthFollowup;
 use App\Models\HealthMedication;
 use App\Services\HealthFollowupService;
@@ -36,6 +39,7 @@ class HealthFollowupPdfController extends Controller
             'doencas' => HealthCondition::query()->where('member_id', $membro)->get(),
             // Só os remédios em uso: os encerrados confundiriam quem lê.
             'remedios' => HealthMedication::query()->where('member_id', $membro)->where('is_active', true)->get(),
+            'exames' => $this->examComparison($acompanhamento),
             'geradoEm' => now(),
         ]);
 
@@ -43,5 +47,35 @@ class HealthFollowupPdfController extends Controller
         $nome = 'resumo-de-saude-'.Str::slug($acompanhamento->member->name).'-'.now()->format('Y-m-d').'.pdf';
 
         return $pdf->download($nome)->header('Cache-Control', 'no-store, private');
+    }
+
+    /**
+     * A comparação só dos marcadores medidos nos pedidos DESTE acompanhamento, com os valores anteriores da pessoa. As últimas 5 datas cabem
+     * na página.
+     *
+     * @return array{columns: list<string>, groups: array<string, list<array<string, mixed>>>}
+     */
+    private function examComparison(HealthFollowup $acompanhamento): array
+    {
+        $deste = HealthExamReport::query()->whereHas('request', fn ($q) => $q->where('followup_id', $acompanhamento->id))->with('values')->get()
+            ->flatMap(fn (HealthExamReport $r) => $r->values->map(fn ($v) => ExamCatalog::markerKey($v->name)))
+            ->unique()->flip();
+
+        if ($deste->isEmpty()) {
+            return ['columns' => [], 'groups' => []];
+        }
+
+        $comparacao = app(HealthExamResultService::class)->comparison($acompanhamento->member_id);
+        $grupos = [];
+
+        foreach ($comparacao['groups'] as $nome => $linhas) {
+            $linhas = array_values(array_filter($linhas, fn (array $l) => $deste->has($l['key'])));
+
+            if ($linhas !== []) {
+                $grupos[$nome] = $linhas;
+            }
+        }
+
+        return ['columns' => array_slice($comparacao['columns'], -5), 'groups' => $grupos];
     }
 }

@@ -74,6 +74,11 @@ final class NotificationPresenter
                 'message' => self::juntar($titulo, isset($d['member_name']) ? 'para '.$d['member_name'] : null, ($d['days_left'] ?? 0) <= 0 ? 'é hoje' : 'é amanhã'),
                 'url' => route('health.care.index'),
             ],
+            'health_exam_reading' => [
+                'heading' => 'Exames',
+                'message' => self::juntar($titulo, isset($d['member_name']) ? 'de '.$d['member_name'] : null),
+                'url' => isset($d['health_exam_reading_id']) ? route('health.exams.reading', $d['health_exam_reading_id']) : route('health.exams.index'),
+            ],
             'health_routine_due' => [
                 'heading' => 'Check-up e rotinas',
                 'message' => self::juntar($titulo, isset($d['member_name']) ? 'para '.$d['member_name'] : null, ($d['days_left'] ?? 0) <= 0 ? 'vence hoje' : 'vence em '.self::dia($d['due_on'] ?? null)),

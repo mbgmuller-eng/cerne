@@ -395,7 +395,7 @@ class HealthAppointmentIndex extends Component
             'calendario' => $this->calendarData(),
             'upcoming' => HealthAppointment::query()->where('profile_id', $profileId)->upcoming()->with(['member', 'createdByUser', 'escort', 'routine', 'followups'])->get(),
             'past' => HealthAppointment::query()->where('profile_id', $profileId)->past()->with(['member', 'createdByUser', 'statusBy', 'routine', 'followups'])->get(),
-            'pedidosSemData' => \App\Models\HealthExamRequest::query()->open()->with('member')->orderBy('requested_on')->get(),
+            'pedidosSemData' => \App\Models\HealthExamRequest::query()->open()->with(['member', 'items.appointment'])->orderBy('requested_on')->get(),
             'rotinasDaPessoa' => $this->showForm && $this->memberId ? \App\Models\HealthRoutine::query()->where('member_id', $this->memberId)->get() : collect(),
             'acompanhamentosDaPessoa' => $this->showForm && $this->memberId ? \App\Models\HealthFollowup::query()->where('member_id', $this->memberId)->orderByDesc('started_on')->get() : collect(),
             'editingExisting' => $this->editingId !== null,

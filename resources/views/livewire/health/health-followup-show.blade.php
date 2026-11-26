@@ -27,7 +27,7 @@
             <p class="eyebrow">Linha do tempo</p>
             <div data-write class="flex flex-wrap gap-2">
                 <a href="{{ route('health.appointments.index', ['acompanhamento' => $acompanhamento->id]) }}" class="btn-primary px-3 py-1.5 text-xs">+ Consulta</a>
-                <button type="button" wire:click="open('request')" class="btn-secondary px-3 py-1.5 text-xs">+ Exame pedido</button>
+                <a href="{{ route('health.exams.create', ['acompanhamento' => $acompanhamento->id]) }}" wire:navigate class="btn-secondary px-3 py-1.5 text-xs">+ Pedido de exames</a>
                 <button type="button" wire:click="open('document')" class="btn-secondary px-3 py-1.5 text-xs">+ Documento</button>
                 <button type="button" wire:click="open('note')" class="btn-secondary px-3 py-1.5 text-xs">+ Anotação</button>
                 <button type="button" wire:click="open('link')" class="btn-ghost px-2 py-1.5 text-xs">Ligar da Agenda</button>
@@ -53,28 +53,6 @@
                 <x-form-consequence :lines="['A anotação entra na linha do tempo e no PDF para o médico.']" />
                 <x-form-errors />
                 <button type="submit" class="btn-primary px-3 py-1.5 text-sm">Salvar anotação</button>
-            </form>
-        @endif
-
-        @if ($panel === 'request')
-            <form wire:submit="saveRequest" class="space-y-3 rounded-xl border border-dashed border-slate-200 p-3 dark:border-white/10">
-                <div class="grid gap-3 sm:grid-cols-3">
-                    <div>
-                        <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Tipo</label>
-                        <select wire:model="requestKind" class="select mt-1.5 w-full"><option value="exam">Exame</option><option value="consultation">Consulta</option></select>
-                    </div>
-                    <div>
-                        <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">O que foi pedido</label>
-                        <input type="text" wire:model="requestTitle" class="input mt-1.5" placeholder="Ex.: Ressonância do ombro">
-                    </div>
-                    <div>
-                        <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Quem pediu (opcional)</label>
-                        <input type="text" wire:model="requestBy" class="input mt-1.5">
-                    </div>
-                </div>
-                <x-form-consequence :lines="\App\Support\Forms\FormConsequence::healthRequest()" />
-                <x-form-errors />
-                <button type="submit" class="btn-primary px-3 py-1.5 text-sm">Guardar pedido</button>
             </form>
         @endif
 
@@ -169,14 +147,12 @@
                         @elseif ($linha['type'] === 'note')
                             <button type="button" data-write wire:click="deleteNote('{{ $linha['id'] }}')" wire:confirm="Excluir esta anotação?" class="text-xs text-slate-400 hover:text-red-700">excluir</button>
                         @elseif ($linha['type'] === 'request')
-                            <div data-write class="mt-1 flex flex-wrap items-center gap-2">
+                            <div class="mt-1 flex flex-wrap items-center gap-2">
                                 <span class="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-900 dark:bg-amber-500/15 dark:text-amber-300">Falta agendar</span>
-                                <button type="button" wire:click="startScheduling('{{ $linha['id'] }}')" class="btn-secondary px-3 py-1 text-xs">Marcar data</button>
-                                <button type="button" wire:click="deleteRequest('{{ $linha['id'] }}')" wire:confirm="Excluir este pedido?" class="text-xs text-slate-400 hover:text-red-700">excluir</button>
+                                <a href="{{ route('health.exams.show', $linha['id']) }}" wire:navigate class="btn-secondary px-3 py-1 text-xs">Abrir pedido</a>
                             </div>
-                            @if ($schedulingId === $linha['id'])
-                                @include('livewire.health.partials.schedule-request')
-                            @endif
+                        @elseif ($linha['type'] === 'result' && $linha['by']?->request_id)
+                            <a href="{{ route('health.exams.show', $linha['by']->request_id) }}" wire:navigate class="text-xs font-medium text-saude-800 hover:underline dark:text-saude-200">Ver o resultado no pedido</a>
                         @endif
                     </li>
                 @endforeach

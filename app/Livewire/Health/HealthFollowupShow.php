@@ -3,20 +3,17 @@
 namespace App\Livewire\Health;
 
 use App\Enums\DocumentCategory;
-use App\Enums\HealthAppointmentKind;
 use App\Enums\HealthFollowupStatus;
 use App\Livewire\Concerns\RequiresActiveProfile;
 use App\Livewire\Concerns\RequiresPersonalHealth;
 use App\Models\Document;
 use App\Models\HealthAppointment;
-use App\Models\HealthExamRequest;
 use App\Models\HealthFollowup;
 use App\Models\HealthFollowupNote;
 use App\Models\ProfileMember;
 use App\Services\HealthFollowupService;
 use App\Support\ProfileContext;
 use Carbon\CarbonImmutable;
-use Illuminate\Validation\Rule;
 use InvalidArgumentException;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Locked;
@@ -32,20 +29,12 @@ class HealthFollowupShow extends Component
     #[Locked]
     public string $followupId = '';
 
-    /** '' | note | request | document | link | edit */
+    /** '' | note | document | link | edit */
     public string $panel = '';
 
     public string $noteDate = '';
     public string $noteText = '';
     public ?int $notePain = null;
-
-    public string $requestKind = 'exam';
-    public string $requestTitle = '';
-    public string $requestBy = '';
-
-    public ?string $schedulingId = null;
-    public string $scheduleDate = '';
-    public string $scheduleTime = '';
 
     public $arquivo = null;
     public string $documentTitle = '';
@@ -70,16 +59,11 @@ class HealthFollowupShow extends Component
     public function open(string $panel): void
     {
         $this->resetErrorBag();
-        $this->schedulingId = null;
         $this->panel = $this->panel === $panel ? '' : $panel;
 
         if ($this->panel === 'note') {
             $this->noteDate = CarbonImmutable::today()->toDateString();
             $this->reset('noteText', 'notePain');
-        }
-
-        if ($this->panel === 'request') {
-            $this->reset('requestKind', 'requestTitle', 'requestBy');
         }
 
         if ($this->panel === 'document') {
@@ -139,53 +123,6 @@ class HealthFollowupShow extends Component
     public function deleteNote(string $noteId): void
     {
         HealthFollowupNote::query()->where('followup_id', $this->followupId)->findOrFail($noteId)->delete();
-    }
-
-    public function saveRequest(HealthFollowupService $service): void
-    {
-        $this->validate([
-            'requestKind' => ['required', Rule::enum(HealthAppointmentKind::class)],
-            'requestTitle' => ['required', 'string', 'max:120'],
-            'requestBy' => ['nullable', 'string', 'max:120'],
-        ], attributes: ['requestKind' => 'tipo', 'requestTitle' => 'o que foi pedido', 'requestBy' => 'quem pediu']);
-
-        $acompanhamento = $this->followup();
-        $membro = ProfileMember::query()->visibleHere()->findOrFail($acompanhamento->member_id);
-
-        $service->requestExam($membro, ['kind' => $this->requestKind, 'title' => $this->requestTitle, 'requested_by' => $this->requestBy], null, $acompanhamento, $this->autor());
-        $this->panel = '';
-    }
-
-    public function startScheduling(string $requestId): void
-    {
-        $this->resetErrorBag();
-        $this->panel = '';
-        $this->schedulingId = HealthExamRequest::query()->where('followup_id', $this->followupId)->findOrFail($requestId)->id;
-        $this->reset('scheduleDate', 'scheduleTime');
-    }
-
-    public function schedule(HealthFollowupService $service): void
-    {
-        $this->validate([
-            'scheduleDate' => ['required', 'date'],
-            'scheduleTime' => ['required', 'date_format:H:i'],
-        ], attributes: ['scheduleDate' => 'data', 'scheduleTime' => 'hora']);
-
-        try {
-            $service->scheduleRequest(HealthExamRequest::query()->where('followup_id', $this->followupId)->findOrFail($this->schedulingId), "{$this->scheduleDate} {$this->scheduleTime}", $this->autor());
-        } catch (InvalidArgumentException $e) {
-            $this->addError('scheduleDate', $e->getMessage());
-
-            return;
-        }
-
-        $this->schedulingId = null;
-        session()->flash('status', 'Marcado na Agenda de Saúde.');
-    }
-
-    public function deleteRequest(string $requestId, HealthFollowupService $service): void
-    {
-        $service->deleteRequest(HealthExamRequest::query()->where('followup_id', $this->followupId)->findOrFail($requestId));
     }
 
     public function linkAppointment(HealthFollowupService $service): void

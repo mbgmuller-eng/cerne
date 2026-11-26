@@ -8,6 +8,7 @@ use App\Models\Document;
 use App\Models\DocumentUpload;
 use App\Models\FinancialProfile;
 use App\Models\GymExercise;
+use App\Models\HealthExamReading;
 use App\Models\LeadAttachment;
 use App\Models\Subscription;
 use App\Models\User;
@@ -161,6 +162,11 @@ class AccountDeletionService
                 if ($p !== '') {
                     $arquivos[] = [$importacao, (string) $p];
                 }
+            }
+
+            // Laudo esperando revisão: o PDF ainda está na pasta de importação.
+            foreach (HealthExamReading::withoutGlobalScopes()->whereIn('profile_id', $perfis)->where('source_path', '!=', '')->pluck('source_path') as $p) {
+                $arquivos[] = [$importacao, (string) $p];
             }
 
             foreach (GymExercise::withoutGlobalScopes()->whereIn('profile_id', $perfis)->get(['image_path', 'image_path_2']) as $e) {

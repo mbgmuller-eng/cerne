@@ -66,6 +66,31 @@
         @endif
     @endif
 
+    @if ($exames['groups'] !== [])
+        <h2>Resultados de exames para comparar</h2>
+        <p class="sub">Os resultados pedidos neste acompanhamento, com os valores anteriores da pessoa. “Acima” e “abaixo” comparam com a referência do laudo daquela data.</p>
+        <table style="font-size: 9.5px">
+            <tr>
+                <th>Resultado de</th>
+                @foreach ($exames['columns'] as $data)<th>{{ \Carbon\CarbonImmutable::parse($data)->format('d/m/Y') }}</th>@endforeach
+                <th>Referência atual</th>
+            </tr>
+            @foreach ($exames['groups'] as $grupo => $linhasDoGrupo)
+                <tr><td colspan="{{ count($exames['columns']) + 2 }}" class="sub">{{ $grupo }}</td></tr>
+                @foreach ($linhasDoGrupo as $r)
+                    <tr>
+                        <td class="nome">{{ $r['name'] }} <span class="sub">{{ $r['unit'] }}</span></td>
+                        @foreach ($exames['columns'] as $data)
+                            @php $c = $r['cells'][$data] ?? null; @endphp
+                            <td>{{ $c['value'] ?? '-' }}@if ($c && ! $c['comparable']) {{ $c['unit'] }}@endif @if ($c && $c['flag'] !== '')<div class="nome">{{ $c['flag'] === 'above' ? 'acima' : 'abaixo' }}</div>@endif</td>
+                        @endforeach
+                        <td class="sub">{{ $r['reference'] ?: '-' }}</td>
+                    </tr>
+                @endforeach
+            @endforeach
+        </table>
+    @endif
+
     <h2>Ficha de saúde</h2>
     <table>
         <tr><td class="tipo">Alergias</td><td>{{ $alergias->pluck('description')->implode('; ') ?: 'Nenhuma registrada' }}</td></tr>

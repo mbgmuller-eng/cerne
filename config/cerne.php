@@ -147,6 +147,9 @@ return [
         // Idem para a simulação em PDF de um lead (ver LeadQuoteExtractionService), por profissional.
         'lead_quote_reads_per_day' => (int) env('CERNE_LEAD_QUOTE_READS_PER_DAY', 20),
 
+        // Idem para o laudo de exame lido na Saúde (ver HealthExamReadingService).
+        'exam_reads_per_day' => (int) env('CERNE_EXAM_READS_PER_DAY', 10),
+
         // Teto geral de envios na tela Importar (extrato, fatura, relatório) por perfil e por dia.
         'document_imports_per_day' => (int) env('CERNE_DOCUMENT_IMPORTS_PER_DAY', 40),
 
@@ -280,8 +283,8 @@ return [
     'legal' => [
         // Declaração de quem cadastra uma pessoa acompanhada (ela autorizou, ou ele é o representante legal). Subir quando o texto mudar.
         'care_consent_version' => '2026-10-22',
-        'terms_version' => '2026-11-26',
-        'health_consent_version' => '2026-11-26',
+        'terms_version' => '2026-11-27',
+        'health_consent_version' => '2026-11-27',
         'controller_name' => env('CERNE_CONTROLLER_NAME'),
         'controller_cnpj' => env('CERNE_CONTROLLER_CNPJ'),
         'dpo_name' => env('CERNE_DPO_NAME'),

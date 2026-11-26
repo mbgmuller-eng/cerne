@@ -155,7 +155,7 @@
                 ['bg-brand-800', 'Finanças', ['Fluxo de caixa, contas fixas e cartões', 'Regra de orçamento do mês', 'Investimentos, proventos e moedas', 'Dívidas, financiamentos e consórcios', 'Objetivos com previsão e histórico', 'Importação de extrato e fatura com IA']],
                 ['bg-seguros-800', 'Seguros', ['Apólices por tipo, pessoa e seguradora', 'Importação da apólice em PDF', 'Datas importantes e renovação', 'Acompanhamento com seu corretor']],
                 ['bg-documentos-800', 'Documentos', ['CNH, passaporte, certificados e exames', 'Pastas do seu jeito', 'Validade registrada em cada documento', 'Visibilidade por categoria']],
-                ['bg-saude-800', 'Saúde', ['Ficha de saúde com QR de emergência', 'Agenda de consultas com lembrete', 'Check-ups e acompanhamento de cada problema', 'Programa de atividades com presença e nota de dor', 'Treino de academia com histórico e PDF', 'Itens de cuidado com data de troca', 'Cuidado de pais e familiares']],
+                ['bg-saude-800', 'Saúde', ['Ficha de saúde com QR de emergência', 'Agenda de consultas com lembrete', 'Check-ups e acompanhamento de cada problema', 'Pedidos de exame com resultados para comparar, com leitura do laudo em PDF', 'Programa de atividades com presença e nota de dor', 'Treino de academia com histórico e PDF', 'Itens de cuidado com data de troca', 'Cuidado de pais e familiares']],
             ] as [$cor, $nome, $itens])
                 <div class="card overflow-hidden">
                     <div class="h-1.5 {{ $cor }}"></div>

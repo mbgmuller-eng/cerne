@@ -320,15 +320,65 @@ final class FormConsequence
     }
 
     /** @return list<string> */
-    public static function healthRequest(): array
+    public static function examOrder(int $quantos): array
     {
-        return ['O pedido fica guardado como "falta agendar". Ele só entra na Agenda de Saúde quando você marcar a data.'];
+        if ($quantos === 0) {
+            return [];
+        }
+
+        return [
+            ($quantos === 1 ? 'O exame fica' : "Os {$quantos} exames ficam").' em "falta agendar". Nada vai para a Agenda de Saúde até você marcar a data.',
+            'Quem vê a Agenda de Saúde desta pessoa vê o pedido. O consultor não vê.',
+        ];
+    }
+
+    /**
+     * @param  list<string>  $exames
+     * @return list<string>
+     */
+    public static function examSchedule(array $exames): array
+    {
+        if ($exames === []) {
+            return [];
+        }
+
+        return [
+            'Entra um compromisso na Agenda de Saúde com '.(count($exames) === 1 ? 'este exame' : 'estes '.count($exames).' exames').': '.implode('; ', $exames).'.',
+            'O lembrete sai um dia antes, como nos outros compromissos.',
+        ];
     }
 
     /** @return list<string> */
-    public static function healthSchedule(): array
+    public static function examReading(): array
     {
-        return ['Entra na Agenda de Saúde, com o lembrete um dia antes, e continua ligado ao check-up ou ao acompanhamento.'];
+        return [
+            'O PDF é enviado à Anthropic, que faz a leitura. O laudo pode trazer o seu nome e documentos.',
+            'Nada vira resultado sem a sua revisão. Ao salvar a revisão, o PDF vai para os Documentos; se descartar, ele é apagado.',
+        ];
+    }
+
+    /** @return list<string> */
+    public static function examResult(string $tipo, int $valores, int $exames, bool $comArquivo, bool $comPedido): array
+    {
+        $linhas = [];
+
+        if ($tipo === 'report') {
+            $linhas[] = 'A conclusão entra na comparação dos laudos deste exame.';
+        } elseif ($valores > 0) {
+            $linhas[] = ($valores === 1 ? '1 resultado entra' : "{$valores} resultados entram").' na comparação, na data da coleta.';
+        }
+
+        if ($comPedido) {
+            $linhas[] = $exames > 0
+                ? ($exames === 1 ? '1 exame do pedido fica' : "{$exames} exames do pedido ficam").' com resultado.'
+                : 'Nenhum exame do pedido está marcado: todos continuam aguardando resultado.';
+        }
+
+        if ($comArquivo) {
+            $linhas[] = 'O PDF vai para os Documentos, como exame de saúde desta pessoa. Quem pode vê-lo segue a regra dos Documentos.';
+        }
+
+        return $linhas;
     }
 
     /** @return list<string> */

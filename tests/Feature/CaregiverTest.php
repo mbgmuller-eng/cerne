@@ -51,6 +51,8 @@ class CaregiverTest extends TestCase
         'HealthAllergy', 'HealthAppointment', 'HealthCard', 'HealthCareItem', 'HealthCondition', 'HealthMedication', 'HealthMedicationChange', 'Document',
         // Check-ups, acompanhamentos e programa de atividades: decisão do dono em 2026-11-26, valem para quem ele acompanha como a Agenda.
         'HealthActivity', 'HealthActivityExercise', 'HealthActivitySession', 'HealthExamRequest', 'HealthFollowup', 'HealthFollowupNote', 'HealthRoutine',
+        // Exames: lista do pedido, resultados e leitura do laudo. Decisão do dono em 2026-11-26: os mesmos que veem a Agenda.
+        'HealthExamItem', 'HealthExamReading', 'HealthExamReport', 'HealthExamValue',
     ];
 
     protected function setUp(): void

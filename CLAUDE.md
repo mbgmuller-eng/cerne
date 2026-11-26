@@ -217,7 +217,7 @@ continua). Regras que não se quebram:
 
 ### Privacidade e LGPD
 
-Texto da política em `/privacidade` (versão `terms_version` e `health_consent_version` de 2026-11-26; o aviso de rascunho saiu da política e dos Termos de Uso por decisão do dono, **mas o texto ainda não passou por advogado**), plano de incidente em `INCIDENTES.md`. **Política e recurso andam juntos: quem passa a mandar dado a um terceiro novo (nova leitura por IA, novo operador) atualiza as seções 2, 3 e 13 da política e sobe a versão.** Regras que não se quebram:
+Texto da política em `/privacidade` (versão `terms_version` e `health_consent_version` de 2026-11-27; o aviso de rascunho saiu da política e dos Termos de Uso por decisão do dono, **mas o texto ainda não passou por advogado**), plano de incidente em `INCIDENTES.md`. **Política e recurso andam juntos: quem passa a mandar dado a um terceiro novo (nova leitura por IA, novo operador) atualiza as seções 2, 3 e 13 da política e sobe a versão.** Regras que não se quebram:
 
 - **Aceite versionado** (`config cerne.legal.terms_version`, `RequiresCurrentTerms`, grupo `termos` de toda rota autenticada): mudar o texto dos Termos ou da
   Política exige subir a versão, e todo mundo aceita de novo no próximo acesso. Todo caminho que cria conta grava `terms_accepted_at` **e** `terms_version`.
@@ -634,13 +634,27 @@ Três peças: rotina preventiva (`HealthRoutine`, `/saude/check-ups`), acompanha
 - **Um compromisso pode estar num check-up E num acompanhamento** (`health_appointments.routine_id` + pivô). Excluir rotina ou acompanhamento não apaga consulta nem documento.
 - **Próxima data do check-up** = o mais recente entre a "última vez" informada à mão e a última consulta REALIZADA ligada, mais o intervalo; gravada em `next_due_on` e refeita pelos eventos do `HealthAppointment`.
   O aviso (`rotinas-saude`, 03:37) sai 60 dias antes e no dia, não sai se já há compromisso futuro ligado, e tem o público do lembrete de consulta da Agenda. O histórico por ciclo mostra feito, em andamento, em aberto ou não registrado.
-- **Exame pedido sem data** (`HealthExamRequest`) não está na Agenda até alguém marcar; marcar cria a consulta pelo `HealthAppointmentService` (lembretes e avisos de sempre) já ligada à rotina e ao acompanhamento.
+- **Pedido de exame** (`HealthExamRequest`) não está na Agenda até alguém marcar: ver "Pedidos de exame, resultados e leitura do laudo".
 - **Documento ligado continua nos Documentos** com a visibilidade dele: ligar não abre nada a ninguém.
 - **O Cerne não escolhe exercício para um problema de saúde**: os exercícios são digitados à mão, a partir do que o profissional orientou. Presença exige nota de dor (0 a 10); falta não tem nota. Os gráficos (sessões e dor média por semana, separados) somam todas as atividades, em SQL.
 - **Ligação com a Academia** é opcional e só com fase da própria pessoa: terminar um treino dela grava a presença uma vez (índice único `health_activity_sessions(activity_id, gym_session_id)`) e leva à tela para informar a dor.
   Cargas, séries e histórico da Academia continuam só do dono (o cônjuge vê o programa, não a fase).
 - **PDF "para o médico"** (`HealthFollowupPdfController`): só o que quem pede enxerga, mais a Ficha de Saúde; o nome do arquivo não leva o nome do problema.
-- Textos cifrados (lista em `EncryptSensitiveData::COLUMNS`). Fora do escopo, por decisão: leitura de laudo por IA.
+- Textos cifrados (lista em `EncryptSensitiveData::COLUMNS`).
+
+### Pedidos de exame, resultados e leitura do laudo (Saúde)
+
+Telas em `/saude/exames` (`App\Livewire\Health\Exams`), serviços `HealthExamService`, `HealthExamResultService`, `HealthExamReadingService`. Teste: `HealthExamsTest`. Decisões do dono em 2026-11-26. Regras:
+
+- **O pedido tem uma lista** (`HealthExamItem`): cada item tem detalhe, data e resultado próprios. Vários itens podem ir para o MESMO compromisso (`appointment_id` não é único); compromisso cancelado, não realizado ou apagado
+  devolve os itens para "falta agendar". A situação é calculada (`HealthExamItem::status`, escopo `pending`), nunca gravada. `health_exam_requests.appointment_id` ficou da versão de um exame só e não é mais lido (a migração copiou cada pedido antigo para um item).
+- **O Cerne não sugere exame**: nada vem marcado. A lista é código (`ExamCatalog`), com os nomes alternativos e os marcadores; o que a pessoa digitou volta a aparecer porque sai dos itens antigos (nomes cifrados, filtro em PHP).
+- **Resultado** é um `HealthExamReport`: de valores (`HealthExamValue`) ou de conclusão (copiada como está no laudo). A comparação junta o mesmo marcador entre laboratórios por `ExamCatalog::markerKey` (nome INTEIRO normalizado, nunca pedaço); é montada em PHP porque tudo é cifrado.
+- **Destaque conservador** (`ReferenceRange`): só quando a referência IMPRESSA NAQUELE laudo é uma faixa simples ("70 a 99", "menor que 130"). Várias faixas, texto ou valor não numérico: sem destaque. O Cerne nunca interpreta nem diagnostica. Unidade diferente fica fora do gráfico, com o motivo.
+- **Leitura por IA (regra 5)**: o PDF vai para a pasta de importação, a leitura grava só em `health_exam_readings.summary` (cifrado) e NADA vira resultado antes da pessoa salvar a revisão. Salvar adota o PDF nos Documentos (`DocumentService::adopt`, exame de saúde da pessoa, ligado ao acompanhamento do pedido) e apaga o da importação;
+  descartar apaga; nunca revisado sai em 90 dias (`DataRetentionService`). Teto por perfil e por dia (`cerne.ai.exam_reads_per_day`, falha e descarte contam). A instrução manda tratar o documento como dado e não copiar dados que identificam o paciente. A tela avisa, antes do envio, que o arquivo vai à Anthropic.
+  Sem `ANTHROPIC_API_KEY` o envio é recusado (digita-se à mão). Falha na leitura deixa digitar, e o PDF vai junto ao salvar. Mensagem técnica fica no acompanhamento de erros.
+- **Mesma visibilidade da Agenda** (`IsCoupleHealthData` nos quatro models novos), inclusive pessoa acompanhada (rotas no `RestrictCareContext`). O arquivo não passa pela trava do model: `HealthExamReadingService::request/confirm` barram quem só lê ANTES de gravar.
 
 ### Calendário (Saúde e agenda do profissional)
 

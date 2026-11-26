@@ -305,6 +305,42 @@ return [
             'tip' => 'Quem vê a Agenda de Saúde da pessoa vê o acompanhamento. Cargas e séries da Academia continuam só suas, e o consultor não vê nada.',
         ],
 
+        'health.exams.index' => [
+            'title' => 'Exames',
+            'summary' => 'Os pedidos do médico, o que falta agendar e os laudos para revisar.',
+            'steps' => [
+                'Use “+ Novo pedido” e marque na lista o que o médico pediu.',
+                'Dentro do pedido, selecione os exames do mesmo dia e use “Marcar data”. Os outros continuam esperando.',
+                'Quando sair o laudo, envie o PDF para leitura ou digite o resultado à mão.',
+                'Confira o que foi lido antes de salvar: nada vira resultado sem a sua revisão.',
+            ],
+            'tip' => 'Guarde também os laudos de anos anteriores: eles entram na comparação.',
+        ],
+
+        'health.exams.create' => [
+            'title' => 'Novo pedido de exame',
+            'summary' => 'Escolha o tipo, marque o que foi pedido e escreva o detalhe de cada exame.',
+            'steps' => [
+                'Escolha o tipo, como Sangue ou Cardiologia, ou busque pelo nome.',
+                'Marque o que está no pedido do médico. O que não estiver na lista você digita.',
+                'Use o detalhe do pedido para região, lado ou preparo de um exame.',
+                'No check-up seguinte, “Repetir o pedido” traz a lista anterior para você ajustar.',
+            ],
+            'tip' => 'Nada vem marcado: o Cerne registra o que foi pedido e não sugere exames.',
+        ],
+
+        'health.exams.results' => [
+            'title' => 'Comparar resultados',
+            'summary' => 'Os valores de cada data lado a lado, com gráfico, e as conclusões dos laudos.',
+            'steps' => [
+                'Em Valores, cada linha é um resultado e cada coluna é uma data.',
+                'Toque no nome para ver o gráfico. A faixa sombreada é a referência do laudo mais recente.',
+                'O aviso de acima ou abaixo compara o valor com a referência do próprio laudo.',
+                'Em Laudos, veja as conclusões do mesmo exame em cada data.',
+            ],
+            'tip' => 'O Cerne não interpreta resultado. Leve ao médico o PDF do acompanhamento ou os laudos.',
+        ],
+
         'health.gym.index' => [
             'title' => 'Academia',
             'summary' => 'Seu plano de treino, o próximo treino e as últimas sessões. Só você vê estes dados.',

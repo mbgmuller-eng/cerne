@@ -75,9 +75,7 @@
                 @foreach ($pedidosSemData as $p)
                     <li>
                         {{ $p->member->name }} · {{ $p->title }}
-                        @if ($p->followup_id) <a href="{{ route('health.followups.show', $p->followup_id) }}" class="font-medium underline">marcar data</a>
-                        @elseif ($p->routine_id) <a href="{{ route('health.routines.index', ['rotina' => $p->routine_id]) }}" class="font-medium underline">marcar data</a>
-                        @endif
+                        <a href="{{ route('health.exams.show', $p->id) }}" class="font-medium underline">marcar data</a>
                     </li>
                 @endforeach
             </ul>

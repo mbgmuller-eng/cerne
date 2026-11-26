@@ -5,6 +5,7 @@ namespace App\Services\Privacy;
 use App\Enums\ProcessingStatus;
 use App\Models\DataExport;
 use App\Models\DocumentUpload;
+use App\Models\HealthExamReading;
 use App\Models\User;
 use Illuminate\Support\Facades\Storage;
 use Throwable;
@@ -45,7 +46,25 @@ class DataRetentionService
     /** @return array{exports: int, source_files: int} */
     public function purge(): array
     {
-        return ['exports' => $this->purgeExports(), 'source_files' => $this->purgeSourceFiles()];
+        return ['exports' => $this->purgeExports(), 'source_files' => $this->purgeSourceFiles() + $this->purgeExamReadings()];
+    }
+
+    /** Laudo enviado para leitura e nunca salvo nem descartado: o PDF e o que foi lido saem depois do mesmo prazo dos outros envios. */
+    private function purgeExamReadings(): int
+    {
+        $apagados = 0;
+
+        HealthExamReading::withoutGlobalScopes()
+            ->where('source_path', '!=', '')
+            ->where('updated_at', '<', now()->subDays((int) config('cerne.legal.source_pdf_days', 90)))
+            ->orderBy('id')
+            ->each(function (HealthExamReading $leitura) use (&$apagados): void {
+                Storage::disk(config('cerne.documents.disk'))->delete($leitura->source_path);
+                $leitura->forceFill(['source_path' => '', 'summary' => null])->saveQuietly();
+                $apagados++;
+            });
+
+        return $apagados;
     }
 
     /** Cópia de dados vencida (7 dias) ou que nunca terminou (2 dias): o arquivo tem dado pessoal e não fica parado no servidor. */

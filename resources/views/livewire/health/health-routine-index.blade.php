@@ -78,47 +78,24 @@
 
                     <div class="flex flex-wrap gap-2">
                         <a data-write href="{{ route('health.appointments.index', ['rotina' => $escolhida->id]) }}" class="btn-primary px-3 py-1.5 text-sm">+ Consulta neste ciclo</a>
-                        <button type="button" data-write wire:click="openRequest" class="btn-secondary px-3 py-1.5 text-sm">+ Exame pedido</button>
+                        <a data-write href="{{ route('health.exams.create', ['rotina' => $escolhida->id]) }}" wire:navigate class="btn-secondary px-3 py-1.5 text-sm">+ Pedido de exames</a>
                     </div>
-
-                    @if ($showRequest)
-                        <form wire:submit="saveRequest" class="space-y-3 rounded-xl border border-dashed border-slate-200 p-3 dark:border-white/10">
-                            <div class="grid gap-3 sm:grid-cols-3">
-                                <div>
-                                    <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Tipo</label>
-                                    <select wire:model="requestKind" class="select mt-1.5 w-full"><option value="exam">Exame</option><option value="consultation">Consulta</option></select>
-                                </div>
-                                <div>
-                                    <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">O que foi pedido</label>
-                                    <input type="text" wire:model="requestTitle" class="input mt-1.5" placeholder="Ex.: Hemograma">
-                                </div>
-                                <div>
-                                    <label class="block text-xs font-medium text-slate-500 dark:text-slate-400">Quem pediu (opcional)</label>
-                                    <input type="text" wire:model="requestBy" class="input mt-1.5">
-                                </div>
-                            </div>
-                            <x-form-consequence :lines="\App\Support\Forms\FormConsequence::healthRequest()" />
-                            <x-form-errors />
-                            <button type="submit" class="btn-primary px-3 py-1.5 text-sm">Guardar pedido</button>
-                        </form>
-                    @endif
 
                     @if ($pedidos->isNotEmpty())
                         <div>
-                            <p class="eyebrow">Pedidos sem data</p>
-                            <ul class="mt-2 space-y-2">
-                                @foreach ($pedidos as $p)
-                                    <li class="rounded-xl border border-amber-200 p-3 dark:border-amber-500/30" wire:key="pedido-{{ $p->id }}">
-                                        <div class="flex flex-wrap items-center justify-between gap-2">
-                                            <span class="min-w-0 text-sm text-slate-800 dark:text-slate-200">{{ $p->kind->label() }}: {{ $p->title }}</span>
-                                            <span class="flex items-center gap-2">
-                                                <button type="button" data-write wire:click="startScheduling('{{ $p->id }}')" class="btn-secondary px-3 py-1 text-xs">Marcar data</button>
-                                                <button type="button" data-write wire:click="deleteRequest('{{ $p->id }}')" wire:confirm="Excluir este pedido?" class="text-xs text-slate-400 hover:text-red-700">Excluir</button>
-                                            </span>
-                                        </div>
-                                        @if ($schedulingId === $p->id)
-                                            @include('livewire.health.partials.schedule-request')
-                                        @endif
+                            <p class="eyebrow">Pedidos com exame sem data</p>
+                            @include('livewire.health.partials.pending-orders', ['pedidos' => $pedidos])
+                        </div>
+                    @endif
+
+                    @if ($outrosPedidos->isNotEmpty())
+                        <div data-pedidos-da-rotina>
+                            <p class="eyebrow">{{ $pedidos->isNotEmpty() ? 'Outros pedidos desta rotina' : 'Pedidos de exame desta rotina' }}</p>
+                            <ul class="mt-2 divide-y divide-slate-100 dark:divide-white/10">
+                                @foreach ($outrosPedidos as $p)
+                                    <li class="py-2" wire:key="todos-{{ $p->id }}">
+                                        <a href="{{ route('health.exams.show', $p->id) }}" wire:navigate class="text-sm text-slate-800 hover:underline dark:text-slate-200">{{ $p->requested_on?->format('d/m/Y') }} · {{ $p->title }}</a>
+                                        <span class="text-xs text-slate-400">({{ $p->items->whereNotNull('report_id')->count() }} de {{ $p->items->count() }} com resultado)</span>
                                     </li>
                                 @endforeach
                             </ul>

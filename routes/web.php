@@ -221,7 +221,7 @@ Route::middleware(['auth', 'verified', 'termos', 'dois-passos', 'cuidado'])->gro
     Route::post('/pessoas/sair', [\App\Http\Controllers\CareSwitchController::class, 'leave'])->name('care.exit');
     Route::post('/pessoas/{profile}/abrir', [\App\Http\Controllers\CareSwitchController::class, 'open'])->name('care.open');
     // Link dos avisos (e-mail e push): escolhe a pessoa e vai direto à agenda ou aos cuidados dela. Só escolhe o contexto, depois de autorizar.
-    Route::get('/pessoas/{profile}/ir/{destino}', [\App\Http\Controllers\CareSwitchController::class, 'goto'])->whereIn('destino', ['agenda', 'cuidados', 'financas', 'rotinas'])->name('care.goto');
+    Route::get('/pessoas/{profile}/ir/{destino}', [\App\Http\Controllers\CareSwitchController::class, 'goto'])->whereIn('destino', ['agenda', 'cuidados', 'financas', 'rotinas', 'exames'])->name('care.goto');
 
     Route::middleware('assinatura')->group(function (): void {
         Route::get('/painel', Dashboard::class)->name('dashboard');
@@ -281,6 +281,13 @@ Route::middleware(['auth', 'verified', 'termos', 'dois-passos', 'cuidado'])->gro
         Route::get('/saude/acompanhamentos', \App\Livewire\Health\HealthFollowupIndex::class)->name('health.followups.index');
         Route::get('/saude/acompanhamentos/{followup}', \App\Livewire\Health\HealthFollowupShow::class)->name('health.followups.show');
         Route::get('/saude/acompanhamentos/{followup}/resumo.pdf', \App\Http\Controllers\HealthFollowupPdfController::class)->name('health.followups.pdf');
+        // Pedidos de exame e resultados. Os caminhos fixos vêm antes de {pedido}.
+        Route::get('/saude/exames', \App\Livewire\Health\Exams\HealthExamIndex::class)->name('health.exams.index');
+        Route::get('/saude/exames/novo', \App\Livewire\Health\Exams\HealthExamBuilder::class)->name('health.exams.create');
+        Route::get('/saude/exames/resultados', \App\Livewire\Health\Exams\HealthExamResults::class)->name('health.exams.results');
+        Route::get('/saude/exames/resultado', \App\Livewire\Health\Exams\HealthExamResultForm::class)->name('health.exams.manual');
+        Route::get('/saude/exames/laudos/{leitura}', \App\Livewire\Health\Exams\HealthExamResultForm::class)->name('health.exams.reading');
+        Route::get('/saude/exames/{pedido}', \App\Livewire\Health\Exams\HealthExamShow::class)->name('health.exams.show');
         // Evento para a agenda da pessoa (.ics); mesma restrição das telas de onde sai.
         Route::get('/saude/agenda/{appointment}/evento.ics', [HealthCalendarController::class, 'appointment'])->name('health.appointments.ics');
         Route::get('/saude/cuidados/{item}/evento.ics', [HealthCalendarController::class, 'careItem'])->name('health.care.ics');

@@ -3,7 +3,6 @@
 namespace App\Services;
 
 use App\Enums\DocumentCategory;
-use App\Enums\HealthAppointmentKind;
 use App\Enums\HealthAppointmentStatus;
 use App\Enums\HealthFollowupStatus;
 use App\Models\Document;
@@ -118,58 +117,24 @@ class HealthFollowupService
      */
     public function requestExam(ProfileMember $membro, array $dados, ?HealthRoutine $rotina, ?HealthFollowup $acompanhamento, ?ProfileMember $autor): HealthExamRequest
     {
-        if ($rotina !== null && $rotina->member_id !== $membro->id) {
-            throw new InvalidArgumentException('A rotina é de outra pessoa.');
-        }
-
-        if ($acompanhamento !== null) {
-            $this->assertSamePerson($acompanhamento, $membro->id);
-        }
-
-        return HealthExamRequest::create([
-            'member_id' => $membro->id,
-            'kind' => HealthAppointmentKind::from($dados['kind'] ?? HealthAppointmentKind::Exam->value),
-            'title' => trim($dados['title']),
-            'requested_on' => ($dados['requested_on'] ?? null) ?: CarbonImmutable::today(),
-            'requested_by' => $this->blankToNull($dados['requested_by'] ?? null),
-            'routine_id' => $rotina?->id,
-            'followup_id' => $acompanhamento?->id,
-            'created_by_member_id' => $autor?->id,
-        ]);
+        return app(HealthExamService::class)->createOrder($membro, [
+            'title' => $dados['title'],
+            'requested_on' => $dados['requested_on'] ?? null,
+            'requested_by' => $dados['requested_by'] ?? null,
+            'items' => [['name' => $dados['title']]],
+        ], $rotina, $acompanhamento, $autor);
     }
 
-    /** Marcou a data: o pedido vira um compromisso da Agenda (com lembrete e avisos de sempre), ligado à mesma rotina e ao mesmo acompanhamento. */
+    /** Marca num compromisso só tudo o que o pedido ainda espera. Para separar em datas diferentes, ver HealthExamService::schedule. */
     public function scheduleRequest(HealthExamRequest $pedido, string $quando, ?ProfileMember $autor): HealthAppointment
     {
-        if ($pedido->appointment_id !== null) {
+        $pendentes = $pedido->items()->pending()->pluck('id')->all();
+
+        if ($pendentes === []) {
             throw new InvalidArgumentException('Este pedido já tem data marcada.');
         }
 
-        return DB::transaction(function () use ($pedido, $quando, $autor): HealthAppointment {
-            $membro = ProfileMember::query()->visibleHere()->findOrFail($pedido->member_id);
-            $consulta = app(HealthAppointmentService::class)->create($membro, [
-                'kind' => $pedido->kind,
-                'title' => $pedido->title,
-                'scheduled_at' => $quando,
-            ], $autor);
-
-            if ($pedido->routine_id !== null) {
-                $consulta->update(['routine_id' => $pedido->routine_id]);
-            }
-
-            $pedido->update(['appointment_id' => $consulta->id]);
-
-            if ($pedido->followup_id !== null) {
-                $this->attachAppointment(HealthFollowup::query()->findOrFail($pedido->followup_id), $consulta);
-            }
-
-            return $consulta;
-        });
-    }
-
-    public function deleteRequest(HealthExamRequest $pedido): void
-    {
-        $pedido->delete();
+        return app(HealthExamService::class)->schedule($pedido, $pendentes, $quando, null, $autor);
     }
 
     /** Liga um documento que já está guardado (da mesma pessoa, ou sem pessoa). Não muda quem pode vê-lo. */
@@ -247,10 +212,24 @@ class HealthFollowupService
             $linhas[] = $this->entry(CarbonImmutable::parse($acompanhamento->resolved_on->toDateString())->endOfDay(), 'status', 'Situação', 'Marcado como resolvido', null, $acompanhamento->id, null);
         }
 
+        // Os resultados dos pedidos deste acompanhamento, com a data do exame.
+        $laudos = \App\Models\HealthExamReport::query()->whereHas('request', fn ($q) => $q->where('followup_id', $acompanhamento->id))->with(['values', 'request', 'createdByUser'])->get();
+
+        foreach ($laudos as $r) {
+            $titulo = $r->exam_name ?? $r->request?->title ?? 'Resultado de exames';
+            $texto = $r->isValues() ? $r->values->count().($r->values->count() === 1 ? ' resultado guardado.' : ' resultados guardados.') : $r->conclusion;
+            $linhas[] = $this->entry(CarbonImmutable::parse($r->performed_on->toDateString())->setTime(12, 0), 'result', 'Resultado de exame', $titulo, $this->blankToNull(trim($texto."\n".(string) $r->highlight)), $r->id, $r, routine: null);
+        }
+
         usort($linhas, fn (array $a, array $b) => $a['date'] <=> $b['date']);
 
-        foreach ($acompanhamento->requests()->open()->with('createdByUser')->orderBy('requested_on')->get() as $p) {
-            $linhas[] = $this->entry(null, 'request', $p->kind->label().' pedido', $p->title, $p->requested_by !== null ? 'Pedido por '.$p->requested_by : null, $p->id, $p, pending: true);
+        foreach ($acompanhamento->requests()->open()->with(['createdByUser', 'items.appointment'])->orderBy('requested_on')->get() as $p) {
+            $esperando = $p->items->filter(fn ($i) => $i->status() === \App\Enums\HealthExamItemStatus::Pending)->pluck('name');
+            $texto = implode("\n", array_filter([
+                $esperando->count() === 1 && $esperando->first() === $p->title ? null : 'Falta agendar: '.$esperando->implode('; ').'.',
+                $p->requested_by !== null ? 'Pedido por '.$p->requested_by : null,
+            ]));
+            $linhas[] = $this->entry(null, 'request', $p->kind->label().' pedido', $p->title, $this->blankToNull($texto), $p->id, $p, pending: true);
         }
 
         return $linhas;
